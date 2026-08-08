@@ -4,16 +4,12 @@
  * Density: 1 mountain per 10% of terrain area, i.e. ~10% surface coverage.
  * Each mountain is a smooth radial bump (smoothstep falloff) added on top
  * of the base fbm terrain, updating both vertex positions and colours.
+ *
+ * Colours come from the shared weather palette so raised vertices match the
+ * base terrain under whatever tone render_weather last set.
  */
 
-function heightToColor(h) {
-    if (h < 4)   return [0.10, 0.25, 0.65];
-    if (h < 12)  return [0.75, 0.68, 0.48];
-    if (h < 130) { const t = h / 130;        return [0.22 + t*0.12, 0.42 + t*0.10, 0.12]; }
-    if (h < 300) { const t = (h-130) / 170;  return [0.40 + t*0.20, 0.35 + t*0.10, 0.25 + t*0.10]; }
-    const t = Math.min(1, (h-300) / 100);
-    return [0.55 + t*0.45, 0.55 + t*0.45, 0.60 + t*0.40];
-}
+import { heightToColor } from './weather-style.js';
 
 export function addMountains(terrain) {
     const { size, maxHeight } = terrain;

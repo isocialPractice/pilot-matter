@@ -5,6 +5,8 @@ import { Sky }              from './sky.js';
 import { CameraController } from './camera.js';
 import { HUD }              from './hud.js';
 import { addMountains }     from './mountains.js';
+import { Weather }          from './weather.js';
+import { applyHudTheme }    from './weather-style.js';
 
 class FlightSimulator {
     constructor() {
@@ -12,6 +14,9 @@ class FlightSimulator {
     }
 
     init() {
+        // Paint the HUD chrome from the same weather knobs as the 3D scene.
+        applyHudTheme();
+
         this.scene = new THREE.Scene();
 
         this.camera = new THREE.PerspectiveCamera(
@@ -31,6 +36,7 @@ class FlightSimulator {
         addMountains(this.terrain);
         this.aircraft = new Aircraft(this.scene);
         this.camera2  = new CameraController(this.camera, this.aircraft);
+        this.weather  = new Weather(this.scene, this.sky);
         this.hud      = new HUD();
 
         document.getElementById('loading').style.display = 'none';
@@ -55,6 +61,7 @@ class FlightSimulator {
         this.aircraft.update(dt, groundH);
         this.camera2.update();
         this.sky.update();
+        this.weather.update(dt, this.camera.position, this.aircraft.getRotation().y);
         this.hud.update(this.aircraft, this.camera2);
 
         this.renderer.render(this.scene, this.camera);

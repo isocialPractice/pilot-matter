@@ -6,6 +6,20 @@
     <title>3D Flight Simulator</title>
     <link href="favicon.png" rel="icon">
     <style>
+        /*
+         * The --weather-* custom properties are written at startup by
+         * applyHudTheme() in js/weather-style.js, so the HUD chrome tracks the
+         * same tone and time of day as the 3D scene. The values below are the
+         * fallbacks used before that runs.
+         */
+        :root {
+            --weather-accent: #ff8c42;
+            --weather-text:   #ffcf9b;
+            --weather-glow:   rgba(255, 140, 66, 0.45);
+            --weather-sky:    #1b1520;
+            --weather-panel:  rgba(8, 6, 12, 0.62);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,7 +28,7 @@
 
         body {
             overflow: hidden;
-            background: #000;
+            background: var(--weather-sky);
         }
 
         #canvas-container {
@@ -26,38 +40,48 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            color: #0f0;
+            color: var(--weather-text);
             font-family: 'Courier New', monospace;
             font-size: 16px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            text-shadow: 0 0 6px var(--weather-glow), 1px 1px 2px rgba(0, 0, 0, 0.8);
             pointer-events: none;
             z-index: 100;
         }
 
         #hud div {
             margin-bottom: 8px;
-            background: rgba(0, 0, 0, 0.4);
-            padding: 4px 8px;
+            background: var(--weather-panel);
+            border-left: 3px solid var(--weather-accent);
+            padding: 4px 10px;
             border-radius: 4px;
+            backdrop-filter: blur(2px);
+        }
+
+        #hud span {
+            color: var(--weather-accent);
+            font-weight: bold;
         }
 
         #controls-help {
             position: fixed;
             bottom: 20px;
             left: 20px;
-            color: #fff;
+            color: var(--weather-text);
             font-family: 'Courier New', monospace;
             font-size: 12px;
-            background: rgba(0, 0, 0, 0.5);
+            background: var(--weather-panel);
+            border: 1px solid var(--weather-accent);
             padding: 10px 15px;
             border-radius: 8px;
             pointer-events: none;
             z-index: 100;
+            backdrop-filter: blur(2px);
         }
 
         #controls-help h3 {
             margin-bottom: 8px;
-            color: #0f0;
+            color: var(--weather-accent);
+            letter-spacing: 2px;
         }
 
         #loading {
@@ -65,9 +89,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #fff;
-            font-family: Arial, sans-serif;
+            color: var(--weather-text);
+            font-family: 'Courier New', monospace;
             font-size: 24px;
+            text-shadow: 0 0 12px var(--weather-glow);
             z-index: 200;
         }
     </style>
@@ -82,6 +107,7 @@
         <div>ALTITUDE: <span id="hud-altitude">0</span> ft</div>
         <div>THROTTLE: <span id="hud-throttle">0</span>%</div>
         <div>CAMERA: <span id="hud-camera">CHASE</span></div>
+        <div>WEATHER: <span id="hud-weather">--</span></div>
     </div>
 
     <div id="controls-help">

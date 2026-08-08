@@ -1,9 +1,15 @@
+import { weatherLabel } from './weather-style.js';
+
 export class HUD {
     constructor() {
         this.speedElement = document.getElementById('hud-speed');
         this.altitudeElement = document.getElementById('hud-altitude');
         this.throttleElement = document.getElementById('hud-throttle');
         this.cameraElement = document.getElementById('hud-camera');
+        this.weatherElement = document.getElementById('hud-weather');
+
+        // Conditions are fixed for the session, so write them once
+        this.weatherElement.textContent = weatherLabel();
     }
 
     update(aircraft, cameraController) {

@@ -1,4 +1,15 @@
 import * as THREE from 'three';
+import { STYLE } from './weather-style.js';
+
+// Keep the airframe in the same tone as the sky and terrain, and let it carry
+// a little self-illumination so it stays readable in low light.
+const TONE = new THREE.Color(...STYLE.tone.tint);
+const toned = (hex) => new THREE.Color(hex).multiply(TONE);
+
+const airframeMaterial = (hex) => new THREE.MeshPhongMaterial({
+    color:    toned(hex),
+    emissive: toned(hex).multiplyScalar(STYLE.airframe.selfLight),
+});
 
 export class Aircraft {
     constructor(scene) {
@@ -23,8 +34,8 @@ export class Aircraft {
     createModel() {
         this.group = new THREE.Group();
 
-        const mat = new THREE.MeshPhongMaterial({ color: 0x4477aa });
-        const wingMat = new THREE.MeshPhongMaterial({ color: 0x3366aa });
+        const mat = airframeMaterial(0x4477aa);
+        const wingMat = airframeMaterial(0x3366aa);
 
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.5, 8, 8), mat);
         body.rotation.x = Math.PI / 2;
@@ -43,7 +54,7 @@ export class Aircraft {
 
         const nose = new THREE.Mesh(
             new THREE.ConeGeometry(0.5, 1.5, 8),
-            new THREE.MeshPhongMaterial({ color: 0xdddddd })
+            airframeMaterial(0xdddddd)
         );
         nose.rotation.x = -Math.PI / 2;
         nose.position.set(0, 0, 4.5);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { heightToColor } from './weather-style.js';
 
 // --- Noise functions ---
 
@@ -64,23 +65,8 @@ export class Terrain {
             h = Math.min(h, 1.0) * maxHeight;
             pos.setY(i, h);
 
-            // Vertex colour by height
-            let r, g, b;
-            if (h < 4) {
-                r = 0.10; g = 0.25; b = 0.65;
-            } else if (h < 12) {
-                r = 0.75; g = 0.68; b = 0.48;
-            } else if (h < 130) {
-                const t = h / 130;
-                r = 0.22 + t * 0.12; g = 0.42 + t * 0.10; b = 0.12;
-            } else if (h < 300) {
-                const t = (h - 130) / 170;
-                r = 0.40 + t * 0.20; g = 0.35 + t * 0.10; b = 0.25 + t * 0.10;
-            } else {
-                const t = Math.min(1, (h - 300) / 100);
-                r = 0.55 + t * 0.45; g = 0.55 + t * 0.45; b = 0.60 + t * 0.40;
-            }
-            colors.push(r, g, b);
+            // Vertex colour by height, tinted by the active weather tone
+            colors.push(...heightToColor(h));
         }
 
         geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));

@@ -57,16 +57,42 @@ Then open `http://localhost:8080` in your browser.
 
 ```
 pilot-matter/
-├── index.html          # Entry point — HUD markup, import map, styles
+├── index.html                    # Entry point - HUD markup, import map, styles
+├── assets/weather/               # Cloud, rain and moon SVGs used by the effects layer
+├── local-weather-style/
+│   └── STYLE.md                  # How to restyle the app from weather directives
 └── js/
-    ├── main.js         # Scene setup, render loop
-    ├── aircraft.js     # Arcade flight physics and 3D model
-    ├── terrain.js      # Procedural fBm terrain with vertex colours
-    ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
-    ├── camera.js       # Fixed chase camera
-    ├── sky.js          # Lighting and atmospheric fog
-    └── hud.js          # On-screen instrument display
+    ├── main.js                   # Scene setup, render loop
+    ├── aircraft.js               # Arcade flight physics and 3D model
+    ├── terrain.js                # Procedural fBm terrain with vertex colours
+    ├── mountains.js              # Random mountain placement algorithm (~10% coverage)
+    ├── camera.js                 # Fixed chase camera
+    ├── sky.js                    # Lighting, atmospheric fog and lightning flash
+    ├── weather.js                # Cloud deck, rain, sun or moon, storm timing
+    ├── weather-style.js          # Weather knobs and the palette every module reads
+    └── hud.js                    # On-screen instrument display
 ```
+
+## Local Weather Styling
+
+The whole scene is themed from three knobs in `js/weather-style.js`: time of day,
+temperature tone, and precipitation. Changing them repaints the sky and fog,
+retints the terrain, the airframe and the HUD, and turns the effects layer on or
+off - a drifting cloud deck, falling rain, a sun or moon, and lightning that
+flashes the sky and both lights.
+
+```javascript
+export const WEATHER = {
+    timeOfDay:     'night',    // day | night
+    temperature:   'hot',      // hot | medium | cold
+    precipitation: 'stormy',   // sunny | cloudy | stormy
+};
+```
+
+Rain and the celestial sprite ride with the camera and the cloud deck wraps
+around it, so the aircraft cannot fly out of the weather. See
+[`local-weather-style/STYLE.md`](local-weather-style/STYLE.md) for the full
+contract and the rules for changing it.
 
 ## How the Terrain Works
 
