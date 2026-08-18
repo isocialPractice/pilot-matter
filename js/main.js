@@ -5,6 +5,7 @@ import { Sky }              from './sky.js';
 import { CameraController } from './camera.js';
 import { HUD }              from './hud.js';
 import { addMountains }     from './mountains.js';
+import { createPauseState, applyPauseKey, simulationDelta } from './pause.js';
 
 class FlightSimulator {
     constructor() {
@@ -35,6 +36,10 @@ class FlightSimulator {
 
         document.getElementById('loading').style.display = 'none';
 
+        this.pauseState      = createPauseState();
+        this.pausedIndicator = document.getElementById('paused');
+        this.setupPause();
+
         window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
@@ -45,10 +50,20 @@ class FlightSimulator {
         this.animate();
     }
 
+    setupPause() {
+        window.addEventListener('keydown', (e) => {
+            if (applyPauseKey(this.pauseState, e.code, true, e.repeat)) {
+                this.pausedIndicator.style.display = this.pauseState.paused ? 'block' : 'none';
+            }
+        });
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        const dt          = this.clock.getDelta();
+        // The clock is always read so the time spent paused is discarded
+        // rather than applied in one jump on the frame the sim resumes.
+        const dt          = simulationDelta(this.pauseState, this.clock.getDelta());
         const aircraftPos = this.aircraft.getPosition();
         const groundH     = this.terrain.getTerrainHeightAt(aircraftPos.x, aircraftPos.z);
 

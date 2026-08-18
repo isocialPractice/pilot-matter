@@ -51,8 +51,33 @@ surface. Completing items in this section applies a minor version update.
 - [ ] Add crash detection: hitting terrain above a vertical-speed threshold
   triggers a brief crash state and auto-reset, instead of silently clamping
   to ground height
-- [ ] Add pause (`P`) that stops the simulation clock and shows a paused
-  indicator
+
+## Game UI/UX
+
+Player-facing interface and experience around the flight model, beyond the
+raw instrument readout. Completing items in this section applies a minor
+version update.
+
+- [ ] Add a title screen overlay shown before the first flight, with the
+  game name and a "press any key to start" prompt
+- [ ] Add a pause menu built on the pause state, with Resume, Reset Flight,
+  and Controls entries selectable by keyboard
+- [ ] Add a controls-help toggle (`H`) that collapses the on-screen control
+  list down to a single hint line
+- [ ] Add a HUD visibility toggle (`Tab`) for clean flying, persisting the
+  choice in `localStorage` across sessions
+- [ ] Add an attitude indicator to the HUD with a pitch ladder and bank
+  angle marks
+- [ ] Add a minimap in a screen corner showing aircraft position and heading
+  within the terrain bounds
+- [ ] Add engine and wind audio that track throttle and airspeed, with a
+  mute toggle (`M`)
+- [ ] Add a settings panel (`O`) for control sensitivity, fog density, and
+  HUD units (knots/mph, ft/m)
+- [ ] Add on-screen touch controls so the simulator is playable on a phone
+  or tablet without a keyboard
+- [ ] Add a photo mode (`F2`) that hides every overlay for one frame and
+  downloads the rendered canvas as a PNG
 
 ## Camera & HUD
 
@@ -114,3 +139,12 @@ in this section applies a patch version update.
 - [x] Update the README controls table to match the in-game help once yaw
   and camera cycling exist (add `Q`/`E` and `C` rows)
   - From: Documentation & Polish
+- [x] Start gameplay with an **AIRSPEED** value of `0 knots`
+  - From: `version.control = null`
+- [x] Add **Game UI/UX** (*underneath `Flight Model & Controls`*) section, and
+  create 10 todo items for it
+  - From: `version.control = null`
+- [x] Add pause feature, using keypress `P`
+  - From: Game UI/UX
+- [x] Update `index.html` GitHub Pages demo to reflect current status of application
+  - From: `version.control = null`

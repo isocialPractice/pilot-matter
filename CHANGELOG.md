@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0-alpha] - 2026-08-18
+
+### Added
+
+- Pause with the `P` key: the simulation clock latches at zero, a `PAUSED`
+  indicator appears over the frozen frame, and pressing `P` again resumes
+  without applying the time spent paused
+- `js/pause.js`, a pure module holding the pause toggle rules (latch on
+  keydown, ignore key release and auto-repeat) and the frozen simulation
+  delta, with unit tests
+- `js/flight-state.js`, a pure module defining the starting condition
+  gameplay begins from and `R` resets back to, with unit tests asserting
+  flight starts at an airspeed of 0 knots
+- `P - Pause` row in the on-screen controls help and the README controls
+  table, and a page description for link previews of the demo page
+
+### Changed
+
+- The aircraft constructor and `reset()` now read their starting position,
+  rotation, and speed from `js/flight-state.js` instead of repeating literal
+  values, so the 0-knot start has a single source of truth
+
 ## [1.1.0-alpha] - 2026-08-18
 
 ### Added

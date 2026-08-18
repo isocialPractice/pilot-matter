@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { createInputState, applyKeyToInput } from './input-map.js';
+import { createFlightState } from './flight-state.js';
 
 export class Aircraft {
     constructor(scene) {
         this.scene = scene;
-        this.position = new THREE.Vector3(0, 300, 0);
-        this.rotation = new THREE.Euler(0, 0, 0, 'YXZ');
-        this.speed = 0;
+
+        const start = createFlightState();
+        this.position = new THREE.Vector3(start.position.x, start.position.y, start.position.z);
+        this.rotation = new THREE.Euler(start.rotation.x, start.rotation.y, start.rotation.z, 'YXZ');
+        this.speed = start.speed;
+
         this.minSpeed = 40;
         this.maxSpeed = 200;
         this.gravity = 12;
@@ -64,9 +68,10 @@ export class Aircraft {
     }
 
     reset() {
-        this.position.set(0, 300, 0);
-        this.rotation.set(0, 0, 0);
-        this.speed = 0;
+        const start = createFlightState();
+        this.position.set(start.position.x, start.position.y, start.position.z);
+        this.rotation.set(start.rotation.x, start.rotation.y, start.rotation.z);
+        this.speed = start.speed;
     }
 
     update(dt, terrainHeight = 0) {

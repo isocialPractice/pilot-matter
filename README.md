@@ -15,6 +15,7 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Atmospheric fog** — exponential fog fades the world to sky blue in the distance, hiding terrain edges and giving the illusion of an infinite world
 - **Three camera modes** — chase, cockpit, and orbit views, cycled with the `C` key
 - **HUD** — live readout of airspeed (knots), altitude (ft), throttle (%), and camera mode
+- **Pause** - freeze the simulation with `P`; the world stays on screen behind a paused indicator and no flight time passes while it is held
 - **Zero build step** — runs directly in the browser via ES modules and an import map
 
 ## Getting Started
@@ -53,9 +54,14 @@ Then open `http://localhost:8080` in your browser.
 | `Shift` | Throttle up |
 | `Ctrl` | Throttle down |
 | `C` | Cycle camera (chase, cockpit, orbit) |
+| `P` | Pause / resume |
 | `R` | Reset aircraft to starting position |
 
-**Tip:** The aircraft is always subject to gravity. Apply throttle and pitch up gently to climb and maintain altitude.
+**Tip:** Flight begins at 0 knots and the aircraft is always subject to gravity. Apply throttle first, then pitch up gently to climb and maintain altitude.
+
+### Pausing
+
+`P` latches the simulation clock at zero: the flight model, gravity, and the orbit camera all stop, a `PAUSED` indicator appears, and the last frame stays on screen. Pressing `P` again resumes from exactly where the flight left off, with the time spent paused discarded rather than applied in one jump.
 
 ## Project Structure
 
@@ -65,7 +71,9 @@ pilot-matter/
 ├── js/
 │   ├── main.js         # Scene setup, render loop
 │   ├── aircraft.js     # Arcade flight physics and 3D model
+│   ├── flight-state.js # Pure starting conditions (0 knots, 300 units up)
 │   ├── input-map.js    # Pure keyboard-to-input-state mapping
+│   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── terrain.js      # Procedural fBm terrain with vertex colours
 │   ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
 │   ├── camera.js       # Chase, cockpit, and orbit cameras
@@ -76,8 +84,9 @@ pilot-matter/
 
 ## Testing
 
-Unit tests cover the pure logic (unit conversions, input mapping, mountain
-count formula) and run on Node 18+ with no dependencies to install:
+Unit tests cover the pure logic (unit conversions, input mapping, starting
+flight state, pause toggling, mountain count formula) and run on Node 18+
+with no dependencies to install:
 
 ```bash
 npm test        # or: node --test

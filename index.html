@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Pilot Matter - a browser-based Three.js flight simulator over procedurally generated terrain, with no build step.">
     <title>3D Flight Simulator</title>
     <link href="favicon.png" rel="icon">
     <style>
@@ -70,12 +71,41 @@
             font-size: 24px;
             z-index: 200;
         }
+
+        #paused {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 40px;
+            letter-spacing: 6px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(0, 255, 0, 0.4);
+            padding: 20px 40px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        #paused small {
+            display: block;
+            margin-top: 10px;
+            color: #f0f2f3;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
     <div id="loading">Loading Flight Simulator...</div>
 
     <div id="canvas-container"></div>
+
+    <div id="paused">PAUSED<small>PRESS P TO RESUME</small></div>
 
     <div id="hud">
         <div>AIRSPEED: <span id="hud-speed">0</span> knots</div>
@@ -92,6 +122,7 @@
         Shift - Throttle Up<br>
         Ctrl - Throttle Down<br>
         C - Cycle Camera<br>
+        P - Pause<br>
         R - Reset Position
     </div>
 
