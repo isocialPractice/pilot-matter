@@ -15,15 +15,23 @@ function heightToColor(h) {
     return [0.55 + t*0.45, 0.55 + t*0.45, 0.60 + t*0.40];
 }
 
+/**
+ * Mountain count for ~10% area coverage of a square terrain.
+ * Pure function (no Three.js) so the formula can be unit tested in Node.
+ * count = (size^2 * coverage) / (pi * avgRadius^2), floored at 5.
+ */
+export function mountainCount(size, coverage = 0.10, avgRadius = 750) {
+    const avgArea     = Math.PI * avgRadius * avgRadius;
+    const terrainArea = size * size;
+    return Math.max(5, Math.round(terrainArea * coverage / avgArea));
+}
+
 export function addMountains(terrain) {
     const { size, maxHeight } = terrain;
 
     // --- Calculate mountain count for ~10% area coverage ---
-    const avgRadius     = 750;                              // average mountain radius (units)
-    const avgArea       = Math.PI * avgRadius * avgRadius;  // ≈ 1,767,000 sq units
-    const terrainArea   = size * size;                      // 256,000,000 sq units
-    const coverage      = 0.10;
-    const count         = Math.max(5, Math.round(terrainArea * coverage / avgArea)); // ≈ 14-15
+    const avgRadius = 750;                        // average mountain radius (units)
+    const count     = mountainCount(size, 0.10, avgRadius); // 14-15 for a 16000-unit terrain
 
     // --- Place mountains randomly, keeping them away from the terrain edge ---
     const margin = size * 0.10;

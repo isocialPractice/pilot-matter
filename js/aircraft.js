@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createInputState, applyKeyToInput } from './input-map.js';
 
 export class Aircraft {
     constructor(scene) {
@@ -10,11 +11,7 @@ export class Aircraft {
         this.maxSpeed = 200;
         this.gravity = 12;
 
-        this.input = {
-            pitchUp: false, pitchDown: false,
-            rollLeft: false, rollRight: false,
-            throttleUp: false, throttleDown: false
-        };
+        this.input = createInputState();
 
         this.createModel();
         this.setupControls();
@@ -59,21 +56,11 @@ export class Aircraft {
     }
 
     onKey(e, down) {
-        switch (e.code) {
-            case 'KeyW': case 'ArrowUp':    this.input.pitchUp = down; break;
-            case 'KeyS': case 'ArrowDown':  this.input.pitchDown = down; break;
-            case 'KeyA': case 'ArrowLeft':  this.input.rollLeft = down; break;
-            case 'KeyD': case 'ArrowRight': this.input.rollRight = down; break;
-            case 'ShiftLeft': case 'ShiftRight':
-                this.input.throttleUp = down;
-                if (down) e.preventDefault();
-                break;
-            case 'ControlLeft': case 'ControlRight':
-                this.input.throttleDown = down;
-                if (down) e.preventDefault();
-                break;
-            case 'KeyR': if (down) this.reset(); break;
+        const changed = applyKeyToInput(this.input, e.code, down);
+        if (down && (changed === 'throttleUp' || changed === 'throttleDown')) {
+            e.preventDefault();
         }
+        if (e.code === 'KeyR' && down) this.reset();
     }
 
     reset() {
@@ -103,6 +90,10 @@ export class Aircraft {
         if (!this.input.rollLeft && !this.input.rollRight) {
             this.rotation.z *= (1 - dt * 1.5);
         }
+
+        // Yaw: Q = nose left, E = nose right
+        if (this.input.yawLeft)  this.rotation.y += 0.8 * dt;
+        if (this.input.yawRight) this.rotation.y -= 0.8 * dt;
 
         // Banking roll causes yaw (coordinated turn)
         this.rotation.y -= Math.sin(this.rotation.z) * 1.2 * dt;

@@ -1,3 +1,12 @@
+// Unit conversions (approximate, tuned for arcade feel). Kept as pure
+// exported functions so they can be unit tested in Node without a DOM.
+export const KNOTS_PER_UNIT = 2;
+export const FEET_PER_UNIT  = 3.28;
+
+export function speedToKnots(speed)       { return Math.round(speed * KNOTS_PER_UNIT); }
+export function altitudeToFeet(altitude)  { return Math.round(altitude * FEET_PER_UNIT); }
+export function throttleToPercent(throttle) { return Math.round(throttle * 100); }
+
 export class HUD {
     constructor() {
         this.speedElement = document.getElementById('hud-speed');
@@ -7,20 +16,9 @@ export class HUD {
     }
 
     update(aircraft, cameraController) {
-        // Convert units for display
-        // Speed: internal units to knots (approximate conversion for arcade feel)
-        const speedKnots = Math.round(aircraft.getSpeed() * 2);
-
-        // Altitude: internal units to feet (approximate)
-        const altitudeFeet = Math.round(aircraft.getAltitude() * 3.28);
-
-        // Throttle as percentage
-        const throttlePercent = Math.round(aircraft.getThrottle() * 100);
-
-        // Update HUD elements
-        this.speedElement.textContent = speedKnots;
-        this.altitudeElement.textContent = altitudeFeet;
-        this.throttleElement.textContent = throttlePercent;
+        this.speedElement.textContent = speedToKnots(aircraft.getSpeed());
+        this.altitudeElement.textContent = altitudeToFeet(aircraft.getAltitude());
+        this.throttleElement.textContent = throttleToPercent(aircraft.getThrottle());
         this.cameraElement.textContent = cameraController.getCurrentMode();
     }
 }

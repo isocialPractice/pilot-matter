@@ -53,7 +53,7 @@ class FlightSimulator {
         const groundH     = this.terrain.getTerrainHeightAt(aircraftPos.x, aircraftPos.z);
 
         this.aircraft.update(dt, groundH);
-        this.camera2.update();
+        this.camera2.update(dt);
         this.sky.update();
         this.hud.update(this.aircraft, this.camera2);
 

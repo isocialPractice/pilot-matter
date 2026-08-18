@@ -1,0 +1,10 @@
+{
+  "name": "pilot-matter",
+  "version": "1.1.0-alpha",
+  "description": "Browser-based Three.js flight simulator over procedurally generated terrain, with no build step",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -13,7 +13,8 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Random mountains** — a dedicated algorithm scatters mountains across ~10% of the terrain surface using smooth radial bumps
 - **Height-based vertex colouring** — water, sand, grass, rock, and snow rendered purely through vertex colours, no textures needed
 - **Atmospheric fog** — exponential fog fades the world to sky blue in the distance, hiding terrain edges and giving the illusion of an infinite world
-- **HUD** — live readout of airspeed (knots), altitude (ft), and throttle (%)
+- **Three camera modes** — chase, cockpit, and orbit views, cycled with the `C` key
+- **HUD** — live readout of airspeed (knots), altitude (ft), throttle (%), and camera mode
 - **Zero build step** — runs directly in the browser via ES modules and an import map
 
 ## Getting Started
@@ -47,8 +48,11 @@ Then open `http://localhost:8080` in your browser.
 | `S` / `↓` | Pitch down (nose down) |
 | `A` / `←` | Roll left |
 | `D` / `→` | Roll right |
+| `Q` | Yaw left |
+| `E` | Yaw right |
 | `Shift` | Throttle up |
 | `Ctrl` | Throttle down |
+| `C` | Cycle camera (chase, cockpit, orbit) |
 | `R` | Reset aircraft to starting position |
 
 **Tip:** The aircraft is always subject to gravity. Apply throttle and pitch up gently to climb and maintain altitude.
@@ -58,14 +62,25 @@ Then open `http://localhost:8080` in your browser.
 ```
 pilot-matter/
 ├── index.html          # Entry point — HUD markup, import map, styles
-└── js/
-    ├── main.js         # Scene setup, render loop
-    ├── aircraft.js     # Arcade flight physics and 3D model
-    ├── terrain.js      # Procedural fBm terrain with vertex colours
-    ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
-    ├── camera.js       # Fixed chase camera
-    ├── sky.js          # Lighting and atmospheric fog
-    └── hud.js          # On-screen instrument display
+├── js/
+│   ├── main.js         # Scene setup, render loop
+│   ├── aircraft.js     # Arcade flight physics and 3D model
+│   ├── input-map.js    # Pure keyboard-to-input-state mapping
+│   ├── terrain.js      # Procedural fBm terrain with vertex colours
+│   ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
+│   ├── camera.js       # Chase, cockpit, and orbit cameras
+│   ├── sky.js          # Lighting and atmospheric fog
+│   └── hud.js          # On-screen instrument display
+└── test/               # Zero-dependency node:test unit tests
+```
+
+## Testing
+
+Unit tests cover the pure logic (unit conversions, input mapping, mountain
+count formula) and run on Node 18+ with no dependencies to install:
+
+```bash
+npm test        # or: node --test
 ```
 
 ## How the Terrain Works
