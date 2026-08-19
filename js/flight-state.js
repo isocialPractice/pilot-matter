@@ -8,6 +8,10 @@
 // the HUD reads AIRSPEED 0 knots until the throttle is applied.
 export const INITIAL_SPEED = 0;
 
+// Throttle is the 0-1 lever setting, closed at the start of a flight so the
+// HUD reads THROTTLE 0% and airspeed has nothing to converge toward yet.
+export const INITIAL_THROTTLE = 0;
+
 // Altitude and position are in world units.
 export const INITIAL_ALTITUDE = 300;
 
@@ -18,6 +22,7 @@ export const INITIAL_ALTITUDE = 300;
 export function createFlightState() {
     return {
         speed: INITIAL_SPEED,
+        throttle: INITIAL_THROTTLE,
         position: { x: 0, y: INITIAL_ALTITUDE, z: 0 },
         rotation: { x: 0, y: 0, z: 0 }
     };

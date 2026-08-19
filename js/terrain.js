@@ -1,32 +1,5 @@
 import * as THREE from 'three';
-
-// --- Noise functions ---
-
-function hash(x, y) {
-    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-    return n - Math.floor(n);
-}
-
-function smoothNoise(x, y) {
-    const ix = Math.floor(x), iy = Math.floor(y);
-    const fx = x - ix,       fy = y - iy;
-    const ux = fx * fx * (3 - 2 * fx);
-    const uy = fy * fy * (3 - 2 * fy);
-    const a = hash(ix,   iy),   b = hash(ix+1, iy);
-    const c = hash(ix,   iy+1), d = hash(ix+1, iy+1);
-    return a + (b-a)*ux + (c-a)*uy + (a-b-c+d)*ux*uy;
-}
-
-function fbm(x, y, octaves = 7) {
-    let v = 0, amp = 0.5, freq = 1, max = 0;
-    for (let i = 0; i < octaves; i++) {
-        v   += amp * smoothNoise(x * freq, y * freq);
-        max += amp;
-        amp  *= 0.5;
-        freq *= 2.1;
-    }
-    return v / max;
-}
+import { fbm, shapeHeight, heightToColor } from './terrain-math.js';
 
 // --- Terrain ---
 
@@ -53,33 +26,12 @@ export class Terrain {
             const nx = x / size * 3.5;
             const nz = z / size * 3.5;
 
-            let h = fbm(nx, nz);
-
             // Flatten low areas into plains, exaggerate peaks
-            if (h < 0.38) {
-                h = h * 0.25;
-            } else {
-                h = 0.095 + Math.pow((h - 0.38) / 0.62, 1.4) * 0.9;
-            }
-            h = Math.min(h, 1.0) * maxHeight;
+            const h = shapeHeight(fbm(nx, nz), maxHeight);
             pos.setY(i, h);
 
             // Vertex colour by height
-            let r, g, b;
-            if (h < 4) {
-                r = 0.10; g = 0.25; b = 0.65;
-            } else if (h < 12) {
-                r = 0.75; g = 0.68; b = 0.48;
-            } else if (h < 130) {
-                const t = h / 130;
-                r = 0.22 + t * 0.12; g = 0.42 + t * 0.10; b = 0.12;
-            } else if (h < 300) {
-                const t = (h - 130) / 170;
-                r = 0.40 + t * 0.20; g = 0.35 + t * 0.10; b = 0.25 + t * 0.10;
-            } else {
-                const t = Math.min(1, (h - 300) / 100);
-                r = 0.55 + t * 0.45; g = 0.55 + t * 0.45; b = 0.60 + t * 0.40;
-            }
+            const [r, g, b] = heightToColor(h);
             colors.push(r, g, b);
         }
 

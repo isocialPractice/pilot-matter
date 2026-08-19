@@ -6,14 +6,7 @@
  * of the base fbm terrain, updating both vertex positions and colours.
  */
 
-function heightToColor(h) {
-    if (h < 4)   return [0.10, 0.25, 0.65];
-    if (h < 12)  return [0.75, 0.68, 0.48];
-    if (h < 130) { const t = h / 130;        return [0.22 + t*0.12, 0.42 + t*0.10, 0.12]; }
-    if (h < 300) { const t = (h-130) / 170;  return [0.40 + t*0.20, 0.35 + t*0.10, 0.25 + t*0.10]; }
-    const t = Math.min(1, (h-300) / 100);
-    return [0.55 + t*0.45, 0.55 + t*0.45, 0.60 + t*0.40];
-}
+import { mountainBump, heightToColor } from './terrain-math.js';
 
 /**
  * Mountain count for ~10% area coverage of a square terrain.
@@ -61,12 +54,9 @@ export function addMountains(terrain) {
             const dx   = x - m.x;
             const dz   = z - m.z;
             const dist = Math.sqrt(dx*dx + dz*dz);
-            if (dist >= m.radius) continue;
 
             // Smoothstep falloff — sharp enough to read as a mountain
-            const t  = 1 - dist / m.radius;
-            const st = t * t * (3 - 2 * t);
-            added   += m.peak * st;
+            added += mountainBump(dist, m.radius, m.peak);
         }
 
         if (added > 0) {

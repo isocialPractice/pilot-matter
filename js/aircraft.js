@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { createInputState, applyKeyToInput } from './input-map.js';
 import { createFlightState } from './flight-state.js';
+import {
+    MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY,
+    updateThrottle, targetSpeed, convergeSpeed, sinkRate
+} from './flight-model.js';
 
 export class Aircraft {
     constructor(scene) {
@@ -10,10 +14,12 @@ export class Aircraft {
         this.position = new THREE.Vector3(start.position.x, start.position.y, start.position.z);
         this.rotation = new THREE.Euler(start.rotation.x, start.rotation.y, start.rotation.z, 'YXZ');
         this.speed = start.speed;
+        this.throttle = start.throttle;
 
-        this.minSpeed = 40;
-        this.maxSpeed = 200;
-        this.gravity = 12;
+        this.minSpeed = MIN_SPEED;
+        this.cruiseSpeed = CRUISE_SPEED;
+        this.maxSpeed = MAX_SPEED;
+        this.gravity = GRAVITY;
 
         this.input = createInputState();
 
@@ -72,14 +78,16 @@ export class Aircraft {
         this.position.set(start.position.x, start.position.y, start.position.z);
         this.rotation.set(start.rotation.x, start.rotation.y, start.rotation.z);
         this.speed = start.speed;
+        this.throttle = start.throttle;
     }
 
     update(dt, terrainHeight = 0) {
         dt = Math.min(dt, 0.05);
 
-        // Throttle controls speed directly
-        if (this.input.throttleUp)   this.speed = Math.min(this.maxSpeed, this.speed + 80 * dt);
-        if (this.input.throttleDown) this.speed = Math.max(0, this.speed - 80 * dt);
+        // Shift and Ctrl move the throttle lever, and speed chases the
+        // setting rather than jumping with the key
+        this.throttle = updateThrottle(this.throttle, this.input, dt);
+        this.speed = convergeSpeed(this.speed, targetSpeed(this.throttle, this.maxSpeed), dt);
 
         // Pitch: W = nose up, S = nose down
         if (this.input.pitchUp)   this.rotation.x += 1.2 * dt;
@@ -108,8 +116,13 @@ export class Aircraft {
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
         this.position.addScaledVector(forward, this.speed * dt);
 
-        // Gravity pulls down always
-        this.position.y -= this.gravity * dt;
+        // Lift is read off airspeed: a stalled wing drops hard, cruise speed
+        // cancels gravity and holds altitude in level flight
+        this.position.y -= sinkRate(this.speed, {
+            gravity: this.gravity,
+            minSpeed: this.minSpeed,
+            cruiseSpeed: this.cruiseSpeed
+        }) * dt;
 
         // Ground collision
         const minY = terrainHeight + 5;
@@ -126,5 +139,5 @@ export class Aircraft {
     getQuaternion(){ return new THREE.Quaternion().setFromEuler(this.rotation); }
     getSpeed()     { return this.speed; }
     getAltitude()  { return this.position.y; }
-    getThrottle()  { return this.speed / this.maxSpeed; }
+    getThrottle()  { return this.throttle; }
 }

@@ -8,7 +8,8 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 
 ## Features
 
-- **Arcade flight model** — throttle up, pitch, roll, and bank through coordinated turns
+- **Arcade flight model** — pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases
+- **Airspeed-driven lift** — hold cruise speed and level flight holds altitude; let the speed decay and the wing stalls and drops
 - **Procedural terrain** — multi-octave fractal Brownian motion (fBm) noise generates a unique landscape every time
 - **Random mountains** — a dedicated algorithm scatters mountains across ~10% of the terrain surface using smooth radial bumps
 - **Height-based vertex colouring** — water, sand, grass, rock, and snow rendered purely through vertex colours, no textures needed
@@ -26,7 +27,14 @@ A modern browser with ES module support (Chrome, Firefox, Edge, Safari). No Node
 
 ### Running locally
 
-Because ES modules require a server context, open the project with any static file server. The simplest options:
+Because ES modules require a server context, open the project with any static file server. The bundled one needs no install and no dependencies:
+
+```bash
+npm run serve           # http://localhost:8080
+npm run serve -- 3000   # or pick another port (the PORT variable works too)
+```
+
+Any other static server works just as well:
 
 ```bash
 # Python
@@ -51,13 +59,13 @@ Then open `http://localhost:8080` in your browser.
 | `D` / `→` | Roll right |
 | `Q` | Yaw left |
 | `E` | Yaw right |
-| `Shift` | Throttle up |
-| `Ctrl` | Throttle down |
+| `Shift` | Throttle up (hold to open the lever) |
+| `Ctrl` | Throttle down (hold to close it) |
 | `C` | Cycle camera (chase, cockpit, orbit) |
 | `P` | Pause / resume |
 | `R` | Reset aircraft to starting position |
 
-**Tip:** Flight begins at 0 knots and the aircraft is always subject to gravity. Apply throttle first, then pitch up gently to climb and maintain altitude.
+**Tip:** Flight begins at 0 knots with the throttle closed, which is a stall — open the throttle straight away. `Shift` and `Ctrl` move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on.
 
 ### Pausing
 
@@ -70,23 +78,28 @@ pilot-matter/
 ├── index.html          # Entry point — HUD markup, import map, styles
 ├── js/
 │   ├── main.js         # Scene setup, render loop
-│   ├── aircraft.js     # Arcade flight physics and 3D model
+│   ├── aircraft.js     # 3D model, and the frame loop the flight model drives
+│   ├── flight-model.js # Pure throttle, speed convergence, lift and stall math
 │   ├── flight-state.js # Pure starting conditions (0 knots, 300 units up)
 │   ├── input-map.js    # Pure keyboard-to-input-state mapping
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
+│   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
 │   ├── terrain.js      # Procedural fBm terrain with vertex colours
 │   ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
 │   ├── camera.js       # Chase, cockpit, and orbit cameras
 │   ├── sky.js          # Lighting and atmospheric fog
 │   └── hud.js          # On-screen instrument display
+├── tools/
+│   └── serve.mjs       # Zero-dependency static server behind `npm run serve`
 └── test/               # Zero-dependency node:test unit tests
 ```
 
 ## Testing
 
 Unit tests cover the pure logic (unit conversions, input mapping, starting
-flight state, pause toggling, mountain count formula) and run on Node 18+
-with no dependencies to install:
+flight state, throttle and lift math, pause toggling, terrain noise and
+mountain formulas, page metadata, and the static server's path and content
+type rules) and run on Node 18+ with no dependencies to install:
 
 ```bash
 npm test        # or: node --test
@@ -97,6 +110,8 @@ npm test        # or: node --test
 The terrain is a `16000 × 16000` unit `PlaneGeometry` (200 × 200 segments) whose vertices are displaced vertically by a **fractal Brownian motion** function — seven octaves of smooth value noise layered together. Low-frequency octaves define broad valleys and mountain ranges; high-frequency octaves add fine surface detail.
 
 A remapping curve flattens values below a threshold into wide plains and water, then exaggerates values above the threshold into steep peaks.
+
+The noise, the remapping curve, the mountain falloff, and the height-to-colour ramp all live in `js/terrain-math.js` as plain functions with no Three.js dependency, so the world's shape can be unit tested in Node.
 
 ### Mountains
 

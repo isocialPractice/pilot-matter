@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0-alpha] - 2026-08-19
+
+### Added
+
+- `js/flight-model.js`, a pure module holding the arcade physics rules -
+  throttle lever travel, speed convergence, lift, and the stall penalty -
+  with unit tests
+- `js/terrain-math.js`, a pure module holding the world's math - value
+  noise, fractal Brownian motion, the plains/peaks height curve, the
+  smoothstep mountain bump, and the height-to-colour ramp - with unit tests
+  covering range, determinism, and falloff
+- `npm run serve`, a zero-dependency static server for manual testing that
+  serves the project root on port 8080, with the port overridable by
+  argument or the `PORT` variable, and unit tests for its request path and
+  content type rules
+
+### Changed
+
+- Throttle is now a setting rather than a speed: `Shift` and `Ctrl` move a
+  0-100% lever over two seconds, airspeed converges toward the speed that
+  lever asks for, and the HUD throttle readout reports the setting instead
+  of the current speed
+- Lift is now read off airspeed, replacing the constant gravity sink: below
+  the stall speed the aircraft sinks up to twice as hard, easing off as
+  speed builds, and at cruise speed lift cancels gravity so level flight
+  holds altitude
+- The page title is now "Pilot Matter" rather than "3D Flight Simulator",
+  matching the favicon beside it in the browser tab
+- `js/terrain.js` and `js/mountains.js` now import their shared math and
+  colour ramp from `js/terrain-math.js` instead of each carrying a copy
+- Starting flight state gained a closed throttle, so a reset returns the
+  lever to 0% along with the 0-knot airspeed
+
 ## [1.2.0-alpha] - 2026-08-18
 
 ### Added

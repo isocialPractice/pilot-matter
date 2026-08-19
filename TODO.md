@@ -7,47 +7,28 @@ that applies when their items are completed.
 
 ## Current
 
-- [ ] Extract pure math helpers (noise/fBm from `js/terrain.js`, smoothstep
-  bump from `js/mountains.js`) into an importable module without DOM or
-  Three.js dependencies so they can be unit tested in Node
-  - From: Project Infrastructure
-- [ ] Add a `npm run serve` convenience script to the manifest that starts a
-  local static server for manual testing
-  - From: Project Infrastructure
-- [ ] Make throttle a target-based setting (0-100%) that speed converges
-  toward, instead of Shift/Ctrl directly adding and subtracting speed, so
-  `getThrottle()` reflects the setting rather than current speed
+- [ ] Add crash detection: hitting terrain above a vertical-speed threshold
+  triggers a brief crash state and auto-reset, instead of silently clamping
+  to ground height
   - From: Flight Model & Controls
-- [ ] Tie lift to airspeed: below `minSpeed` the aircraft sinks faster
-  (stall) and at cruise speed level flight holds altitude, replacing the
-  current constant-gravity sink
-  - From: Flight Model & Controls
-- [ ] Add a favicon-consistent page title ("Pilot Matter") to `index.html`,
-  which currently reads "3D Flight Simulator"
+- [ ] Document the flight model (lift, stall, throttle behavior) in a README
+  section once the Flight Model & Controls items land
   - From: Documentation & Polish
-
-## Project Infrastructure
-
-Foundation work so the automation can version, test, and release the
-project. Completing items in this section applies a patch version update.
-
-- [ ] Extract pure math helpers (noise/fBm from `js/terrain.js`, smoothstep
-  bump from `js/mountains.js`) into an importable module without DOM or
-  Three.js dependencies so they can be unit tested in Node
-- [ ] Add a `npm run serve` convenience script to the manifest that starts a
-  local static server for manual testing
+- [ ] Add a heading readout (compass degrees) and vertical speed indicator
+  (ft/min) to the HUD in `index.html` and `js/hud.js`
+  - From: Camera & HUD
+- [ ] Add a low-altitude warning to the HUD that activates when height
+  above terrain drops below a threshold
+  - From: Camera & HUD
+- [ ] Smooth the chase camera with positional lag/damping so turns and
+  pitch changes feel less rigid
+  - From: Camera & HUD
 
 ## Flight Model & Controls
 
 Deepen the arcade flight physics and complete the advertised control
 surface. Completing items in this section applies a minor version update.
 
-- [ ] Tie lift to airspeed: below `minSpeed` the aircraft sinks faster
-  (stall) and at cruise speed level flight holds altitude, replacing the
-  current constant-gravity sink
-- [ ] Make throttle a target-based setting (0-100%) that speed converges
-  toward, instead of Shift/Ctrl directly adding and subtracting speed, so
-  `getThrottle()` reflects the setting rather than current speed
 - [ ] Add crash detection: hitting terrain above a vertical-speed threshold
   triggers a brief crash state and auto-reset, instead of silently clamping
   to ground height
@@ -115,8 +96,6 @@ in this section applies a patch version update.
   progress/fade-in tied to first rendered frame
 - [ ] Document the flight model (lift, stall, throttle behavior) in a
   README section once the Flight Model & Controls items land
-- [ ] Add a favicon-consistent page title ("Pilot Matter") to `index.html`,
-  which currently reads "3D Flight Simulator"
 
 ## Complete
 
@@ -148,3 +127,21 @@ in this section applies a patch version update.
   - From: Game UI/UX
 - [x] Update `index.html` GitHub Pages demo to reflect current status of application
   - From: `version.control = null`
+- [x] Extract pure math helpers (noise/fBm from `js/terrain.js`, smoothstep
+  bump from `js/mountains.js`) into an importable module without DOM or
+  Three.js dependencies so they can be unit tested in Node
+  - From: Project Infrastructure
+- [x] Add a `npm run serve` convenience script to the manifest that starts a
+  local static server for manual testing
+  - From: Project Infrastructure
+- [x] Make throttle a target-based setting (0-100%) that speed converges
+  toward, instead of Shift/Ctrl directly adding and subtracting speed, so
+  `getThrottle()` reflects the setting rather than current speed
+  - From: Flight Model & Controls
+- [x] Tie lift to airspeed: below `minSpeed` the aircraft sinks faster
+  (stall) and at cruise speed level flight holds altitude, replacing the
+  current constant-gravity sink
+  - From: Flight Model & Controls
+- [x] Add a favicon-consistent page title ("Pilot Matter") to `index.html`,
+  which currently reads "3D Flight Simulator"
+  - From: Documentation & Polish
