@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import {
+    CHASE_POSITION_LAMBDA, CHASE_TARGET_LAMBDA,
+    damp, shouldSnap
+} from './camera-math.js';
 
 export const CAMERA_MODES = ['CHASE', 'COCKPIT', 'ORBIT'];
 
@@ -10,6 +14,11 @@ export class CameraController {
         this.height     = 10;
         this.modeIndex  = 0;
         this.orbitAngle = 0;
+
+        // Where the chase camera has eased to, and the point it is easing to
+        // look at. Null until the first chase frame places them.
+        this.chasePosition = null;
+        this.chaseTarget   = null;
 
         window.addEventListener('keydown', (e) => {
             if (e.code === 'KeyC') this.cycleMode();
@@ -48,15 +57,38 @@ export class CameraController {
                 break;
             }
             default: {
-                // CHASE: fixed offset behind and above the aircraft in its local space
+                // CHASE: an offset behind and above the aircraft in its local
+                // space, which the camera trails rather than sits on, so
+                // turns and pitch changes swing the view instead of snapping it
                 const offset = new THREE.Vector3(0, this.height, -this.distance);
                 offset.applyQuaternion(quat);
+                const desired = pos.clone().add(offset);
+
                 this.camera.up.set(0, 1, 0);
-                this.camera.position.copy(pos).add(offset);
-                this.camera.lookAt(pos);
+                if (!this.chasePosition || shouldSnap(this.chasePosition.distanceTo(desired))) {
+                    // First frame, a reset, or a return from another mode:
+                    // cut to the offset rather than fly across the world to it
+                    this.chasePosition = desired;
+                    this.chaseTarget   = pos.clone();
+                } else {
+                    dampVector(this.chasePosition, desired, CHASE_POSITION_LAMBDA, dt);
+                    dampVector(this.chaseTarget, pos, CHASE_TARGET_LAMBDA, dt);
+                }
+
+                this.camera.position.copy(this.chasePosition);
+                this.camera.lookAt(this.chaseTarget);
             }
         }
     }
 
     getCurrentMode() { return CAMERA_MODES[this.modeIndex]; }
+}
+
+// Eases a vector toward another in place, one axis at a time.
+function dampVector(current, target, lambda, dt) {
+    current.set(
+        damp(current.x, target.x, lambda, dt),
+        damp(current.y, target.y, lambda, dt),
+        damp(current.z, target.z, lambda, dt)
+    );
 }

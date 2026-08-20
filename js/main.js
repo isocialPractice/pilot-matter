@@ -70,7 +70,7 @@ class FlightSimulator {
         this.aircraft.update(dt, groundH);
         this.camera2.update(dt);
         this.sky.update();
-        this.hud.update(this.aircraft, this.camera2);
+        this.hud.update(this.aircraft, this.camera2, this.pauseState.paused);
 
         this.renderer.render(this.scene, this.camera);
     }

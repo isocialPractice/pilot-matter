@@ -7,31 +7,21 @@ that applies when their items are completed.
 
 ## Current
 
-- [ ] Add crash detection: hitting terrain above a vertical-speed threshold
-  triggers a brief crash state and auto-reset, instead of silently clamping
-  to ground height
-  - From: Flight Model & Controls
-- [ ] Document the flight model (lift, stall, throttle behavior) in a README
-  section once the Flight Model & Controls items land
-  - From: Documentation & Polish
-- [ ] Add a heading readout (compass degrees) and vertical speed indicator
-  (ft/min) to the HUD in `index.html` and `js/hud.js`
-  - From: Camera & HUD
-- [ ] Add a low-altitude warning to the HUD that activates when height
-  above terrain drops below a threshold
-  - From: Camera & HUD
-- [ ] Smooth the chase camera with positional lag/damping so turns and
-  pitch changes feel less rigid
-  - From: Camera & HUD
-
-## Flight Model & Controls
-
-Deepen the arcade flight physics and complete the advertised control
-surface. Completing items in this section applies a minor version update.
-
-- [ ] Add crash detection: hitting terrain above a vertical-speed threshold
-  triggers a brief crash state and auto-reset, instead of silently clamping
-  to ground height
+- [ ] Add a title screen overlay shown before the first flight, with the
+  game name and a "press any key to start" prompt
+  - From: Game UI/UX
+- [ ] Add a pause menu built on the pause state, with Resume, Reset Flight,
+  and Controls entries selectable by keyboard
+  - From: Game UI/UX
+- [ ] Add a controls-help toggle (`H`) that collapses the on-screen control
+  list down to a single hint line
+  - From: Game UI/UX
+- [ ] Add a HUD visibility toggle (`Tab`) for clean flying, persisting the
+  choice in `localStorage` across sessions
+  - From: Game UI/UX
+- [ ] Add an attitude indicator to the HUD with a pitch ladder and bank
+  angle marks
+  - From: Game UI/UX
 
 ## Game UI/UX
 
@@ -60,18 +50,6 @@ version update.
 - [ ] Add a photo mode (`F2`) that hides every overlay for one frame and
   downloads the rendered canvas as a PNG
 
-## Camera & HUD
-
-Complete the camera system and expand the instrument readout. Completing
-items in this section applies a minor version update.
-
-- [ ] Smooth the chase camera with positional lag/damping so turns and
-  pitch changes feel less rigid
-- [ ] Add a heading readout (compass degrees) and vertical speed indicator
-  (ft/min) to the HUD in `index.html` and `js/hud.js`
-- [ ] Add a low-altitude warning to the HUD that activates when height
-  above terrain drops below a threshold
-
 ## World & Environment
 
 Grow the procedural world beyond the single terrain tile. Completing items
@@ -94,8 +72,6 @@ in this section applies a patch version update.
 
 - [ ] Replace the static "Loading Flight Simulator..." text with a simple
   progress/fade-in tied to first rendered frame
-- [ ] Document the flight model (lift, stall, throttle behavior) in a
-  README section once the Flight Model & Controls items land
 
 ## Complete
 
@@ -145,3 +121,19 @@ in this section applies a patch version update.
 - [x] Add a favicon-consistent page title ("Pilot Matter") to `index.html`,
   which currently reads "3D Flight Simulator"
   - From: Documentation & Polish
+- [x] Add crash detection: hitting terrain above a vertical-speed threshold
+  triggers a brief crash state and auto-reset, instead of silently clamping
+  to ground height
+  - From: Flight Model & Controls
+- [x] Document the flight model (lift, stall, throttle behavior) in a README
+  section once the Flight Model & Controls items land
+  - From: Documentation & Polish
+- [x] Add a heading readout (compass degrees) and vertical speed indicator
+  (ft/min) to the HUD in `index.html` and `js/hud.js`
+  - From: Camera & HUD
+- [x] Add a low-altitude warning to the HUD that activates when height
+  above terrain drops below a threshold
+  - From: Camera & HUD
+- [x] Smooth the chase camera with positional lag/damping so turns and
+  pitch changes feel less rigid
+  - From: Camera & HUD

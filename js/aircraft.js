@@ -5,6 +5,10 @@ import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY,
     updateThrottle, targetSpeed, convergeSpeed, sinkRate
 } from './flight-model.js';
+import {
+    GROUND_CLEARANCE, createCrashState, isCrashImpact,
+    beginCrash, clearCrash, updateCrash, controlsLocked
+} from './crash.js';
 
 export class Aircraft {
     constructor(scene) {
@@ -21,6 +25,12 @@ export class Aircraft {
         this.maxSpeed = MAX_SPEED;
         this.gravity = GRAVITY;
 
+        // Climb rate for the vertical speed indicator, and the ground under
+        // the aircraft for the altitude warning, both filled in each frame.
+        this.verticalSpeed = 0;
+        this.terrainHeight = 0;
+
+        this.crash = createCrashState();
         this.input = createInputState();
 
         this.createModel();
@@ -79,10 +89,24 @@ export class Aircraft {
         this.rotation.set(start.rotation.x, start.rotation.y, start.rotation.z);
         this.speed = start.speed;
         this.throttle = start.throttle;
+        this.verticalSpeed = 0;
+        clearCrash(this.crash);
     }
 
     update(dt, terrainHeight = 0) {
         dt = Math.min(dt, 0.05);
+        this.terrainHeight = terrainHeight;
+
+        // A crash locks the controls: the wreck sits where it hit while the
+        // countdown runs, then the flight resets itself
+        if (controlsLocked(this.crash)) {
+            if (updateCrash(this.crash, dt)) this.reset();
+            this.group.position.copy(this.position);
+            this.group.rotation.copy(this.rotation);
+            return;
+        }
+
+        const startY = this.position.y;
 
         // Shift and Ctrl move the throttle lever, and speed chases the
         // setting rather than jumping with the key
@@ -124,11 +148,27 @@ export class Aircraft {
             cruiseSpeed: this.cruiseSpeed
         }) * dt;
 
-        // Ground collision
-        const minY = terrainHeight + 5;
+        // Ground collision. Meeting the terrain gently is a landing and the
+        // aircraft flies on; arriving faster than the impact threshold is a
+        // crash, which locks the controls and resets the flight
+        const impactRate = dt > 0 ? (this.position.y - startY) / dt : 0;
+        const minY = terrainHeight + GROUND_CLEARANCE;
         if (this.position.y < minY) {
             this.position.y = minY;
+            if (isCrashImpact(impactRate) && beginCrash(this.crash)) {
+                this.speed = 0;
+                this.throttle = 0;
+                this.verticalSpeed = 0;
+                this.group.position.copy(this.position);
+                this.group.rotation.copy(this.rotation);
+                return;
+            }
         }
+
+        // The vertical speed indicator reads the altitude actually gained or
+        // lost this frame, so riding up a hillside shows as the climb it is.
+        // A frozen clock leaves the last reading on the dial.
+        if (dt > 0) this.verticalSpeed = (this.position.y - startY) / dt;
 
         this.group.position.copy(this.position);
         this.group.rotation.copy(this.rotation);
@@ -140,4 +180,8 @@ export class Aircraft {
     getSpeed()     { return this.speed; }
     getAltitude()  { return this.position.y; }
     getThrottle()  { return this.throttle; }
+    getHeading()   { return this.rotation.y; }
+    getVerticalSpeed() { return this.verticalSpeed; }
+    getHeightAboveTerrain() { return this.position.y - this.terrainHeight; }
+    isCrashed()    { return controlsLocked(this.crash); }
 }

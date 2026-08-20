@@ -98,6 +98,68 @@
             font-size: 13px;
             letter-spacing: 1px;
         }
+
+        #low-altitude {
+            display: none;
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffb000;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+            letter-spacing: 3px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 176, 0, 0.5);
+            padding: 8px 20px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 140;
+            animation: warn-blink 1s steps(1, end) infinite;
+        }
+
+        #low-altitude small {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            letter-spacing: 2px;
+        }
+
+        #crashed {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff3b30;
+            font-family: 'Courier New', monospace;
+            font-size: 40px;
+            letter-spacing: 6px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(255, 59, 48, 0.5);
+            padding: 20px 40px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        #crashed small {
+            display: block;
+            margin-top: 10px;
+            color: #f0f2f3;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        @keyframes warn-blink {
+            50% { opacity: 0.25; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #low-altitude { animation: none; }
+        }
     </style>
 </head>
 <body>
@@ -107,9 +169,15 @@
 
     <div id="paused">PAUSED<small>PRESS P TO RESUME</small></div>
 
+    <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>
+
+    <div id="crashed">CRASHED<small>RESETTING FLIGHT</small></div>
+
     <div id="hud">
         <div>AIRSPEED: <span id="hud-speed">0</span> knots</div>
         <div>ALTITUDE: <span id="hud-altitude">0</span> ft</div>
+        <div>V/S: <span id="hud-vertical-speed">0</span> ft/min</div>
+        <div>HEADING: <span id="hud-heading">000</span>&deg; <span id="hud-compass">N</span></div>
         <div>THROTTLE: <span id="hud-throttle">0</span>%</div>
         <div>CAMERA: <span id="hud-camera">CHASE</span></div>
     </div>

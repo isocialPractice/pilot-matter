@@ -5,6 +5,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0-alpha] - 2026-08-20
+
+### Added
+
+- Crash detection: flying into terrain faster than 30 units/s wrecks the
+  aircraft rather than clamping it silently to the ground height, killing the
+  controls behind a `CRASHED` banner for two and a half seconds and then
+  resetting the flight. A gentler arrival is still a landing, so an
+  engine-out settle onto a hillside survives, and `R` skips the countdown
+- `js/crash.js`, a pure module holding the impact threshold, the crash
+  countdown, and the ground clearance the aircraft keeps, with unit tests
+  covering what separates a landing from a crash and the single reset a
+  countdown asks for
+- Heading and vertical speed on the HUD: a three-digit compass bearing with
+  the nearest of the eight compass points, counting clockwise from north, and
+  a signed climb rate in feet per minute rounded to the nearest 10 so the
+  readout settles instead of flickering
+- A `LOW ALTITUDE` warning that blinks over the middle of the screen within
+  200 ft of the terrain directly below the aircraft, measured against the
+  ground rather than sea level, so a run up a valley warns while the same
+  altitude out over water does not
+- `js/camera-math.js`, a pure module holding the framerate-independent
+  damping behind the chase camera's lag, with unit tests covering
+  convergence, the frozen clock, and the snap distance
+- A `How the Flight Model Works` README section covering the throttle lever,
+  airspeed-driven lift, the stall penalty, and the crash threshold, and an
+  `Instruments` section listing every HUD readout and warning
+
+### Changed
+
+- The chase camera now trails its offset behind the aircraft rather than
+  riding it exactly, easing into position each frame so turns and pitch
+  changes swing the view instead of snapping it. The point it looks at
+  follows more tightly than the camera itself, so the aircraft leads the
+  frame through a turn, and a jump too wide to have been flown - a reset, a
+  crash recovery, or a return from another camera mode - cuts across rather
+  than flying the whole way
+- The crash and low altitude warnings give the middle of the screen up to
+  the paused indicator, and a paused frame holds the crash countdown where
+  it stands
+
 ## [1.3.0-alpha] - 2026-08-19
 
 ### Added
