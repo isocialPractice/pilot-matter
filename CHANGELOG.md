@@ -5,6 +5,52 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-alpha] - 2026-08-21
+
+### Added
+
+- A title screen the game opens on, carrying the name and a prompt to press
+  any key. The simulation clock is held at zero behind it, so the aircraft
+  waits on the prompt rather than gliding toward the terrain, and the key
+  that answers it is swallowed rather than passed on to the controls. A
+  modifier pressed on its own is not an answer, so a hand resting on `Shift`
+  leaves the title up
+- A pause menu over the frozen frame, offering Resume, Reset Flight, and
+  Controls. The cursor moves on the same keys the aircraft pitches with,
+  wraps round both ends, opens on Resume every time, and `Enter` or `Space`
+  chooses the entry under it
+- A controls-help toggle on `H` that collapses the on-screen control list
+  down to a single hint line naming the key that brings it back, which the
+  pause menu's Controls entry can also reopen
+- A HUD visibility toggle on `Tab` that clears the instruments off the screen
+  for clean flying, remembered in `localStorage` for the next session. A
+  browser that refuses storage costs the choice its memory and nothing else
+- An attitude indicator in the bottom right corner: an artificial horizon
+  whose ball rolls against the bank and whose ladder slides against the
+  pitch, with a labelled rung every 10 degrees out to 60 either side, bank
+  marks at 10, 20, 30, 45, and 60 degrees around the rim, and the aircraft
+  drawn across the middle of the face
+- `js/title-screen.js`, `js/menu.js`, `js/controls-help.js`, and
+  `js/hud-visibility.js`, pure modules holding the rules behind each of those
+  overlays, with unit tests covering the latching toggles, the wrapping
+  cursor, and a stored choice that outlives the session which made it
+- `js/attitude.js`, holding the artificial horizon's angles and geometry with
+  no DOM or Three.js dependency, with unit tests covering the pitch and bank
+  it reads, the ladder it builds, and the face it draws them on
+- `getAttitude()` on the aircraft, reporting where the nose and the wings
+  point rather than the angles behind them, so the indicator shows what the
+  aircraft is doing rather than what it was asked to do
+
+### Changed
+
+- Every overlay is now placed from the state that drives it in a single pass,
+  and starts hidden in the stylesheet, so a page whose scripts never arrive
+  shows an honest nothing rather than a HUD reading zero over an empty world
+- The warnings stay quiet while the simulation is frozen by the title screen
+  as well as by a pause: there is nothing to be done about either one while
+  the world is holding still
+- The on-screen control list gained its `Tab` and `H` rows
+
 ## [1.4.0-alpha] - 2026-08-20
 
 ### Added

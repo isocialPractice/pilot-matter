@@ -1,3 +1,5 @@
+import { AttitudeIndicator, pitchFromForward, bankFromWing } from './attitude.js';
+
 // Unit conversions and readout rules (approximate, tuned for arcade feel).
 // Kept as pure exported functions so they can be unit tested in Node without
 // a DOM.
@@ -87,9 +89,16 @@ export class HUD {
         this.cameraElement        = document.getElementById('hud-camera');
         this.lowAltitudeElement   = document.getElementById('low-altitude');
         this.crashElement         = document.getElementById('crashed');
+        this.attitude             = new AttitudeIndicator(document.getElementById('attitude'));
     }
 
-    update(aircraft, cameraController, paused = false) {
+    /**
+     * Writes the frame's readings onto the instruments. A frozen simulation -
+     * a paused flight, or one still waiting behind the title screen - keeps
+     * the warnings quiet: there is nothing for the pilot to do about them
+     * while the world is holding still.
+     */
+    update(aircraft, cameraController, frozen = false) {
         this.speedElement.textContent = speedToKnots(aircraft.getSpeed());
         this.altitudeElement.textContent = altitudeToFeet(aircraft.getAltitude());
         this.throttleElement.textContent = throttleToPercent(aircraft.getThrottle());
@@ -103,11 +112,14 @@ export class HUD {
         this.headingElement.textContent = formatHeading(heading);
         this.compassElement.textContent = compassPoint(heading);
 
+        const { forwardY, rightY, upY } = aircraft.getAttitude();
+        this.attitude.update(pitchFromForward(forwardY), bankFromWing(rightY, upY));
+
         // The crash banner replaces the low altitude warning: once the
         // ground has been hit there is nothing left to warn about. Both give
         // the middle of the screen up to the paused indicator.
-        const crashed = !paused && aircraft.isCrashed();
-        const low = !paused && !crashed && isLowAltitude(aircraft.getHeightAboveTerrain());
+        const crashed = !frozen && aircraft.isCrashed();
+        const low = !frozen && !crashed && isLowAltitude(aircraft.getHeightAboveTerrain());
         this.crashElement.style.display = crashed ? 'block' : 'none';
         this.lowAltitudeElement.style.display = low ? 'block' : 'none';
     }

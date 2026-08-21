@@ -18,8 +18,11 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Three camera modes** — chase, cockpit, and orbit views, cycled with the `C` key
 - **Trailing chase camera** - the chase view lags behind the aircraft instead of riding a fixed offset, so turns and pitch changes swing the frame around
 - **HUD** — live readout of airspeed (knots), altitude (ft), climb rate (ft/min), compass heading, throttle (%), and camera mode
+- **Attitude indicator** - an artificial horizon with a pitch ladder and bank marks, reading the aircraft's own nose and wings rather than the controls behind them
 - **Low altitude warning** - a blinking caution over the terrain below, measured against the ground rather than sea level
-- **Pause** - freeze the simulation with `P`; the world stays on screen behind a paused indicator and no flight time passes while it is held
+- **Title screen** - the game opens on its name and waits for a key, with the flight held on the ramp until one arrives
+- **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, and Controls
+- **A screen you can clear** - `H` collapses the control list to a single hint line and `Tab` clears the instruments off entirely for clean flying, remembered for the next session
 - **Zero build step** — runs directly in the browser via ES modules and an import map
 
 ## Getting Started
@@ -65,14 +68,38 @@ Then open `http://localhost:8080` in your browser.
 | `Shift` | Throttle up (hold to open the lever) |
 | `Ctrl` | Throttle down (hold to close it) |
 | `C` | Cycle camera (chase, cockpit, orbit) |
-| `P` | Pause / resume |
+| `P` | Pause / resume, and open the pause menu |
+| `H` | Collapse the control list to a hint line, and open it again |
+| `Tab` | Show or hide the instruments |
 | `R` | Reset aircraft to starting position |
+
+In the pause menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one.
 
 **Tip:** Flight begins at 0 knots with the throttle closed, which is a stall — open the throttle straight away. `Shift` and `Ctrl` move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in [How the Flight Model Works](#how-the-flight-model-works).
 
+### Starting a flight
+
+The game opens on its title screen, with the clock held at zero: the aircraft waits on the prompt rather than gliding toward the terrain behind it. Any key starts the flight, apart from a modifier pressed on its own, which is half of a shortcut rather than an answer to the prompt. The key that starts the flight is swallowed by the title screen, so it does not also move a control surface on the way past.
+
 ### Pausing
 
-`P` latches the simulation clock at zero: the flight model, gravity, and the orbit camera all stop, a `PAUSED` indicator appears, and the last frame stays on screen. Pressing `P` again resumes from exactly where the flight left off, with the time spent paused discarded rather than applied in one jump.
+`P` latches the simulation clock at zero: the flight model, gravity, and the orbit camera all stop, the last frame stays on screen, and a menu opens over it. Pressing `P` again resumes from exactly where the flight left off, with the time spent paused discarded rather than applied in one jump.
+
+The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between the entries, wrapping round both ends, and `Enter` or `Space` chooses the one under the cursor:
+
+| Entry | Does |
+|-------|------|
+| `RESUME` | Unpauses and flies on |
+| `RESET FLIGHT` | Puts the aircraft back at its starting condition and unpauses |
+| `CONTROLS` | Opens the control list back up, for a screen it has been collapsed on |
+
+The cursor starts on `RESUME` every time the menu opens, so resuming is always one key press away from a paused flight.
+
+### Clearing the screen
+
+Two keys take the overlays off the view. `H` collapses the control list in the bottom left corner down to a single `H - CONTROLS` line, and pressing it again brings the list back - as does the pause menu's `CONTROLS` entry, for a list whose key has been forgotten. `Tab` clears the instruments off entirely, the artificial horizon included, for a clean view out of the window; that choice is stored, so a flight that ends with the instruments off starts the next one the same way. A browser that refuses storage costs the choice its memory and nothing else.
+
+The warnings are not part of what those keys hide. `LOW ALTITUDE` and `CRASHED` still appear over a cleared screen, because they are the two things a pilot needs to be told about whatever the view is set to.
 
 ### Instruments
 
@@ -87,27 +114,36 @@ The HUD in the top left corner reads:
 | `THROTTLE` | The lever setting as a percentage, not the speed it has reached |
 | `CAMERA` | The active camera mode |
 
-Two warnings sit over the middle of the screen. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself.
+The attitude indicator in the bottom right corner is the artificial horizon. The ball rolls against the bank so its horizon stays where the real one is, and the ladder slides against the pitch, carrying a labelled rung every 10 degrees with a tick between them, out to 60 degrees either side. The marks around the rim read the bank angle at the index on top of the face, at 10, 20, 30, 45, and 60 degrees either side of level, and the amber wings across the middle are the aircraft itself.
+
+It reads the direction the nose and the wings are actually pointing rather than the pitch and roll angles behind them, so the ladder shows what the aircraft is doing rather than what it was asked to do.
+
+Two warnings sit over the middle of the screen. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself. Both stay quiet while the simulation is frozen, whether by the pause menu or by a title screen that has not been answered yet: there is nothing to be done about either warning while the world is holding still.
 
 ## Project Structure
 
 ```
 pilot-matter/
-├── index.html          # Entry point — HUD markup, import map, styles
+├── index.html          # Entry point — overlay markup, import map, styles
 ├── js/
-│   ├── main.js         # Scene setup, render loop
+│   ├── main.js         # Scene setup, render loop, keys, and overlay state
 │   ├── aircraft.js     # 3D model, and the frame loop the flight model drives
 │   ├── flight-model.js # Pure throttle, speed convergence, lift and stall math
 │   ├── flight-state.js # Pure starting conditions (0 knots, 300 units up)
 │   ├── crash.js        # Pure impact threshold and crash countdown
 │   ├── input-map.js    # Pure keyboard-to-input-state mapping
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
+│   ├── title-screen.js # Pure start rules and the held pre-flight clock
+│   ├── menu.js         # Pure keyboard menu, and the pause menu list
+│   ├── controls-help.js# Pure collapse toggle for the on-screen control list
+│   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
 │   ├── terrain.js      # Procedural fBm terrain with vertex colours
 │   ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
 │   ├── camera-math.js  # Pure framerate-independent camera damping
 │   ├── camera.js       # Chase, cockpit, and orbit cameras
 │   ├── sky.js          # Lighting and atmospheric fog
+│   ├── attitude.js     # Pure artificial horizon geometry, and its SVG face
 │   └── hud.js          # On-screen instrument display and warnings
 ├── tools/
 │   └── serve.mjs       # Zero-dependency static server behind `npm run serve`
@@ -117,10 +153,12 @@ pilot-matter/
 ## Testing
 
 Unit tests cover the pure logic (unit conversions, heading and climb rate
-readouts, the low altitude warning, input mapping, starting flight state,
-throttle and lift math, the crash threshold and countdown, camera damping,
-pause toggling, terrain noise and mountain formulas, page metadata, and the
-static server's path and content type rules) and run on Node 18+ with no
+readouts, the low altitude warning, the artificial horizon's angles and
+ladder, input mapping, starting flight state, throttle and lift math, the
+crash threshold and countdown, camera damping, pause toggling, the title
+screen's start rules, pause menu selection, the control list and instrument
+toggles, terrain noise and mountain formulas, page metadata, and the static
+server's path and content type rules) and run on Node 18+ with no
 dependencies to install:
 
 ```bash

@@ -184,4 +184,21 @@ export class Aircraft {
     getVerticalSpeed() { return this.verticalSpeed; }
     getHeightAboveTerrain() { return this.position.y - this.terrainHeight; }
     isCrashed()    { return controlsLocked(this.crash); }
+
+    /**
+     * Where the nose and the wings are pointing, as the vertical part of each
+     * direction. The attitude indicator reads the aircraft's orientation this
+     * way rather than reading the pitch and roll angles behind it, so the
+     * ladder shows what the aircraft is doing rather than what it was asked
+     * to do. The model is built with its nose along +Z, which puts the right
+     * wing along -X.
+     */
+    getAttitude() {
+        const quat = this.getQuaternion();
+        return {
+            forwardY: new THREE.Vector3(0, 0, 1).applyQuaternion(quat).y,
+            rightY:   new THREE.Vector3(-1, 0, 0).applyQuaternion(quat).y,
+            upY:      new THREE.Vector3(0, 1, 0).applyQuaternion(quat).y
+        };
+    }
 }

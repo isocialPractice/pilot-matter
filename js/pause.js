@@ -21,6 +21,19 @@ export function togglePause(state) {
 }
 
 /**
+ * Leaves the simulation running, whatever it was doing. The pause menu picks
+ * this rather than the toggle: Resume and Reset Flight both mean fly on, and
+ * neither should pause a flight that is already running.
+ *
+ * Returns true when the state changed.
+ */
+export function resumeFlight(state) {
+    const changed = state.paused;
+    state.paused = false;
+    return changed;
+}
+
+/**
  * Applies a key event to the pause state.
  *
  * Only the initial keydown toggles: key releases are ignored so pause is a

@@ -7,21 +7,18 @@ that applies when their items are completed.
 
 ## Current
 
-- [ ] Add a title screen overlay shown before the first flight, with the
-  game name and a "press any key to start" prompt
+- [ ] Add a minimap in a screen corner showing aircraft position and heading
+  within the terrain bounds
   - From: Game UI/UX
-- [ ] Add a pause menu built on the pause state, with Resume, Reset Flight,
-  and Controls entries selectable by keyboard
+- [ ] Add a settings panel (`O`) for control sensitivity, fog density, and
+  HUD units (knots/mph, ft/m)
   - From: Game UI/UX
-- [ ] Add a controls-help toggle (`H`) that collapses the on-screen control
-  list down to a single hint line
+- [ ] Add engine and wind audio that track throttle and airspeed, with a
+  mute toggle (`M`)
   - From: Game UI/UX
-- [ ] Add a HUD visibility toggle (`Tab`) for clean flying, persisting the
-  choice in `localStorage` across sessions
-  - From: Game UI/UX
-- [ ] Add an attitude indicator to the HUD with a pitch ladder and bank
-  angle marks
-  - From: Game UI/UX
+- [ ] Replace the static "Loading Flight Simulator..." text with a simple
+  progress/fade-in tied to first rendered frame
+  - From: Documentation & Polish
 
 ## Game UI/UX
 
@@ -29,16 +26,6 @@ Player-facing interface and experience around the flight model, beyond the
 raw instrument readout. Completing items in this section applies a minor
 version update.
 
-- [ ] Add a title screen overlay shown before the first flight, with the
-  game name and a "press any key to start" prompt
-- [ ] Add a pause menu built on the pause state, with Resume, Reset Flight,
-  and Controls entries selectable by keyboard
-- [ ] Add a controls-help toggle (`H`) that collapses the on-screen control
-  list down to a single hint line
-- [ ] Add a HUD visibility toggle (`Tab`) for clean flying, persisting the
-  choice in `localStorage` across sessions
-- [ ] Add an attitude indicator to the HUD with a pitch ladder and bank
-  angle marks
 - [ ] Add a minimap in a screen corner showing aircraft position and heading
   within the terrain bounds
 - [ ] Add engine and wind audio that track throttle and airspeed, with a
@@ -137,3 +124,18 @@ in this section applies a patch version update.
 - [x] Smooth the chase camera with positional lag/damping so turns and
   pitch changes feel less rigid
   - From: Camera & HUD
+- [x] Add a title screen overlay shown before the first flight, with the
+  game name and a "press any key to start" prompt
+  - From: Game UI/UX
+- [x] Add a pause menu built on the pause state, with Resume, Reset Flight,
+  and Controls entries selectable by keyboard
+  - From: Game UI/UX
+- [x] Add a controls-help toggle (`H`) that collapses the on-screen control
+  list down to a single hint line
+  - From: Game UI/UX
+- [x] Add a HUD visibility toggle (`Tab`) for clean flying, persisting the
+  choice in `localStorage` across sessions
+  - From: Game UI/UX
+- [x] Add an attitude indicator to the HUD with a pitch ladder and bank
+  angle marks
+  - From: Game UI/UX

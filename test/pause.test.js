@@ -5,6 +5,7 @@ import {
     createPauseState,
     isPauseKey,
     togglePause,
+    resumeFlight,
     applyPauseKey,
     simulationDelta
 } from '../js/pause.js';
@@ -27,6 +28,17 @@ test('togglePause flips the flag and returns the new value', () => {
     assert.equal(state.paused, true);
     assert.equal(togglePause(state), false);
     assert.equal(state.paused, false);
+});
+
+test('resumeFlight leaves the simulation running, whatever it was doing', () => {
+    const state = createPauseState();
+    assert.equal(resumeFlight(state), false, 'a running flight was already resumed');
+    assert.equal(state.paused, false);
+
+    togglePause(state);
+    assert.equal(resumeFlight(state), true);
+    assert.equal(state.paused, false);
+    assert.equal(resumeFlight(state), false, 'the menu can only resume a flight once');
 });
 
 test('pressing P pauses and pressing it again resumes', () => {
