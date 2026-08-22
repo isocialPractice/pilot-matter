@@ -2,7 +2,7 @@
 
 `Ctrl + click` to [play](https://isocialpractice.github.io/pilot-matter/index.html)
 
-A browser-based 3D flight simulator built with [Three.js](https://threejs.org/). Fly over a procedurally generated landscape with mountains, plains, beaches, and snow-capped peaks — all rendered in real time with no build step required.
+A browser-based 3D flight simulator built with [Three.js](https://threejs.org/). Fly over five procedurally generated worlds - highlands, a river basin, canyon country, a dune sea, and a lakeside town - each assembled out of elements that are drawn by algorithm rather than placed as assets, all rendered in real time with no build step required.
 
 ![screenshot placeholder](banner.png)
 
@@ -10,19 +10,23 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 
 - **Arcade flight model** — pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases
 - **Airspeed-driven lift** — hold cruise speed and level flight holds altitude; let the speed decay and the wing stalls and drops
+- **A flight already in the air** - every flight opens at 80 knots, 1390 ft, climbing at 1260 ft/min on a heading of 000, with the throttle set where it holds that airspeed
 - **Crash detection** - settle onto a hillside gently and you have landed; fly into it and the aircraft is wrecked, the controls go dead, and the flight resets itself
-- **Procedural terrain** — multi-octave fractal Brownian motion (fBm) noise generates a unique landscape every time
-- **Random mountains** — a dedicated algorithm scatters mountains across ~10% of the terrain surface using smooth radial bumps
-- **Height-based vertex colouring** — water, sand, grass, rock, and snow rendered purely through vertex colours, no textures needed
+- **Procedural terrain** — multi-octave fractal Brownian motion (fBm) noise generates the ground every world is drawn on
+- **The world as data** - ten environment elements (mountain, canyon, desert, grass, sand, water, river, forest, town, snow), each declaring the ranges it can be configured through and the algorithm that draws it, so nothing in the world is a placed asset
+- **Five assembled environments** - Highlands, River Basin, Canyon Country, Dune Sea, and Lakeside, picked from the settings panel and regenerated on the spot
+- **Element vertex colouring** - every band the ground is painted in is a light-to-dark gradient of one base hue, rendered through vertex colours with no textures
 - **Atmospheric fog** — exponential fog fades the world to sky blue in the distance, hiding terrain edges and giving the illusion of an infinite world
 - **Three camera modes** — chase, cockpit, and orbit views, cycled with the `C` key
 - **Trailing chase camera** - the chase view lags behind the aircraft instead of riding a fixed offset, so turns and pitch changes swing the frame around
 - **HUD** — live readout of airspeed (knots), altitude (ft), climb rate (ft/min), compass heading, throttle (%), and camera mode
 - **Attitude indicator** - an artificial horizon with a pitch ladder and bank marks, reading the aircraft's own nose and wings rather than the controls behind them
 - **Low altitude warning** - a blinking caution over the terrain below, measured against the ground rather than sea level
-- **Title screen** - the game opens on its name and waits for a key, with the flight held on the ramp until one arrives
-- **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, and Controls
+- **Start screen menu** - the game opens on its name over a menu offering Start Flight, Controls, and Settings, with the flight held on the ramp until one is chosen
+- **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, Controls, and Settings
+- **Settings panel** - the same panel from either screen, picking the environment to fly and remembering the choice for the next session
 - **A screen you can clear** - `H` collapses the control list to a single hint line and `Tab` clears the instruments off entirely for clean flying, remembered for the next session
+- **A simulator API** - the Pilot API flies the aircraft against a host's own scene, terrain, and model; the Matter API hands a host the world as one detachable group anything can fly over
 - **Zero build step** — runs directly in the browser via ES modules and an import map
 
 ## Getting Started
@@ -73,13 +77,21 @@ Then open `http://localhost:8080` in your browser.
 | `Tab` | Show or hide the instruments |
 | `R` | Reset aircraft to starting position |
 
-In the pause menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one.
+In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one. `Esc` backs out of the settings panel.
 
-**Tip:** Flight begins at 0 knots with the throttle closed, which is a stall — open the throttle straight away. `Shift` and `Ctrl` move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in [How the Flight Model Works](#how-the-flight-model-works).
+**Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft with the throttle set at 20%, which is exactly the setting that holds 80 knots. That airspeed is the stall speed itself, so the wing is carrying with nothing in hand: opening the throttle is still the first thing to do. `Shift` and `Ctrl` move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in [How the Flight Model Works](#how-the-flight-model-works).
 
 ### Starting a flight
 
-The game opens on its title screen, with the clock held at zero: the aircraft waits on the prompt rather than gliding toward the terrain behind it. Any key starts the flight, apart from a modifier pressed on its own, which is half of a shortcut rather than an answer to the prompt. The key that starts the flight is swallowed by the title screen, so it does not also move a control surface on the way past.
+The game opens on its start screen, with the clock held at zero: the aircraft waits on the menu rather than climbing away behind it. The menu is flown the same way the pause menu is, and every key it sees is swallowed by the screen, so working it never also moves a control surface.
+
+| Entry | Does |
+|-------|------|
+| `START FLIGHT` | Releases the clock and hands the controls over |
+| `CONTROLS` | Puts the control list on screen, over the title, before anything is flying, and takes it back off when chosen again |
+| `SETTINGS` | Opens the settings panel |
+
+This is the opening screen rather than a menu to come back to: once the flight has started, the way back to Controls and Settings is the pause menu.
 
 ### Pausing
 
@@ -92,8 +104,19 @@ The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between t
 | `RESUME` | Unpauses and flies on |
 | `RESET FLIGHT` | Puts the aircraft back at its starting condition and unpauses |
 | `CONTROLS` | Opens the control list back up, for a screen it has been collapsed on |
+| `SETTINGS` | Opens the same panel the start screen opens |
 
 The cursor starts on `RESUME` every time the menu opens, so resuming is always one key press away from a paused flight.
+
+### Settings
+
+The settings panel opens from either menu and holds the same choices whichever one opened it. It is the one overlay that clears the screen it was opened from, because the point of picking an environment is seeing the environment.
+
+Right now the panel sets the world being flown. Every entry is one of the five [assembled environments](#environments), the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.
+
+The choice is stored in `localStorage`, so the world a session ends on is the world the next one opens on. A browser that refuses storage costs the choice its memory and nothing else.
+
+`Esc` or `Backspace` closes the panel, as does its own `BACK` entry.
 
 ### Clearing the screen
 
@@ -118,31 +141,41 @@ The attitude indicator in the bottom right corner is the artificial horizon. The
 
 It reads the direction the nose and the wings are actually pointing rather than the pitch and roll angles behind them, so the ladder shows what the aircraft is doing rather than what it was asked to do.
 
-Two warnings sit over the middle of the screen. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself. Both stay quiet while the simulation is frozen, whether by the pause menu or by a title screen that has not been answered yet: there is nothing to be done about either warning while the world is holding still.
+Two warnings sit over the middle of the screen. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself. Both stay quiet while the simulation is frozen, whether by the pause menu or by a start screen whose menu has not been answered yet: there is nothing to be done about either warning while the world is holding still.
 
 ## Project Structure
 
 ```
 pilot-matter/
-├── index.html          # Entry point — overlay markup, import map, styles
+├── index.html          # Entry point - overlay markup, import map, styles
 ├── js/
 │   ├── main.js         # Scene setup, render loop, keys, and overlay state
 │   ├── aircraft.js     # 3D model, and the frame loop the flight model drives
 │   ├── flight-model.js # Pure throttle, speed convergence, lift and stall math
-│   ├── flight-state.js # Pure starting conditions (0 knots, 300 units up)
+│   ├── flight-state.js # Pure configured start (80 kt, 1390 ft, +1260 ft/min)
+│   ├── units.js        # Pure conversions between world units and readings
 │   ├── crash.js        # Pure impact threshold and crash countdown
-│   ├── input-map.js    # Pure keyboard-to-input-state mapping
+│   ├── input-map.js    # Pure keybinding map and keyboard-to-input-state mapping
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── title-screen.js # Pure start rules and the held pre-flight clock
-│   ├── menu.js         # Pure keyboard menu, and the pause menu list
+│   ├── menu.js         # Pure keyboard menu, and the list any menu is drawn into
+│   ├── settings.js     # Pure settings panel state and its stored choices
 │   ├── controls-help.js# Pure collapse toggle for the on-screen control list
 │   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
-│   ├── terrain.js      # Procedural fBm terrain with vertex colours
-│   ├── mountains.js    # Random mountain placement algorithm (~10% coverage)
-│   ├── camera-math.js  # Pure framerate-independent camera damping
+│   ├── terrain.js      # An assembled environment as scene geometry
+│   ├── mountains.js    # Pure mountain density formula (~10% coverage)
+│   ├── environment/
+│   │   ├── elements.js # Pure element registry, the field, and every generator
+│   │   └── presets.js  # Pure five assembled environments, and the builder
+│   ├── api/
+│   │   ├── index.js    # The public entry point, re-exporting both halves
+│   │   ├── contract.js # Pure option defaults, contract checks, and telemetry
+│   │   ├── pilot.js    # Pilot API: the aircraft, without the world
+│   │   └── matter.js   # Matter API: the world, without the aircraft
+│   ├── camera-math.js  # Pure camera modes and framerate-independent damping
 │   ├── camera.js       # Chase, cockpit, and orbit cameras
-│   ├── sky.js          # Lighting and atmospheric fog
+│   ├── sky.js          # Lighting, atmospheric fog, and the standalone depth
 │   ├── attitude.js     # Pure artificial horizon geometry, and its SVG face
 │   └── hud.js          # On-screen instrument display and warnings
 ├── tools/
@@ -152,14 +185,16 @@ pilot-matter/
 
 ## Testing
 
-Unit tests cover the pure logic (unit conversions, heading and climb rate
-readouts, the low altitude warning, the artificial horizon's angles and
-ladder, input mapping, starting flight state, throttle and lift math, the
-crash threshold and countdown, camera damping, pause toggling, the title
-screen's start rules, pause menu selection, the control list and instrument
-toggles, terrain noise and mountain formulas, page metadata, and the static
-server's path and content type rules) and run on Node 18+ with no
-dependencies to install:
+Unit tests cover the pure logic (unit conversions in both directions, heading
+and climb rate readouts, the low altitude warning, the artificial horizon's
+angles and ladder, the keybinding map, the configured start state and the
+attitude that holds its climb, throttle and lift math, the crash threshold and
+countdown, camera damping, pause toggling, the start screen's rules, menu
+selection, the settings panel and its stored choices, terrain noise and the
+mountain formula, the element registry and every generator it holds, the five
+assembled environments, the API's option defaults and contract checks, page
+metadata, and the static server's path and content type rules) and run on
+Node 18+ with no dependencies to install:
 
 ```bash
 npm test        # or: node --test
@@ -191,7 +226,15 @@ Climbing is therefore a trade rather than a free gain: pulling the nose up spend
 
 Under 40 units/s the wing is stalled and the sink rate is multiplied on top of the lost lift, easing in from no penalty at the stall speed up to double at a dead stop. The penalty eases rather than snapping on, so a stall is a mush and a sag rather than a switch being thrown.
 
-Every flight starts stalled, at 0 knots with the lever closed, which is what makes opening the throttle the first thing to do.
+Every flight starts at exactly 40 units/s, which is 80 knots and the stall speed itself: the wing is carrying, but there is nothing in hand. Opening the throttle is still the first thing to do.
+
+### The start is a condition, not a set of numbers
+
+The configured start is written the way a pilot reads it - 80 knots, 1390 ft, +1260 ft/min, heading 000, 20% throttle, chase camera - and converted into world units by the same factors the instruments read back through, so the HUD shows those numbers on the first frame rather than something near them.
+
+Two of those values are held to the flight model rather than declared at it. The throttle setting is the one that asks for exactly 80 knots, so airspeed is not converging on anything when the flight begins. The pitch is the angle that turns enough of 80 knots into height to cover both the 1260 ft/min climb and the sink the wing is losing at that airspeed. The result is a flight that holds its opening condition until the pilot changes it, rather than settling out of it over the first second.
+
+`R`, and the pause menu's `RESET FLIGHT`, put the aircraft back into that same condition.
 
 ### The ground is not a floor
 
@@ -201,21 +244,106 @@ Coming down faster than that - which takes a dive, since it can only be reached 
 
 ## How the Terrain Works
 
-The terrain is a `16000 × 16000` unit `PlaneGeometry` (200 × 200 segments) whose vertices are displaced vertically by a **fractal Brownian motion** function — seven octaves of smooth value noise layered together. Low-frequency octaves define broad valleys and mountain ranges; high-frequency octaves add fine surface detail.
+The ground is a `16000 x 16000` unit `PlaneGeometry` (200 x 200 segments) whose vertices are displaced vertically by a **fractal Brownian motion** function - seven octaves of smooth value noise layered together. Low-frequency octaves define broad valleys and mountain ranges; high-frequency octaves add fine surface detail. A remapping curve flattens values below a threshold into wide plains and water, then exaggerates values above the threshold into steep peaks.
 
-A remapping curve flattens values below a threshold into wide plains and water, then exaggerates values above the threshold into steep peaks.
+The noise, the remapping curve, and the mountain falloff live in `js/terrain-math.js` as plain functions with no Three.js dependency, so the world's shape can be unit tested in Node.
 
-The noise, the remapping curve, the mountain falloff, and the height-to-colour ramp all live in `js/terrain-math.js` as plain functions with no Three.js dependency, so the world's shape can be unit tested in Node.
+Everything drawn over that base ground is an **environment element**.
 
-### Mountains
+### Elements
 
-`mountains.js` runs a second pass after the base terrain is built. It calculates how many mountains are needed for ~10% area coverage:
+An element is not a model, a texture, or a placed asset. It is a registry entry in `js/environment/elements.js` carrying two things: the ranges it can be configured through, and the algorithm that draws it into a height and colour field. Adding a landform to the world means adding an entry, not another bespoke terrain pass, and reconfiguring one means changing a number rather than commissioning new art.
+
+| Element | Configured through |
+|---------|--------------------|
+| **Mountain** | Peak count, a height range, a radius range, and a girth that stretches a peak along an axis of its own |
+| **Canyon** | A depth range, a width range, a steepness, a branch count, and how far the cut wanders |
+| **Desert** | A dune height range, the spacing between crests, how much of the world the dune sea covers, and a sand gradient |
+| **Grass** | A green gradient, and the height band it covers |
+| **Sand** | A brown gradient, and the height band it covers |
+| **Water body** | A water line, a blue gradient read by depth, and how far the basin is pulled up to a flat surface |
+| **River** | A blue gradient, a windiness, a width range, and a depth range |
+| **Forest** | A tree height range, a density, a grove size range, a grove count, a canopy gradient, and the height band trees will grow in |
+| **Town** | A block size, how many blocks are built on, a building height range, the extent of the site, and building and street gradients |
+| **Snow** | A snow line, a coverage, the steepest ground snow will hold on to, and a white gradient |
+
+Three rules hold across all of them:
+
+- **Every colour is a gradient of one base hue.** An element declares a `light` and a `dark` end of the same colour and blends between them, so nothing shifts hue dramatically across the ground it covers.
+- **Nothing is symmetrical.** Rivers and canyons wander on three waves whose lengths share no common multiple, forests are outlined by three lobes at frequencies that share none either, and dune crests are pushed off their axis by noise. There is no repeating pattern to spot from the air.
+- **The order is the pipeline's, not the preset's.** A preset lists the elements it wants and the builder applies them in a fixed order: landforms shaped first, then ground cover laid over them, then water filling what is left below its line, then the cuts and the built things, and snow settling last. An element never has to know what a preset put beside it.
+
+Mountain density, when a preset does not name a count, is still the formula it has always been:
 
 ```
-count = (terrainArea × 0.10) / (π × avgRadius²)  ≈  14–15 mountains
+count = (terrainArea x 0.10) / (pi x avgRadius^2)  ~  14 to 15 mountains
 ```
 
-Each mountain is a **smoothstep radial bump** added on top of the base terrain height. Vertex colours and the collision height cache are updated in the same pass, so the aircraft correctly collides with mountain peaks.
+### Environments
+
+An assembled environment is a name, a seed, the base ground it is drawn on, and the elements placed over it. It carries no geometry: the world is generated from that description every time it is flown, which is why switching one from the settings panel takes a few tens of milliseconds and no download.
+
+| Environment | Is |
+|-------------|-----|
+| `HIGHLANDS` | fBm ground under scattered peaks, with snow above 300. The world the simulator has always generated, and the one a fresh install opens on |
+| `RIVER BASIN` | A meandering river the width of the world, through low forested country |
+| `CANYON COUNTRY` | A branching canyon system cut into a high plateau. The only one of the five with no standing water in it |
+| `DUNE SEA` | Wind-blown dunes and rock outcrops, cut by one desert river with palm groves along it |
+| `LAKESIDE` | A town on the shore of a wide lake, under forested hills and snow-capped peaks |
+
+The seed is what makes a world reproducible: the same preset lays out the same peaks, the same river, and the same streets every time, so a place worth flying back to is still there.
+
+## Simulator API
+
+The simulator is two halves that can be used without each other, and `js/api/index.js` is the one module a host page imports to get either.
+
+The **Pilot API** is the aircraft: the flight model, the controls, and the telemetry, flown against a scene, a terrain, and an aircraft model the host supplies.
+
+```javascript
+import { createPilot } from './js/api/index.js';
+
+const pilot = createPilot({
+    scene,                                  // your scene
+    camera,                                 // optional, placed behind the aircraft
+    aircraft: myModel,                      // any Object3D, or a loader result
+    anchor: { x: 0, y: 0, z: 0 },           // the point in it the flight model moves
+    terrain: {                              // your world, or none for flat ground
+        sampleHeight: (x, z) => myHeightAt(x, z),
+        bounds: { minX: -5000, maxX: 5000, minZ: -5000, maxZ: 5000 }
+    },
+    keymap: { yawLeft: ['KeyZ'] }           // remap what you like, keep the rest
+});
+
+function frame(dt) {
+    const { airspeed, altitude, verticalSpeed, heading, throttle } = pilot.update(dt);
+    myHud.render({ airspeed, altitude, verticalSpeed, heading, throttle });
+}
+```
+
+The **Matter API** is the world: an assembled environment as one detachable group, a height sampler for whatever is flying over it, and a contract any aircraft can satisfy, including one driven by a control API that has never heard of this one.
+
+```javascript
+import { createEnvironment } from './js/api/index.js';
+
+const world = createEnvironment({ environment: 'lakeside' });
+
+scene.add(world.group);
+world.applyDepth(scene);                    // the sky and the fog, without the ground
+world.register(myWindsock, { x: 400, z: -900 });  // set down on the ground, not over it
+
+const flown = world.attach(myAircraft);     // throws with every gap in the contract
+myFlightModel.setGroundHeight(flown.groundHeight());
+
+world.setEnvironment('dune-sea');           // regenerated in place, registered assets settled
+```
+
+Everything under `js/api/contract.js` is pure and imports no renderer, so a host can check its own options, its own aircraft, or the shape of its telemetry with nothing loaded:
+
+```javascript
+import { validateAircraftContract, TELEMETRY_FIELDS } from './js/api/contract.js';
+
+const problems = validateAircraftContract(myAircraft);   // every gap at once, or []
+```
 
 ## Tech Stack
 

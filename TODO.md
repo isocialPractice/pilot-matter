@@ -20,38 +20,6 @@ that applies when their items are completed.
   progress/fade-in tied to first rendered frame
   - From: Documentation & Polish
 
-### User Overrides
-
-- [ ] Configure the simulator with the initial starting controls below,
-  replacing the current standing start
-  - From: Simulator Configuration
-
-```text
-Airspeed: 80 knots
-Altitude: 1390 ft
-V/S: +1260 ft/min
-Heading: 000 deg N
-Throttle: 20%
-Camera: chase
-```
-
-- [ ] Add a start screen menu with **Controls** and **Settings** entries, and
-  add **Settings** to the pause menu
-  - From: Simulator Configuration
-- [ ] Add environment elements that are placed and adjusted through
-  configurable ranges and rendered by algorithm rather than asset placement
-  (mountain, grass, sand, water body, river, forest, canyon, desert, town,
-  snow)
-  - From: Environment Design
-- [ ] Add 5 assembled environments that can be piloted over, selectable from
-  the settings menu
-  - From: Simulator Configuration
-- [ ] Add a simulator API with a **Pilot API** (aircraft controls usable with
-  external environments and external aircraft assets) and a **Matter API**
-  (environments usable with external aircraft, foreign control APIs, and
-  external assets)
-  - From: Simulator API
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -301,3 +269,24 @@ in this section applies a patch version update.
 - [x] Add a new level 2 section called **Environment Design**, and create 21
   todo items for it
   - From: `version.control = null`
+- [x] Configure the simulator with the initial starting controls below,
+  replacing the current standing start
+  - From: Simulator Configuration
+  - Starting controls: airspeed 80 knots, altitude 1390 ft, V/S +1260 ft/min,
+    heading 000 deg N, throttle 20%, camera chase
+- [x] Add a start screen menu with **Controls** and **Settings** entries, and
+  add **Settings** to the pause menu
+  - From: Simulator Configuration
+- [x] Add environment elements that are placed and adjusted through
+  configurable ranges and rendered by algorithm rather than asset placement
+  (mountain, grass, sand, water body, river, forest, canyon, desert, town,
+  snow)
+  - From: Environment Design
+- [x] Add 5 assembled environments that can be piloted over, selectable from
+  the settings menu
+  - From: Simulator Configuration
+- [x] Add a simulator API with a **Pilot API** (aircraft controls usable with
+  external environments and external aircraft assets) and a **Matter API**
+  (environments usable with external aircraft, foreign control APIs, and
+  external assets)
+  - From: Simulator API

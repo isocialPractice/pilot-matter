@@ -1,96 +1,136 @@
 import * as THREE from 'three';
-import { createInputState, applyKeyToInput } from './input-map.js';
+import { createInputState, applyKeyToInput, isResetKey, DEFAULT_KEYMAP } from './input-map.js';
 import { createFlightState } from './flight-state.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY,
-    updateThrottle, targetSpeed, convergeSpeed, sinkRate
+    updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled
 } from './flight-model.js';
 import {
-    GROUND_CLEARANCE, createCrashState, isCrashImpact,
+    GROUND_CLEARANCE, CRASH_IMPACT_SPEED, createCrashState, isCrashImpact,
     beginCrash, clearCrash, updateCrash, controlsLocked
 } from './crash.js';
 
+/**
+ * The aircraft: a model in a scene, and the frame loop the flight model drives
+ * it through.
+ *
+ * Everything the game hands it is optional, because the Pilot API flies the
+ * same class against a host's own scene, a host's own model, and a host's own
+ * input source. Given nothing but a scene, it is the bundled aircraft flying
+ * the configured start state.
+ */
 export class Aircraft {
-    constructor(scene) {
-        this.scene = scene;
+    constructor(scene, options = {}) {
+        this.scene   = scene;
+        this.options = options;
 
-        const start = createFlightState();
-        this.position = new THREE.Vector3(start.position.x, start.position.y, start.position.z);
-        this.rotation = new THREE.Euler(start.rotation.x, start.rotation.y, start.rotation.z, 'YXZ');
-        this.speed = start.speed;
-        this.throttle = start.throttle;
+        const flight = options.flight ?? {};
+        this.minSpeed    = flight.minSpeed    ?? MIN_SPEED;
+        this.cruiseSpeed = flight.cruiseSpeed ?? CRUISE_SPEED;
+        this.maxSpeed    = flight.maxSpeed    ?? MAX_SPEED;
+        this.gravity     = flight.gravity     ?? GRAVITY;
+        this.clearance   = flight.clearance   ?? GROUND_CLEARANCE;
+        this.impactSpeed = flight.impactSpeed ?? CRASH_IMPACT_SPEED;
 
-        this.minSpeed = MIN_SPEED;
-        this.cruiseSpeed = CRUISE_SPEED;
-        this.maxSpeed = MAX_SPEED;
-        this.gravity = GRAVITY;
+        this.position = new THREE.Vector3();
+        this.rotation = new THREE.Euler(0, 0, 0, 'YXZ');
 
-        // Climb rate for the vertical speed indicator, and the ground under
-        // the aircraft for the altitude warning, both filled in each frame.
-        this.verticalSpeed = 0;
+        // The ground under the aircraft, for the altitude warning, filled in
+        // each frame from whatever terrain the caller is flying over.
         this.terrainHeight = 0;
 
-        this.crash = createCrashState();
-        this.input = createInputState();
+        this.crash  = createCrashState();
+        this.input  = options.input ?? createInputState();
+        this.keymap = options.keymap ?? DEFAULT_KEYMAP;
 
-        this.createModel();
-        this.setupControls();
+        this.reset();
+        this.createModel(options.model ?? null, options.anchor ?? null);
+        if (options.controls !== false) this.setupControls();
     }
 
-    createModel() {
+    /**
+     * The condition a flight starts from and resets back to: the configured
+     * start state, with anything the caller asked to change about it applied
+     * over the top.
+     */
+    startState() {
+        const start  = createFlightState();
+        const flight = this.options.flight;
+        if (!flight) return start;
+
+        return {
+            speed:         flight.speed         ?? start.speed,
+            throttle:      flight.throttle      ?? start.throttle,
+            verticalSpeed: flight.verticalSpeed ?? start.verticalSpeed,
+            cameraMode:    start.cameraMode,
+            position: { x: 0, y: flight.altitude ?? start.position.y, z: 0 },
+            rotation: {
+                x: flight.pitch ?? start.rotation.x,
+                y: flight.yaw   ?? start.rotation.y,
+                z: 0
+            }
+        };
+    }
+
+    createModel(external = null, anchor = null) {
         this.group = new THREE.Group();
 
-        const mat = new THREE.MeshPhongMaterial({ color: 0x4477aa });
-        const wingMat = new THREE.MeshPhongMaterial({ color: 0x3366aa });
-
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.5, 8, 8), mat);
-        body.rotation.x = Math.PI / 2;
-        this.group.add(body);
-
-        const wings = new THREE.Mesh(new THREE.BoxGeometry(14, 0.15, 2), wingMat);
-        this.group.add(wings);
-
-        const tail = new THREE.Mesh(new THREE.BoxGeometry(5, 0.1, 1), wingMat);
-        tail.position.set(0, 0, -3.5);
-        this.group.add(tail);
-
-        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2, 1.5), wingMat);
-        fin.position.set(0, 1, -3.5);
-        this.group.add(fin);
-
-        const nose = new THREE.Mesh(
-            new THREE.ConeGeometry(0.5, 1.5, 8),
-            new THREE.MeshPhongMaterial({ color: 0xdddddd })
-        );
-        nose.rotation.x = -Math.PI / 2;
-        nose.position.set(0, 0, 4.5);
-        this.group.add(nose);
+        if (external) {
+            // An external aircraft is flown from the control anchor it
+            // declares: the model is shifted so that point sits where the
+            // flight model puts the aircraft, rather than the host having to
+            // rebuild its own model around an origin this simulator chose.
+            if (anchor) external.position.set(-(anchor.x ?? 0), -(anchor.y ?? 0), -(anchor.z ?? 0));
+            this.group.add(external);
+        } else {
+            this.group.add(...bundledModel());
+        }
 
         this.group.position.copy(this.position);
-        this.scene.add(this.group);
+        this.group.rotation.copy(this.rotation);
+        this.scene?.add(this.group);
     }
 
     setupControls() {
-        window.addEventListener('keydown', (e) => this.onKey(e, true));
-        window.addEventListener('keyup',  (e) => this.onKey(e, false));
+        this.onKeyDown = (e) => this.onKey(e, true);
+        this.onKeyUp   = (e) => this.onKey(e, false);
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup',   this.onKeyUp);
+    }
+
+    /** Takes the keyboard back off the aircraft, for a host tearing one down. */
+    releaseControls() {
+        if (!this.onKeyDown) return;
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup',   this.onKeyUp);
+        this.onKeyDown = this.onKeyUp = null;
     }
 
     onKey(e, down) {
-        const changed = applyKeyToInput(this.input, e.code, down);
+        const changed = applyKeyToInput(this.input, e.code, down, this.keymap);
         if (down && (changed === 'throttleUp' || changed === 'throttleDown')) {
             e.preventDefault();
         }
-        if (e.code === 'KeyR' && down) this.reset();
+        if (down && isResetKey(e.code)) this.reset();
     }
 
     reset() {
-        const start = createFlightState();
+        const start = this.startState();
         this.position.set(start.position.x, start.position.y, start.position.z);
         this.rotation.set(start.rotation.x, start.rotation.y, start.rotation.z);
         this.speed = start.speed;
         this.throttle = start.throttle;
-        this.verticalSpeed = 0;
+
+        // The climb rate starts on the configured one, so the vertical speed
+        // indicator reads the climb the aircraft is already in rather than a
+        // level zero it would only leave on the first frame that runs.
+        this.verticalSpeed = start.verticalSpeed;
         clearCrash(this.crash);
+
+        if (this.group) {
+            this.group.position.copy(this.position);
+            this.group.rotation.copy(this.rotation);
+        }
     }
 
     update(dt, terrainHeight = 0) {
@@ -152,10 +192,10 @@ export class Aircraft {
         // aircraft flies on; arriving faster than the impact threshold is a
         // crash, which locks the controls and resets the flight
         const impactRate = dt > 0 ? (this.position.y - startY) / dt : 0;
-        const minY = terrainHeight + GROUND_CLEARANCE;
+        const minY = terrainHeight + this.clearance;
         if (this.position.y < minY) {
             this.position.y = minY;
-            if (isCrashImpact(impactRate) && beginCrash(this.crash)) {
+            if (isCrashImpact(impactRate, this.impactSpeed) && beginCrash(this.crash)) {
                 this.speed = 0;
                 this.throttle = 0;
                 this.verticalSpeed = 0;
@@ -184,6 +224,7 @@ export class Aircraft {
     getVerticalSpeed() { return this.verticalSpeed; }
     getHeightAboveTerrain() { return this.position.y - this.terrainHeight; }
     isCrashed()    { return controlsLocked(this.crash); }
+    isStalling()   { return isStalled(this.speed, this.minSpeed); }
 
     /**
      * Where the nose and the wings are pointing, as the vertical part of each
@@ -201,4 +242,33 @@ export class Aircraft {
             upY:      new THREE.Vector3(0, 1, 0).applyQuaternion(quat).y
         };
     }
+}
+
+/**
+ * The bundled aircraft, built nose-first along +Z with its control anchor at
+ * the origin, which is the same contract an external model has to meet.
+ */
+export function bundledModel() {
+    const mat     = new THREE.MeshPhongMaterial({ color: 0x4477aa });
+    const wingMat = new THREE.MeshPhongMaterial({ color: 0x3366aa });
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.5, 8, 8), mat);
+    body.rotation.x = Math.PI / 2;
+
+    const wings = new THREE.Mesh(new THREE.BoxGeometry(14, 0.15, 2), wingMat);
+
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(5, 0.1, 1), wingMat);
+    tail.position.set(0, 0, -3.5);
+
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2, 1.5), wingMat);
+    fin.position.set(0, 1, -3.5);
+
+    const nose = new THREE.Mesh(
+        new THREE.ConeGeometry(0.5, 1.5, 8),
+        new THREE.MeshPhongMaterial({ color: 0xdddddd })
+    );
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.set(0, 0, 4.5);
+
+    return [body, wings, tail, fin, nose];
 }

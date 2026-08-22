@@ -1,14 +1,25 @@
 /**
- * Keyboard menu - the pause menu's entries, the cursor over them, and the
- * keys that move and choose. The selection rules are pure and have no DOM or
- * Three.js dependency so they can be unit tested in Node; the small class at
- * the bottom is the list they are drawn into.
+ * Keyboard menu - the entries of the menus the game is flown through, the
+ * cursor over them, and the keys that move and choose. The selection rules are
+ * pure and have no DOM or Three.js dependency so they can be unit tested in
+ * Node; the small class at the bottom is the list they are drawn into, and
+ * every menu on screen is one of them.
  */
 
+// The menu the game opens on, before the first flight.
+export const START_MENU_ENTRIES = [
+    { id: 'start',    label: 'START FLIGHT' },
+    { id: 'controls', label: 'CONTROLS' },
+    { id: 'settings', label: 'SETTINGS' }
+];
+
+// The menu over a paused flight. Controls and Settings answer to the same ids
+// the start menu uses, so both screens open the same thing.
 export const PAUSE_MENU_ENTRIES = [
     { id: 'resume',   label: 'RESUME' },
     { id: 'reset',    label: 'RESET FLIGHT' },
-    { id: 'controls', label: 'CONTROLS' }
+    { id: 'controls', label: 'CONTROLS' },
+    { id: 'settings', label: 'SETTINGS' }
 ];
 
 // The cursor moves on the same keys the aircraft pitches with, so a hand
@@ -69,14 +80,22 @@ export function applyMenuKey(state, code, down, repeat = false) {
     return null;
 }
 
-/** The menu as a list on screen, with the cursor drawn as the selected row. */
-export class PauseMenu {
+/**
+ * A menu as a list on screen, with the cursor drawn as the selected row.
+ *
+ * An entry can also mark itself as the one currently in force - the
+ * environment being flown, in the settings panel - which is drawn apart from
+ * the cursor, because what is chosen and what is under the cursor are two
+ * different things.
+ */
+export class MenuList {
     constructor(listElement, state) {
         this.list  = listElement;
         this.items = state.entries.map(entry => {
             const item = document.createElement('li');
             item.textContent = entry.label;
             item.dataset.entry = entry.id;
+            if (entry.note) item.dataset.note = entry.note;
             this.list.appendChild(item);
             return item;
         });
@@ -85,6 +104,7 @@ export class PauseMenu {
     render(state) {
         this.items.forEach((item, index) => {
             item.classList.toggle('selected', index === state.index);
+            item.classList.toggle('current', state.entries[index]?.current === true);
         });
     }
 }

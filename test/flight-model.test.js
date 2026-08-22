@@ -62,11 +62,12 @@ test('the throttle setting is what the HUD reports, not the current speed', () =
         'speed should still be catching up to the setting');
 });
 
-test('flight starts with the throttle closed', () => {
-    assert.equal(INITIAL_THROTTLE, 0);
-    assert.equal(createFlightState().throttle, 0);
-    assert.equal(throttleToPercent(createFlightState().throttle), 0);
-    assert.equal(targetSpeed(createFlightState().throttle), 0);
+test('flight starts on a part-open throttle, already asking for its airspeed', () => {
+    const state = createFlightState();
+    assert.equal(state.throttle, INITIAL_THROTTLE);
+    assert.equal(throttleToPercent(state.throttle), 20);
+    assert.equal(targetSpeed(state.throttle), state.speed,
+        'a lever asking for a different speed would drift off the configured start');
 });
 
 // --- Speed converging toward the setting ---
@@ -164,12 +165,14 @@ test('sink is never negative, so the model never lifts the aircraft by itself', 
     }
 });
 
-test('a flight starting from a standstill stalls until the throttle catches up', () => {
-    // Full throttle from the 0-knot start: the aircraft is stalled at first
-    // and flying by the time the lever is fully open.
+test('a flight opening the throttle from its start climbs clear of the stall', () => {
+    // The configured start sits right on the stall speed, where the wing is
+    // carrying but has nothing in hand. Opening the lever is what buys the
+    // margin back.
     const state = createFlightState();
     let { speed, throttle } = state;
-    assert.ok(isStalled(speed), 'the start of a flight is a stall');
+    assert.equal(isStalled(speed), false, 'the start is not a stall, but it is the edge of one');
+    assert.equal(speed, MIN_SPEED, 'and the edge is exactly where it sits');
 
     const dt = 1 / 60;
     for (let frame = 0; frame < 120; frame++) {

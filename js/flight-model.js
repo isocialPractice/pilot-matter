@@ -103,3 +103,27 @@ export function sinkRate(speed, options = {}) {
     const severity = 1 + (1 - Math.max(speed, 0) / minSpeed) * (stallMultiplier - 1);
     return sink * severity;
 }
+
+/**
+ * The vertical part of the direction the nose has to point to hold a climb
+ * rate at an airspeed. The nose has to lift enough to turn forward motion into
+ * the asked-for climb and to out-climb the sink the wing is already losing at
+ * that speed, so a slow aircraft needs a steeper attitude for the same climb.
+ */
+export function climbForward(verticalSpeed, speed, options = {}) {
+    if (speed <= 0) return 0;
+    return clamp((verticalSpeed + sinkRate(speed, options)) / speed, -1, 1);
+}
+
+/**
+ * The same climb as a pitch angle, in the form the aircraft carries it: the X
+ * part of its YXZ euler rotation.
+ *
+ * The angle comes out negated because the model flies nose-first along +Z, and
+ * a positive rotation about +X - the axis out of the left wing - carries that
+ * nose down. Anything reading the attitude reads the nose direction instead,
+ * so this sign lives here and nowhere else.
+ */
+export function pitchForClimb(verticalSpeed, speed, options = {}) {
+    return -Math.asin(climbForward(verticalSpeed, speed, options));
+}

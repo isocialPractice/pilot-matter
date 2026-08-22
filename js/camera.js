@@ -1,18 +1,18 @@
 import * as THREE from 'three';
 import {
     CHASE_POSITION_LAMBDA, CHASE_TARGET_LAMBDA,
-    damp, shouldSnap
+    CAMERA_MODES, modeIndexOf, damp, shouldSnap
 } from './camera-math.js';
 
-export const CAMERA_MODES = ['CHASE', 'COCKPIT', 'ORBIT'];
+export { CAMERA_MODES, modeIndexOf } from './camera-math.js';
 
 export class CameraController {
-    constructor(camera, aircraft) {
+    constructor(camera, aircraft, mode = CAMERA_MODES[0]) {
         this.camera     = camera;
         this.aircraft   = aircraft;
         this.distance   = 30;
         this.height     = 10;
-        this.modeIndex  = 0;
+        this.modeIndex  = modeIndexOf(mode);
         this.orbitAngle = 0;
 
         // Where the chase camera has eased to, and the point it is easing to

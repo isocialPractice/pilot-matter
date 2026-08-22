@@ -2,37 +2,50 @@
  * Input map - translates keyboard event codes into aircraft input state.
  * Pure module with no DOM or Three.js dependencies so the input-to-state
  * mapping can be unit tested in Node.
+ *
+ * The bindings are a plain map from a control to the codes that work it, so a
+ * host embedding the Pilot API can remap them, or ignore them entirely and
+ * write the input state from an input source of its own.
  */
 
+/** The controls the flight model reads, and the keys the game binds to them. */
+export const DEFAULT_KEYMAP = {
+    pitchUp:      ['KeyW', 'ArrowUp'],
+    pitchDown:    ['KeyS', 'ArrowDown'],
+    rollLeft:     ['KeyA', 'ArrowLeft'],
+    rollRight:    ['KeyD', 'ArrowRight'],
+    yawLeft:      ['KeyQ'],
+    yawRight:     ['KeyE'],
+    throttleUp:   ['ShiftLeft', 'ShiftRight'],
+    throttleDown: ['ControlLeft', 'ControlRight']
+};
+
+// Reset is not a control surface, so it is not part of the input state: it is
+// an instruction to put the flight back where it started.
+export const RESET_KEYS = ['KeyR'];
+
+export const CONTROL_NAMES = Object.keys(DEFAULT_KEYMAP);
+
 export function createInputState() {
-    return {
-        pitchUp: false, pitchDown: false,
-        rollLeft: false, rollRight: false,
-        yawLeft: false, yawRight: false,
-        throttleUp: false, throttleDown: false
-    };
+    const input = {};
+    for (const name of CONTROL_NAMES) input[name] = false;
+    return input;
+}
+
+export function isResetKey(code, keys = RESET_KEYS) {
+    return keys.includes(code);
 }
 
 /**
  * Applies a key event to the input state.
  * Returns the name of the input field that changed, or null when the
- * key code is not mapped to a control.
+ * key code is not bound to a control.
  */
-export function applyKeyToInput(input, code, down) {
-    switch (code) {
-        case 'KeyW': case 'ArrowUp':    input.pitchUp = down;   return 'pitchUp';
-        case 'KeyS': case 'ArrowDown':  input.pitchDown = down; return 'pitchDown';
-        case 'KeyA': case 'ArrowLeft':  input.rollLeft = down;  return 'rollLeft';
-        case 'KeyD': case 'ArrowRight': input.rollRight = down; return 'rollRight';
-        case 'KeyQ':                    input.yawLeft = down;   return 'yawLeft';
-        case 'KeyE':                    input.yawRight = down;  return 'yawRight';
-        case 'ShiftLeft': case 'ShiftRight':
-            input.throttleUp = down;
-            return 'throttleUp';
-        case 'ControlLeft': case 'ControlRight':
-            input.throttleDown = down;
-            return 'throttleDown';
-        default:
-            return null;
+export function applyKeyToInput(input, code, down, keymap = DEFAULT_KEYMAP) {
+    for (const [name, codes] of Object.entries(keymap)) {
+        if (!codes.includes(code)) continue;
+        input[name] = down;
+        return name;
     }
+    return null;
 }

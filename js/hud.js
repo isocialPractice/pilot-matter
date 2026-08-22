@@ -1,10 +1,16 @@
 import { AttitudeIndicator, pitchFromForward, bankFromWing } from './attitude.js';
+import {
+    FEET_PER_UNIT, SECONDS_PER_MINUTE,
+    speedToKnots, altitudeToFeet, throttleToPercent, headingDegrees
+} from './units.js';
 
-// Unit conversions and readout rules (approximate, tuned for arcade feel).
-// Kept as pure exported functions so they can be unit tested in Node without
-// a DOM.
-export const KNOTS_PER_UNIT = 2;
-export const FEET_PER_UNIT  = 3.28;
+// The unit conversions live in js/units.js, which converts in both directions
+// so a start state can be configured in knots and feet. They are re-exported
+// here because the instruments are what those numbers are read on.
+export {
+    KNOTS_PER_UNIT, FEET_PER_UNIT,
+    speedToKnots, altitudeToFeet, throttleToPercent, headingDegrees
+} from './units.js';
 
 // The vertical speed indicator rounds to this many feet per minute, so the
 // readout settles on a number instead of flickering every frame.
@@ -17,21 +23,6 @@ export const LOW_ALTITUDE_FEET = 200;
 // The compass points the heading readout names, in clockwise order from
 // north, each covering an equal slice of the circle.
 export const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-
-export function speedToKnots(speed)       { return Math.round(speed * KNOTS_PER_UNIT); }
-export function altitudeToFeet(altitude)  { return Math.round(altitude * FEET_PER_UNIT); }
-export function throttleToPercent(throttle) { return Math.round(throttle * 100); }
-
-/**
- * The compass bearing the aircraft is pointing along, in whole degrees from
- * 0 to 359. The world's +Z axis is north, so a flight starts on 000, and the
- * card counts clockwise the way a right turn carries the nose - which is the
- * falling direction of the yaw angle, hence the sign.
- */
-export function headingDegrees(yaw) {
-    const degrees = Math.round(-yaw * 180 / Math.PI);
-    return ((degrees % 360) + 360) % 360;
-}
 
 /**
  * Pads a heading to the three digits a compass card reads: 7 degrees is
@@ -57,7 +48,7 @@ export function compassPoint(degrees) {
  * climb, negative is a descent.
  */
 export function verticalSpeedToFeetPerMinute(verticalSpeed) {
-    const perMinute = verticalSpeed * FEET_PER_UNIT * 60;
+    const perMinute = verticalSpeed * FEET_PER_UNIT * SECONDS_PER_MINUTE;
     return Math.round(perMinute / VERTICAL_SPEED_STEP) * VERTICAL_SPEED_STEP;
 }
 

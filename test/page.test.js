@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { TITLE_NAME, START_PROMPT } from '../js/title-screen.js';
+import { TITLE_NAME, START_HINT } from '../js/title-screen.js';
 import { HELP_HINT } from '../js/controls-help.js';
 import { FACE_RADIUS } from '../js/attitude.js';
+import { SETTINGS_TITLE, SETTINGS_HEADING } from '../js/settings.js';
 
 const indexHtml = readFileSync(
     fileURLToPath(new URL('../index.html', import.meta.url)),
@@ -19,10 +20,19 @@ const hudSource = readFileSync(
     'utf8'
 );
 
+// Every script under js/, folders included, so a module that reaches for an
+// element from a subfolder is checked the same way the top-level ones are.
+function collectScripts(directory, prefix = '') {
+    return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+        const path = `${directory}/${entry.name}`;
+        if (entry.isDirectory()) return collectScripts(path, `${prefix}${entry.name}/`);
+        if (!entry.name.endsWith('.js')) return [];
+        return [{ name: `${prefix}${entry.name}`, source: readFileSync(path, 'utf8') }];
+    });
+}
+
 const scriptDir = fileURLToPath(new URL('../js', import.meta.url));
-const scripts = readdirSync(scriptDir)
-    .filter(name => name.endsWith('.js'))
-    .map(name => ({ name, source: readFileSync(`${scriptDir}/${name}`, 'utf8') }));
+const scripts = collectScripts(scriptDir);
 
 // The browser tab shows the title next to the favicon, so the two should
 // name the same thing rather than a leftover working title.
@@ -77,7 +87,7 @@ test('the warning overlays start hidden and wait for the flight to trip them', (
 // screen. Starting hidden means a page whose scripts never arrive shows an
 // honest nothing rather than a HUD reading zero over an empty world.
 test('the overlays the simulator places start hidden and wait to be placed', () => {
-    for (const id of ['title-screen', 'paused', 'hud', 'attitude', 'controls-help', 'controls-help-hint']) {
+    for (const id of ['title-screen', 'paused', 'settings', 'hud', 'attitude', 'controls-help', 'controls-help-hint']) {
         const rule = indexHtml.match(new RegExp(`#${id}\\s*\\{([^}]*)\\}`));
         assert.ok(rule, `index.html should style #${id}`);
         assert.ok(/display:\s*none/.test(rule[1]), `#${id} should start hidden`);
@@ -99,18 +109,65 @@ test('every element the scripts reach for exists on the page', () => {
     }
 });
 
-test('the title screen names the game and says what to do about it', () => {
+test('the title screen names the game and says how to work the menu on it', () => {
     assert.ok(indexHtml.includes(TITLE_NAME), 'the title screen should name the game');
-    assert.ok(indexHtml.includes(START_PROMPT), 'the title screen should carry the start prompt');
+    assert.ok(indexHtml.includes(START_HINT), 'the title screen should say how its menu is worked');
+});
+
+test('the settings panel is titled and says what it is setting', () => {
+    assert.ok(indexHtml.includes(SETTINGS_TITLE), 'the panel should carry its title');
+    assert.ok(indexHtml.includes(SETTINGS_HEADING), 'and name what the list under it changes');
 });
 
 test('the collapsed controls list leaves the hint that reopens it', () => {
     assert.ok(indexHtml.includes(HELP_HINT), `index.html should carry the hint "${HELP_HINT}"`);
 });
 
-test('the pause menu has a list to be drawn into', () => {
-    assert.ok(/<ul id="pause-menu">\s*<\/ul>/.test(indexHtml),
-        'the entries are drawn from js/menu.js, so the page should leave the list empty');
+test('every menu has a list to be drawn into, and nothing drawn in it yet', () => {
+    for (const id of ['start-menu', 'pause-menu', 'settings-menu']) {
+        assert.ok(new RegExp(`<ul id="${id}">\\s*</ul>`).test(indexHtml),
+            `the entries are drawn from js/menu.js, so the page should leave #${id} empty`);
+    }
+});
+
+// The browser resolves every import itself, and the modules that pull in
+// Three.js are never loaded here, so a path typed wrong in one of those is a
+// blank page rather than a failing test. Checking the paths themselves catches
+// it without a renderer.
+test('every module a script imports is a module that is there', () => {
+    for (const { name, source } of scripts) {
+        const folder = name.includes('/') ? `${scriptDir}/${name.slice(0, name.lastIndexOf('/'))}` : scriptDir;
+
+        for (const match of source.matchAll(/from\s+'(\.[^']+)'/g)) {
+            const target = new URL(match[1], `file:///${folder.replace(/\\/g, '/')}/`);
+            assert.ok(existsSync(fileURLToPath(target)),
+                `js/${name} imports "${match[1]}", which does not exist`);
+        }
+    }
+});
+
+test('every bare import is one the page maps to a module', () => {
+    const mapped = Object.keys(JSON.parse(
+        indexHtml.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]
+    ).imports);
+
+    for (const { name, source } of scripts) {
+        for (const match of source.matchAll(/from\s+'([^'.][^']*)'/g)) {
+            const specifier = match[1];
+            assert.ok(mapped.some(prefix => specifier === prefix || specifier.startsWith(prefix)),
+                `js/${name} imports "${specifier}", which the import map does not resolve`);
+        }
+    }
+});
+
+test('every path the manifest publishes is a module that is there', () => {
+    const root = fileURLToPath(new URL('..', import.meta.url));
+    const paths = [manifest.main, ...Object.values(manifest.exports ?? {})];
+
+    assert.ok(paths.length > 1, 'the manifest should publish the API entry point');
+    for (const path of paths) {
+        assert.ok(existsSync(`${root}/${path}`), `the manifest publishes ${path}, which does not exist`);
+    }
 });
 
 test('the attitude indicator is clipped to the face its marks are drawn on', () => {

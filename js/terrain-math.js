@@ -1,9 +1,12 @@
 /**
- * Terrain math - the pure functions the procedural world is built from:
- * value noise, fractal Brownian motion, the plains/peaks height curve, the
- * smoothstep radial bump that shapes a mountain, and the height-to-colour
- * ramp. No DOM or Three.js dependencies, so every function here can be unit
- * tested in Node.
+ * Terrain math - the pure functions the procedural world is built from: value
+ * noise, fractal Brownian motion, the plains/peaks height curve, and the
+ * smoothstep radial bump that shapes a mountain. No DOM or Three.js
+ * dependencies, so every function here can be unit tested in Node.
+ *
+ * What the ground is coloured is not decided here any more. Every band the
+ * world is painted in is an element in `js/environment/elements.js`, with its
+ * own configurable range, rather than one fixed ramp.
  */
 
 // fBm layering constants. Each octave halves the amplitude and multiplies
@@ -87,18 +90,4 @@ export function shapeHeight(noise, maxHeight) {
 export function mountainBump(distance, radius, peak) {
     if (radius <= 0 || distance >= radius) return 0;
     return peak * smoothstep(1 - Math.max(distance, 0) / radius);
-}
-
-/**
- * Vertex colour for a world height, as [r, g, b] in the 0-1 range: water,
- * sand, grass, rock, then snow. Shared by the base terrain and the mountain
- * pass so a peak is coloured exactly like ground of the same height.
- */
-export function heightToColor(h) {
-    if (h < 4)   return [0.10, 0.25, 0.65];
-    if (h < 12)  return [0.75, 0.68, 0.48];
-    if (h < 130) { const t = h / 130;       return [0.22 + t*0.12, 0.42 + t*0.10, 0.12]; }
-    if (h < 300) { const t = (h-130) / 170; return [0.40 + t*0.20, 0.35 + t*0.10, 0.25 + t*0.10]; }
-    const t = Math.min(1, (h-300) / 100);
-    return [0.55 + t*0.45, 0.55 + t*0.45, 0.60 + t*0.40];
 }

@@ -1,43 +1,34 @@
 /**
- * Title screen state - the overlay the game opens on, before the first
- * flight. Pure module with no DOM or Three.js dependencies so the start rules
- * and the held pre-flight clock can be unit tested in Node.
+ * Title screen state - the screen the game opens on, before the first flight.
+ * Pure module with no DOM or Three.js dependencies so the start rules and the
+ * held pre-flight clock can be unit tested in Node.
+ *
+ * The screen carries a menu rather than a prompt, so the flight can be started,
+ * the controls read, or the settings changed before anything is in the air. The
+ * menu itself is the shared one in `js/menu.js`; all this module owns is
+ * whether the flight has begun.
  */
 
-export const TITLE_NAME   = 'PILOT MATTER';
-export const START_PROMPT = 'PRESS ANY KEY TO START';
+export const TITLE_NAME = 'PILOT MATTER';
 
-// Keys that are held rather than pressed. A modifier on its own is half of a
-// shortcut rather than an answer to the prompt, so resting a hand on Shift
-// leaves the title up.
-export const MODIFIER_KEYS = [
-    'ShiftLeft', 'ShiftRight',
-    'ControlLeft', 'ControlRight',
-    'AltLeft', 'AltRight',
-    'MetaLeft', 'MetaRight',
-    'CapsLock', 'NumLock', 'ScrollLock'
-];
+// What the screen says under the menu: the keys that work it, in the same
+// words the pause menu uses for the same keys.
+export const START_HINT = 'W/S TO SELECT, ENTER TO CHOOSE';
 
 export function createTitleState() {
     return { started: false };
 }
 
-export function isStartKey(code) {
-    return !MODIFIER_KEYS.includes(code);
-}
-
 /**
- * Applies a key event to the title state. Only the initial keydown of a key
- * that is actually a key press starts the flight, and once started the title
- * is gone for the session: this is the opening screen, not a menu to come
- * back to.
+ * Begins the flight. This is the opening screen rather than a menu to come
+ * back to, so once it is answered it is gone for the session.
  *
- * Returns true when the flight started on this key.
+ * Returns true when this call started the flight.
  */
-export function applyStartKey(state, code, down, repeat = false) {
-    if (state.started || !down || repeat || !isStartKey(code)) return false;
+export function startFlight(state) {
+    const changed = !state.started;
     state.started = true;
-    return true;
+    return changed;
 }
 
 /** True while the title screen still holds the flight on the ramp. */
@@ -47,9 +38,9 @@ export function titleShowing(state) {
 
 /**
  * The delta time the simulation should advance by this frame. Held at zero
- * until the first key press, so the aircraft is not already gliding toward
- * the terrain behind the title screen, and the wait before someone presses a
- * key is not applied in one jump on the frame the flight starts.
+ * until the flight is started, so the aircraft is not already climbing away
+ * behind the title screen, and the wait before someone chooses is not applied
+ * in one jump on the frame the flight begins.
  */
 export function preFlightDelta(state, dt) {
     return state.started ? dt : 0;

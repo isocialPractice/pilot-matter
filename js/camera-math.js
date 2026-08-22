@@ -9,6 +9,18 @@
  * snapping it into place.
  */
 
+// The views the C key cycles through, in the order it cycles them. The names
+// live here rather than beside the Three.js camera so anything that only needs
+// to name a mode - the configured start state, the API's options - can read
+// them without pulling in a renderer.
+export const CAMERA_MODES = ['CHASE', 'COCKPIT', 'ORBIT'];
+
+/** Where a named mode sits in the cycle, falling back to the first one. */
+export function modeIndexOf(mode) {
+    const index = CAMERA_MODES.indexOf(mode);
+    return index < 0 ? 0 : index;
+}
+
 // How quickly the camera closes on its offset, in reciprocal seconds. The
 // position trails further than the point it looks at, so the aircraft leads
 // the frame through a turn.

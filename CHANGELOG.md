@@ -5,6 +5,77 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0-alpha] - 2026-08-22
+
+### Added
+
+- A configured start state, replacing the standing start: every flight now
+  opens at 80 knots and 1390 ft, climbing at 1260 ft/min on a heading of 000,
+  with the throttle at 20% and the chase camera selected. The two values that
+  have to be flown rather than declared are derived rather than guessed - the
+  throttle setting is the one asking for exactly 80 knots, and the pitch is the
+  angle that covers both the climb and the sink the wing loses at that airspeed
+  - so the flight holds its opening condition instead of settling out of it.
+  `R` and Reset Flight put the aircraft back into the same condition
+- A start screen menu over the title, offering Start Flight, Controls, and
+  Settings, worked with the same keys the pause menu uses. The Controls entry
+  puts the control list on screen over the title, where nothing had shown it
+  before the first flight
+- A Settings entry on the pause menu, opening the same panel the start screen
+  opens. The panel is the one overlay that clears the screen it was opened
+  from, because the point of picking an environment is seeing it
+- Ten environment elements - mountain, canyon, desert, grass, sand, water body,
+  river, forest, town, and snow - each declaring the ranges it can be
+  configured through and the algorithm that draws it. Nothing in the world is a
+  placed asset: rivers and canyons wander on three waves whose lengths share no
+  common multiple, forests are outlined by three lobes that share none either,
+  dune crests are pushed off their axis by noise, and every colour is a
+  light-to-dark gradient of one base hue so nothing shifts hue across the ground
+  it covers
+- Five assembled environments - Highlands, River Basin, Canyon Country, Dune
+  Sea, and Lakeside - selectable from the settings panel, regenerated in place
+  in a few tens of milliseconds, and remembered in `localStorage` for the next
+  session. Each is a name, a seed, and a set of elements rather than any
+  geometry, so the same preset lays out the same world every time it is flown
+- A simulator API under `js/api/`, with `js/api/index.js` as the one module a
+  host page imports. The **Pilot API** flies the aircraft against a
+  caller-supplied scene, terrain sampler, aircraft asset, and keybinding map,
+  and reports a fixed telemetry shape an external HUD can be written against.
+  The **Matter API** hands over an assembled environment as one detachable
+  group, with a height sampler, a contract any external aircraft can be checked
+  against, caller-supplied meshes placed by the generator, and the world's fog
+  and sky as a standalone effect
+- `js/environment/elements.js` and `js/environment/presets.js`, pure modules
+  holding the registry, the field, every generator, and the five worlds, with
+  unit tests covering the ranges, the seeded layout, the carve profile, and what
+  each generator does to the ground it is placed in
+- `js/api/contract.js`, a pure module holding the option defaults, the aircraft
+  contract, and the telemetry shape, which imports no renderer so a host can
+  check its own options and its own aircraft with nothing loaded
+- `js/settings.js` and `js/units.js`, pure modules holding the settings panel's
+  choices and the conversions between world units and instrument readings in
+  both directions, with unit tests covering the round trips, the stored choice,
+  and a storage that refuses outright
+
+### Changed
+
+- The title screen is answered by its menu rather than by any key, so the
+  screen the game opens on can be read and configured before anything flies
+- The terrain is built from an assembled environment rather than a fixed noise
+  pass followed by a mountain pass, and can be rebuilt in place when a different
+  world is chosen
+- The keybindings are a map rather than a switch, published as an interface a
+  host can remap or replace with an input source of its own
+- The aircraft accepts an external model flown from a declared control anchor,
+  its own input state, and overrides for the start state and the flight model,
+  so the game and the Pilot API fly the same class
+
+### Removed
+
+- The fixed height-to-colour ramp in `js/terrain-math.js`. Every band it drew -
+  water, sand, grass, rock, and snow - is now an element with a configurable
+  range of its own
+
 ## [1.5.0-alpha] - 2026-08-21
 
 ### Added

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    PauseMenu,
+    MenuList,
     PAUSE_MENU_ENTRIES,
+    START_MENU_ENTRIES,
     MENU_SELECT_KEYS,
     createMenuState,
     selectedEntry,
@@ -14,12 +15,28 @@ import {
 } from '../js/menu.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 
-test('the pause menu offers a way out, a way back to the start, and the controls', () => {
+test('the pause menu offers a way out, a way back to the start, the controls, and the settings', () => {
     const ids = PAUSE_MENU_ENTRIES.map(entry => entry.id);
-    assert.deepEqual(ids, ['resume', 'reset', 'controls']);
+    assert.deepEqual(ids, ['resume', 'reset', 'controls', 'settings']);
     assert.equal(new Set(ids).size, ids.length, 'two entries answering to one id is one entry too many');
     for (const entry of PAUSE_MENU_ENTRIES) {
         assert.ok(entry.label.length > 0, `${entry.id} needs a label to be read by`);
+    }
+});
+
+test('the start menu begins the flight, and reaches the controls and the settings', () => {
+    const ids = START_MENU_ENTRIES.map(entry => entry.id);
+    assert.deepEqual(ids, ['start', 'controls', 'settings']);
+    assert.equal(selectedId(createMenuState(START_MENU_ENTRIES)), 'start',
+        'the cursor should open on the entry that starts flying');
+});
+
+// Both screens open the same two panels, so the entries that do it answer to
+// the same ids rather than to two names for one thing.
+test('the entries the two menus share are the same entries', () => {
+    for (const id of ['controls', 'settings']) {
+        assert.ok(START_MENU_ENTRIES.some(entry => entry.id === id), `the start menu should offer ${id}`);
+        assert.ok(PAUSE_MENU_ENTRIES.some(entry => entry.id === id), `the pause menu should offer ${id}`);
     }
 });
 
@@ -38,7 +55,7 @@ test('the cursor walks the list in both directions', () => {
 
 test('the cursor wraps rather than stopping dead at either end', () => {
     const state = createMenuState();
-    assert.equal(moveSelection(state, -1).id, 'controls', 'up from the top lands on the bottom');
+    assert.equal(moveSelection(state, -1).id, 'settings', 'up from the top lands on the bottom');
     assert.equal(moveSelection(state, 1).id, 'resume', 'down from the bottom lands on the top');
 });
 
@@ -52,7 +69,7 @@ test('the pitch keys move the cursor, so a hand on the controls stays there', ()
     for (const code of ['KeyW', 'ArrowUp']) {
         resetSelection(state);
         assert.equal(applyMenuKey(state, code, true), null);
-        assert.equal(selectedId(state), 'controls');
+        assert.equal(selectedId(state), 'settings');
     }
 });
 
@@ -138,7 +155,7 @@ function fakeList() {
 test('the menu is drawn as the entries it holds, in the order it holds them', () => {
     const list = fakeList();
     const state = createMenuState();
-    new PauseMenu(list, state);
+    new MenuList(list, state);
 
     assert.deepEqual(list.children.map(item => item.textContent),
         PAUSE_MENU_ENTRIES.map(entry => entry.label));
@@ -149,7 +166,7 @@ test('the menu is drawn as the entries it holds, in the order it holds them', ()
 test('the cursor is drawn on one entry, and it is the selected one', () => {
     const list = fakeList();
     const state = createMenuState();
-    const menu = new PauseMenu(list, state);
+    const menu = new MenuList(list, state);
 
     for (let index = 0; index < state.entries.length; index++) {
         state.index = index;
@@ -158,6 +175,21 @@ test('the cursor is drawn on one entry, and it is the selected one', () => {
         assert.equal(selected.length, 1, 'a cursor on two entries is a cursor on neither');
         assert.equal(selected[0].dataset.entry, selectedId(state));
     }
+});
+
+// What is chosen and what is under the cursor are two different things, so an
+// entry can be marked as the one in force without the cursor being on it.
+test('the entry in force is drawn apart from the cursor', () => {
+    const list = fakeList();
+    const state = createMenuState([
+        { id: 'first',  label: 'FIRST' },
+        { id: 'second', label: 'SECOND', current: true }
+    ]);
+    const menu = new MenuList(list, state);
+    menu.render(state);
+
+    assert.deepEqual(list.children.map(item => item.classes.has('current')), [false, true]);
+    assert.deepEqual(list.children.map(item => item.classes.has('selected')), [true, false]);
 });
 
 test('an empty menu has nothing to select and does not fall over being asked', () => {

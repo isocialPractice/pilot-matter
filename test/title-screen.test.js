@@ -2,15 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     TITLE_NAME,
-    START_PROMPT,
-    MODIFIER_KEYS,
+    START_HINT,
     createTitleState,
-    isStartKey,
-    applyStartKey,
+    startFlight,
     titleShowing,
     preFlightDelta
 } from '../js/title-screen.js';
-import { createInputState, applyKeyToInput } from '../js/input-map.js';
+import { START_MENU_ENTRIES, createMenuState, applyMenuKey, selectedId } from '../js/menu.js';
 
 test('the game opens on the title screen, before any flight', () => {
     const state = createTitleState();
@@ -18,49 +16,32 @@ test('the game opens on the title screen, before any flight', () => {
     assert.equal(titleShowing(state), true);
 });
 
-test('the prompt names the game and says what to do about it', () => {
+test('the screen names the game and says how to work the menu on it', () => {
     assert.equal(TITLE_NAME, 'PILOT MATTER');
-    assert.match(START_PROMPT, /PRESS ANY KEY/);
+    assert.match(START_HINT, /SELECT/);
+    assert.match(START_HINT, /CHOOSE/);
 });
 
-test('any key means any key', () => {
-    for (const code of ['KeyW', 'Space', 'Enter', 'KeyP', 'F1', 'Digit1', 'Tab']) {
-        const state = createTitleState();
-        assert.equal(applyStartKey(state, code, true), true, `${code} should start the flight`);
-        assert.equal(titleShowing(state), false);
-    }
-});
-
-test('a modifier on its own is not an answer to the prompt', () => {
-    for (const code of MODIFIER_KEYS) {
-        const state = createTitleState();
-        assert.equal(isStartKey(code), false, `${code} should not start the flight`);
-        assert.equal(applyStartKey(state, code, true), false);
-        assert.equal(titleShowing(state), true, `resting a hand on ${code} should leave the title up`);
-    }
-});
-
-test('releasing a key does not start the flight, so a held key starts it once', () => {
+test('the flight starts when the menu says so, and not before', () => {
     const state = createTitleState();
-    assert.equal(applyStartKey(state, 'Space', false), false);
+    const menu = createMenuState(START_MENU_ENTRIES);
+
+    // Walking the cursor down to Settings and back is not an answer
+    applyMenuKey(menu, 'ArrowDown', true);
     assert.equal(titleShowing(state), true);
-    assert.equal(applyStartKey(state, 'Space', true), true);
-    assert.equal(applyStartKey(state, 'Space', false), false);
-});
 
-test('auto-repeat while holding a key changes nothing after the first press', () => {
-    const state = createTitleState();
-    applyStartKey(state, 'Space', true, false);
-    for (let i = 0; i < 5; i++) {
-        assert.equal(applyStartKey(state, 'Space', true, true), false);
-    }
-    assert.equal(state.started, true);
+    applyMenuKey(menu, 'ArrowUp', true);
+    assert.equal(selectedId(menu), 'start');
+    assert.equal(applyMenuKey(menu, 'Enter', true), 'start');
+
+    assert.equal(startFlight(state), true);
+    assert.equal(titleShowing(state), false);
 });
 
 test('the title screen never comes back once the flight has started', () => {
     const state = createTitleState();
-    applyStartKey(state, 'Enter', true);
-    assert.equal(applyStartKey(state, 'Enter', true), false, 'a second press is a flight control, not a start');
+    startFlight(state);
+    assert.equal(startFlight(state), false, 'a second answer changes nothing');
     assert.equal(titleShowing(state), false);
 });
 
@@ -68,14 +49,6 @@ test('the clock is held until the flight starts', () => {
     const state = createTitleState();
     assert.equal(preFlightDelta(state, 0.016), 0);
     assert.equal(preFlightDelta(state, 45), 0, 'a long wait never leaks in as one big step');
-    applyStartKey(state, 'Space', true);
+    startFlight(state);
     assert.equal(preFlightDelta(state, 0.016), 0.016);
-});
-
-test('the key that starts the flight is not one that also flies it', () => {
-    // The key press is swallowed by the title screen rather than passed on,
-    // so nothing the input map maps should be moved by it
-    const input = createInputState();
-    assert.equal(applyKeyToInput(input, 'Space', true), null);
-    assert.deepEqual(input, createInputState());
 });

@@ -7,8 +7,7 @@ import {
     fbm,
     smoothstep,
     shapeHeight,
-    mountainBump,
-    heightToColor
+    mountainBump
 } from '../js/terrain-math.js';
 
 test('hash is deterministic and stays inside the unit range', () => {
@@ -121,31 +120,4 @@ test('mountainBump falls off smoothly from centre to rim', () => {
 test('mountainBump ignores a degenerate radius instead of dividing by zero', () => {
     assert.equal(mountainBump(0, 0, 300), 0);
     assert.equal(mountainBump(10, -5, 300), 0);
-});
-
-test('heightToColor walks the water, sand, grass, rock, snow bands', () => {
-    const water = heightToColor(0);
-    const sand  = heightToColor(8);
-    const grass = heightToColor(60);
-    const rock  = heightToColor(200);
-    const snow  = heightToColor(450);
-
-    // Water is the only band where blue dominates red
-    assert.ok(water[2] > water[0], 'water should read blue');
-    // Sand is bright and warm
-    assert.ok(sand[0] > sand[2], 'sand should read warm');
-    // Grass is the only band where green dominates
-    assert.ok(grass[1] > grass[0] && grass[1] > grass[2], 'grass should read green');
-    // Rock is browner than grass, snow is the brightest of all
-    assert.ok(rock[0] > grass[0], 'rock should be redder than grass');
-    assert.ok(snow[0] > rock[0] && snow[1] > rock[1] && snow[2] > rock[2],
-        'snow should be the brightest band');
-});
-
-test('heightToColor stays inside the 0-1 colour range at every height', () => {
-    for (const h of [-10, 0, 3.9, 4, 11.9, 12, 129, 130, 299, 300, 400, 5000]) {
-        for (const channel of heightToColor(h)) {
-            assert.ok(channel >= 0 && channel <= 1, `channel ${channel} at height ${h} is out of range`);
-        }
-    }
 });
