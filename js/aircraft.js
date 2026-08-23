@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { createInputState, applyKeyToInput, isResetKey, DEFAULT_KEYMAP } from './input-map.js';
 import { createFlightState } from './flight-state.js';
 import {
-    MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY,
-    updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled
+    MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY,
+    updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled, controlRates
 } from './flight-model.js';
 import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, createCrashState, isCrashImpact,
@@ -31,6 +31,8 @@ export class Aircraft {
         this.gravity     = flight.gravity     ?? GRAVITY;
         this.clearance   = flight.clearance   ?? GROUND_CLEARANCE;
         this.impactSpeed = flight.impactSpeed ?? CRASH_IMPACT_SPEED;
+
+        this.setSensitivity(flight.sensitivity ?? CONTROL_SENSITIVITY);
 
         this.position = new THREE.Vector3();
         this.rotation = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -70,6 +72,17 @@ export class Aircraft {
                 z: 0
             }
         };
+    }
+
+    /**
+     * How hard the controls bite, as a multiplier on every control rate. The
+     * rates are worked out here rather than every frame, because a setting is
+     * changed far less often than a frame is drawn.
+     */
+    setSensitivity(sensitivity) {
+        this.sensitivity = sensitivity;
+        this.rates = controlRates(sensitivity);
+        return this.rates;
     }
 
     createModel(external = null, anchor = null) {
@@ -154,13 +167,13 @@ export class Aircraft {
         this.speed = convergeSpeed(this.speed, targetSpeed(this.throttle, this.maxSpeed), dt);
 
         // Pitch: W = nose up, S = nose down
-        if (this.input.pitchUp)   this.rotation.x += 1.2 * dt;
-        if (this.input.pitchDown) this.rotation.x -= 1.2 * dt;
+        if (this.input.pitchUp)   this.rotation.x += this.rates.pitch * dt;
+        if (this.input.pitchDown) this.rotation.x -= this.rates.pitch * dt;
         this.rotation.x = THREE.MathUtils.clamp(this.rotation.x, -Math.PI / 2.2, Math.PI / 2.2);
 
         // Roll
-        if (this.input.rollLeft)  this.rotation.z += 2.0 * dt;
-        if (this.input.rollRight) this.rotation.z -= 2.0 * dt;
+        if (this.input.rollLeft)  this.rotation.z += this.rates.roll * dt;
+        if (this.input.rollRight) this.rotation.z -= this.rates.roll * dt;
         this.rotation.z = THREE.MathUtils.clamp(this.rotation.z, -Math.PI, Math.PI);
 
         // Roll auto-levels slowly when no input
@@ -169,8 +182,8 @@ export class Aircraft {
         }
 
         // Yaw: Q = nose left, E = nose right
-        if (this.input.yawLeft)  this.rotation.y += 0.8 * dt;
-        if (this.input.yawRight) this.rotation.y -= 0.8 * dt;
+        if (this.input.yawLeft)  this.rotation.y += this.rates.yaw * dt;
+        if (this.input.yawRight) this.rotation.y -= this.rates.yaw * dt;
 
         // Banking roll causes yaw (coordinated turn)
         this.rotation.y -= Math.sin(this.rotation.z) * 1.2 * dt;

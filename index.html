@@ -116,15 +116,106 @@
             z-index: 310;
         }
 
+        /* The loading screen sits over everything, the title included, so the
+           fade that takes it off reveals the world the first frame drew. */
         #loading {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff;
-            font-family: Arial, sans-serif;
-            font-size: 24px;
-            z-index: 200;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            z-index: 400;
+            transition: opacity 600ms ease;
+        }
+
+        #loading.done {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #loading h1 {
+            font-size: clamp(22px, 6vw, 40px);
+            letter-spacing: 10px;
+            padding-left: 10px;
+        }
+
+        #loading-track {
+            width: min(320px, 60vw);
+            height: 4px;
+            background: rgba(0, 255, 0, 0.18);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #loading-bar {
+            width: 0;
+            height: 100%;
+            background: #0f0;
+            transition: width 400ms ease;
+        }
+
+        #loading-label {
+            color: #f0f2f3;
+            font-size: 12px;
+            letter-spacing: 4px;
+            padding-left: 4px;
+        }
+
+        #minimap {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 140px;
+            height: 140px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #minimap svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+        }
+
+        .minimap-face   { fill: rgba(0, 0, 0, 0.4); stroke: rgba(0, 255, 0, 0.55); stroke-width: 1.4; }
+        .minimap-grid   { stroke: rgba(0, 255, 0, 0.22); stroke-width: 0.8; }
+        .minimap-marker { fill: #ffb000; stroke: #000; stroke-width: 0.6; }
+
+        .minimap-label {
+            fill: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 8px;
+            letter-spacing: 1px;
+        }
+
+        /* Off the map, the marker is held at the edge it left through, and says
+           so rather than reading as a position inside the world. */
+        #minimap.off-map .minimap-marker { fill: #ff3b30; }
+        #minimap.off-map .minimap-face   { stroke: rgba(255, 59, 48, 0.7); }
+
+        /* Sits above the artificial horizon in the same corner, rather than
+           over it. */
+        #audio-muted {
+            display: none;
+            position: fixed;
+            bottom: 180px;
+            right: 20px;
+            color: #f0f2f3;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 3px;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 5px 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 100;
         }
 
         #title-screen {
@@ -164,6 +255,11 @@
             left: 50%;
             transform: translate(-50%, -50%);
             min-width: 360px;
+            /* The panel holds a world list and an option list, which is enough
+               rows to outgrow a short window, so it scrolls rather than
+               running off the bottom of one. */
+            max-height: 92vh;
+            overflow-y: auto;
             color: #0f0;
             font-family: 'Courier New', monospace;
             text-align: center;
@@ -171,7 +267,6 @@
             border: 1px solid rgba(0, 255, 0, 0.4);
             padding: 20px 40px;
             border-radius: 8px;
-            pointer-events: none;
             z-index: 340;
         }
 
@@ -223,14 +318,16 @@
 
         #pause-menu,
         #start-menu,
-        #settings-menu {
+        #settings-menu,
+        #settings-options {
             list-style: none;
             margin: 18px 0 14px;
         }
 
         #pause-menu li,
         #start-menu li,
-        #settings-menu li {
+        #settings-menu li,
+        #settings-options li {
             margin: 4px 0;
             padding: 5px 10px;
             color: #f0f2f3;
@@ -242,10 +339,23 @@
 
         #pause-menu li.selected,
         #start-menu li.selected,
-        #settings-menu li.selected {
+        #settings-menu li.selected,
+        #settings-options li.selected {
             color: #000;
             background: #0f0;
             border-color: #0f0;
+        }
+
+        /* Two lists under two headings sit closer together than one list on its
+           own would, so the panel stays one screenful. */
+        #settings-menu,
+        #settings-options {
+            margin: 10px 0 8px;
+        }
+
+        #settings-menu li,
+        #settings-options li {
+            margin: 2px 0;
         }
 
         /* The environment being flown, which is not the same thing as the one
@@ -258,7 +368,8 @@
             content: '\203A\00a0';
         }
 
-        #settings-menu li[data-note]::after {
+        #settings-menu li[data-note]::after,
+        #settings-options li[data-note]::after {
             content: attr(data-note);
             display: block;
             margin-top: 2px;
@@ -327,11 +438,16 @@
 
         @media (prefers-reduced-motion: reduce) {
             #low-altitude { animation: none; }
+            #loading, #loading-bar { transition: none; }
         }
     </style>
 </head>
 <body>
-    <div id="loading">Loading Flight Simulator...</div>
+    <div id="loading">
+        <h1>PILOT MATTER</h1>
+        <div id="loading-track"><div id="loading-bar"></div></div>
+        <p id="loading-label">BUILDING THE SCENE</p>
+    </div>
 
     <div id="canvas-container"></div>
 
@@ -351,7 +467,9 @@
         <h2>SETTINGS</h2>
         <h3>ENVIRONMENT</h3>
         <ul id="settings-menu"></ul>
-        <small>W/S TO SELECT &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
+        <h3>OPTIONS</h3>
+        <ul id="settings-options"></ul>
+        <small>W/S TO SELECT &middot; A/D TO ADJUST &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>
@@ -359,13 +477,27 @@
     <div id="crashed">CRASHED<small>RESETTING FLIGHT</small></div>
 
     <div id="hud">
-        <div>AIRSPEED: <span id="hud-speed">80</span> knots</div>
-        <div>ALTITUDE: <span id="hud-altitude">1390</span> ft</div>
-        <div>V/S: <span id="hud-vertical-speed">+1260</span> ft/min</div>
+        <div>AIRSPEED: <span id="hud-speed">80</span> <span id="hud-speed-unit">knots</span></div>
+        <div>ALTITUDE: <span id="hud-altitude">1390</span> <span id="hud-altitude-unit">ft</span></div>
+        <div>V/S: <span id="hud-vertical-speed">+1260</span> <span id="hud-vertical-speed-unit">ft/min</span></div>
         <div>HEADING: <span id="hud-heading">000</span>&deg; <span id="hud-compass">N</span></div>
         <div>THROTTLE: <span id="hud-throttle">20</span>%</div>
         <div>CAMERA: <span id="hud-camera">CHASE</span></div>
     </div>
+
+    <div id="minimap">
+        <svg viewBox="-56 -56 112 112" role="img" aria-label="Minimap">
+            <rect class="minimap-face" x="-50" y="-50" width="100" height="100" rx="2"></rect>
+            <line class="minimap-grid" x1="-50" y1="0" x2="50" y2="0"></line>
+            <line class="minimap-grid" x1="0" y1="-50" x2="0" y2="50"></line>
+            <text class="minimap-label" x="0" y="-52" text-anchor="middle">N</text>
+            <g id="minimap-aircraft" transform="translate(0 0) rotate(0)">
+                <polygon class="minimap-marker" points="0,-5 3.5,4 0,2 -3.5,4"></polygon>
+            </g>
+        </svg>
+    </div>
+
+    <div id="audio-muted">AUDIO MUTED</div>
 
     <div id="attitude">
         <svg viewBox="-50 -50 100 100" role="img" aria-label="Attitude indicator">
@@ -402,6 +534,8 @@
             C - Cycle Camera<br>
             Tab - Toggle HUD<br>
             H - Hide Controls<br>
+            M - Mute Audio<br>
+            O - Settings<br>
             P - Pause<br>
             R - Reset Position
         </div>

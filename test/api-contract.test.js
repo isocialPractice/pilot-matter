@@ -13,6 +13,7 @@ import {
 import {
     INITIAL_SPEED, INITIAL_THROTTLE, INITIAL_ALTITUDE, INITIAL_CAMERA_MODE
 } from '../js/flight-state.js';
+import { CONTROL_SENSITIVITY, MIN_SENSITIVITY, MAX_SENSITIVITY } from '../js/flight-model.js';
 import { DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { DEFAULT_SIZE, DEFAULT_SEGMENTS } from '../js/environment/elements.js';
 import { createInputState } from '../js/input-map.js';
@@ -80,6 +81,16 @@ test('a throttle setting outside the lever travel is clamped onto it', () => {
 
 test('a value that is not a number is not an option, it is a typo', () => {
     assert.equal(resolvePilotOptions({ flight: { speed: 'fast' } }).flight.speed, INITIAL_SPEED);
+});
+
+// A host embedding the pilot has its own idea of how hard the controls should
+// bite, so the setting the settings panel moves is one the API takes too.
+test('a host can set how hard the controls bite, within the range they hold', () => {
+    assert.equal(resolvePilotOptions().flight.sensitivity, CONTROL_SENSITIVITY);
+    assert.equal(resolvePilotOptions({ flight: { sensitivity: 1.5 } }).flight.sensitivity, 1.5);
+    assert.equal(resolvePilotOptions({ flight: { sensitivity: 400 } }).flight.sensitivity, MAX_SENSITIVITY);
+    assert.equal(resolvePilotOptions({ flight: { sensitivity: -1 } }).flight.sensitivity, MIN_SENSITIVITY);
+    assert.equal(resolvePilotOptions({ flight: { sensitivity: 'twitchy' } }).flight.sensitivity, CONTROL_SENSITIVITY);
 });
 
 test('an environment created with no options is the one the game opens on', () => {

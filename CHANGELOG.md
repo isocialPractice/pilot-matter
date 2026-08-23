@@ -5,6 +5,67 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0-alpha] - 2026-08-23
+
+### Added
+
+- A minimap in the top right corner, drawn north-up the way a chart is read:
+  the world's +Z axis runs up the face, +X runs across it, and the marker turns
+  under a fixed card rather than the card turning under the marker. It is
+  refitted to whichever environment is being flown, so the marker means the
+  same thing after a world is changed as it did before, and an aircraft flown
+  out past the edge holds the edge it left through and turns red rather than
+  being drawn somewhere it is not
+- Engine and wind audio. The engine note and its loudness are read off the
+  throttle lever, and the wind rises over it with airspeed - faster than the
+  airspeed itself, so a standstill is silent and a dive is loud. `M` mutes and
+  unmutes both, marked by an `AUDIO MUTED` line above the artificial horizon
+  and remembered in `localStorage` for the next session. The sound is built on
+  the key that starts the flight, because a browser will not run an audio
+  context created before a key was pressed at the page, and it fades to silence
+  rather than being torn down, so unmuting picks it back up where it was
+- An `OPTIONS` half of the settings panel, holding control sensitivity, fog
+  density, and the scales the instruments read on - knots or mph for airspeed,
+  feet or metres for the altimeter and the climb rate with it. Each option is a
+  value stepped through a list rather than a slider, so no combination of keys
+  can land one between two settings, and every choice is remembered for the
+  next session on its own: one setting this version cannot read does not cost
+  the others their memory
+- `O` as a key of the settings panel's own, opening it from the flight, the
+  pause menu, or the start screen, and closing it again. The panel holds the
+  simulation clock while it is up, so a setting is changed by looking at the
+  world rather than by flying into it while looking
+- A loading screen carrying the game's name, a progress bar, and a line naming
+  the work in hand, which fades off on the strength of a frame the renderer has
+  actually drawn rather than on a timer, replacing the static
+  "Loading Flight Simulator..." line
+- `js/minimap.js`, `js/audio.js`, and `js/loading.js`, pure modules holding the
+  chart projection, the engine and wind mix, and the start-up progress with no
+  DOM or Three.js dependency, with unit tests covering the projection and its
+  edge behaviour, the mix at every throttle and airspeed, the mute and its
+  stored choice, and progress that only ever moves forward
+- `controlRates()` in `js/flight-model.js`, giving the pitch, roll, and yaw
+  rates at a sensitivity setting, with the rates themselves lifted out of
+  `js/aircraft.js` and named. A host embedding the Pilot API can set the same
+  sensitivity through `flight.sensitivity`
+- A second scale for every reading in `js/units.js`, as a conversion of the
+  first rather than a second set of tuning numbers, so the flight model never
+  learns which scale is on the dial and the two can never drift apart
+
+### Changed
+
+- A menu list can be given a filter and then draws only the entries it keeps
+  while still answering to the cursor of the whole menu, which is what lets the
+  settings panel split one set of entries across two headings without splitting
+  the cursor that walks them
+- An entry carrying its own text is drawn as that rather than as its label,
+  which is how an option shows the setting it is on
+- `Tab` clears the minimap along with the rest of the instruments, because they
+  are one set of instruments rather than three overlays that happen to share a
+  screen
+- The fog is retuned in place rather than replaced when its density is changed,
+  so nothing handed the old fog is left holding one the world has stopped using
+
 ## [1.6.0-alpha] - 2026-08-22
 
 ### Added

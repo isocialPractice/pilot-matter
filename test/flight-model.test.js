@@ -9,12 +9,19 @@ import {
     THROTTLE_RATE,
     SPEED_ACCEL,
     SPEED_DECEL,
+    PITCH_RATE,
+    ROLL_RATE,
+    YAW_RATE,
+    CONTROL_SENSITIVITY,
+    MIN_SENSITIVITY,
+    MAX_SENSITIVITY,
     updateThrottle,
     targetSpeed,
     convergeSpeed,
     liftFactor,
     isStalled,
-    sinkRate
+    sinkRate,
+    controlRates
 } from '../js/flight-model.js';
 import { createFlightState, INITIAL_THROTTLE } from '../js/flight-state.js';
 import { throttleToPercent } from '../js/hud.js';
@@ -184,4 +191,39 @@ test('a flight opening the throttle from its start climbs clear of the stall', (
     assert.equal(throttleToPercent(throttle), 100);
     assert.ok(!isStalled(speed), `still stalled at ${speed} units/s after two seconds`);
     assert.ok(sinkRate(speed) < sinkRate(state.speed), 'sink should have eased off');
+});
+
+// --- How hard the controls bite ---
+
+test('the controls are tuned at a sensitivity of one, which is where a flight starts', () => {
+    assert.deepEqual(controlRates(CONTROL_SENSITIVITY), {
+        pitch: PITCH_RATE,
+        roll: ROLL_RATE,
+        yaw: YAW_RATE
+    });
+    assert.deepEqual(controlRates(), controlRates(CONTROL_SENSITIVITY));
+});
+
+test('a sensitivity setting scales every control by the same amount', () => {
+    const doubled = controlRates(2);
+    assert.equal(doubled.pitch, PITCH_RATE * 2);
+    assert.equal(doubled.roll, ROLL_RATE * 2);
+    assert.equal(doubled.yaw, YAW_RATE * 2);
+
+    // The aircraft the setting changes is still the same aircraft: roll is
+    // still the quickest control and yaw still the slowest.
+    assert.ok(doubled.roll > doubled.pitch);
+    assert.ok(doubled.pitch > doubled.yaw);
+});
+
+test('a sensitivity outside the range is held to the range rather than flown at', () => {
+    assert.deepEqual(controlRates(0), controlRates(MIN_SENSITIVITY));
+    assert.deepEqual(controlRates(-4), controlRates(MIN_SENSITIVITY));
+    assert.deepEqual(controlRates(400), controlRates(MAX_SENSITIVITY));
+});
+
+test('a sensitivity that is not a number leaves the controls where they were tuned', () => {
+    for (const value of [undefined, null, 'twice as much', NaN]) {
+        assert.deepEqual(controlRates(value), controlRates(CONTROL_SENSITIVITY));
+    }
 });

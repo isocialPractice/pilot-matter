@@ -19,12 +19,14 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Atmospheric fog** — exponential fog fades the world to sky blue in the distance, hiding terrain edges and giving the illusion of an infinite world
 - **Three camera modes** — chase, cockpit, and orbit views, cycled with the `C` key
 - **Trailing chase camera** - the chase view lags behind the aircraft instead of riding a fixed offset, so turns and pitch changes swing the frame around
-- **HUD** — live readout of airspeed (knots), altitude (ft), climb rate (ft/min), compass heading, throttle (%), and camera mode
+- **HUD** — live readout of airspeed, altitude, climb rate, compass heading, throttle (%), and camera mode, on whichever scale the settings panel is set to
 - **Attitude indicator** - an artificial horizon with a pitch ladder and bank marks, reading the aircraft's own nose and wings rather than the controls behind them
+- **Minimap** - a north-up chart of the world in the corner, with the aircraft's position and heading marked, holding the edge and turning red when the world is flown out of
+- **Engine and wind audio** - an engine note that rises with the throttle and a wind that rises faster than the airspeed behind it, muted with `M` and remembered for the next session
 - **Low altitude warning** - a blinking caution over the terrain below, measured against the ground rather than sea level
 - **Start screen menu** - the game opens on its name over a menu offering Start Flight, Controls, and Settings, with the flight held on the ramp until one is chosen
 - **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, Controls, and Settings
-- **Settings panel** - the same panel from either screen, picking the environment to fly and remembering the choice for the next session
+- **Settings panel** - opened with `O` or from either menu, setting the environment, control sensitivity, fog density, and the units the instruments read in, all remembered for the next session
 - **A screen you can clear** - `H` collapses the control list to a single hint line and `Tab` clears the instruments off entirely for clean flying, remembered for the next session
 - **A simulator API** - the Pilot API flies the aircraft against a host's own scene, terrain, and model; the Matter API hands a host the world as one detachable group anything can fly over
 - **Zero build step** — runs directly in the browser via ES modules and an import map
@@ -73,13 +75,21 @@ Then open `http://localhost:8080` in your browser.
 | `Ctrl` | Throttle down (hold to close it) |
 | `C` | Cycle camera (chase, cockpit, orbit) |
 | `P` | Pause / resume, and open the pause menu |
+| `O` | Open the settings panel, and close it again |
+| `M` | Mute or unmute the engine and wind |
 | `H` | Collapse the control list to a hint line, and open it again |
 | `Tab` | Show or hide the instruments |
 | `R` | Reset aircraft to starting position |
 
-In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one. `Esc` backs out of the settings panel.
+In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one. In the settings panel, `A`/`D` or `←`/`→` step the option under the cursor through its settings. `Esc` backs out of the panel.
 
 **Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft with the throttle set at 20%, which is exactly the setting that holds 80 knots. That airspeed is the stall speed itself, so the wing is carrying with nothing in hand: opening the throttle is still the first thing to do. `Shift` and `Ctrl` move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in [How the Flight Model Works](#how-the-flight-model-works).
+
+### Loading
+
+The page opens on a loading screen carrying the game's name, a bar, and a line naming the work in hand - building the scene, generating the world, rolling out the aircraft, calibrating the instruments, and drawing the first frame. The screen fades off on the strength of a frame the renderer has actually drawn rather than on a timer, so it is gone exactly when there is a world behind it and not a moment before.
+
+Start-up runs in one pass with no chance for the browser to paint between the steps, so the bar is not seen creeping from one to the next: it is a width the stylesheet animates toward, and the progress behind it is real whether or not every step of it gets a frame of its own.
 
 ### Starting a flight
 
@@ -110,13 +120,30 @@ The cursor starts on `RESUME` every time the menu opens, so resuming is always o
 
 ### Settings
 
-The settings panel opens from either menu and holds the same choices whichever one opened it. It is the one overlay that clears the screen it was opened from, because the point of picking an environment is seeing the environment.
+The settings panel opens on `O`, and from either menu, and holds the same choices whichever way it was opened. It is the one overlay that clears the screen it was opened from, because the point of picking an environment is seeing the environment, and it holds the simulation clock while it is up, so a setting is changed by looking at the world rather than by flying into it while looking.
 
-Right now the panel sets the world being flown. Every entry is one of the five [assembled environments](#environments), the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.
+The panel is in two halves. Under `ENVIRONMENT` is the world being flown: every entry is one of the five [assembled environments](#environments), the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.
 
-The choice is stored in `localStorage`, so the world a session ends on is the world the next one opens on. A browser that refuses storage costs the choice its memory and nothing else.
+Under `OPTIONS` are the settings that hold whichever world is flown. Each is a value stepped through a list rather than a slider, so no combination of keys can land one between two settings:
 
-`Esc` or `Backspace` closes the panel, as does its own `BACK` entry.
+| Option | Steps through | Changes |
+|--------|---------------|---------|
+| `CONTROL SENSITIVITY` | 50% to 200% | How far pitch, roll, and yaw move per key press. All three scale together, so the aircraft stays the same aircraft |
+| `FOG DENSITY` | `CLEAR` to `THICK` | How far into the distance the world is visible. `CLEAR` is the thinnest offered rather than none at all, because the fog is what hides the edge of the world |
+| `AIRSPEED IN` | `KNOTS`, `MPH` | The scale the airspeed readout is on |
+| `ALTITUDE IN` | `FEET`, `METERS` | The scale the altimeter and the climb rate are on |
+
+`W`/`S` moves the cursor over both halves as though they were one list. `A`/`D` steps the option under the cursor, and `Enter` steps it forward as well, because an option has no single thing to choose.
+
+Every choice is stored in `localStorage`, so the world and the options a session ends on are the ones the next session opens on. A setting from a version that had one this one does not reads as the default on its own, without costing the others their memory, and a browser that refuses storage costs the choices their memory and nothing else.
+
+`O`, `Esc`, or `Backspace` closes the panel, as does its own `BACK` entry.
+
+### Sound
+
+The engine runs behind the flight, its note and its loudness read off the throttle lever, and the wind rises over it with airspeed - faster than the airspeed itself, so a standstill is silent and a dive is loud. Nothing is heard until the flight is started, because a browser will not let a page make a sound before a key has been pressed at it, and nothing is heard while the simulation is frozen by the pause menu, the start screen, or the settings panel: an engine running behind a paused frame would be a frame that was not paused.
+
+`M` mutes and unmutes both, marked by an `AUDIO MUTED` line above the artificial horizon, and the choice is stored for the next session. Muting fades the levels to silence rather than tearing the sound down, so unmuting picks it back up where it was.
 
 ### Clearing the screen
 
@@ -130,16 +157,22 @@ The HUD in the top left corner reads:
 
 | Readout | Shows |
 |---------|-------|
-| `AIRSPEED` | Current speed in knots |
-| `ALTITUDE` | Height above sea level in feet |
-| `V/S` | Climb or descent rate in feet per minute, signed, rounded to the nearest 10 |
+| `AIRSPEED` | Current speed, in knots or mph |
+| `ALTITUDE` | Height above sea level, in feet or metres |
+| `V/S` | Climb or descent rate per minute on the same scale as the altimeter, signed, rounded to the nearest 10 |
 | `HEADING` | Compass bearing in degrees with the nearest of the eight compass points, counting clockwise from north |
 | `THROTTLE` | The lever setting as a percentage, not the speed it has reached |
 | `CAMERA` | The active camera mode |
 
+The scales the first three are read on are set from the [settings panel](#settings). They are conversions of the same reading rather than a second set of tuning numbers, so the flight model never learns which scale is on the dial and the two can never drift apart.
+
+The minimap in the top right corner is a north-up chart of the world: `+Z` is north and runs up the face, `+X` is east and runs across it, and the marker turns under a fixed card rather than the card turning under the marker. It is fitted to whichever environment is being flown, so the marker means the same thing after a world is changed as it did before. Fly out past the edge and the marker holds the edge it left through and turns red, which is the honest reading - it says where the aircraft went out rather than drawing it somewhere it is not.
+
 The attitude indicator in the bottom right corner is the artificial horizon. The ball rolls against the bank so its horizon stays where the real one is, and the ladder slides against the pitch, carrying a labelled rung every 10 degrees with a tick between them, out to 60 degrees either side. The marks around the rim read the bank angle at the index on top of the face, at 10, 20, 30, 45, and 60 degrees either side of level, and the amber wings across the middle are the aircraft itself.
 
 It reads the direction the nose and the wings are actually pointing rather than the pitch and roll angles behind them, so the ladder shows what the aircraft is doing rather than what it was asked to do.
+
+`Tab` clears the instruments, the minimap and the artificial horizon with them, because they are one set of instruments rather than three overlays that happen to share a screen.
 
 Two warnings sit over the middle of the screen. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself. Both stay quiet while the simulation is frozen, whether by the pause menu or by a start screen whose menu has not been answered yet: there is nothing to be done about either warning while the world is holding still.
 
@@ -159,7 +192,9 @@ pilot-matter/
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── title-screen.js # Pure start rules and the held pre-flight clock
 │   ├── menu.js         # Pure keyboard menu, and the list any menu is drawn into
-│   ├── settings.js     # Pure settings panel state and its stored choices
+│   ├── settings.js     # Pure settings panel state, its options, and their storage
+│   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
+│   ├── audio.js        # Pure engine and wind mix, and the graph it is played through
 │   ├── controls-help.js# Pure collapse toggle for the on-screen control list
 │   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
@@ -177,6 +212,7 @@ pilot-matter/
 │   ├── camera.js       # Chase, cockpit, and orbit cameras
 │   ├── sky.js          # Lighting, atmospheric fog, and the standalone depth
 │   ├── attitude.js     # Pure artificial horizon geometry, and its SVG face
+│   ├── minimap.js      # Pure world-to-chart projection, and its SVG face
 │   └── hud.js          # On-screen instrument display and warnings
 ├── tools/
 │   └── serve.mjs       # Zero-dependency static server behind `npm run serve`
@@ -185,16 +221,19 @@ pilot-matter/
 
 ## Testing
 
-Unit tests cover the pure logic (unit conversions in both directions, heading
-and climb rate readouts, the low altitude warning, the artificial horizon's
-angles and ladder, the keybinding map, the configured start state and the
-attitude that holds its climb, throttle and lift math, the crash threshold and
-countdown, camera damping, pause toggling, the start screen's rules, menu
-selection, the settings panel and its stored choices, terrain noise and the
-mountain formula, the element registry and every generator it holds, the five
-assembled environments, the API's option defaults and contract checks, page
-metadata, and the static server's path and content type rules) and run on
-Node 18+ with no dependencies to install:
+Unit tests cover the pure logic (unit conversions in both directions and on
+both scales, heading and climb rate readouts, the low altitude warning, the
+artificial horizon's angles and ladder, the minimap's projection and its
+behaviour at the world's edge, the keybinding map, control rates at every
+sensitivity, the configured start state and the attitude that holds its climb,
+throttle and lift math, the engine and wind mix and its mute, the crash
+threshold and countdown, camera damping, pause toggling, the start screen's
+rules, start-up progress, menu selection, the settings panel with its options
+and their stored choices, terrain noise and the mountain formula, the element
+registry and every generator it holds, the five assembled environments, the
+API's option defaults and contract checks, page metadata, and the static
+server's path and content type rules) and run on Node 18+ with no dependencies
+to install:
 
 ```bash
 npm test        # or: node --test
@@ -311,7 +350,8 @@ const pilot = createPilot({
         sampleHeight: (x, z) => myHeightAt(x, z),
         bounds: { minX: -5000, maxX: 5000, minZ: -5000, maxZ: 5000 }
     },
-    keymap: { yawLeft: ['KeyZ'] }           // remap what you like, keep the rest
+    keymap: { yawLeft: ['KeyZ'] },          // remap what you like, keep the rest
+    flight: { sensitivity: 1.5 }            // how hard the controls bite, 0.1 to 4
 });
 
 function frame(dt) {

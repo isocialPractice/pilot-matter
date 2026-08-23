@@ -1,15 +1,18 @@
 import { AttitudeIndicator, pitchFromForward, bankFromWing } from './attitude.js';
+import { Minimap } from './minimap.js';
 import {
     FEET_PER_UNIT, SECONDS_PER_MINUTE,
-    speedToKnots, altitudeToFeet, throttleToPercent, headingDegrees
+    DEFAULT_SPEED_UNIT, DEFAULT_ALTITUDE_UNIT,
+    speedTo, altitudeTo, speedUnit, altitudeUnit,
+    altitudeToFeet, throttleToPercent, headingDegrees
 } from './units.js';
 
 // The unit conversions live in js/units.js, which converts in both directions
 // so a start state can be configured in knots and feet. They are re-exported
 // here because the instruments are what those numbers are read on.
 export {
-    KNOTS_PER_UNIT, FEET_PER_UNIT,
-    speedToKnots, altitudeToFeet, throttleToPercent, headingDegrees
+    KNOTS_PER_UNIT, FEET_PER_UNIT, SPEED_UNITS, ALTITUDE_UNITS,
+    speedToKnots, altitudeToFeet, speedTo, altitudeTo, throttleToPercent, headingDegrees
 } from './units.js';
 
 // The vertical speed indicator rounds to this many feet per minute, so the
@@ -43,13 +46,18 @@ export function compassPoint(degrees) {
 }
 
 /**
- * Climb and descent rate in feet per minute, from a vertical speed in world
- * units per second. Signed the way an altimeter needle moves: positive is a
- * climb, negative is a descent.
+ * Climb and descent rate over a minute, on whichever scale the altimeter is
+ * set to, from a vertical speed in world units per second. Signed the way an
+ * altimeter needle moves: positive is a climb, negative is a descent.
  */
-export function verticalSpeedToFeetPerMinute(verticalSpeed) {
-    const perMinute = verticalSpeed * FEET_PER_UNIT * SECONDS_PER_MINUTE;
+export function verticalSpeedToRate(verticalSpeed, unit = DEFAULT_ALTITUDE_UNIT) {
+    const perMinute = verticalSpeed * altitudeUnit(unit).perUnit * SECONDS_PER_MINUTE;
     return Math.round(perMinute / VERTICAL_SPEED_STEP) * VERTICAL_SPEED_STEP;
+}
+
+/** The same climb rate on the scale a flight opens on. */
+export function verticalSpeedToFeetPerMinute(verticalSpeed) {
+    return verticalSpeedToRate(verticalSpeed, 'feet');
 }
 
 /**
@@ -81,6 +89,37 @@ export class HUD {
         this.lowAltitudeElement   = document.getElementById('low-altitude');
         this.crashElement         = document.getElementById('crashed');
         this.attitude             = new AttitudeIndicator(document.getElementById('attitude'));
+        this.minimap              = new Minimap(document.getElementById('minimap'));
+
+        // The units the readouts are written beside, which the settings panel
+        // can switch without the flight model ever hearing about it.
+        this.speedUnitElement         = document.getElementById('hud-speed-unit');
+        this.altitudeUnitElement      = document.getElementById('hud-altitude-unit');
+        this.verticalSpeedUnitElement = document.getElementById('hud-vertical-speed-unit');
+
+        this.setUnits();
+    }
+
+    /**
+     * Fits the minimap to the world being flown, so the marker on it means the
+     * same thing after an environment is changed as it did before.
+     */
+    setBounds(bounds) {
+        return this.minimap.setBounds(bounds);
+    }
+
+    /**
+     * Puts the instruments on a pair of scales. The labels are written once
+     * here rather than every frame, because they only change when the pilot
+     * changes them.
+     */
+    setUnits({ speed = DEFAULT_SPEED_UNIT, altitude = DEFAULT_ALTITUDE_UNIT } = {}) {
+        this.speedUnit    = speedUnit(speed).id;
+        this.altitudeUnit = altitudeUnit(altitude).id;
+
+        this.speedUnitElement.textContent         = speedUnit(this.speedUnit).label;
+        this.altitudeUnitElement.textContent      = altitudeUnit(this.altitudeUnit).label;
+        this.verticalSpeedUnitElement.textContent = altitudeUnit(this.altitudeUnit).rateLabel;
     }
 
     /**
@@ -90,13 +129,13 @@ export class HUD {
      * while the world is holding still.
      */
     update(aircraft, cameraController, frozen = false) {
-        this.speedElement.textContent = speedToKnots(aircraft.getSpeed());
-        this.altitudeElement.textContent = altitudeToFeet(aircraft.getAltitude());
+        this.speedElement.textContent = speedTo(aircraft.getSpeed(), this.speedUnit);
+        this.altitudeElement.textContent = altitudeTo(aircraft.getAltitude(), this.altitudeUnit);
         this.throttleElement.textContent = throttleToPercent(aircraft.getThrottle());
         this.cameraElement.textContent = cameraController.getCurrentMode();
 
         this.verticalSpeedElement.textContent = formatVerticalSpeed(
-            verticalSpeedToFeetPerMinute(aircraft.getVerticalSpeed())
+            verticalSpeedToRate(aircraft.getVerticalSpeed(), this.altitudeUnit)
         );
 
         const heading = headingDegrees(aircraft.getHeading());
@@ -105,6 +144,7 @@ export class HUD {
 
         const { forwardY, rightY, upY } = aircraft.getAttitude();
         this.attitude.update(pitchFromForward(forwardY), bankFromWing(rightY, upY));
+        this.minimap.update(aircraft.getPosition(), aircraft.getHeading());
 
         // The crash banner replaces the low altitude warning: once the
         // ground has been hit there is nothing left to warn about. Both give

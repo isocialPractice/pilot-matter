@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { TITLE_NAME, START_HINT } from '../js/title-screen.js';
 import { HELP_HINT } from '../js/controls-help.js';
 import { FACE_RADIUS } from '../js/attitude.js';
-import { SETTINGS_TITLE, SETTINGS_HEADING } from '../js/settings.js';
+import { SETTINGS_TITLE, SETTINGS_HEADING, SETTINGS_OPTIONS_HEADING } from '../js/settings.js';
+import { MINIMAP_SIZE } from '../js/minimap.js';
+import { LOADING_STEPS, LOADING_FADE_MS } from '../js/loading.js';
+import { MUTE_KEY } from '../js/audio.js';
+import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
+import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 
 const indexHtml = readFileSync(
     fileURLToPath(new URL('../index.html', import.meta.url)),
@@ -87,7 +92,8 @@ test('the warning overlays start hidden and wait for the flight to trip them', (
 // screen. Starting hidden means a page whose scripts never arrive shows an
 // honest nothing rather than a HUD reading zero over an empty world.
 test('the overlays the simulator places start hidden and wait to be placed', () => {
-    for (const id of ['title-screen', 'paused', 'settings', 'hud', 'attitude', 'controls-help', 'controls-help-hint']) {
+    for (const id of ['title-screen', 'paused', 'settings', 'hud', 'attitude', 'minimap',
+        'audio-muted', 'controls-help', 'controls-help-hint']) {
         const rule = indexHtml.match(new RegExp(`#${id}\\s*\\{([^}]*)\\}`));
         assert.ok(rule, `index.html should style #${id}`);
         assert.ok(/display:\s*none/.test(rule[1]), `#${id} should start hidden`);
@@ -117,6 +123,73 @@ test('the title screen names the game and says how to work the menu on it', () =
 test('the settings panel is titled and says what it is setting', () => {
     assert.ok(indexHtml.includes(SETTINGS_TITLE), 'the panel should carry its title');
     assert.ok(indexHtml.includes(SETTINGS_HEADING), 'and name what the list under it changes');
+    assert.ok(indexHtml.includes(SETTINGS_OPTIONS_HEADING), 'and name the other list too');
+});
+
+test('every menu the panel splits its entries across has a list to be drawn into', () => {
+    for (const id of ['settings-menu', 'settings-options']) {
+        assert.ok(new RegExp(`<ul id="${id}">\\s*</ul>`).test(indexHtml),
+            `the entries are drawn from js/menu.js, so the page should leave #${id} empty`);
+    }
+});
+
+// The instruments are read on whichever scale the panel is set to, so the
+// units beside the numbers have to be something the HUD can rewrite.
+test('every readout with a scale has the scale in an element of its own', () => {
+    for (const id of ['hud-speed-unit', 'hud-altitude-unit', 'hud-vertical-speed-unit']) {
+        assert.ok(indexHtml.includes(`id="${id}"`), `index.html is missing id="${id}"`);
+    }
+
+    const labels = [
+        ...Object.values(SPEED_UNITS).map(scale => scale.label),
+        ...Object.values(ALTITUDE_UNITS).map(scale => scale.label)
+    ];
+    assert.ok(labels.some(label => indexHtml.includes(`>${label}</span>`)),
+        'the page should open on a scale the instruments know');
+});
+
+// The map is drawn in the units its projection works in, so a face drawn at a
+// different scale would put the marker somewhere the aircraft is not.
+test('the minimap face is drawn at the size the projection places points in', () => {
+    const face = indexHtml.match(/<rect class="minimap-face"[^>]*width="(\d+)"[^>]*height="(\d+)"/);
+    assert.ok(face, 'index.html should draw the face the marker moves over');
+    assert.equal(Number(face[1]), MINIMAP_SIZE, 'the drawn face and js/minimap.js should be one size');
+    assert.equal(Number(face[2]), MINIMAP_SIZE);
+});
+
+test('the loading screen has a bar to fill and a label to write into', () => {
+    for (const id of ['loading', 'loading-bar', 'loading-label']) {
+        assert.ok(indexHtml.includes(`id="${id}"`), `index.html is missing id="${id}"`);
+    }
+    assert.ok(indexHtml.includes(LOADING_STEPS[0].label),
+        'the screen should open on the first thing the start-up does');
+});
+
+// The fade is the stylesheet's to run and the removal is the script's to time,
+// so a transition either side of what js/loading.js waits for would either cut
+// the fade off or leave the screen lying over the world after it.
+test('the fade the screen is taken off by is the one the script waits out', () => {
+    const rule = indexHtml.match(/#loading\s*\{([^}]*)\}/);
+    assert.ok(rule, 'index.html should style #loading');
+
+    const transition = rule[1].match(/transition:\s*opacity\s+(\d+)ms/);
+    assert.ok(transition, '#loading should fade rather than disappear');
+    assert.equal(Number(transition[1]), LOADING_FADE_MS,
+        'the fade in index.html and the wait in js/loading.js should be one duration');
+});
+
+// A key with nothing on screen naming it is a key nobody presses.
+test('the control list names the keys the flight is worked with', () => {
+    const list = indexHtml.match(/<div id="controls-help-list">([\s\S]*?)<\/div>/);
+    assert.ok(list, 'index.html should carry the control list');
+
+    for (const key of ['C', 'Tab', 'H', 'P', 'R']) {
+        assert.ok(new RegExp(`(^|>|\\s)${key} -`, 'm').test(list[1]), `the list should name the ${key} key`);
+    }
+    assert.ok(list[1].includes(`${MUTE_KEY.replace('Key', '')} -`), 'including the one that mutes the sound');
+    for (const code of SETTINGS_OPEN_KEYS) {
+        assert.ok(list[1].includes(`${code.replace('Key', '')} -`), 'and the one that opens the settings');
+    }
 });
 
 test('the collapsed controls list leaves the hint that reopens it', () => {

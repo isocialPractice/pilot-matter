@@ -18,7 +18,8 @@ export function applyDepth(scene, { color = SKY_COLOR, density = FOG_DENSITY } =
 
 export class Sky {
     constructor(scene) {
-        this.scene = scene;
+        this.scene   = scene;
+        this.density = FOG_DENSITY;
         this.setup();
     }
 
@@ -26,7 +27,7 @@ export class Sky {
         const skyColor = SKY_COLOR;
 
         // Exponential fog hides terrain edges - the "smoke and mirrors"
-        applyDepth(this.scene, { color: skyColor, density: FOG_DENSITY });
+        applyDepth(this.scene, { color: skyColor, density: this.density });
 
         // Sun directional light
         this.sunLight = new THREE.DirectionalLight(0xfff4e0, 1.3);
@@ -38,6 +39,20 @@ export class Sky {
     }
 
     update() {}
+
+    /**
+     * Thickens or thins the haze, as a multiple of the density the world is
+     * drawn at by default. The fog object already in the scene is retuned
+     * rather than replaced, so nothing that was handed the old one is left
+     * holding a fog the world has stopped using.
+     *
+     * Returns the density now in force.
+     */
+    setFogDensity(scale = 1) {
+        this.density = FOG_DENSITY * Math.max(Number(scale) || 0, 0);
+        if (this.scene.fog) this.scene.fog.density = this.density;
+        return this.density;
+    }
 
     getSunPosition() { return this.sunLight.position.clone(); }
 }

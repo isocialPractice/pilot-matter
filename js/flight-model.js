@@ -30,8 +30,45 @@ export const THROTTLE_RATE = 0.5;
 export const SPEED_ACCEL = 60;
 export const SPEED_DECEL = 40;
 
+// How fast a held control key turns the aircraft, in radians per second. Roll
+// is the quickest because it is the control a turn is flown with, and yaw is
+// the slowest because it is the one used to trim rather than to manoeuvre.
+export const PITCH_RATE = 1.2;
+export const ROLL_RATE  = 2.0;
+export const YAW_RATE   = 0.8;
+
+// What those rates are multiplied by, which the settings panel moves. The
+// range it offers is deliberately narrow: this is how hard the controls bite,
+// not a different aircraft.
+export const CONTROL_SENSITIVITY = 1;
+export const MIN_SENSITIVITY     = 0.1;
+export const MAX_SENSITIVITY     = 4;
+
 function clamp(value, low, high) {
     return Math.min(Math.max(value, low), high);
+}
+
+/**
+ * The control rates at a sensitivity setting. Kept as a function of the
+ * setting rather than as state so the same setting always means the same
+ * rates, however many times it has been changed.
+ */
+export function controlRates(sensitivity = CONTROL_SENSITIVITY) {
+    const scale = clamp(numberOr(sensitivity, CONTROL_SENSITIVITY), MIN_SENSITIVITY, MAX_SENSITIVITY);
+    return {
+        pitch: PITCH_RATE * scale,
+        roll:  ROLL_RATE  * scale,
+        yaw:   YAW_RATE   * scale
+    };
+}
+
+// Nothing named is not a setting of zero: a caller asking for no particular
+// sensitivity gets the one the controls were tuned at, rather than a control
+// that has been turned all the way down.
+function numberOr(value, fallback) {
+    if (value === null || value === undefined) return fallback;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
 }
 
 /**

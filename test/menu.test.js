@@ -5,12 +5,16 @@ import {
     PAUSE_MENU_ENTRIES,
     START_MENU_ENTRIES,
     MENU_SELECT_KEYS,
+    MENU_LEFT_KEYS,
+    MENU_RIGHT_KEYS,
     createMenuState,
     selectedEntry,
     selectedId,
     moveSelection,
     resetSelection,
     isMenuKey,
+    isMenuAdjustKey,
+    menuAdjustStep,
     applyMenuKey
 } from '../js/menu.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
@@ -111,6 +115,33 @@ test('isMenuKey names every key the menu acts on', () => {
     }
 });
 
+// An entry holding a value is stepped where an entry holding an action is
+// chosen, and the two sets of keys are kept apart so a menu of actions is
+// never quietly adjusted by the roll keys.
+test('the roll keys step a value, in the direction they are pressed', () => {
+    for (const code of MENU_LEFT_KEYS)  assert.equal(menuAdjustStep(code), -1);
+    for (const code of MENU_RIGHT_KEYS) assert.equal(menuAdjustStep(code), 1);
+    for (const code of [...MENU_LEFT_KEYS, ...MENU_RIGHT_KEYS]) {
+        assert.equal(isMenuAdjustKey(code), true);
+        assert.equal(isMenuKey(code), false, `${code} steps an entry rather than moving the cursor`);
+    }
+});
+
+test('a key that steps nothing steps nowhere', () => {
+    for (const code of ['ArrowUp', 'KeyW', 'Enter', 'KeyQ']) {
+        assert.equal(isMenuAdjustKey(code), false);
+        assert.equal(menuAdjustStep(code), 0);
+    }
+});
+
+test('stepping an entry is not choosing it, so a step never runs a menu entry', () => {
+    const state = createMenuState();
+    for (const code of [...MENU_LEFT_KEYS, ...MENU_RIGHT_KEYS]) {
+        assert.equal(applyMenuKey(state, code, true), null, `${code} should not choose an entry`);
+    }
+    assert.equal(state.index, 0, 'nor move the cursor');
+});
+
 test('reopening the menu puts the cursor back on the first entry', () => {
     const state = createMenuState();
     moveSelection(state, 2);
@@ -190,6 +221,44 @@ test('the entry in force is drawn apart from the cursor', () => {
 
     assert.deepEqual(list.children.map(item => item.classes.has('current')), [false, true]);
     assert.deepEqual(list.children.map(item => item.classes.has('selected')), [true, false]);
+});
+
+// The settings panel splits one set of entries across two headings, so a list
+// has to be able to draw part of a menu while the cursor still walks all of it.
+test('a filtered list draws its own entries and answers to the whole cursor', () => {
+    const state = createMenuState([
+        { id: 'first',  label: 'FIRST',  kind: 'a' },
+        { id: 'second', label: 'SECOND', kind: 'b' },
+        { id: 'third',  label: 'THIRD',  kind: 'b' }
+    ]);
+
+    const list = fakeList();
+    const menu = new MenuList(list, state, entry => entry.kind === 'b');
+
+    assert.deepEqual(list.children.map(item => item.dataset.entry), ['second', 'third']);
+
+    state.index = 0;
+    menu.render(state);
+    assert.deepEqual(list.children.map(item => item.classes.has('selected')), [false, false],
+        'a cursor on an entry this list does not draw is drawn on none of them');
+
+    state.index = 2;
+    menu.render(state);
+    assert.deepEqual(list.children.map(item => item.classes.has('selected')), [false, true]);
+});
+
+// An entry holding a value shows the value, and the value changes under it.
+test('an entry carrying its own text is drawn as that text, and redrawn as it changes', () => {
+    const entry = { id: 'fog', label: 'FOG DENSITY', text: 'FOG DENSITY  NORMAL' };
+    const state = createMenuState([entry]);
+
+    const list = fakeList();
+    const menu = new MenuList(list, state);
+    assert.equal(list.children[0].textContent, 'FOG DENSITY  NORMAL');
+
+    entry.text = 'FOG DENSITY  THICK';
+    menu.render(state);
+    assert.equal(list.children[0].textContent, 'FOG DENSITY  THICK');
 });
 
 test('an empty menu has nothing to select and does not fall over being asked', () => {

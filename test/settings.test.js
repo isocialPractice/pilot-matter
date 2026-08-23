@@ -4,20 +4,38 @@ import {
     SETTINGS_STORAGE_KEY,
     SETTINGS_BACK_ID,
     SETTINGS_CLOSE_KEYS,
+    SETTINGS_OPEN_KEYS,
+    SETTINGS_OPTIONS,
+    ENVIRONMENT_ENTRY,
+    OPTION_ENTRY,
+    BACK_ENTRY,
+    SENSITIVITY_OPTION,
+    FOG_OPTION,
+    SPEED_UNIT_OPTION,
+    ALTITUDE_UNIT_OPTION,
     defaultSettings,
     readSettings,
     writeSettings,
     settingsEntries,
+    settingsOption,
+    isOptionValue,
+    optionValueLabel,
+    optionEntryText,
+    cycleOptionValue,
     createSettingsState,
     syncSettingsEntries,
     settingsShowing,
     openSettings,
     closeSettings,
     currentEnvironment,
+    currentOption,
+    adjustSetting,
     chooseSetting,
-    isSettingsCloseKey
+    isSettingsCloseKey,
+    isSettingsOpenKey
 } from '../js/settings.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
+import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 
 // Enough of a storage for the settings to remember something, with no browser
 // to remember it in.
@@ -37,9 +55,30 @@ function refusingStorage() {
     };
 }
 
-test('a first flight gets the default environment', () => {
-    assert.deepEqual(defaultSettings(), { environment: DEFAULT_ENVIRONMENT_ID });
-    assert.equal(currentEnvironment(createSettingsState(null)), DEFAULT_ENVIRONMENT_ID);
+test('a first flight gets the default environment, and every option where it starts', () => {
+    const defaults = defaultSettings();
+    assert.equal(defaults.environment, DEFAULT_ENVIRONMENT_ID);
+    for (const option of SETTINGS_OPTIONS) {
+        assert.equal(defaults[option.id], option.default, `${option.id} should start on its own default`);
+        assert.ok(isOptionValue(option.id, option.default), `${option.id} should start on a setting it can hold`);
+    }
+
+    const state = createSettingsState(null);
+    assert.equal(currentEnvironment(state), DEFAULT_ENVIRONMENT_ID);
+    assert.equal(currentOption(state, SENSITIVITY_OPTION), 1, 'the controls start where they were tuned');
+    assert.equal(currentOption(state, FOG_OPTION), 1, 'the world starts at the density it is drawn at');
+});
+
+test('the instrument scales are ones the instruments can be read on', () => {
+    assert.ok(SPEED_UNITS[defaultSettings()[SPEED_UNIT_OPTION]], 'the airspeed scale should be a scale');
+    assert.ok(ALTITUDE_UNITS[defaultSettings()[ALTITUDE_UNIT_OPTION]], 'the altitude scale should be a scale');
+
+    for (const id of [SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION]) {
+        const scales = id === SPEED_UNIT_OPTION ? SPEED_UNITS : ALTITUDE_UNITS;
+        for (const entry of settingsOption(id).values) {
+            assert.ok(scales[entry.value], `${entry.value} is offered but is not a scale js/units.js knows`);
+        }
+    }
 });
 
 test('the panel starts closed, and opens and closes on request', () => {
@@ -52,17 +91,90 @@ test('the panel starts closed, and opens and closes on request', () => {
     assert.equal(settingsShowing(state), false);
 });
 
-test('the panel lists every environment, then the way out of it', () => {
+test('the panel lists every environment, then every option, then the way out', () => {
     const entries = settingsEntries();
-    assert.equal(entries.length, ENVIRONMENTS.length + 1);
+    assert.equal(entries.length, ENVIRONMENTS.length + SETTINGS_OPTIONS.length + 1);
+
     assert.deepEqual(
-        entries.slice(0, -1).map(entry => entry.id),
+        entries.filter(entry => entry.kind === ENVIRONMENT_ENTRY).map(entry => entry.id),
         ENVIRONMENTS.map(environment => environment.id)
     );
+    assert.deepEqual(
+        entries.filter(entry => entry.kind === OPTION_ENTRY).map(entry => entry.id),
+        SETTINGS_OPTIONS.map(option => option.id)
+    );
+
     assert.equal(entries.at(-1).id, SETTINGS_BACK_ID);
+    assert.equal(entries.at(-1).kind, BACK_ENTRY);
     for (const entry of entries) {
         assert.ok(entry.label.length > 0, `${entry.id} needs a label to be read by`);
     }
+});
+
+test('an option reads as the setting it is on, and a world reads as its own name', () => {
+    const state = createSettingsState(null);
+    const option = state.entries.find(entry => entry.id === SENSITIVITY_OPTION);
+    const world  = state.entries.find(entry => entry.kind === ENVIRONMENT_ENTRY);
+
+    assert.ok(option.text.includes(option.label), 'the option should still say what it sets');
+    assert.ok(option.text.includes(optionValueLabel(SENSITIVITY_OPTION, option.value)),
+        'and what it is currently set to');
+    assert.equal(optionEntryText(world), world.label, 'a world is chosen rather than stepped');
+});
+
+test('an option steps through its settings and wraps round both ends', () => {
+    const values = settingsOption(FOG_OPTION).values.map(entry => entry.value);
+
+    assert.equal(cycleOptionValue(FOG_OPTION, values[0], 1), values[1]);
+    assert.equal(cycleOptionValue(FOG_OPTION, values.at(-1), 1), values[0], 'past the last is the first');
+    assert.equal(cycleOptionValue(FOG_OPTION, values[0], -1), values.at(-1), 'before the first is the last');
+    assert.equal(cycleOptionValue(FOG_OPTION, 'a setting it has never held', 1), values[0]);
+    assert.equal(cycleOptionValue('an-option-that-does-not-exist', 7, 1), 7, 'and nothing else moves');
+});
+
+test('the arrow keys walk an option in both directions and remember where it landed', () => {
+    const storage = fakeStorage();
+    const state = createSettingsState(storage);
+    const values = settingsOption(SENSITIVITY_OPTION).values.map(entry => entry.value);
+    const start = values.indexOf(currentOption(state, SENSITIVITY_OPTION));
+
+    assert.equal(adjustSetting(state, SENSITIVITY_OPTION, 1), SENSITIVITY_OPTION);
+    assert.equal(currentOption(state, SENSITIVITY_OPTION), values[start + 1]);
+
+    assert.equal(adjustSetting(state, SENSITIVITY_OPTION, -1), SENSITIVITY_OPTION);
+    assert.equal(currentOption(state, SENSITIVITY_OPTION), values[start]);
+
+    adjustSetting(state, SENSITIVITY_OPTION, 1);
+    assert.equal(currentOption(createSettingsState(storage), SENSITIVITY_OPTION), values[start + 1],
+        'a setting the panel changed should outlive the session that changed it');
+});
+
+test('a step that is no step, on a thing that is not an option, changes nothing', () => {
+    const state = createSettingsState(null);
+    assert.equal(adjustSetting(state, SENSITIVITY_OPTION, 0), null, 'a step of nowhere is not a change');
+    assert.equal(adjustSetting(state, DEFAULT_ENVIRONMENT_ID, 1), null, 'a world is chosen rather than stepped');
+    assert.equal(adjustSetting(state, SETTINGS_BACK_ID, 1), null);
+    assert.deepEqual(state.values, defaultSettings());
+});
+
+test('choosing an option is the same as stepping it forward', () => {
+    const state = createSettingsState(null);
+    const values = settingsOption(FOG_OPTION).values.map(entry => entry.value);
+    const start = values.indexOf(currentOption(state, FOG_OPTION));
+
+    assert.equal(chooseSetting(state, FOG_OPTION), FOG_OPTION);
+    assert.equal(currentOption(state, FOG_OPTION), values[(start + 1) % values.length]);
+    assert.equal(settingsShowing(state), false, 'and it does not close the panel on the way');
+});
+
+test('the list redraws itself from the choices behind it', () => {
+    const state = createSettingsState(null);
+    const entry = () => state.entries.find(item => item.id === ALTITUDE_UNIT_OPTION);
+
+    adjustSetting(state, ALTITUDE_UNIT_OPTION, 1);
+    assert.equal(entry().value, currentOption(state, ALTITUDE_UNIT_OPTION));
+    assert.equal(entry().valueLabel, optionValueLabel(ALTITUDE_UNIT_OPTION, entry().value));
+    assert.ok(entry().text.includes(entry().valueLabel), 'the row should say what the option now reads');
 });
 
 test('the environment being flown is the one marked in the list', () => {
@@ -140,6 +252,35 @@ test('the keys that close the panel are the ones that back out of anything', () 
     for (const code of ['KeyW', 'Enter', 'KeyP']) {
         assert.equal(isSettingsCloseKey(code), false, `${code} is a menu key, not a way out`);
     }
+});
+
+test('the panel has a key of its own, and it is not one anything else answers to', () => {
+    for (const code of SETTINGS_OPEN_KEYS) {
+        assert.equal(isSettingsOpenKey(code), true);
+        assert.equal(isSettingsCloseKey(code), false, 'the way in should not also be a way out by accident');
+    }
+    for (const code of ['KeyP', 'KeyH', 'KeyM', 'Tab', 'KeyR', 'KeyC']) {
+        assert.equal(isSettingsOpenKey(code), false, `${code} already belongs to something else`);
+    }
+});
+
+test('an option setting this version has never heard of reads as the default', () => {
+    const storage = fakeStorage({
+        [SETTINGS_STORAGE_KEY]: JSON.stringify({
+            environment: DEFAULT_ENVIRONMENT_ID,
+            [SENSITIVITY_OPTION]: 99,
+            [FOG_OPTION]: 'PEA SOUP',
+            [SPEED_UNIT_OPTION]: 'furlongs per fortnight',
+            [ALTITUDE_UNIT_OPTION]: 'meters'
+        })
+    });
+
+    const settings = readSettings(storage);
+    assert.equal(settings[SENSITIVITY_OPTION], defaultSettings()[SENSITIVITY_OPTION]);
+    assert.equal(settings[FOG_OPTION], defaultSettings()[FOG_OPTION]);
+    assert.equal(settings[SPEED_UNIT_OPTION], defaultSettings()[SPEED_UNIT_OPTION]);
+    assert.equal(settings[ALTITUDE_UNIT_OPTION], 'meters',
+        'one setting it cannot read should not cost the others their memory');
 });
 
 test('syncing the list is what marks it, so a reopened panel shows the pick', () => {

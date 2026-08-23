@@ -8,7 +8,8 @@ import { INITIAL_CAMERA_MODE } from './flight-state.js';
 import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from './pause.js';
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
-    createMenuState, resetSelection, applyMenuKey, isMenuKey,
+    createMenuState, resetSelection, applyMenuKey, isMenuKey, selectedId,
+    isMenuAdjustKey, menuAdjustStep,
     MenuList, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
 import { createHelpState, applyHelpKey, expandHelp } from './controls-help.js';
@@ -17,8 +18,15 @@ import {
 } from './hud-visibility.js';
 import {
     createSettingsState, openSettings, closeSettings, settingsShowing,
-    chooseSetting, currentEnvironment, isSettingsCloseKey, SETTINGS_BACK_ID
+    chooseSetting, adjustSetting, currentEnvironment, currentOption,
+    isSettingsCloseKey, isSettingsOpenKey, isEnvironmentId,
+    SETTINGS_BACK_ID, ENVIRONMENT_ENTRY,
+    SENSITIVITY_OPTION, FOG_OPTION, SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
+import {
+    createLoadingState, advanceLoading, loadingComplete, LoadingScreen
+} from './loading.js';
+import { createAudioState, applyMuteKey, audioLevels, FlightAudio } from './audio.js';
 
 // Keys whose browser default would disturb the page behind the game: the
 // focus ring walking off the canvas, or the page scrolling under it. Every
@@ -31,6 +39,12 @@ class FlightSimulator {
     }
 
     init() {
+        // The loading screen is the first thing built and the last thing taken
+        // off, so every step below has somewhere to report itself to.
+        this.loading       = createLoadingState();
+        this.loadingScreen = new LoadingScreen(document.getElementById('loading'));
+        this.loadingScreen.update(this.loading);
+
         this.scene = new THREE.Scene();
 
         this.camera = new THREE.PerspectiveCamera(
@@ -44,16 +58,20 @@ class FlightSimulator {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+        this.loaded('scene');
 
         this.settings = createSettingsState(defaultStorage());
 
         this.sky      = new Sky(this.scene);
         this.terrain  = new Terrain(this.scene, currentEnvironment(this.settings));
+        this.loaded('world');
+
         this.aircraft = new Aircraft(this.scene);
         this.camera2  = new CameraController(this.camera, this.aircraft, INITIAL_CAMERA_MODE);
-        this.hud      = new HUD();
+        this.loaded('aircraft');
 
-        document.getElementById('loading').style.display = 'none';
+        this.hud = new HUD();
+        this.hud.setBounds(this.terrain.getBounds());
 
         this.titleState     = createTitleState();
         this.pauseState     = createPauseState();
@@ -62,6 +80,8 @@ class FlightSimulator {
         this.settingsState  = createMenuState(this.settings.entries);
         this.helpState      = createHelpState();
         this.hudVisibility  = createHudVisibilityState(defaultStorage());
+        this.audioState     = createAudioState(defaultStorage());
+        this.audio          = new FlightAudio(this.audioState);
 
         // The start screen's Controls entry puts the control list on screen
         // over the title, where nothing else would have shown it yet.
@@ -73,6 +93,8 @@ class FlightSimulator {
             settings: document.getElementById('settings'),
             hud:      document.getElementById('hud'),
             attitude: document.getElementById('attitude'),
+            minimap:  document.getElementById('minimap'),
+            muted:    document.getElementById('audio-muted'),
             help:     document.getElementById('controls-help'),
             helpList: document.getElementById('controls-help-list'),
             helpHint: document.getElementById('controls-help-hint')
@@ -80,10 +102,22 @@ class FlightSimulator {
 
         this.startMenu    = new MenuList(document.getElementById('start-menu'), this.startMenuState);
         this.pauseMenu    = new MenuList(document.getElementById('pause-menu'), this.pauseMenuState);
-        this.settingsMenu = new MenuList(document.getElementById('settings-menu'), this.settingsState);
+
+        // One cursor, two lists: the worlds under one heading of the panel and
+        // the options under the other, walked as though they were one list.
+        this.settingsMenu = new MenuList(
+            document.getElementById('settings-menu'), this.settingsState,
+            entry => entry.kind === ENVIRONMENT_ENTRY
+        );
+        this.settingsOptions = new MenuList(
+            document.getElementById('settings-options'), this.settingsState,
+            entry => entry.kind !== ENVIRONMENT_ENTRY
+        );
 
         this.setupKeys();
+        this.applySettings();
         this.syncOverlays();
+        this.loaded('instruments');
 
         window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -93,6 +127,25 @@ class FlightSimulator {
 
         this.clock = new THREE.Clock();
         this.animate();
+    }
+
+    /** Reports a step of the start-up to the screen covering it. */
+    loaded(step) {
+        if (advanceLoading(this.loading, step)) this.loadingScreen.update(this.loading);
+    }
+
+    /**
+     * Hands the settings the panel holds to the things they drive. Called once
+     * at start-up so a stored choice is in force on the first frame, and again
+     * whenever one of them is changed.
+     */
+    applySettings() {
+        this.aircraft.setSensitivity(currentOption(this.settings, SENSITIVITY_OPTION));
+        this.sky.setFogDensity(currentOption(this.settings, FOG_OPTION));
+        this.hud.setUnits({
+            speed:    currentOption(this.settings, SPEED_UNIT_OPTION),
+            altitude: currentOption(this.settings, ALTITUDE_UNIT_OPTION)
+        });
     }
 
     setupKeys() {
@@ -120,6 +173,19 @@ class FlightSimulator {
             return;
         }
 
+        if (isSettingsOpenKey(e.code) && !e.repeat) {
+            this.openSettingsPanel();
+            this.syncOverlays();
+            return;
+        }
+
+        // The sound can be muted before the flight it would have been heard
+        // over has begun.
+        if (applyMuteKey(this.audioState, e.code, true, e.repeat)) {
+            this.syncOverlays();
+            return;
+        }
+
         const chosen = applyMenuKey(this.startMenuState, e.code, true, e.repeat);
         if (chosen) this.chooseStartEntry(chosen);
         this.syncOverlays();
@@ -130,6 +196,9 @@ class FlightSimulator {
             case 'start':
                 this.titleHelp = false;
                 startFlight(this.titleState);
+                // The key that started the flight is also the gesture a
+                // browser wants before it will let the page make a sound.
+                this.audio.start();
                 break;
             case 'controls':
                 // The same entry the pause menu carries, showing the same list.
@@ -145,8 +214,8 @@ class FlightSimulator {
     }
 
     onKeyDown(e) {
-        // The panel is modal over a paused flight: nothing else reads a key
-        // while it is open, so P cannot resume out from under it.
+        // The panel is modal over the flight behind it: nothing else reads a
+        // key while it is open, so P cannot resume out from under it.
         if (settingsShowing(this.settings)) {
             this.onSettingsKey(e);
             return;
@@ -154,7 +223,12 @@ class FlightSimulator {
 
         let changed = false;
 
-        if (applyPauseKey(this.pauseState, e.code, true, e.repeat)) {
+        if (isSettingsOpenKey(e.code) && !e.repeat) {
+            this.openSettingsPanel();
+            changed = true;
+        } else if (applyMuteKey(this.audioState, e.code, true, e.repeat)) {
+            changed = true;
+        } else if (applyPauseKey(this.pauseState, e.code, true, e.repeat)) {
             // The menu opens on its first entry every time, so Resume is
             // always one key press away from a paused flight.
             resetSelection(this.pauseMenuState);
@@ -202,8 +276,20 @@ class FlightSimulator {
     }
 
     onSettingsKey(e) {
-        if (isSettingsCloseKey(e.code)) {
+        // The key that opens the panel closes it again, so O is a way in and
+        // out rather than a one-way door.
+        if (isSettingsCloseKey(e.code) || (isSettingsOpenKey(e.code) && !e.repeat)) {
             closeSettings(this.settings);
+            this.syncOverlays();
+            return;
+        }
+
+        // An option is stepped where a world is chosen, so the roll keys move
+        // a setting along its own list rather than the cursor down the panel.
+        if (isMenuAdjustKey(e.code)) {
+            e.preventDefault();
+            const adjusted = adjustSetting(this.settings, selectedId(this.settingsState), menuAdjustStep(e.code));
+            if (adjusted) this.applySettings();
             this.syncOverlays();
             return;
         }
@@ -220,10 +306,16 @@ class FlightSimulator {
         const applied = chooseSetting(this.settings, id);
         if (!applied || applied === SETTINGS_BACK_ID) return;
 
+        if (!isEnvironmentId(applied)) {
+            this.applySettings();
+            return;
+        }
+
         // A new world is a new flight: the aircraft goes back to the configured
         // start rather than carrying on inside a mountain that was not there
         // a moment ago.
         this.terrain.setEnvironment(applied);
+        this.hud.setBounds(this.terrain.getBounds());
         this.aircraft.reset();
     }
 
@@ -233,7 +325,7 @@ class FlightSimulator {
         const onTitle  = titleShowing(this.titleState);
         const settings = settingsShowing(this.settings);
         const paused   = !onTitle && this.pauseState.paused;
-        const chrome   = !onTitle && this.hudVisibility.visible;
+        const chrome   = !onTitle && !settings && this.hudVisibility.visible;
         // The panel is opened to look at the world behind it, so it is the one
         // overlay that clears the screen it was opened from.
         const help     = !settings && (chrome || (onTitle && this.titleHelp));
@@ -241,8 +333,10 @@ class FlightSimulator {
         this.overlays.title.style.display    = onTitle && !settings ? 'flex' : 'none';
         this.overlays.settings.style.display = settings ? 'block' : 'none';
         this.overlays.paused.style.display   = paused && !settings ? 'block' : 'none';
-        this.overlays.hud.style.display      = chrome && !settings ? 'block' : 'none';
-        this.overlays.attitude.style.display = chrome && !settings ? 'block' : 'none';
+        this.overlays.hud.style.display      = chrome ? 'block' : 'none';
+        this.overlays.attitude.style.display = chrome ? 'block' : 'none';
+        this.overlays.minimap.style.display  = chrome ? 'block' : 'none';
+        this.overlays.muted.style.display    = chrome && this.audioState.muted ? 'block' : 'none';
         this.overlays.help.style.display     = help ? 'block' : 'none';
         this.overlays.helpList.style.display = this.helpState.expanded ? 'block' : 'none';
         this.overlays.helpHint.style.display = this.helpState.expanded ? 'none' : 'block';
@@ -254,16 +348,23 @@ class FlightSimulator {
         this.startMenu.render(this.startMenuState);
         this.pauseMenu.render(this.pauseMenuState);
         this.settingsMenu.render(this.settingsState);
+        this.settingsOptions.render(this.settingsState);
     }
 
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        // The clock is always read so the time spent paused, or spent on the
-        // start screen before the flight is chosen, is discarded rather than
-        // applied in one jump on the frame the simulation runs again.
-        const frozen      = titleShowing(this.titleState) || this.pauseState.paused;
-        const dt          = preFlightDelta(this.titleState, simulationDelta(this.pauseState, this.clock.getDelta()));
+        // The clock is always read so the time spent frozen - paused, waiting
+        // behind the title screen, or held under the settings panel - is
+        // discarded rather than applied in one jump on the frame the
+        // simulation runs again.
+        const elapsed = this.clock.getDelta();
+        const frozen  = titleShowing(this.titleState)
+            || this.pauseState.paused
+            || settingsShowing(this.settings);
+
+        const dt = frozen ? 0 : preFlightDelta(this.titleState, simulationDelta(this.pauseState, elapsed));
+
         const aircraftPos = this.aircraft.getPosition();
         const groundH     = this.terrain.getTerrainHeightAt(aircraftPos.x, aircraftPos.z);
 
@@ -272,7 +373,22 @@ class FlightSimulator {
         this.sky.update();
         this.hud.update(this.aircraft, this.camera2, frozen);
 
+        this.audio.update(audioLevels(this.audioState, {
+            throttle: this.aircraft.getThrottle(),
+            speed: this.aircraft.getSpeed(),
+            maxSpeed: this.aircraft.maxSpeed,
+            frozen
+        }));
+
         this.renderer.render(this.scene, this.camera);
+
+        // The screen over the page comes off on the strength of a frame that
+        // has actually been drawn, rather than on a timer that would take it
+        // off a black canvas.
+        if (!loadingComplete(this.loading)) {
+            this.loaded('frame');
+            this.loadingScreen.finish();
+        }
     }
 }
 

@@ -7,18 +7,23 @@ that applies when their items are completed.
 
 ## Current
 
-- [ ] Add a minimap in a screen corner showing aircraft position and heading
-  within the terrain bounds
+- [ ] Add a configuration module (`js/config.js`) that holds the simulator
+  defaults as one exported object, so start state is data rather than
+  scattered literals
+  - From: Simulator Configuration
+- [ ] Let the settings panel edit the start state fields before launch, and
+  persist the choices in `localStorage` across sessions
+  - From: Simulator Configuration
+- [ ] Handle the world edge: either wrap the aircraft position across the
+  16000-unit terrain bounds or recenter terrain tiles around the aircraft
+  so the fog-hidden edge can never be reached
+  - From: World & Environment
+- [ ] Add a photo mode (`F2`) that hides every overlay for one frame and
+  downloads the rendered canvas as a PNG
   - From: Game UI/UX
-- [ ] Add a settings panel (`O`) for control sensitivity, fog density, and
-  HUD units (knots/mph, ft/m)
-  - From: Game UI/UX
-- [ ] Add engine and wind audio that track throttle and airspeed, with a
-  mute toggle (`M`)
-  - From: Game UI/UX
-- [ ] Replace the static "Loading Flight Simulator..." text with a simple
-  progress/fade-in tied to first rendered frame
-  - From: Documentation & Polish
+- [ ] Document the API surface in `docs/api.md`, including the stability
+  guarantee and a worked example for each half
+  - From: Simulator API
 
 ## Game UI/UX
 
@@ -26,12 +31,6 @@ Player-facing interface and experience around the flight model, beyond the
 raw instrument readout. Completing items in this section applies a minor
 version update.
 
-- [ ] Add a minimap in a screen corner showing aircraft position and heading
-  within the terrain bounds
-- [ ] Add engine and wind audio that track throttle and airspeed, with a
-  mute toggle (`M`)
-- [ ] Add a settings panel (`O`) for control sensitivity, fog density, and
-  HUD units (knots/mph, ft/m)
 - [ ] Add on-screen touch controls so the simulator is playable on a phone
   or tablet without a keyboard
 - [ ] Add a photo mode (`F2`) that hides every overlay for one frame and
@@ -178,9 +177,6 @@ this section applies a minor version update.
 Keep the docs accurate and improve first-run experience. Completing items
 in this section applies a patch version update.
 
-- [ ] Replace the static "Loading Flight Simulator..." text with a simple
-  progress/fade-in tied to first rendered frame
-
 ## Complete
 
 - [x] Create `CHANGELOG.md` with a `1.0.0` baseline entry describing the
@@ -290,3 +286,15 @@ in this section applies a patch version update.
   (environments usable with external aircraft, foreign control APIs, and
   external assets)
   - From: Simulator API
+- [x] Add a minimap in a screen corner showing aircraft position and heading
+  within the terrain bounds
+  - From: Game UI/UX
+- [x] Add a settings panel (`O`) for control sensitivity, fog density, and
+  HUD units (knots/mph, ft/m)
+  - From: Game UI/UX
+- [x] Add engine and wind audio that track throttle and airspeed, with a
+  mute toggle (`M`)
+  - From: Game UI/UX
+- [x] Replace the static "Loading Flight Simulator..." text with a simple
+  progress/fade-in tied to first rendered frame
+  - From: Documentation & Polish

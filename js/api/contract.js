@@ -15,7 +15,10 @@ import {
     INITIAL_SPEED, INITIAL_THROTTLE, INITIAL_ALTITUDE,
     INITIAL_VERTICAL_SPEED, INITIAL_PITCH, INITIAL_YAW, INITIAL_CAMERA_MODE
 } from '../flight-state.js';
-import { MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY } from '../flight-model.js';
+import {
+    MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY,
+    CONTROL_SENSITIVITY, MIN_SENSITIVITY, MAX_SENSITIVITY
+} from '../flight-model.js';
 import { GROUND_CLEARANCE, CRASH_IMPACT_SPEED } from '../crash.js';
 import { DEFAULT_KEYMAP } from '../input-map.js';
 
@@ -126,6 +129,7 @@ export function resolvePilotOptions(options = {}) {
             verticalSpeed: numberOr(flight.verticalSpeed, INITIAL_VERTICAL_SPEED),
             pitch:         numberOr(flight.pitch, INITIAL_PITCH),
             yaw:           numberOr(flight.yaw, INITIAL_YAW),
+            sensitivity:   clamp(numberOr(flight.sensitivity, CONTROL_SENSITIVITY), MIN_SENSITIVITY, MAX_SENSITIVITY),
             minSpeed:      numberOr(flight.minSpeed, MIN_SPEED),
             cruiseSpeed:   numberOr(flight.cruiseSpeed, CRUISE_SPEED),
             maxSpeed:      numberOr(flight.maxSpeed, MAX_SPEED),
