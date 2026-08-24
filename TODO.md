@@ -7,23 +7,19 @@ that applies when their items are completed.
 
 ## Current
 
-- [ ] Add a configuration module (`js/config.js`) that holds the simulator
-  defaults as one exported object, so start state is data rather than
-  scattered literals
-  - From: Simulator Configuration
-- [ ] Let the settings panel edit the start state fields before launch, and
-  persist the choices in `localStorage` across sessions
-  - From: Simulator Configuration
-- [ ] Handle the world edge: either wrap the aircraft position across the
-  16000-unit terrain bounds or recenter terrain tiles around the aircraft
-  so the fog-hidden edge can never be reached
-  - From: World & Environment
-- [ ] Add a photo mode (`F2`) that hides every overlay for one frame and
-  downloads the rendered canvas as a PNG
-  - From: Game UI/UX
-- [ ] Document the API surface in `docs/api.md`, including the stability
-  guarantee and a worked example for each half
+- [ ] **Matter API**: allow an environment to act as one tile of a larger
+  assembled environment, matching heights and materials at shared edges
   - From: Simulator API
+- [ ] Add an example host page that imports the Pilot API with an external
+  environment and the Matter API with an external aircraft, proving both
+  directions work
+  - From: Simulator API
+- [ ] Add a day-night cycle in `js/sky.js` with gradual light, fog color,
+  and sky color transitions
+  - From: World & Environment
+- [ ] Animate water: give below-water-level vertices a subtle wave motion
+  and specular tint distinct from land shading
+  - From: World & Environment
 
 ## Game UI/UX
 
@@ -33,17 +29,12 @@ version update.
 
 - [ ] Add on-screen touch controls so the simulator is playable on a phone
   or tablet without a keyboard
-- [ ] Add a photo mode (`F2`) that hides every overlay for one frame and
-  downloads the rendered canvas as a PNG
 
 ## World & Environment
 
 Grow the procedural world beyond the single terrain tile. Completing items
 in this section applies a minor version update.
 
-- [ ] Handle the world edge: either wrap the aircraft position across the
-  16000-unit terrain bounds or recenter terrain tiles around the aircraft
-  so the fog-hidden edge can never be reached
 - [ ] Integrate the weather system from the `local-weather` branch (clouds,
   rain, moon, sky styling) into main once its API stabilizes
 - [ ] Add a day-night cycle in `js/sky.js` with gradual light, fog color,
@@ -137,8 +128,6 @@ applies a minor version update.
   assembled environment, matching heights and materials at shared edges
 - [ ] **Matter API**: expose environment depth (fog and distance shading) as
   a standalone effect other scenes can apply without importing the terrain
-- [ ] Document the API surface in `docs/api.md`, including the stability
-  guarantee and a worked example for each half
 - [ ] Add unit tests for the pure surfaces of both APIs: option defaults,
   contract validation, and telemetry shape
 - [ ] Add an example host page that imports the Pilot API with an external
@@ -151,9 +140,6 @@ Make the simulator start state and its options data the pilot can see and
 change, rather than constants held in the flight code. Completing items in
 this section applies a minor version update.
 
-- [ ] Add a configuration module (`js/config.js`) that holds the simulator
-  defaults as one exported object, so start state is data rather than
-  scattered literals
 - [ ] Set the initial flight state to 80 knots airspeed, 1390 ft altitude,
   +1260 ft/min vertical speed, heading 000, 20% throttle, and the chase
   camera, superseding the current standing start
@@ -165,8 +151,6 @@ this section applies a minor version update.
   matches the pause menu entry of the same name
 - [ ] Add a **Settings** entry to the pause menu that opens the same panel
   the start screen opens
-- [ ] Let the settings panel edit the start state fields before launch, and
-  persist the choices in `localStorage` across sessions
 - [ ] Add an environment selection to the settings panel, defaulting to the
   current generated terrain
 - [ ] Add 5 assembled environments, each a named preset of the Environment
@@ -298,3 +282,20 @@ in this section applies a patch version update.
 - [x] Replace the static "Loading Flight Simulator..." text with a simple
   progress/fade-in tied to first rendered frame
   - From: Documentation & Polish
+- [x] Add a configuration module (`js/config.js`) that holds the simulator
+  defaults as one exported object, so start state is data rather than
+  scattered literals
+  - From: Simulator Configuration
+- [x] Let the settings panel edit the start state fields before launch, and
+  persist the choices in `localStorage` across sessions
+  - From: Simulator Configuration
+- [x] Handle the world edge: either wrap the aircraft position across the
+  16000-unit terrain bounds or recenter terrain tiles around the aircraft
+  so the fog-hidden edge can never be reached
+  - From: World & Environment
+- [x] Add a photo mode (`F2`) that hides every overlay for one frame and
+  downloads the rendered canvas as a PNG
+  - From: Game UI/UX
+- [x] Document the API surface in `docs/api.md`, including the stability
+  guarantee and a worked example for each half
+  - From: Simulator API

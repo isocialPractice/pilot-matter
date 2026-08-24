@@ -15,8 +15,10 @@ import {
     INITIAL_THROTTLE,
     INITIAL_PITCH,
     INITIAL_YAW,
-    createFlightState
+    createFlightState,
+    flightStart
 } from '../js/flight-state.js';
+import { DEFAULT_CONFIG, startDefaults } from '../js/config.js';
 import {
     speedToKnots, altitudeToFeet, throttleToPercent,
     verticalSpeedToFeetPerMinute, formatVerticalSpeed,
@@ -111,6 +113,85 @@ test('the HUD readouts on the page match the state the flight starts in', () => 
     assert.equal(readout('hud-heading'), formatHeading(INITIAL_HEADING_DEGREES));
     assert.equal(readout('hud-compass'), compassPoint(INITIAL_HEADING_DEGREES));
     assert.equal(readout('hud-camera'), INITIAL_CAMERA_MODE);
+});
+
+// The constants are the configured start resolved once. Reading them off
+// js/config.js is what keeps the start data rather than a set of literals the
+// flight code happens to agree with.
+test('the constants are the configured start, and not a second copy of it', () => {
+    assert.equal(INITIAL_AIRSPEED_KNOTS, DEFAULT_CONFIG.start.airspeedKnots);
+    assert.equal(INITIAL_ALTITUDE_FEET, DEFAULT_CONFIG.start.altitudeFeet);
+    assert.equal(INITIAL_VERTICAL_SPEED_FPM, DEFAULT_CONFIG.start.verticalSpeedFpm);
+    assert.equal(INITIAL_HEADING_DEGREES, DEFAULT_CONFIG.start.headingDegrees);
+    assert.equal(INITIAL_THROTTLE_PERCENT, DEFAULT_CONFIG.start.throttlePercent);
+    assert.equal(INITIAL_CAMERA_MODE, DEFAULT_CONFIG.start.cameraMode);
+});
+
+test('a start with nothing named is the one the simulator ships with', () => {
+    const start = flightStart();
+    assert.equal(start.speed, INITIAL_SPEED);
+    assert.equal(start.altitude, INITIAL_ALTITUDE);
+    assert.equal(start.verticalSpeed, INITIAL_VERTICAL_SPEED);
+    assert.equal(start.throttle, INITIAL_THROTTLE);
+    assert.equal(start.yaw, INITIAL_YAW);
+    assert.equal(start.pitch, INITIAL_PITCH);
+    assert.equal(start.cameraMode, INITIAL_CAMERA_MODE);
+});
+
+test('a configured start reads back on the instruments as the numbers set', () => {
+    const start = flightStart({
+        ...startDefaults(),
+        airspeedKnots: 140,
+        altitudeFeet: 3000,
+        verticalSpeedFpm: -500,
+        headingDegrees: 90,
+        throttlePercent: 60,
+        cameraMode: 'COCKPIT'
+    });
+
+    assert.equal(speedToKnots(start.speed), 140);
+    assert.equal(altitudeToFeet(start.altitude), 3000);
+    assert.equal(verticalSpeedToFeetPerMinute(start.verticalSpeed), -500);
+    assert.equal(headingDegrees(start.yaw), 90);
+    assert.equal(throttleToPercent(start.throttle), 60);
+    assert.equal(start.cameraMode, 'COCKPIT');
+});
+
+// The pitch is worked out from the climb and the airspeed rather than stored,
+// so a start edited to a different climb is flown at the attitude that holds it.
+test('an edited climb comes with the attitude that actually holds it', () => {
+    for (const [verticalSpeedFpm, airspeedKnots] of [[-500, 140], [0, 200], [2400, 120]]) {
+        const start = flightStart({ ...startDefaults(), verticalSpeedFpm, airspeedKnots });
+        const climb = forwardY(start.pitch) * start.speed - sinkRate(start.speed);
+
+        // Read off the dial rather than compared as a number: a climb worked
+        // out through an arcsine and back lands a rounding error away from the
+        // one asked for, and the indicator is what says whether that matters.
+        assert.equal(
+            formatVerticalSpeed(verticalSpeedToFeetPerMinute(climb)),
+            formatVerticalSpeed(verticalSpeedFpm),
+            `a start climbing at ${verticalSpeedFpm} should be pitched to climb at it`
+        );
+    }
+});
+
+test('a start nose down is a start pointed at the ground', () => {
+    const descent = flightStart({ ...startDefaults(), verticalSpeedFpm: -2000, airspeedKnots: 200 });
+    assert.ok(forwardY(descent.pitch) < 0, 'a descent needs the nose below the horizon');
+});
+
+test('a flight state can be built from a start other than the configured one', () => {
+    const state = createFlightState({ ...startDefaults(), altitudeFeet: 3000, headingDegrees: 180 });
+    assert.equal(altitudeToFeet(state.position.y), 3000);
+    assert.equal(headingDegrees(state.rotation.y), 180);
+    assert.equal(state.position.x, 0, 'and still over the middle of the world');
+    assert.equal(state.position.z, 0);
+});
+
+test('a start a version cannot read falls back to the configured one, field by field', () => {
+    const state = createFlightState({ altitudeFeet: 3000, airspeedKnots: 'quite fast' });
+    assert.equal(altitudeToFeet(state.position.y), 3000);
+    assert.equal(speedToKnots(state.speed), INITIAL_AIRSPEED_KNOTS);
 });
 
 test('createFlightState hands out fresh objects, so a reset is never poisoned', () => {

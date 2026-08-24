@@ -6,9 +6,15 @@ import {
     SETTINGS_CLOSE_KEYS,
     SETTINGS_OPEN_KEYS,
     SETTINGS_OPTIONS,
+    START_OPTIONS,
+    FLIGHT_OPTIONS,
     ENVIRONMENT_ENTRY,
     OPTION_ENTRY,
     BACK_ENTRY,
+    START_GROUP,
+    OPTION_GROUP,
+    isRangeOption,
+    startSettings,
     SENSITIVITY_OPTION,
     FOG_OPTION,
     SPEED_UNIT_OPTION,
@@ -36,6 +42,7 @@ import {
 } from '../js/settings.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
+import { START_FIELDS, START_FIELD_IDS, startDefaults } from '../js/config.js';
 
 // Enough of a storage for the settings to remember something, with no browser
 // to remember it in.
@@ -281,6 +288,121 @@ test('an option setting this version has never heard of reads as the default', (
     assert.equal(settings[SPEED_UNIT_OPTION], defaultSettings()[SPEED_UNIT_OPTION]);
     assert.equal(settings[ALTITUDE_UNIT_OPTION], 'meters',
         'one setting it cannot read should not cost the others their memory');
+});
+
+// --- The start state -------------------------------------------------------
+
+test('the panel offers every field of the start state, and offers it as declared', () => {
+    assert.deepEqual(START_OPTIONS.map(option => option.id), START_FIELD_IDS);
+    for (const option of START_OPTIONS) {
+        assert.equal(option.group, START_GROUP, `${option.id} belongs under the start heading`);
+        assert.deepEqual(
+            option.default,
+            START_FIELDS.find(field => field.id === option.id).default,
+            `${option.id} should be offered on the value js/config.js declares`
+        );
+    }
+});
+
+test('the cursor walks the start state first, then the rest, as one list', () => {
+    assert.deepEqual(SETTINGS_OPTIONS, [...START_OPTIONS, ...FLIGHT_OPTIONS]);
+    for (const option of FLIGHT_OPTIONS) {
+        assert.equal(option.group, OPTION_GROUP, `${option.id} belongs under the options heading`);
+    }
+});
+
+test('a first flight opens on the configured start, and says so in the list', () => {
+    const state = createSettingsState(null);
+    assert.deepEqual(startSettings(state), startDefaults());
+
+    const entry = state.entries.find(item => item.id === 'airspeedKnots');
+    assert.equal(entry.group, START_GROUP);
+    assert.ok(entry.text.includes('80 KTS'), 'the row should read the airspeed with its scale');
+});
+
+test('a range reads as a number and a list reads as a label', () => {
+    assert.equal(isRangeOption(settingsOption('airspeedKnots')), true);
+    assert.equal(isRangeOption(settingsOption('cameraMode')), false);
+    assert.equal(isRangeOption(settingsOption(FOG_OPTION)), false);
+    assert.equal(isRangeOption(null), false);
+});
+
+// A reading is punctuated the way an instrument punctuates it: three digits on
+// the card, a sign on a climb, and the units hard against a percentage.
+test('a reading is written the way its instrument writes it', () => {
+    assert.equal(optionValueLabel('headingDegrees', 0), '000 DEG');
+    assert.equal(optionValueLabel('headingDegrees', 45), '045 DEG');
+    assert.equal(optionValueLabel('verticalSpeedFpm', 1260), '+1260 FT/MIN');
+    assert.equal(optionValueLabel('verticalSpeedFpm', 0), '0 FT/MIN');
+    assert.equal(optionValueLabel('verticalSpeedFpm', -500), '-500 FT/MIN');
+    assert.equal(optionValueLabel('throttlePercent', 20), '20%');
+    assert.equal(optionValueLabel('altitudeFeet', 1390), '1390 FT');
+    assert.equal(optionValueLabel('cameraMode', 'ORBIT'), 'ORBIT');
+    assert.equal(optionValueLabel('airspeedKnots', 'quite fast'), '', 'and nothing else reads at all');
+});
+
+test('a range steps by its own step in both directions', () => {
+    const option = settingsOption('airspeedKnots');
+    assert.equal(cycleOptionValue('airspeedKnots', 80, 1), 80 + option.step);
+    assert.equal(cycleOptionValue('airspeedKnots', 80, -1), 80 - option.step);
+    assert.equal(cycleOptionValue('airspeedKnots', 'a speed it has never held', 1),
+        option.default + option.step, 'a value from nowhere starts from the configured one');
+});
+
+// A list wraps because its ends mean nothing; a range stops because its ends
+// mean something. Past the fastest a flight can open at is not the slowest.
+test('a range stops at its ends rather than wrapping round them', () => {
+    const option = settingsOption('airspeedKnots');
+    assert.equal(cycleOptionValue('airspeedKnots', option.max, 1), option.max);
+    assert.equal(cycleOptionValue('airspeedKnots', option.min, -1), option.min);
+});
+
+test('a start field the panel steps is remembered for the next session', () => {
+    const storage = fakeStorage();
+    const state = createSettingsState(storage);
+    const step = settingsOption('altitudeFeet').step;
+    const start = currentOption(state, 'altitudeFeet');
+
+    assert.equal(adjustSetting(state, 'altitudeFeet', 1), 'altitudeFeet');
+    assert.equal(currentOption(state, 'altitudeFeet'), start + step);
+    assert.equal(currentOption(createSettingsState(storage), 'altitudeFeet'), start + step,
+        'a start edited before launch should outlive the session that edited it');
+});
+
+test('a step that would leave the range is not a change at all', () => {
+    const state = createSettingsState(null);
+    state.values.throttlePercent = settingsOption('throttlePercent').max;
+    assert.equal(adjustSetting(state, 'throttlePercent', 1), null);
+    assert.equal(currentOption(state, 'throttlePercent'), settingsOption('throttlePercent').max);
+});
+
+test('a stored start this version cannot read reads as the configured one', () => {
+    const storage = fakeStorage({
+        [SETTINGS_STORAGE_KEY]: JSON.stringify({
+            environment: DEFAULT_ENVIRONMENT_ID,
+            airspeedKnots: 120,
+            altitudeFeet: 82,
+            headingDegrees: 400,
+            cameraMode: 'PERISCOPE'
+        })
+    });
+
+    const settings = readSettings(storage);
+    assert.equal(settings.airspeedKnots, 120, 'a value it can read is kept');
+    assert.equal(settings.altitudeFeet, startDefaults().altitudeFeet, 'one between two steps is not');
+    assert.equal(settings.headingDegrees, startDefaults().headingDegrees, 'nor one off the card');
+    assert.equal(settings.cameraMode, startDefaults().cameraMode, 'nor a view there is no camera for');
+});
+
+test('the start the panel hands over is a start and nothing else', () => {
+    const state = createSettingsState(null);
+    adjustSetting(state, 'airspeedKnots', 1);
+
+    const start = startSettings(state);
+    assert.deepEqual(Object.keys(start), START_FIELD_IDS);
+    assert.equal(start.airspeedKnots, currentOption(state, 'airspeedKnots'));
+    assert.equal(start.environment, undefined, 'the world is not part of the start state');
+    assert.equal(start[FOG_OPTION], undefined);
 });
 
 test('syncing the list is what marks it, so a reopened panel shows the pick', () => {

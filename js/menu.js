@@ -122,6 +122,9 @@ export class MenuList {
     constructor(listElement, state, include = () => true) {
         this.list  = listElement;
         this.items = [];
+        // Where the cursor was when the list was last drawn, so a redraw can
+        // tell a cursor that moved from a list that was simply redrawn.
+        this.cursor = null;
 
         state.entries.forEach((entry, index) => {
             if (!include(entry, index)) return;
@@ -142,6 +145,16 @@ export class MenuList {
             item.textContent = entry?.text ?? entry?.label ?? '';
             item.classList.toggle('selected', index === state.index);
             item.classList.toggle('current', entry?.current === true);
+        }
+
+        // A panel with more entries than a short window can hold scrolls, and a
+        // cursor that had walked off the top of it would be a cursor nobody
+        // could follow. Only a cursor that has just moved asks to be seen, so a
+        // redraw of a list nothing moved in leaves the panel where it was left.
+        if (state.index !== this.cursor) {
+            this.cursor = state.index;
+            this.items.find(({ index }) => index === state.index)
+                ?.item.scrollIntoView?.({ block: 'nearest' });
         }
     }
 }

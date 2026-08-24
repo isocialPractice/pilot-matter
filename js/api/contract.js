@@ -121,6 +121,11 @@ export function resolvePilotOptions(options = {}) {
         terrain: resolveTerrain(options.terrain),
         keymap: { ...DEFAULT_KEYMAP, ...(options.keymap ?? {}) },
         controls: options.controls !== false,
+        // The world has no outside unless a host says it has one: the aircraft
+        // is carried back in at the opposite edge rather than flown off the
+        // ground the terrain declared.
+        wrap: options.wrap !== false,
+        onReset: typeof options.onReset === 'function' ? options.onReset : null,
         cameraMode: CAMERA_MODES.includes(options.cameraMode) ? options.cameraMode : INITIAL_CAMERA_MODE,
         flight: {
             speed:         numberOr(flight.speed, INITIAL_SPEED),

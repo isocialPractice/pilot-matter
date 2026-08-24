@@ -9,6 +9,7 @@ import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, createCrashState, isCrashImpact,
     beginCrash, clearCrash, updateCrash, controlsLocked
 } from './crash.js';
+import { wrapPosition } from './world-edge.js';
 
 /**
  * The aircraft: a model in a scene, and the frame loop the flight model drives
@@ -72,6 +73,18 @@ export class Aircraft {
                 z: 0
             }
         };
+    }
+
+    /**
+     * Changes the condition the aircraft resets into, without resetting it: a
+     * start edited mid-flight is the next flight's, not this one's. Fields the
+     * caller does not name keep whatever they were.
+     *
+     * Returns the start state now in force.
+     */
+    setStart(flight = {}) {
+        this.options = { ...this.options, flight: { ...this.options.flight, ...flight } };
+        return this.startState();
     }
 
     /**
@@ -140,10 +153,33 @@ export class Aircraft {
         this.verticalSpeed = start.verticalSpeed;
         clearCrash(this.crash);
 
+        // Nothing is told about the reset the constructor runs: there is no
+        // model to place and no flight to have been interrupted yet, so a host
+        // hears about the resets that happened to a flight rather than about
+        // the one that built it.
         if (this.group) {
             this.group.position.copy(this.position);
             this.group.rotation.copy(this.rotation);
+            this.options.onReset?.(start);
         }
+    }
+
+    /**
+     * Carries the aircraft across the world's edge and back in over the
+     * opposite one, so the ground never runs out from under it. Only the
+     * horizontal position moves: the altitude, the attitude, and the heading
+     * are the flight, and a flight that changed at the edge would be a fence.
+     *
+     * Returns true when the aircraft crossed.
+     */
+    wrapInside(bounds) {
+        const inside = wrapPosition(bounds, this.position.x, this.position.z);
+        if (!inside.wrapped) return false;
+
+        this.position.x = inside.x;
+        this.position.z = inside.z;
+        this.group?.position.copy(this.position);
+        return true;
     }
 
     update(dt, terrainHeight = 0) {

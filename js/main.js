@@ -4,7 +4,7 @@ import { Terrain }          from './terrain.js';
 import { Sky }              from './sky.js';
 import { CameraController } from './camera.js';
 import { HUD }              from './hud.js';
-import { INITIAL_CAMERA_MODE } from './flight-state.js';
+import { INITIAL_CAMERA_MODE, flightStart } from './flight-state.js';
 import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from './pause.js';
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
@@ -18,20 +18,30 @@ import {
 } from './hud-visibility.js';
 import {
     createSettingsState, openSettings, closeSettings, settingsShowing,
-    chooseSetting, adjustSetting, currentEnvironment, currentOption,
+    chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
     isSettingsCloseKey, isSettingsOpenKey, isEnvironmentId,
-    SETTINGS_BACK_ID, ENVIRONMENT_ENTRY,
+    SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, OPTION_ENTRY, START_GROUP,
     SENSITIVITY_OPTION, FOG_OPTION, SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
 import {
     createLoadingState, advanceLoading, loadingComplete, LoadingScreen
 } from './loading.js';
 import { createAudioState, applyMuteKey, audioLevels, FlightAudio } from './audio.js';
+import {
+    createPhotoState, applyPhotoKey, photoPending, completePhoto,
+    photoFilename, savePhoto
+} from './photo.js';
 
 // Keys whose browser default would disturb the page behind the game: the
 // focus ring walking off the canvas, or the page scrolling under it. Every
 // other key, the reload key included, keeps whatever the browser does with it.
 const SWALLOWED_KEYS = ['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+// Whether two starts are the same condition, so that changing a setting which
+// is not part of the start does not put the aircraft back into one.
+function sameStart(start, applied) {
+    return applied != null && Object.keys(start).every(field => start[field] === applied[field]);
+}
 
 class FlightSimulator {
     constructor() {
@@ -64,14 +74,21 @@ class FlightSimulator {
 
         this.sky      = new Sky(this.scene);
         this.terrain  = new Terrain(this.scene, currentEnvironment(this.settings));
+        // The square the world covers, held rather than asked for every frame:
+        // it only changes when the world does.
+        this.bounds   = this.terrain.getBounds();
         this.loaded('world');
 
-        this.aircraft = new Aircraft(this.scene);
+        // A flight that resets - by the menu, by the R key, or by a crash - goes
+        // back to the whole configured start, the view it opens in included.
+        this.aircraft = new Aircraft(this.scene, {
+            onReset: () => this.camera2?.setMode(startSettings(this.settings).cameraMode)
+        });
         this.camera2  = new CameraController(this.camera, this.aircraft, INITIAL_CAMERA_MODE);
         this.loaded('aircraft');
 
         this.hud = new HUD();
-        this.hud.setBounds(this.terrain.getBounds());
+        this.hud.setBounds(this.bounds);
 
         this.titleState     = createTitleState();
         this.pauseState     = createPauseState();
@@ -82,6 +99,7 @@ class FlightSimulator {
         this.hudVisibility  = createHudVisibilityState(defaultStorage());
         this.audioState     = createAudioState(defaultStorage());
         this.audio          = new FlightAudio(this.audioState);
+        this.photoState     = createPhotoState();
 
         // The start screen's Controls entry puts the control list on screen
         // over the title, where nothing else would have shown it yet.
@@ -103,15 +121,20 @@ class FlightSimulator {
         this.startMenu    = new MenuList(document.getElementById('start-menu'), this.startMenuState);
         this.pauseMenu    = new MenuList(document.getElementById('pause-menu'), this.pauseMenuState);
 
-        // One cursor, two lists: the worlds under one heading of the panel and
-        // the options under the other, walked as though they were one list.
+        // One cursor, three lists: the worlds under one heading of the panel,
+        // the start state under the next, and the options that hold whichever
+        // world is flown under the last, all walked as though they were one.
         this.settingsMenu = new MenuList(
             document.getElementById('settings-menu'), this.settingsState,
             entry => entry.kind === ENVIRONMENT_ENTRY
         );
+        this.settingsStart = new MenuList(
+            document.getElementById('settings-start'), this.settingsState,
+            entry => entry.kind === OPTION_ENTRY && entry.group === START_GROUP
+        );
         this.settingsOptions = new MenuList(
             document.getElementById('settings-options'), this.settingsState,
-            entry => entry.kind !== ENVIRONMENT_ENTRY
+            entry => entry.kind !== ENVIRONMENT_ENTRY && entry.group !== START_GROUP
         );
 
         this.setupKeys();
@@ -146,6 +169,18 @@ class FlightSimulator {
             speed:    currentOption(this.settings, SPEED_UNIT_OPTION),
             altitude: currentOption(this.settings, ALTITUDE_UNIT_OPTION)
         });
+
+        // The start state is the condition the next flight opens in, so it is
+        // handed over rather than flown into: an aircraft already in the air
+        // keeps the flight it is in, and takes the new start at the next reset.
+        // Before launch there is no flight to interrupt, so the aircraft is put
+        // straight into it and the world behind the panel shows what was set.
+        const start   = startSettings(this.settings);
+        const changed = !sameStart(start, this.start);
+
+        this.start = start;
+        this.aircraft.setStart(flightStart(start));
+        if (changed && titleShowing(this.titleState)) this.aircraft.reset();
     }
 
     setupKeys() {
@@ -168,6 +203,13 @@ class FlightSimulator {
     }
 
     onStartKey(e) {
+        // A picture is of the world, whatever is over it, so the key that takes
+        // one is read before the screens that would otherwise have swallowed it.
+        if (applyPhotoKey(this.photoState, e.code, true, e.repeat)) {
+            this.syncOverlays();
+            return;
+        }
+
         if (settingsShowing(this.settings)) {
             this.onSettingsKey(e);
             return;
@@ -214,6 +256,13 @@ class FlightSimulator {
     }
 
     onKeyDown(e) {
+        // A picture is of the world, whatever is over it, so the key that takes
+        // one is read ahead of the panel that is otherwise modal over the rest.
+        if (applyPhotoKey(this.photoState, e.code, true, e.repeat)) {
+            this.syncOverlays();
+            return;
+        }
+
         // The panel is modal over the flight behind it: nothing else reads a
         // key while it is open, so P cannot resume out from under it.
         if (settingsShowing(this.settings)) {
@@ -315,17 +364,22 @@ class FlightSimulator {
         // start rather than carrying on inside a mountain that was not there
         // a moment ago.
         this.terrain.setEnvironment(applied);
-        this.hud.setBounds(this.terrain.getBounds());
+        this.bounds = this.terrain.getBounds();
+        this.hud.setBounds(this.bounds);
         this.aircraft.reset();
     }
 
     // Every overlay is placed from the state that drives it, in one pass, so
     // no two toggles can leave the screen in a state neither of them meant.
     syncOverlays() {
-        const onTitle  = titleShowing(this.titleState);
-        const settings = settingsShowing(this.settings);
-        const paused   = !onTitle && this.pauseState.paused;
-        const chrome   = !onTitle && !settings && this.hudVisibility.visible;
+        // A picture is the world with nothing over it. While one is pending
+        // every overlay comes off, so the screen the shutter falls on is the
+        // frame that ends up in the file.
+        const photo    = photoPending(this.photoState);
+        const onTitle  = !photo && titleShowing(this.titleState);
+        const settings = !photo && settingsShowing(this.settings);
+        const paused   = !photo && !onTitle && this.pauseState.paused;
+        const chrome   = !photo && !onTitle && !settings && this.hudVisibility.visible;
         // The panel is opened to look at the world behind it, so it is the one
         // overlay that clears the screen it was opened from.
         const help     = !settings && (chrome || (onTitle && this.titleHelp));
@@ -348,6 +402,7 @@ class FlightSimulator {
         this.startMenu.render(this.startMenuState);
         this.pauseMenu.render(this.pauseMenuState);
         this.settingsMenu.render(this.settingsState);
+        this.settingsStart.render(this.settingsState);
         this.settingsOptions.render(this.settingsState);
     }
 
@@ -365,13 +420,24 @@ class FlightSimulator {
 
         const dt = frozen ? 0 : preFlightDelta(this.titleState, simulationDelta(this.pauseState, elapsed));
 
+        // The overlays came off when the key was pressed; the warnings the HUD
+        // places itself go quiet the same way a frozen frame quiets them.
+        const capturing = photoPending(this.photoState);
+
         const aircraftPos = this.aircraft.getPosition();
         const groundH     = this.terrain.getTerrainHeightAt(aircraftPos.x, aircraftPos.z);
 
         this.aircraft.update(dt, groundH);
+
+        // The world has no outside: an aircraft that reaches an edge comes back
+        // in over the opposite one. Carried before the camera is placed, so the
+        // chase view cuts across with it rather than flying the width of the
+        // world to catch up.
+        this.aircraft.wrapInside(this.bounds);
+
         this.camera2.update(dt);
         this.sky.update();
-        this.hud.update(this.aircraft, this.camera2, frozen);
+        this.hud.update(this.aircraft, this.camera2, frozen || capturing);
 
         this.audio.update(audioLevels(this.audioState, {
             throttle: this.aircraft.getThrottle(),
@@ -382,6 +448,11 @@ class FlightSimulator {
 
         this.renderer.render(this.scene, this.camera);
 
+        // Read back inside the pass that drew it: a drawing buffer is cleared
+        // once its frame has been composited, so a picture taken any later than
+        // this would be a picture of nothing.
+        if (capturing) this.takePhoto();
+
         // The screen over the page comes off on the strength of a frame that
         // has actually been drawn, rather than on a timer that would take it
         // off a black canvas.
@@ -389,6 +460,17 @@ class FlightSimulator {
             this.loaded('frame');
             this.loadingScreen.finish();
         }
+    }
+
+    /**
+     * Downloads the frame just drawn and puts the screen back. The request is
+     * cleared whether or not the browser took the download, because a request
+     * left pending would clear the overlays off every frame after it.
+     */
+    takePhoto() {
+        savePhoto(this.renderer.domElement, photoFilename());
+        completePhoto(this.photoState);
+        this.syncOverlays();
     }
 }
 

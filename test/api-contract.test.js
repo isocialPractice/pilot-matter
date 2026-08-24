@@ -238,3 +238,28 @@ test('a host can remap the bindings without losing the ones it left alone', () =
     assert.deepEqual(keymap.yawLeft, ['KeyZ']);
     assert.deepEqual(keymap.pitchUp, DEFAULT_KEYMAP.pitchUp);
 });
+
+// --- The edge of the world ------------------------------------------------
+
+// A terrain declares bounds and answers nothing outside them, so a pilot flown
+// past them would be over a flat nothing. The world is carried round instead,
+// unless the host says its own world carries on past what it declared.
+test('a pilot is flown inside the bounds unless the host asks otherwise', () => {
+    assert.equal(resolvePilotOptions().wrap, true);
+    assert.equal(resolvePilotOptions({ wrap: false }).wrap, false);
+    assert.equal(resolvePilotOptions({ wrap: true }).wrap, true);
+});
+
+test('the edge rule is published, so a host handling its own edge can match it', () => {
+    assert.match(source('index.js'), /wrapPosition/, 'the wrap should be re-exported');
+});
+
+// --- Resets ---------------------------------------------------------------
+
+test('a host can be told when the flight resets, and is not told by default', () => {
+    assert.equal(resolvePilotOptions().onReset, null);
+    assert.equal(resolvePilotOptions({ onReset: 'please' }).onReset, null, 'and only by a function');
+
+    const onReset = () => {};
+    assert.equal(resolvePilotOptions({ onReset }).onReset, onReset);
+});

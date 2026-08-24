@@ -319,6 +319,7 @@
         #pause-menu,
         #start-menu,
         #settings-menu,
+        #settings-start,
         #settings-options {
             list-style: none;
             margin: 18px 0 14px;
@@ -327,6 +328,7 @@
         #pause-menu li,
         #start-menu li,
         #settings-menu li,
+        #settings-start li,
         #settings-options li {
             margin: 4px 0;
             padding: 5px 10px;
@@ -340,20 +342,23 @@
         #pause-menu li.selected,
         #start-menu li.selected,
         #settings-menu li.selected,
+        #settings-start li.selected,
         #settings-options li.selected {
             color: #000;
             background: #0f0;
             border-color: #0f0;
         }
 
-        /* Two lists under two headings sit closer together than one list on its
-           own would, so the panel stays one screenful. */
+        /* Three lists under three headings sit closer together than one list on
+           its own would, so the panel stays as near one screenful as it can. */
         #settings-menu,
+        #settings-start,
         #settings-options {
             margin: 10px 0 8px;
         }
 
         #settings-menu li,
+        #settings-start li,
         #settings-options li {
             margin: 2px 0;
         }
@@ -369,6 +374,7 @@
         }
 
         #settings-menu li[data-note]::after,
+        #settings-start li[data-note]::after,
         #settings-options li[data-note]::after {
             content: attr(data-note);
             display: block;
@@ -467,6 +473,8 @@
         <h2>SETTINGS</h2>
         <h3>ENVIRONMENT</h3>
         <ul id="settings-menu"></ul>
+        <h3>START STATE</h3>
+        <ul id="settings-start"></ul>
         <h3>OPTIONS</h3>
         <ul id="settings-options"></ul>
         <small>W/S TO SELECT &middot; A/D TO ADJUST &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
@@ -537,7 +545,8 @@
             M - Mute Audio<br>
             O - Settings<br>
             P - Pause<br>
-            R - Reset Position
+            R - Reset Position<br>
+            F2 - Photo
         </div>
         <div id="controls-help-hint">H - CONTROLS</div>
     </div>

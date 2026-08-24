@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { TITLE_NAME, START_HINT } from '../js/title-screen.js';
 import { HELP_HINT } from '../js/controls-help.js';
 import { FACE_RADIUS } from '../js/attitude.js';
-import { SETTINGS_TITLE, SETTINGS_HEADING, SETTINGS_OPTIONS_HEADING } from '../js/settings.js';
+import {
+    SETTINGS_TITLE, SETTINGS_HEADING, SETTINGS_START_HEADING, SETTINGS_OPTIONS_HEADING
+} from '../js/settings.js';
+import { PHOTO_KEY } from '../js/photo.js';
 import { MINIMAP_SIZE } from '../js/minimap.js';
 import { LOADING_STEPS, LOADING_FADE_MS } from '../js/loading.js';
 import { MUTE_KEY } from '../js/audio.js';
@@ -122,12 +125,13 @@ test('the title screen names the game and says how to work the menu on it', () =
 
 test('the settings panel is titled and says what it is setting', () => {
     assert.ok(indexHtml.includes(SETTINGS_TITLE), 'the panel should carry its title');
-    assert.ok(indexHtml.includes(SETTINGS_HEADING), 'and name what the list under it changes');
-    assert.ok(indexHtml.includes(SETTINGS_OPTIONS_HEADING), 'and name the other list too');
+    for (const heading of [SETTINGS_HEADING, SETTINGS_START_HEADING, SETTINGS_OPTIONS_HEADING]) {
+        assert.ok(indexHtml.includes(heading), `the panel should name what its ${heading} list changes`);
+    }
 });
 
 test('every menu the panel splits its entries across has a list to be drawn into', () => {
-    for (const id of ['settings-menu', 'settings-options']) {
+    for (const id of ['settings-menu', 'settings-start', 'settings-options']) {
         assert.ok(new RegExp(`<ul id="${id}">\\s*</ul>`).test(indexHtml),
             `the entries are drawn from js/menu.js, so the page should leave #${id} empty`);
     }
@@ -189,6 +193,18 @@ test('the control list names the keys the flight is worked with', () => {
     assert.ok(list[1].includes(`${MUTE_KEY.replace('Key', '')} -`), 'including the one that mutes the sound');
     for (const code of SETTINGS_OPEN_KEYS) {
         assert.ok(list[1].includes(`${code.replace('Key', '')} -`), 'and the one that opens the settings');
+    }
+    assert.ok(list[1].includes(`${PHOTO_KEY} -`), 'and the one that takes a picture');
+});
+
+// Every list under the panel's headings is styled the same way, so a heading
+// added to the markup and not to the stylesheet is a list drawn as bullets.
+test('every list the panel is split across is styled as a menu rather than a list', () => {
+    for (const id of ['settings-menu', 'settings-start', 'settings-options']) {
+        assert.ok(new RegExp(`#${id}[,\\s]`).test(indexHtml), `index.html should style #${id}`);
+        assert.ok(new RegExp(`#${id} li[,\\s]`).test(indexHtml), `and the entries drawn into #${id}`);
+        assert.ok(new RegExp(`#${id} li\\.selected[,\\s]`).test(indexHtml),
+            `and the cursor when it is over #${id}`);
     }
 });
 

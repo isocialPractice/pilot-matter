@@ -25,6 +25,8 @@ import { resolvePilotOptions, createTelemetry } from './contract.js';
  * @param {object} [options.camera]   a camera to place behind the aircraft
  * @param {object} [options.keymap]   bindings to use instead of the bundled ones
  * @param {boolean} [options.controls] false to take the keyboard off entirely
+ * @param {boolean} [options.wrap]    false to let the aircraft fly past the bounds
+ * @param {function} [options.onReset] called whenever the flight resets
  * @param {object} [options.flight]   overrides for the start state and the model
  */
 export function createPilot(options = {}) {
@@ -38,7 +40,8 @@ export function createPilot(options = {}) {
         anchor: resolved.anchor,
         keymap: resolved.keymap,
         controls: resolved.controls,
-        flight: resolved.flight
+        flight: resolved.flight,
+        onReset: resolved.onReset
     });
 
     const camera = options.camera
@@ -71,13 +74,26 @@ export function createPilot(options = {}) {
          * read from the terrain each frame rather than cached, so a host that
          * regenerates its world underneath the aircraft is flown over the new
          * one from the next frame on.
+         *
+         * A terrain has an edge, and by default the aircraft is carried across
+         * it and back in over the opposite one, so the ground never runs out
+         * from under it. A host whose own world continues past the bounds it
+         * declared, or which would rather handle the edge itself, creates the
+         * pilot with `wrap: false`.
          */
         update(dt) {
             const position = aircraft.getPosition();
             aircraft.update(dt, terrain.sampleHeight(position.x, position.z));
+            if (resolved.wrap) aircraft.wrapInside(terrain.bounds);
             camera?.update(dt);
             return this.telemetry();
         },
+
+        /**
+         * Changes the condition the flight resets into, without resetting it.
+         * Takes the same fields `flight` does, in world units.
+         */
+        setStart(flight) { return aircraft.setStart(flight); },
 
         /** Everything an external HUD needs, and nothing of what is behind it. */
         telemetry() {

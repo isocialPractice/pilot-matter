@@ -29,6 +29,18 @@ export class CameraController {
         this.modeIndex = (this.modeIndex + 1) % CAMERA_MODES.length;
     }
 
+    /**
+     * Puts the view in a named mode, for a flight starting or restarting in the
+     * camera it was configured to open in. A name nothing answers to reads as
+     * the first mode, the same way the constructor takes one.
+     *
+     * Returns the mode now in force.
+     */
+    setMode(mode) {
+        this.modeIndex = modeIndexOf(mode);
+        return this.getCurrentMode();
+    }
+
     update(dt = 0) {
         const pos  = this.aircraft.getPosition();
         const quat = this.aircraft.getQuaternion();

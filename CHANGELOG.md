@@ -5,6 +5,69 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-alpha] - 2026-08-24
+
+### Added
+
+- `js/config.js`, holding the condition a flight opens in as one object rather
+  than as constants scattered through the flight code. Every field is declared
+  twice over: once as the value it opens on, and once as what it is allowed to
+  be - its range, the step it moves by, and the units it is read in - which is
+  what lets a panel offer the start without knowing anything about flight, and
+  a host offer it its own way
+- A `START STATE` half of the settings panel, setting the airspeed, altitude,
+  climb, heading, throttle, and camera a flight opens in, each remembered in
+  `localStorage` for the next session. Edited before launch the aircraft is put
+  straight into the new start, so the world behind the panel shows what was set;
+  edited mid-flight it waits for the next reset, because a start is the next
+  flight's condition rather than this one's
+- An option can now be a number stepped along a range as well as a value
+  stepped through a list. A range stops at its ends rather than wrapping round
+  them, because the ends of a range mean something a list's do not: past the
+  fastest a flight can open at is not the slowest
+- A world with no outside. Flying at an edge no longer reaches it: the aircraft
+  is carried round and comes back in over the opposite edge, at the same
+  distance past it, at the same altitude, on the same heading, and at the same
+  airspeed. Only the horizontal position moves, and the two axes are carried on
+  their own, so a corner crossed diagonally comes back in at the opposite corner
+- Photo mode on `F2`, which takes every overlay off the screen for the one frame
+  the picture is taken in and downloads the view as a PNG named for the moment
+  it was taken. The overlays were never in the picture - a rendered frame holds
+  the world and nothing that sits over it on the page - but a photo mode whose
+  screen still carried a HUD would be one that lied about the file it wrote. The
+  frame is read back inside the same pass that drew it, because a browser clears
+  a drawing buffer once its frame has been composited
+- `docs/api.md`, writing out the whole API surface: every option and everything
+  that comes back for both halves, the contracts, the configured start, the
+  worlds and the elements, the edge rule, a worked host page for each half, and
+  a stability guarantee saying what holds within a major API version and what -
+  the tuning numbers, the rendered look, and anything not exported from the
+  entry point - explicitly does not
+- `js/world-edge.js` and `js/photo.js`, pure modules holding the crossing and
+  photo mode's state and filenames with no DOM or Three.js dependency, with unit
+  tests covering the crossing at every edge and corner, the state a held key
+  leaves behind, and a frame that refuses to be read
+- `wrap` and `onReset` as Pilot API options: the first turns the crossing off
+  for a host whose own world continues past the bounds it declared, and the
+  second reports a reset - by the menu, by the reset key, or by a crash - to a
+  host that wants to hear about it
+- `setStart()` on the Pilot API, changing what a reset resets to without
+  resetting, and the configured start and the edge rule published from the entry
+  point so a host can offer the same start state and match the same crossing
+
+### Changed
+
+- A reset now restores the whole configured start, the camera it opens in
+  included, whether it came from the pause menu, the reset key, or a crash
+- The settings panel's cursor scrolls the panel to keep itself in view, for a
+  window too short to hold three lists of entries at once
+- `js/flight-state.js` no longer declares the start, it resolves one: the
+  `INITIAL_` constants are the configured defaults read through the conversions
+  once, and a flight can be built from any other start the same way
+- The minimap's red off-map reading is now only reachable through the Pilot API
+  over a host's own world with the crossing turned off, because the bundled
+  simulator can no longer be flown out of its world
+
 ## [1.7.0-alpha] - 2026-08-23
 
 ### Added

@@ -25,6 +25,19 @@ export {
     createTelemetry
 } from './contract.js';
 
+// The configured start, as the values a pilot reads and the fields they are
+// allowed to hold, so a host can offer the same start state its own way.
+export {
+    DEFAULT_CONFIG, START_FIELDS, START_FIELD_IDS,
+    startField, isStartValue, startDefaults, resolveStart
+} from '../config.js';
+
+export { flightStart, createFlightState } from '../flight-state.js';
+
+// The rule the bundled simulator uses at the end of the ground, published so a
+// host handling its own edge can use it, or match it.
+export { wrapValue, wrapPosition, isOutsideBounds } from '../world-edge.js';
+
 // The worlds the Matter API can assemble, and the elements they are assembled
 // out of, so a host can list them, extend a preset, or write one of its own.
 export {
