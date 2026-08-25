@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1-alpha] - 2026-08-25
+
+### Fixed
+
+- The first stage of **Runway Landing** now opens close enough that the strip
+  is clearly visible ahead of the aircraft. The previous approach distance put
+  the runway so far through the scene's exponential fog that it read as bare
+  ground rather than a marked strip; the opening distance has been halved and
+  the starting altitude brought down to match, so the threshold markings are
+  prominent from the first frame and the approach angle is manageable
+
 ## [1.9.0-alpha] - 2026-08-25
 
 ### Added

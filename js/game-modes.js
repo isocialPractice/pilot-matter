@@ -77,7 +77,7 @@ const runwayLanding = {
             note: 'the strip ahead of you over flat country',
             base: { maxHeight: 180, scale: 1.9 },
             runway: { length: [3000, 3400], width: [300, 340] },
-            approach: { distance: 3600, bearing: 8, heading: 0, altitudeFeet: 1400 }
+            approach: { distance: 2400, bearing: 8, heading: 0, altitudeFeet: 1000 }
         },
         {
             label: 'DOWNWIND',
