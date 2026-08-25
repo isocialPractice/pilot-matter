@@ -21,6 +21,11 @@ that applies when their items are completed.
   and specular tint distinct from land shading
   - From: World & Environment
 
+### User Overrides
+
+- [ ] Add mouse events to the pause and opening menu
+  - From: Simulator Configuration
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
