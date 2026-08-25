@@ -19,7 +19,7 @@ import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY,
     CONTROL_SENSITIVITY, MIN_SENSITIVITY, MAX_SENSITIVITY
 } from '../flight-model.js';
-import { GROUND_CLEARANCE, CRASH_IMPACT_SPEED } from '../crash.js';
+import { GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED } from '../crash.js';
 import { DEFAULT_KEYMAP } from '../input-map.js';
 
 /**
@@ -49,11 +49,12 @@ export function isInsideBounds(bounds, x, z) {
 
 /**
  * An external environment as the Pilot API uses it: something that answers the
- * height under a point, and says how far its ground goes.
+ * height under a point, says how far its ground goes, and names whatever strips
+ * are cut into it.
  *
- * A host that supplies neither gets flat ground over the bundled world's
- * square, so a pilot dropped into an empty scene still has something to fly
- * over and something to crash into.
+ * A host that supplies none of it gets flat ground over the bundled world's
+ * square with nothing landable on it, so a pilot dropped into an empty scene
+ * still has something to fly over and something to crash into.
  */
 export function resolveTerrain(terrain = {}) {
     const sample = typeof terrain.sampleHeight === 'function' ? terrain.sampleHeight : flatSampler(0);
@@ -61,6 +62,10 @@ export function resolveTerrain(terrain = {}) {
 
     return {
         bounds,
+        // A world with no strips is a world where every arrival on the ground
+        // is an arrival on open ground, which is the rule the simulator had
+        // before it had runways at all.
+        runways: Array.isArray(terrain.runways) ? terrain.runways : [],
         sampleHeight(x, z) {
             if (!isInsideBounds(bounds, x, z)) return 0;
             const height = Number(sample(x, z));
@@ -119,6 +124,7 @@ export function resolvePilotOptions(options = {}) {
         aircraft: options.aircraft ?? null,
         anchor: options.anchor ?? { x: 0, y: 0, z: 0 },
         terrain: resolveTerrain(options.terrain),
+        runways: Array.isArray(options.runways) ? options.runways : null,
         keymap: { ...DEFAULT_KEYMAP, ...(options.keymap ?? {}) },
         controls: options.controls !== false,
         // The world has no outside unless a host says it has one: the aircraft
@@ -140,7 +146,8 @@ export function resolvePilotOptions(options = {}) {
             maxSpeed:      numberOr(flight.maxSpeed, MAX_SPEED),
             gravity:       numberOr(flight.gravity, GRAVITY),
             clearance:     numberOr(flight.clearance, GROUND_CLEARANCE),
-            impactSpeed:   numberOr(flight.impactSpeed, CRASH_IMPACT_SPEED)
+            impactSpeed:   numberOr(flight.impactSpeed, CRASH_IMPACT_SPEED),
+            runwayImpactSpeed: numberOr(flight.runwayImpactSpeed, RUNWAY_IMPACT_SPEED)
         }
     };
 }
@@ -156,7 +163,17 @@ export function resolveEnvironmentOptions(options = {}) {
         segments: Math.max(2, Math.round(positiveOr(options.segments, DEFAULT_SEGMENTS))),
         fog: options.fog !== false,
         lights: options.lights !== false,
-        elements: Array.isArray(options.elements) ? options.elements : null
+        elements: Array.isArray(options.elements) ? options.elements : null,
+        // A world is generated without a strip unless one is asked for, because
+        // a runway is a thing a host wants rather than a thing every world has.
+        // `true` takes the preset's own, and an object configures one.
+        runway: options.runway ?? false,
+        // The same description built as different ground. Nothing named leaves
+        // the preset's own seed, so a world asked for by name is the world that
+        // name has always meant.
+        seed: options.seed == null || !Number.isFinite(Number(options.seed))
+            ? null
+            : Number(options.seed)
     };
 }
 
@@ -174,6 +191,10 @@ export function createTelemetry(values = {}) {
         throttle:      clamp(numberOr(values.throttle, 0), 0, 1),
         heightAboveTerrain: numberOr(values.heightAboveTerrain, 0),
         crashed:       values.crashed === true,
+        // True while the aircraft is down on a strip after an arrival soft
+        // enough and square enough to have been a landing, which is the other
+        // way a flight can end up on the ground.
+        landed:        values.landed === true,
         stalled:       values.stalled === true
     };
 }

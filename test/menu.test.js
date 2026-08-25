@@ -19,26 +19,26 @@ import {
 } from '../js/menu.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 
-test('the pause menu offers a way out, a way back to the start, the controls, and the settings', () => {
+test('the pause menu offers a way out, a way back to the start, and the three panels', () => {
     const ids = PAUSE_MENU_ENTRIES.map(entry => entry.id);
-    assert.deepEqual(ids, ['resume', 'reset', 'controls', 'settings']);
+    assert.deepEqual(ids, ['resume', 'reset', 'modes', 'controls', 'settings']);
     assert.equal(new Set(ids).size, ids.length, 'two entries answering to one id is one entry too many');
     for (const entry of PAUSE_MENU_ENTRIES) {
         assert.ok(entry.label.length > 0, `${entry.id} needs a label to be read by`);
     }
 });
 
-test('the start menu begins the flight, and reaches the controls and the settings', () => {
+test('the start menu begins the flight, and reaches the three panels', () => {
     const ids = START_MENU_ENTRIES.map(entry => entry.id);
-    assert.deepEqual(ids, ['start', 'controls', 'settings']);
+    assert.deepEqual(ids, ['start', 'modes', 'controls', 'settings']);
     assert.equal(selectedId(createMenuState(START_MENU_ENTRIES)), 'start',
         'the cursor should open on the entry that starts flying');
 });
 
-// Both screens open the same two panels, so the entries that do it answer to
+// Both screens open the same three panels, so the entries that do it answer to
 // the same ids rather than to two names for one thing.
 test('the entries the two menus share are the same entries', () => {
-    for (const id of ['controls', 'settings']) {
+    for (const id of ['modes', 'controls', 'settings']) {
         assert.ok(START_MENU_ENTRIES.some(entry => entry.id === id), `the start menu should offer ${id}`);
         assert.ok(PAUSE_MENU_ENTRIES.some(entry => entry.id === id), `the pause menu should offer ${id}`);
     }
@@ -53,7 +53,7 @@ test('the menu opens on its first entry, so resuming is one key press away', () 
 test('the cursor walks the list in both directions', () => {
     const state = createMenuState();
     assert.equal(moveSelection(state, 1).id, 'reset');
-    assert.equal(moveSelection(state, 1).id, 'controls');
+    assert.equal(moveSelection(state, 1).id, 'modes');
     assert.equal(moveSelection(state, -1).id, 'reset');
 });
 

@@ -83,11 +83,25 @@ test('the instrument readout is labelled for every value the HUD reports', () =>
     assert.ok(/&deg;|°/.test(indexHtml), 'the heading should be read in degrees');
 });
 
+/**
+ * The declarations of the first rule an id is a selector of. Rules that style
+ * several things at once are read the same as rules that style one, so grouping
+ * two overlays that are drawn the same way does not hide either of them from a
+ * check that they are drawn that way.
+ */
+function styleRule(css, id) {
+    // Comments come off first: a rule written under one would otherwise read as
+    // a rule whose selector is the note above it.
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .find(rule => rule[1].split(',').some(selector => selector.trim() === `#${id}`))?.[2] ?? null;
+}
+
 test('the warning overlays start hidden and wait for the flight to trip them', () => {
-    for (const id of ['low-altitude', 'crashed']) {
-        const rule = indexHtml.match(new RegExp(`#${id}\\s*\\{([^}]*)\\}`));
+    for (const id of ['low-altitude', 'crashed', 'landed']) {
+        const rule = styleRule(indexHtml, id);
         assert.ok(rule, `index.html should style #${id}`);
-        assert.ok(/display:\s*none/.test(rule[1]), `#${id} should start hidden`);
+        assert.ok(/display:\s*none/.test(rule), `#${id} should start hidden`);
     }
 });
 
@@ -95,11 +109,11 @@ test('the warning overlays start hidden and wait for the flight to trip them', (
 // screen. Starting hidden means a page whose scripts never arrive shows an
 // honest nothing rather than a HUD reading zero over an empty world.
 test('the overlays the simulator places start hidden and wait to be placed', () => {
-    for (const id of ['title-screen', 'paused', 'settings', 'hud', 'attitude', 'minimap',
-        'audio-muted', 'controls-help', 'controls-help-hint']) {
-        const rule = indexHtml.match(new RegExp(`#${id}\\s*\\{([^}]*)\\}`));
+    for (const id of ['title-screen', 'paused', 'settings', 'game-modes', 'game-mode',
+        'hud', 'attitude', 'minimap', 'audio-muted', 'controls-help', 'controls-help-hint']) {
+        const rule = styleRule(indexHtml, id);
         assert.ok(rule, `index.html should style #${id}`);
-        assert.ok(/display:\s*none/.test(rule[1]), `#${id} should start hidden`);
+        assert.ok(/display:\s*none/.test(rule), `#${id} should start hidden`);
     }
 });
 
@@ -173,10 +187,10 @@ test('the loading screen has a bar to fill and a label to write into', () => {
 // so a transition either side of what js/loading.js waits for would either cut
 // the fade off or leave the screen lying over the world after it.
 test('the fade the screen is taken off by is the one the script waits out', () => {
-    const rule = indexHtml.match(/#loading\s*\{([^}]*)\}/);
+    const rule = styleRule(indexHtml, 'loading');
     assert.ok(rule, 'index.html should style #loading');
 
-    const transition = rule[1].match(/transition:\s*opacity\s+(\d+)ms/);
+    const transition = rule.match(/transition:\s*opacity\s+(\d+)ms/);
     assert.ok(transition, '#loading should fade rather than disappear');
     assert.equal(Number(transition[1]), LOADING_FADE_MS,
         'the fade in index.html and the wait in js/loading.js should be one duration');

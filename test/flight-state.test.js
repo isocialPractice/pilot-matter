@@ -18,7 +18,12 @@ import {
     createFlightState,
     flightStart
 } from '../js/flight-state.js';
-import { DEFAULT_CONFIG, startDefaults } from '../js/config.js';
+import {
+    DEFAULT_CONFIG, startDefaults, START_TAKEOFF, TAKEOFF_THROTTLE_PERCENT
+} from '../js/config.js';
+import {
+    runwayDirection, runwayThresholds, runwayOffsets, isOnRunway
+} from '../js/environment/elements.js';
 import {
     speedToKnots, altitudeToFeet, throttleToPercent,
     verticalSpeedToFeetPerMinute, formatVerticalSpeed,
@@ -205,4 +210,77 @@ test('createFlightState hands out fresh objects, so a reset is never poisoned', 
     assert.equal(second.position.y, INITIAL_ALTITUDE);
     assert.equal(second.rotation.z, 0);
     assert.notEqual(first.position, second.position);
+});
+
+// --- Opening on a runway ---------------------------------------------------
+
+const strip = {
+    x: 1200, z: -800, heading: 90,
+    ...runwayDirection(90),
+    length: 3000, width: 300, elevation: 42
+};
+
+const takeoff = (overrides = {}) => flightStart(
+    { ...startDefaults(), startMode: START_TAKEOFF, ...overrides },
+    { runway: strip }
+);
+
+test('a takeoff opens stopped, level, and idling on the strip', () => {
+    const start = takeoff();
+
+    assert.equal(start.speed, 0, 'nothing has rolled yet');
+    assert.equal(start.verticalSpeed, 0);
+    assert.equal(start.pitch, 0, 'and the nose is on the horizon rather than in a climb');
+    assert.equal(throttleToPercent(start.throttle), TAKEOFF_THROTTLE_PERCENT);
+    assert.equal(start.grounded, true);
+    assert.equal(start.altitude, strip.elevation, 'held at the height of the strip under it');
+});
+
+test('a takeoff opens pointing down the strip, from the end of it', () => {
+    const start = takeoff();
+    const [threshold] = runwayThresholds(strip);
+
+    assert.equal(headingDegrees(start.yaw), threshold.heading);
+    assert.equal(isOnRunway(strip, start.x, start.z), true, 'and on the pavement rather than beside it');
+
+    // Far enough back to have a runway to use, and in far enough from the lip
+    // of it to be lined up on the strip rather than balanced on the end.
+    const { along } = runwayOffsets(strip, start.x, start.z);
+    assert.ok(along < -strip.length * 0.35, 'a takeoff should have the strip in front of it');
+    assert.ok(along > -strip.length / 2, 'and start on it rather than off the end of it');
+});
+
+test('a takeoff takes the camera from the start it was configured with, and nothing else', () => {
+    const start = takeoff({ cameraMode: 'COCKPIT', airspeedKnots: 200, altitudeFeet: 8000 });
+
+    assert.equal(start.cameraMode, 'COCKPIT');
+    assert.equal(start.speed, 0, 'a configured airspeed means nothing to an aircraft held still');
+    assert.equal(start.altitude, strip.elevation, 'nor does a configured altitude to one on the ground');
+});
+
+test('a takeoff with no strip to open on falls back to opening in the air', () => {
+    const start = flightStart({ ...startDefaults(), startMode: START_TAKEOFF });
+
+    assert.equal(start.grounded, false);
+    assert.equal(speedToKnots(start.speed), INITIAL_AIRSPEED_KNOTS);
+    assert.equal(altitudeToFeet(start.altitude), INITIAL_ALTITUDE_FEET);
+});
+
+test('a start off flying is over the middle of the world, whatever came before it', () => {
+    const airborne = flightStart(startDefaults(), { runway: strip });
+
+    assert.equal(airborne.grounded, false);
+    assert.equal(airborne.x, 0, 'so a start handed over after a takeoff does not keep the threshold');
+    assert.equal(airborne.z, 0);
+});
+
+test('a flight state built from a takeoff is built where the takeoff is', () => {
+    const state = createFlightState(
+        { ...startDefaults(), startMode: START_TAKEOFF }, { runway: strip }
+    );
+
+    assert.equal(state.grounded, true);
+    assert.equal(state.position.y, strip.elevation);
+    assert.equal(isOnRunway(strip, state.position.x, state.position.z), true);
+    assert.equal(state.speed, 0);
 });

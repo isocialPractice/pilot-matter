@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import {
     createField, createRandom, applyBase, applyElement, orderPlacements, sampleHeight
 } from '../environment/elements.js';
-import { getEnvironment } from '../environment/presets.js';
+import { getEnvironment, environmentElements } from '../environment/presets.js';
 import { applyDepth, SKY_COLOR, FOG_DENSITY } from '../sky.js';
 import { resolveEnvironmentOptions, validateAircraftContract, boundsFromSize } from './contract.js';
 
@@ -25,6 +25,8 @@ import { resolveEnvironmentOptions, validateAircraftContract, boundsFromSize } f
  * @param {number} [options.size]        the square the world covers
  * @param {number} [options.segments]    how finely that square is sampled
  * @param {Array}  [options.elements]    element placements, instead of the preset's
+ * @param {boolean|object} [options.runway] a landable strip in the world
+ * @param {number} [options.seed]        build the same description as other ground
  * @param {boolean} [options.lights]     false to light the world yourself
  * @param {boolean} [options.fog]        false to keep your own scene depth
  */
@@ -43,8 +45,9 @@ export function createEnvironment(options = {}) {
         field = createField({ size: resolved.size, segments: resolved.segments });
         applyBase(field, preset.base);
 
-        const random = createRandom(preset.seed);
-        for (const placement of orderPlacements(resolved.elements ?? preset.elements)) {
+        const random = createRandom(resolved.seed ?? preset.seed);
+        const placements = resolved.elements ?? environmentElements(preset, resolved.runway);
+        for (const placement of orderPlacements(placements)) {
             applyElement(field, placement, random);
         }
 
@@ -75,6 +78,13 @@ export function createEnvironment(options = {}) {
         get field() { return field; },
         get environment() { return preset; },
         bounds: boundsFromSize(resolved.size),
+
+        /**
+         * The strips cut into this world, which is the other half of the terrain
+         * contract: what a flight model has to know to tell a landing from an
+         * arrival on a hillside. Empty for a world built without a runway.
+         */
+        get runways() { return field.runways; },
 
         /** The terrain contract the Pilot API and any other flight model reads. */
         sampleHeight(x, z) { return sampleHeight(field, x, z); },

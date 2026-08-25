@@ -20,7 +20,14 @@ import {
     percentToThrottle, headingToYaw
 } from './units.js';
 import { pitchForClimb } from './flight-model.js';
-import { DEFAULT_CONFIG, resolveStart } from './config.js';
+import {
+    DEFAULT_CONFIG, TAKEOFF_THROTTLE_PERCENT, resolveStart, startsOnRunway
+} from './config.js';
+import { runwayPoint, runwayThresholds } from './environment/elements.js';
+
+// How far in from the very end of the strip a takeoff is held, in world units,
+// so the aircraft is lined up on the runway rather than balanced on its lip.
+export const TAKEOFF_MARGIN = 120;
 
 /**
  * A configured start in the world units the flight model works in.
@@ -31,9 +38,17 @@ import { DEFAULT_CONFIG, resolveStart } from './config.js';
  * A start whose throttle asks for a different airspeed than it was given is
  * still honoured as written - the lever is a setting the airspeed converges on,
  * and converging on it from somewhere else is a legitimate thing to ask for.
+ *
+ * A start set to open on a runway is a different condition rather than the same
+ * one with different numbers, so it is resolved against the strip it opens on
+ * and takes nothing from the airborne fields but the camera. Asked for with no
+ * strip to open on, it falls back to the airborne start: a flight that cannot
+ * be held on the ground is better begun in the air than not at all.
  */
-export function flightStart(start = DEFAULT_CONFIG.start) {
-    const resolved      = resolveStart(start);
+export function flightStart(start = DEFAULT_CONFIG.start, world = {}) {
+    const resolved = resolveStart(start);
+    if (startsOnRunway(resolved) && world.runway) return takeoffStart(resolved, world.runway);
+
     const speed         = knotsToSpeed(resolved.airspeedKnots);
     const verticalSpeed = feetPerMinuteToVerticalSpeed(resolved.verticalSpeedFpm);
 
@@ -44,7 +59,37 @@ export function flightStart(start = DEFAULT_CONFIG.start) {
         throttle:   percentToThrottle(resolved.throttlePercent),
         yaw:        headingToYaw(resolved.headingDegrees),
         pitch:      pitchForClimb(verticalSpeed, speed),
-        cameraMode: resolved.cameraMode
+        cameraMode: resolved.cameraMode,
+        grounded:   false,
+        // Written out rather than left off, so a start handed over after a
+        // takeoff puts the aircraft back over the middle of the world instead
+        // of opening it in mid-air above the threshold it was last held at.
+        x: 0,
+        z: 0
+    };
+}
+
+/**
+ * A flight held at a runway threshold: stopped, level, engine idling, and
+ * pointing down the strip. The height is the strip's own, which the ground
+ * clamp turns into wheels on the ground rather than an aircraft in the dirt.
+ */
+export function takeoffStart(resolved, runway) {
+    const [threshold] = runwayThresholds(runway);
+    const margin = Math.min(TAKEOFF_MARGIN, runway.length * 0.1);
+    const at = runwayPoint(runway, -runway.length / 2 + margin);
+
+    return {
+        speed:         0,
+        verticalSpeed: 0,
+        altitude:      runway.elevation,
+        throttle:      percentToThrottle(TAKEOFF_THROTTLE_PERCENT),
+        yaw:           headingToYaw(threshold.heading),
+        pitch:         0,
+        cameraMode:    resolved.cameraMode,
+        grounded:      true,
+        x: at.x,
+        z: at.z
     };
 }
 
@@ -78,15 +123,16 @@ export const INITIAL_PITCH = DEFAULT_START.pitch;
  * supplies. Returns new objects on every call so the caller can mutate position
  * and rotation without touching the defaults.
  */
-export function createFlightState(start = DEFAULT_CONFIG.start) {
-    const flight = flightStart(start);
+export function createFlightState(start = DEFAULT_CONFIG.start, world = {}) {
+    const flight = flightStart(start, world);
 
     return {
         speed: flight.speed,
         throttle: flight.throttle,
         verticalSpeed: flight.verticalSpeed,
         cameraMode: flight.cameraMode,
-        position: { x: 0, y: flight.altitude, z: 0 },
+        grounded: flight.grounded === true,
+        position: { x: flight.x ?? 0, y: flight.altitude, z: flight.z ?? 0 },
         rotation: { x: flight.pitch, y: flight.yaw, z: 0 }
     };
 }

@@ -125,8 +125,10 @@ createPilot(options) -> pilot
 | `keymap` | object | `DEFAULT_KEYMAP` | Bindings, merged over the bundled ones |
 | `controls` | boolean | `true` | `false` takes the keyboard off entirely |
 | `wrap` | boolean | `true` | `false` lets the aircraft fly past the bounds |
+| `runways` | array | the terrain's | Strips a landing can be made on |
 | `cameraMode` | `'CHASE'`, `'COCKPIT'`, `'ORBIT'` | `'CHASE'` | The view to open in |
 | `onReset` | function | none | Called whenever the flight resets |
+| `onLanding` | function | none | Called on an arrival that was a landing |
 | `flight` | object | the configured start | Overrides for the start and the model |
 
 `flight` takes the start state and the flight model's own numbers, all in world
@@ -136,11 +138,14 @@ created with no options at all flies exactly the way the bundled simulator does.
 | `flight` field | Is |
 |----------------|-----|
 | `speed`, `throttle`, `altitude`, `verticalSpeed`, `pitch`, `yaw` | The condition the flight opens in, and resets to |
+| `x`, `z` | Where over the world it opens, which defaults to the middle of it |
+| `grounded` | True for a start held on the ground, so the first arrival judged is the one flown back to it |
 | `sensitivity` | How hard the controls bite, `0.1` to `4` |
 | `minSpeed`, `cruiseSpeed`, `maxSpeed` | The stall speed, the speed lift cancels gravity at, and the speed a full throttle asks for |
 | `gravity` | The pull before lift is subtracted |
 | `clearance` | How far above the ground the aircraft sits when it meets it |
 | `impactSpeed` | The sink rate that turns an arrival into a crash |
+| `runwayImpactSpeed` | The same, over a strip, where prepared ground takes more |
 
 An anchor is the one thing an external model has to declare. The bundled
 aircraft is built nose-first along `+Z` with its control anchor at the origin;
@@ -155,10 +160,12 @@ flight model puts the aircraft, rather than the host having to rebuild it.
 | `telemetry()` | The same reading without advancing |
 | `pose()` | `{position, rotation, quaternion, attitude}`, for an external camera |
 | `setTerrain(terrain)` | Flies a different world without rebuilding the aircraft |
+| `setRunways(runways)` | Names the strips a landing can be made on |
 | `setStart(flight)` | Changes what a reset resets to, without resetting |
 | `reset()` | Back to the start state |
 | `dispose()` | Takes the aircraft out of the scene, keyboard and all |
 | `bounds` | The square being flown over, as the terrain declares it |
+| `runways` | The strips currently being flown over |
 | `aircraft`, `camera`, `scene`, `object3D`, `input`, `keymap` | The parts, for a host that wants them |
 
 `input` is the control state the flight model reads each frame. A host that
@@ -184,6 +191,7 @@ others. It is a reading rather than a handle: mutating it changes nothing.
 | `throttle` | The lever setting, `0` to `1` |
 | `heightAboveTerrain` | Height above the ground directly below |
 | `crashed` | True while the controls are locked by an impact |
+| `landed` | True while the aircraft is down on a strip after an arrival that was a landing |
 | `stalled` | True while airspeed is below the stall speed |
 
 `TELEMETRY_FIELDS` is the same list, for a host checking its own.
@@ -265,6 +273,8 @@ createEnvironment(options) -> environment
 | `size` | number | `16000` | The square the world covers |
 | `segments` | number | `200` | How finely that square is sampled |
 | `elements` | array | the preset's | Element placements, instead of the preset's |
+| `runway` | boolean or object | `false` | A landable strip in the world, or a configuration for one |
+| `seed` | number | the preset's | Builds the same description as different ground |
 | `lights` | boolean | `true` | `false` to light the world yourself |
 | `fog` | boolean | `true` | `false` to keep your own scene depth |
 
@@ -275,6 +285,7 @@ createEnvironment(options) -> environment
 | `group` | The world as one `Group` any scene can add |
 | `sampleHeight(x, z)` | The ground under a point - the terrain contract itself |
 | `bounds` | The square the world covers |
+| `runways` | The strips cut into it, empty for a world built without one |
 | `field` | The height and colour field behind the mesh |
 | `environment` | The preset being drawn |
 | `setEnvironment(id)` | Regenerates the ground as a different world |
@@ -449,17 +460,24 @@ host can read it, offer it, and hand back an edited one.
 | `DEFAULT_CONFIG` | The configured start, frozen |
 | `START_FIELDS` | Each field of the start, with what it may hold |
 | `START_FIELD_IDS` | The field names, in the order they are offered |
+| `START_MODES`, `START_FLYING`, `START_TAKEOFF` | The two conditions a flight can open in |
+| `CHOICE_FIELD`, `TOGGLE_FIELD` | What a field that is chosen or switched calls itself |
 | `startField(id)` | One field's declaration |
 | `isStartValue(id, value)` | Whether a field can be left holding a value |
+| `snapStartValue(id, value)` | The nearest value a field can hold to a worked-out one |
 | `startDefaults()` | A fresh copy of the configured start |
 | `resolveStart(values)` | A start with its gaps filled in, field by field |
-| `flightStart(start)` | The same start in the world units `flight` takes |
-| `createFlightState(start)` | The same start as a position and a rotation |
+| `startsOnRunway(start)`, `runwayForced(start)`, `runwayWanted(start)` | What the start says about the strip |
+| `flightStart(start, world)` | The same start in the world units `flight` takes |
+| `takeoffStart(start, runway)` | A flight held at a threshold, ready to roll |
+| `createFlightState(start, world)` | The same start as a position and a rotation |
 
 A start is written the way a pilot reads it:
 
 | Field | Reads in | Opens on |
 |-------|----------|----------|
+| `startMode` | `'flying'` or `'takeoff'` | `'flying'` |
+| `runway` | Whether the generated world carries a strip | `true` |
 | `airspeedKnots` | Knots | `80` |
 | `altitudeFeet` | Feet above sea level | `1390` |
 | `verticalSpeedFpm` | Feet per minute, signed | `1260` |
@@ -467,13 +485,27 @@ A start is written the way a pilot reads it:
 | `throttlePercent` | Percent of lever travel | `20` |
 | `cameraMode` | `'CHASE'`, `'COCKPIT'`, `'ORBIT'` | `'CHASE'` |
 
-`flightStart` is the one place those become world units:
+`startMode` decides which of the others mean anything. `'flying'` opens the
+flight already up, in the condition the rest of the fields describe. `'takeoff'`
+opens it stopped at a runway threshold with the engine idling, and takes nothing
+from the airborne fields but the camera - an aircraft held on the ground has no
+airspeed, no altitude, and no climb of its own to set. A takeoff also turns
+`runway` on and holds it there, because a start that asked to roll out of a world
+with no strip in it is not a start anything could honour.
+
+`flightStart` is the one place those become world units. A start that opens on a
+strip is resolved against the strip it opens on, so the world it is being flown
+over is passed in beside it:
 
 ```javascript
-import { startDefaults, flightStart, createPilot } from 'pilot-matter';
+import { startDefaults, flightStart, createPilot, START_TAKEOFF } from 'pilot-matter';
 
 const start = { ...startDefaults(), airspeedKnots: 140, altitudeFeet: 3000 };
 const pilot = createPilot({ scene, flight: flightStart(start) });
+
+// Or held at the threshold of the strip the world carries:
+const held = { ...startDefaults(), startMode: START_TAKEOFF };
+pilot.setStart(flightStart(held, { runway: world.runways[0] }));
 ```
 
 The pitch is not part of a start, it is worked out from one: the attitude that
@@ -481,15 +513,127 @@ holds the configured climb at the configured airspeed, so a flight opens in the
 climb it was configured for rather than settling out of it over the first
 second.
 
-Each field declares its own range and step, which is what lets a host build a
-control for it without knowing anything about flight:
+Each field declares its own range and step, or the list of settings it may take,
+which is what lets a host build a control for it without knowing anything about
+flight:
 
 ```javascript
-import { START_FIELDS, isStartValue } from 'pilot-matter';
+import { START_FIELDS, CHOICE_FIELD, TOGGLE_FIELD } from 'pilot-matter';
 
 for (const field of START_FIELDS) {
-    if (field.values) makeDropdown(field.label, field.values);
+    if (field.kind === CHOICE_FIELD) makeRadioGroup(field.label, field.values);
+    else if (field.kind === TOGGLE_FIELD) makeCheckbox(field.label, field.default);
+    else if (field.values) makeDropdown(field.label, field.values);
     else makeSlider(field.label, field.min, field.max, field.step, field.unit);
+}
+```
+
+`isStartValue` refuses a reading between two steps rather than snapping it,
+because a value the configuration never offered is a value from somewhere else.
+`snapStartValue` is for the other case - a reading worked out rather than chosen,
+which wants the nearest setting the field actually has.
+
+## Runways and landings
+
+A runway is an element of the world like a river or a forest: generated by
+algorithm rather than placed as an asset, cut into whichever ground the site
+search found flattest, and levelled with an apron that eases back into the
+country around it. A world is built without one unless one is asked for.
+
+```javascript
+import { createEnvironment, createPilot, flightStart, startDefaults, START_TAKEOFF } from 'pilot-matter';
+
+const world = createEnvironment({ environment: 'highlands', runway: true });
+const strip = world.runways[0];
+
+const pilot = createPilot({
+    scene, terrain: world, camera,
+    flight: flightStart({ ...startDefaults(), startMode: START_TAKEOFF }, { runway: strip }),
+    onLanding: (runway) => console.log('down on', runway.heading)
+});
+```
+
+A strip is a plain description, and everything that reads one is published:
+
+| Strip field | Is |
+|-------------|-----|
+| `x`, `z` | The middle of the pavement |
+| `heading` | The bearing it runs on, in degrees clockwise from north |
+| `alongX`, `alongZ` | The same bearing as a unit vector |
+| `length`, `width` | The paved rectangle |
+| `elevation` | The height it was levelled to |
+
+| Export | Is |
+|--------|-----|
+| `runwayDirection(heading)` | A bearing as the vector a strip runs along |
+| `runwayPoint(runway, along, across)` | A place on a strip, as a place in the world |
+| `runwayOffsets(runway, x, z)` | The same reading the other way round |
+| `isOnRunway(runway, x, z, margin)` | Whether a place is over the pavement |
+| `runwayThresholds(runway)` | Both ends, each with the bearing a takeoff from it runs on |
+| `nearestRunway(runways, x, z)` | The strip nearest a place, or null |
+
+A strip changes what an arrival on the ground means rather than how hard one is
+allowed to be. Off a runway the rule is the one it has always been: too fast a
+descent breaks the aircraft, and anything gentler is flown out of. On one, an
+arrival inside the landing limits and flown in the attitude a landing is flown in
+is a landing; a firmer arrival still rolls out, because prepared ground takes
+more than a hillside does; and only past the runway's own threshold is it a
+crash.
+
+| Export | Is |
+|--------|-----|
+| `FLYING`, `LANDED`, `CRASHED` | What an arrival amounted to |
+| `GROUND_OUTCOMES` | The three of them, for a host checking its own |
+| `touchdownOutcome(contact, limits)` | Which one an arrival was |
+| `withinLandingAttitude(contact, limits)` | Whether it was being held the way a landing is flown |
+| `headingOffsetTo(heading, runwayHeading)` | How far off the strip the nose is, to whichever end is nearer |
+| `LANDING_LIMITS` | The thresholds all of the above default to |
+| `GROUND_CLEARANCE`, `CRASH_IMPACT_SPEED`, `RUNWAY_IMPACT_SPEED` | The tuning behind them |
+
+`contact` is `{verticalSpeed, onRunway, bank, pitch, headingOffset}`, in world
+units and radians. The telemetry's `landed` is the same reading for a host that
+would rather not work it out.
+
+## Game modes
+
+The bundled game is played in modes, and the rules behind them are pure: the
+stages, the run state, the course a set of loops is laid out as, and the test for
+whether a gate was flown through. A host can play them against its own renderer,
+or read them as a worked example of a game built on the two APIs.
+
+| Export | Is |
+|--------|-----|
+| `GAME_MODES`, `GAME_MODE_IDS` | The modes there are |
+| `RUNWAY_LANDING`, `LOOP_COURSE` | The two of them by name |
+| `LAND_OBJECTIVE`, `LOOP_OBJECTIVE` | What a mode is asking for |
+| `getGameMode(id)`, `isGameModeId(id)` | Looking one up |
+| `createRunState(modeId)`, `startRun(state, id)`, `endRun(state)` | A run, started and stopped |
+| `runningMode(state)`, `currentStage(state)`, `advanceStage(state)`, `restartStage(state)` | Where it is up to |
+| `recordLanding(state)`, `recordGate(state, index)`, `recordCrash(state)` | Telling it what happened |
+| `stageProgress(state)`, `isStageComplete(state)`, `nextGate(state)` | How far through it is |
+| `runObjective(state)`, `runStatus(state)` | What to write on the screen |
+| `stageWorld(state)` | The world the stage is flown over |
+| `stageStart(state, world)` | Where in it the flight opens |
+| `buildCourse(stage, options)` | The loops a course stage is flown through |
+| `gatePassed(ring, from, to)`, `gateOffset(ring, point)` | Whether a step went through one |
+
+A gate is tested against the step the aircraft flew rather than against where it
+ended up, because a hoop is thinner than the distance covered in a frame and a
+point test would fly straight through one without noticing:
+
+```javascript
+import { createRunState, LOOP_COURSE, buildCourse, currentStage, nextGate, recordGate } from 'pilot-matter';
+
+const run = createRunState(LOOP_COURSE);
+const rings = buildCourse(currentStage(run), { seed: 1, sampleHeight: world.sampleHeight });
+
+let last = pilot.pose().position;
+function frame(dt) {
+    pilot.update(dt);
+    const now = pilot.pose().position;
+    const gate = nextGate(run);
+    if (gate >= 0 && gatePassed(rings[gate], last, now)) recordGate(run, gate);
+    last = now;
 }
 ```
 
@@ -498,8 +642,10 @@ for (const field of START_FIELDS) {
 | Export | Is |
 |--------|-----|
 | `ENVIRONMENTS` | The five assembled environments |
+| `MODE_ENVIRONMENTS` | The thin worlds the game modes are played over |
 | `DEFAULT_ENVIRONMENT_ID` | The one a fresh install opens on |
 | `getEnvironment(id)`, `environmentIds()`, `isEnvironmentId(id)` | Looking one up |
+| `environmentElements(environment, runway)` | A description's placements, with a strip added if asked |
 | `buildEnvironment(environment, options)` | The field a description becomes |
 | `ELEMENTS`, `ELEMENT_ORDER` | The element registry, and the order it applies in |
 | `getElement(id)`, `isElementId(id)` | Looking one up |
@@ -516,6 +662,17 @@ The five worlds a host can ask for by name:
 | `'canyon-country'` | A branching canyon system cut into a high plateau |
 | `'dune-sea'` | Wind-blown dunes and rock outcrops, cut by one desert river |
 | `'lakeside'` | A town on the shore of a wide lake, under forested hills |
+
+Two more are built for the game modes rather than to be chosen between, and are
+deliberately thin - what a mode asks the pilot to read is the objective, not the
+scenery around it. `isEnvironmentId` answers no for both, so a stored choice can
+never leave a free flight parked in one; `getEnvironment` still finds them by
+name.
+
+| Id | Is |
+|----|-----|
+| `'open-country'` | Low rolling ground under a wide sky, with one strip cut into it |
+| `'loop-valley'` | A shallow valley with clear air over it, for a course of loops |
 
 An environment is a description rather than geometry: a name, a seed, the base
 ground, and the elements placed over it. A host can pass its own list of
@@ -553,6 +710,7 @@ const ground = sampleHeight(field, 120, -400);
 | `size`, `segments`, `stride`, `count`, `step` | The grid the world is sampled on |
 | `height` | A `Float32Array` of one height per vertex |
 | `color` | A `Float32Array` of three components per vertex |
+| `runways` | The strips cut into it, which a flight model has to be able to ask about by name |
 
 ## The edge of the world
 

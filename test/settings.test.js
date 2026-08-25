@@ -10,9 +10,16 @@ import {
     FLIGHT_OPTIONS,
     ENVIRONMENT_ENTRY,
     OPTION_ENTRY,
+    CHOICE_ENTRY,
+    TOGGLE_ENTRY,
     BACK_ENTRY,
     START_GROUP,
     OPTION_GROUP,
+    TOGGLE_ON_MARK,
+    TOGGLE_OFF_MARK,
+    choiceEntryId,
+    settingsEntry,
+    isToggleLocked,
     isRangeOption,
     startSettings,
     SENSITIVITY_OPTION,
@@ -42,7 +49,12 @@ import {
 } from '../js/settings.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
-import { START_FIELDS, START_FIELD_IDS, startDefaults } from '../js/config.js';
+import {
+    START_FIELDS, START_FIELD_IDS, START_MODES, START_FLYING, START_TAKEOFF, startDefaults
+} from '../js/config.js';
+
+const FLYING_ENTRY  = choiceEntryId('startMode', START_FLYING);
+const TAKEOFF_ENTRY = choiceEntryId('startMode', START_TAKEOFF);
 
 // Enough of a storage for the settings to remember something, with no browser
 // to remember it in.
@@ -100,19 +112,29 @@ test('the panel starts closed, and opens and closes on request', () => {
 
 test('the panel lists every environment, then every option, then the way out', () => {
     const entries = settingsEntries();
-    assert.equal(entries.length, ENVIRONMENTS.length + SETTINGS_OPTIONS.length + 1);
 
     assert.deepEqual(
         entries.filter(entry => entry.kind === ENVIRONMENT_ENTRY).map(entry => entry.id),
         ENVIRONMENTS.map(environment => environment.id)
     );
+
+    // Most options are one row apiece. A choice is one row per condition, which
+    // is why the rows are counted back to the options rather than the other way.
+    assert.deepEqual(
+        [...new Set(entries
+            .filter(entry => entry.kind !== ENVIRONMENT_ENTRY && entry.kind !== BACK_ENTRY)
+            .map(entry => entry.option ?? entry.id))],
+        SETTINGS_OPTIONS.map(option => option.id)
+    );
     assert.deepEqual(
         entries.filter(entry => entry.kind === OPTION_ENTRY).map(entry => entry.id),
-        SETTINGS_OPTIONS.map(option => option.id)
+        SETTINGS_OPTIONS.filter(option => !option.kind).map(option => option.id)
     );
 
     assert.equal(entries.at(-1).id, SETTINGS_BACK_ID);
     assert.equal(entries.at(-1).kind, BACK_ENTRY);
+    assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length,
+        'two rows answering to one id is one row too many');
     for (const entry of entries) {
         assert.ok(entry.label.length > 0, `${entry.id} needs a label to be read by`);
     }
@@ -186,7 +208,9 @@ test('the list redraws itself from the choices behind it', () => {
 
 test('the environment being flown is the one marked in the list', () => {
     const state = createSettingsState(null);
-    const marked = () => state.entries.filter(entry => entry.current).map(entry => entry.id);
+    const marked = () => state.entries
+        .filter(entry => entry.kind === ENVIRONMENT_ENTRY && entry.current)
+        .map(entry => entry.id);
 
     assert.deepEqual(marked(), [DEFAULT_ENVIRONMENT_ID]);
 
@@ -405,6 +429,127 @@ test('the start the panel hands over is a start and nothing else', () => {
     assert.equal(start[FOG_OPTION], undefined);
 });
 
+// --- The condition a flight opens in ---------------------------------------
+
+test('the condition a flight opens in is a row per condition, only one in force', () => {
+    const state = createSettingsState(null);
+    const rows = state.entries.filter(entry => entry.kind === CHOICE_ENTRY);
+
+    assert.deepEqual(rows.map(entry => entry.value), START_MODES.map(mode => mode.value));
+    for (const row of rows) {
+        assert.equal(row.option, 'startMode', 'every row of a choice sets the same field');
+        assert.equal(row.group, START_GROUP, 'and belongs under the start heading');
+        assert.equal(row.text, row.label, 'a condition is chosen rather than stepped');
+    }
+
+    assert.deepEqual(rows.filter(entry => entry.current).map(entry => entry.value), [START_FLYING]);
+});
+
+test('choosing a condition clears whichever was in force', () => {
+    const state = createSettingsState(null);
+    const marked = () => state.entries
+        .filter(entry => entry.kind === CHOICE_ENTRY && entry.current)
+        .map(entry => entry.value);
+
+    assert.equal(chooseSetting(state, TAKEOFF_ENTRY), 'startMode');
+    assert.equal(currentOption(state, 'startMode'), START_TAKEOFF);
+    assert.deepEqual(marked(), [START_TAKEOFF], 'a mark on two rows is a mark on neither');
+
+    assert.equal(chooseSetting(state, TAKEOFF_ENTRY), null, 'the condition already set is not a change');
+    assert.equal(chooseSetting(state, FLYING_ENTRY), 'startMode');
+    assert.deepEqual(marked(), [START_FLYING]);
+});
+
+test('the roll keys pick the condition under the cursor rather than stepping past it', () => {
+    const state = createSettingsState(null);
+    assert.equal(adjustSetting(state, TAKEOFF_ENTRY, 1), 'startMode');
+    assert.equal(currentOption(state, 'startMode'), START_TAKEOFF);
+
+    assert.equal(adjustSetting(state, TAKEOFF_ENTRY, -1), null, 'and stepping back off it goes nowhere');
+    assert.equal(currentOption(state, 'startMode'), START_TAKEOFF);
+});
+
+test('the condition outlives the session that chose it', () => {
+    const storage = fakeStorage();
+    chooseSetting(createSettingsState(storage), TAKEOFF_ENTRY);
+    assert.equal(currentOption(createSettingsState(storage), 'startMode'), START_TAKEOFF);
+});
+
+// --- The runway box --------------------------------------------------------
+
+test('a toggle reads as the box it is, so its setting is legible unselected', () => {
+    const state = createSettingsState(null);
+    const box = () => settingsEntry(state, 'runway');
+
+    assert.equal(box().kind, TOGGLE_ENTRY);
+    assert.equal(box().group, START_GROUP);
+    assert.ok(box().text.startsWith(TOGGLE_ON_MARK), 'a world starts with a strip in it');
+    assert.ok(box().text.includes(box().label), 'and the row still says what it is');
+
+    chooseSetting(state, 'runway');
+    assert.equal(currentOption(state, 'runway'), false);
+    assert.ok(box().text.startsWith(TOGGLE_OFF_MARK));
+});
+
+test('choosing the box and stepping it both turn it over', () => {
+    const state = createSettingsState(null);
+
+    assert.equal(adjustSetting(state, 'runway', 1), 'runway');
+    assert.equal(currentOption(state, 'runway'), false);
+    assert.equal(chooseSetting(state, 'runway'), 'runway');
+    assert.equal(currentOption(state, 'runway'), true);
+});
+
+test('a runway takeoff holds the box on, and the pilot cannot turn it off', () => {
+    const state = createSettingsState(null);
+    chooseSetting(state, 'runway');
+    assert.equal(currentOption(state, 'runway'), false);
+
+    chooseSetting(state, TAKEOFF_ENTRY);
+    const box = settingsEntry(state, 'runway');
+    assert.equal(box.locked, true, 'the start that needs a strip owns the box');
+    assert.equal(box.value, true, 'and the box says what the world is going to be');
+    assert.ok(box.text.startsWith(TOGGLE_ON_MARK));
+
+    assert.equal(chooseSetting(state, 'runway'), null, 'pressing it changes nothing');
+    assert.equal(adjustSetting(state, 'runway', 1), null);
+    assert.equal(startSettings(state).runway, true, 'and the start handed over carries the strip');
+});
+
+test('the box comes back the moment the start stops needing it', () => {
+    const state = createSettingsState(null);
+    chooseSetting(state, 'runway');
+    chooseSetting(state, TAKEOFF_ENTRY);
+    chooseSetting(state, FLYING_ENTRY);
+
+    const box = settingsEntry(state, 'runway');
+    assert.equal(box.locked, false);
+    assert.equal(box.value, false, 'and it remembers what the pilot had left it on');
+    assert.equal(chooseSetting(state, 'runway'), 'runway');
+});
+
+test('only the runway box is ever held by something other than the pilot', () => {
+    const takeoff = { startMode: START_TAKEOFF };
+    assert.equal(isToggleLocked('runway', takeoff), true);
+    assert.equal(isToggleLocked('runway', { startMode: START_FLYING }), false);
+    assert.equal(isToggleLocked('somethingElse', takeoff), false);
+});
+
+test('the start the panel hands over still carries every field and nothing else', () => {
+    const state = createSettingsState(null);
+    chooseSetting(state, TAKEOFF_ENTRY);
+    assert.deepEqual(Object.keys(startSettings(state)), START_FIELD_IDS);
+    assert.equal(startSettings(state).startMode, START_TAKEOFF);
+});
+
+test('a row nothing answers to is a row nothing answers to', () => {
+    const state = createSettingsState(null);
+    assert.equal(settingsEntry(state, 'startMode:gliding'), null);
+    assert.equal(chooseSetting(state, 'startMode:gliding'), null);
+    assert.equal(adjustSetting(state, 'startMode:gliding', 1), null);
+    assert.deepEqual(state.values, defaultSettings());
+});
+
 test('syncing the list is what marks it, so a reopened panel shows the pick', () => {
     const state = createSettingsState(null);
     state.values.environment = ENVIRONMENTS.at(-1).id;
@@ -412,7 +557,9 @@ test('syncing the list is what marks it, so a reopened panel shows the pick', ()
 
     syncSettingsEntries(state);
     assert.deepEqual(
-        state.entries.filter(entry => entry.current).map(entry => entry.id),
+        state.entries
+            .filter(entry => entry.kind === ENVIRONMENT_ENTRY && entry.current)
+            .map(entry => entry.id),
         [ENVIRONMENTS.at(-1).id]
     );
 });

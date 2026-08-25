@@ -35,7 +35,10 @@ export const ELEMENT_ORDER = [
     'mountain', 'canyon',
     'grass', 'sand', 'desert', 'water',
     'river', 'forest', 'town',
-    'snow'
+    'snow',
+    // The strip is cut last, over whatever else claimed the ground, because a
+    // runway is the one thing in the world that is kept clear.
+    'runway'
 ];
 
 // --- The field ------------------------------------------------------------
@@ -44,6 +47,11 @@ export const ELEMENT_ORDER = [
  * A height and colour field. Vertex order matches a plane sampled row by row
  * from the low z edge to the high one, which is the order a renderer walks its
  * grid in, so no index translation is needed on the way out.
+ *
+ * A field also carries the strips cut into it. A runway is ground like anything
+ * else, but it is the one piece of ground the flight model has to be able to
+ * ask about by name - where it is, which way it runs, and how far it reaches -
+ * so the generator leaves a record of each one beside the heights it wrote.
  */
 export function createField({ size = DEFAULT_SIZE, segments = DEFAULT_SEGMENTS } = {}) {
     const stride = Math.max(2, Math.round(segments)) + 1;
@@ -56,7 +64,8 @@ export function createField({ size = DEFAULT_SIZE, segments = DEFAULT_SEGMENTS }
         count,
         step: size / (stride - 1),
         height: new Float32Array(count),
-        color: new Float32Array(count * 3)
+        color: new Float32Array(count * 3),
+        runways: []
     };
 }
 
@@ -645,9 +654,134 @@ const snow = {
     }
 };
 
+// --- The strip ------------------------------------------------------------
+
+// How many sites are weighed before one is built on, and how densely each of
+// them is measured. A candidate is judged on the ground under the whole strip
+// rather than under its middle, because what makes a runway landable is that
+// the far end is where the near end said it would be.
+const RUNWAY_SITES  = 64;
+const RUNWAY_ALONG  = 9;
+const RUNWAY_ACROSS = 3;
+
+// What a site is charged, per world unit, for the part of it that lies outside
+// the band a strip may be built in. Charged rather than refused, so a world
+// whose ground never quite fits the band still gets a runway - the flattest one
+// going - instead of silently getting none.
+const RUNWAY_BAND_PENALTY = 4;
+
+// Where the paint goes, as fractions of the half width and the half length: a
+// stripe down each shoulder, and a bar across each threshold.
+const RUNWAY_SHOULDER  = 0.78;
+const RUNWAY_THRESHOLD = 0.9;
+
+const runway = {
+    id: 'runway',
+    label: 'Runway',
+    ranges: {
+        length: span(600, 8000, 2200, 3400),
+        width:  span(80, 600, 220, 320),
+        // The bearing the strip is laid along, in degrees off north. The whole
+        // circle by default, so a world gets the heading its ground suits
+        // rather than one chosen for it in advance.
+        heading: span(0, 359, 0, 359),
+        // The ground a strip may be built on: nothing under the shoreline, and
+        // nothing up where an approach would be flown into a mountainside.
+        band: span(0, 2000, 20, 400),
+        // How far the graded ground reaches past the paved strip, in strip
+        // widths, easing back into the ground it was cut into.
+        apron: scalar(0, 3, 1.1),
+        color: gradient([0.32, 0.32, 0.34], [0.11, 0.11, 0.13]),
+        mark:  gradient([0.95, 0.95, 0.92], [0.70, 0.72, 0.70])
+    },
+
+    generate(field, config, random) {
+        const length = pick(random, config.length);
+        const width  = pick(random, config.width);
+        const site   = chooseRunwaySite(field, config, length, width, random);
+        if (!site) return null;
+
+        const strip = { ...site, length, width };
+        gradeRunway(field, strip, config);
+        field.runways.push(strip);
+        return strip;
+    }
+};
+
+// --- Reading a strip ------------------------------------------------------
+
+/**
+ * The unit vector a strip runs along, from the bearing it was laid on. North is
+ * the world's +Z axis, which is the same north the compass card counts from, so
+ * a strip on 000 runs the way a flight starting on 000 is already pointing.
+ */
+export function runwayDirection(heading) {
+    const radians = heading * Math.PI / 180;
+    return { alongX: Math.sin(radians), alongZ: Math.cos(radians) };
+}
+
+/** A place on a strip, given as how far along it and how far across it lies. */
+export function runwayPoint(runway, along, across = 0) {
+    return {
+        x: runway.x + runway.alongX * along - runway.alongZ * across,
+        z: runway.z + runway.alongZ * along + runway.alongX * across
+    };
+}
+
+/** The same reading the other way round: where a place in the world sits on a strip. */
+export function runwayOffsets(runway, x, z) {
+    const dx = x - runway.x;
+    const dz = z - runway.z;
+    return {
+        along:   dx * runway.alongX + dz * runway.alongZ,
+        across: -dx * runway.alongZ + dz * runway.alongX
+    };
+}
+
+/**
+ * True while a place is over the paved strip. The margin widens the box for a
+ * caller that wants to know it is close rather than that it is on.
+ */
+export function isOnRunway(runway, x, z, margin = 0) {
+    if (!runway) return false;
+    const { along, across } = runwayOffsets(runway, x, z);
+    return Math.abs(along)  <= runway.length / 2 + margin
+        && Math.abs(across) <= runway.width  / 2 + margin;
+}
+
+/**
+ * Both ends of a strip, each with the bearing a takeoff from it runs on. A
+ * runway is flown in either direction, so it has two thresholds rather than a
+ * start and a finish.
+ */
+export function runwayThresholds(runway) {
+    const reach = runway.length / 2;
+    return [
+        { ...runwayPoint(runway, -reach), heading: runway.heading },
+        { ...runwayPoint(runway,  reach), heading: (runway.heading + 180) % 360 }
+    ];
+}
+
+/** The strip nearest a place in the world, or null where there is none at all. */
+export function nearestRunway(runways, x, z) {
+    let best = null;
+    let closest = Infinity;
+
+    for (const runway of runways ?? []) {
+        const distance = Math.hypot(x - runway.x, z - runway.z);
+        if (distance >= closest) continue;
+        best = runway;
+        closest = distance;
+    }
+
+    return best;
+}
+
 // --- The registry ---------------------------------------------------------
 
-export const ELEMENTS = [mountain, canyon, desert, grass, sand, water, river, forest, town, snow];
+export const ELEMENTS = [
+    mountain, canyon, desert, grass, sand, water, river, forest, town, snow, runway
+];
 
 export const ELEMENTS_BY_ID = new Map(ELEMENTS.map(element => [element.id, element]));
 
@@ -885,6 +1019,121 @@ function paintBand(field, [low, high], color) {
     }
 
     return painted;
+}
+
+/**
+ * Where to build the strip. Sites are drawn from the environment's own seeded
+ * stream and the flattest one wins, because what a runway needs is not a
+ * particular place but ground that does not move under it.
+ *
+ * A site outside the band the strip may be built in is charged for the part of
+ * it that lies outside rather than thrown away, so the search always comes back
+ * with somewhere: a world with no ground inside the band gets the best ground it
+ * has instead of getting no runway at all.
+ */
+function chooseRunwaySite(field, config, length, width, random) {
+    const reach = field.size / 2 - length / 2 - field.step * 2;
+    if (reach <= 0) return null;
+
+    const [floor, ceiling] = config.band;
+    let best = null;
+
+    for (let i = 0; i < RUNWAY_SITES; i++) {
+        const heading = pick(random, config.heading);
+        const site = {
+            x: (random() * 2 - 1) * reach,
+            z: (random() * 2 - 1) * reach,
+            heading,
+            ...runwayDirection(heading)
+        };
+
+        const ground  = measureRunwayGround(field, site, length, width);
+        const outside = Math.max(0, floor - ground.low) + Math.max(0, ground.high - ceiling);
+        const score   = ground.spread + outside * RUNWAY_BAND_PENALTY;
+
+        if (best && score >= best.score) continue;
+        best = { ...site, elevation: ground.mean, spread: ground.spread, score };
+    }
+
+    return best;
+}
+
+/** How level the ground under a candidate strip is, and what height it sits at. */
+function measureRunwayGround(field, site, length, width) {
+    let low = Infinity, high = -Infinity, total = 0, counted = 0;
+
+    for (let a = 0; a < RUNWAY_ALONG; a++) {
+        const along = (a / (RUNWAY_ALONG - 1) - 0.5) * length;
+
+        for (let c = 0; c < RUNWAY_ACROSS; c++) {
+            const across = (c / (RUNWAY_ACROSS - 1) - 0.5) * width;
+            const at = runwayPoint(site, along, across);
+            const h  = sampleHeight(field, at.x, at.z);
+
+            low  = Math.min(low, h);
+            high = Math.max(high, h);
+            total += h;
+            counted++;
+        }
+    }
+
+    return { low, high, mean: total / counted, spread: high - low };
+}
+
+/**
+ * Cuts the strip into the ground and paints it. The paved rectangle is levelled
+ * dead flat to the site's own height and the apron either side eases back into
+ * whatever was there, so a runway sits in the country rather than on a plinth.
+ *
+ * The paint is a stripe down each shoulder and a bar across each threshold,
+ * which is what makes a strip readable from the air as something to aim at
+ * rather than as a dark patch of ground.
+ */
+function gradeRunway(field, runway, config) {
+    const halfLength = runway.length / 2;
+    const halfWidth  = runway.width / 2;
+    const skirt      = runway.width * config.apron;
+    const outerAlong = halfLength + skirt;
+    const outerCross = halfWidth + skirt;
+
+    for (let i = 0; i < field.count; i++) {
+        const { along, across } = runwayOffsets(runway, fieldX(field, i), fieldZ(field, i));
+        const reachAlong = Math.abs(along);
+        const reachCross = Math.abs(across);
+        if (reachAlong > outerAlong || reachCross > outerCross) continue;
+
+        const grade = Math.min(
+            edgeFade(reachAlong, halfLength, outerAlong),
+            edgeFade(reachCross, halfWidth,  outerCross)
+        );
+        if (grade <= 0) continue;
+
+        field.height[i] += (runway.elevation - field.height[i]) * grade;
+
+        if (reachAlong > halfLength || reachCross > halfWidth) {
+            // The apron is cleared ground rather than pavement: it takes a
+            // little of the strip's colour and keeps its own.
+            mixColor(field, i, blend(config.color, 0.2), grade * 0.4);
+            continue;
+        }
+
+        const painted = reachCross / halfWidth >= RUNWAY_SHOULDER
+                     || reachAlong / halfLength >= RUNWAY_THRESHOLD;
+
+        paint(field, i, painted
+            ? blend(config.mark, reachCross / halfWidth)
+            : blend(config.color, 1 - reachCross / halfWidth));
+    }
+}
+
+/**
+ * Full strength inside an inner reach, nothing past an outer one, and eased
+ * between the two, for anything that has a hard middle and a soft edge.
+ */
+function edgeFade(distance, inner, outer) {
+    if (distance <= inner) return 1;
+    if (distance >= outer) return 0;
+    return smoothstep(1 - (distance - inner) / (outer - inner));
 }
 
 function averageHeight(field, centerX, centerZ, radius) {

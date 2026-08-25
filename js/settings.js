@@ -18,7 +18,9 @@
  */
 
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID, isEnvironmentId } from './environment/presets.js';
-import { START_FIELDS, START_FIELD_IDS } from './config.js';
+import {
+    START_FIELDS, START_FIELD_IDS, CHOICE_FIELD, TOGGLE_FIELD, resolveStart, runwayForced
+} from './config.js';
 
 export { isEnvironmentId } from './environment/presets.js';
 
@@ -40,10 +42,13 @@ export const SETTINGS_CLOSE_KEYS = ['Escape', 'Backspace'];
 // setting can be changed without first pausing to go looking for it.
 export const SETTINGS_OPEN_KEYS = ['KeyO'];
 
-// What an entry in the panel is: a world, a value with settings of its own, or
-// the way out.
+// What an entry in the panel is: a world, a value with settings of its own, one
+// of a set of conditions only one of which can be in force, something that is
+// simply on or off, or the way out.
 export const ENVIRONMENT_ENTRY = 'environment';
 export const OPTION_ENTRY      = 'option';
+export const CHOICE_ENTRY      = 'choice';
+export const TOGGLE_ENTRY      = 'toggle';
 export const BACK_ENTRY        = 'back';
 
 // Which heading an option is drawn under. The cursor walks every option as one
@@ -260,6 +265,66 @@ export function writeSettings(storage, values) {
 }
 
 /**
+ * The id an entry answers to when an option is drawn as more than one row. Only
+ * a choice needs it: every row of one names the same option, so the value it
+ * stands for has to be part of what it is called.
+ */
+export function choiceEntryId(optionId, value) {
+    return `${optionId}:${value}`;
+}
+
+/**
+ * The rows one option is drawn as.
+ *
+ * Most are one row that steps through the settings it may take. A choice is one
+ * row per condition, only one of which can be in force, so choosing one clears
+ * whichever was: the panel has no space to explain a radio group, and a list
+ * that marks the condition it is in explains itself. A toggle is one row that is
+ * either on or off, drawn as the box it is.
+ */
+function optionEntries(option, options) {
+    const group = option.group ?? OPTION_GROUP;
+
+    if (option.kind === CHOICE_FIELD) {
+        return option.values.map(entry => ({
+            kind: CHOICE_ENTRY,
+            group,
+            option: option.id,
+            id: choiceEntryId(option.id, entry.value),
+            label: entry.label,
+            note: entry.note ?? option.note,
+            value: entry.value,
+            current: false
+        }));
+    }
+
+    if (option.kind === TOGGLE_FIELD) {
+        return [{
+            kind: TOGGLE_ENTRY,
+            group,
+            option: option.id,
+            id: option.id,
+            label: option.label,
+            note: option.note,
+            value: option.default,
+            locked: false,
+            current: false
+        }];
+    }
+
+    return [{
+        kind: OPTION_ENTRY,
+        group,
+        id: option.id,
+        label: option.label,
+        note: option.note,
+        value: option.default,
+        valueLabel: optionValueLabel(option.id, option.default, options),
+        current: false
+    }];
+}
+
+/**
  * The panel's entries: every environment that can be flown, then every option
  * that can be set, then the way out.
  */
@@ -272,16 +337,7 @@ export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_
             note: environment.description,
             current: false
         })),
-        ...options.map(option => ({
-            kind: OPTION_ENTRY,
-            group: option.group ?? OPTION_GROUP,
-            id: option.id,
-            label: option.label,
-            note: option.note,
-            value: option.default,
-            valueLabel: optionValueLabel(option.id, option.default, options),
-            current: false
-        })),
+        ...options.flatMap(option => optionEntries(option, options)),
         { kind: BACK_ENTRY, id: SETTINGS_BACK_ID, label: SETTINGS_BACK_LABEL, note: '', current: false }
     ];
 }
@@ -295,7 +351,15 @@ export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_
 export const OPTION_LEFT_MARK  = '‹';
 export const OPTION_RIGHT_MARK = '›';
 
+// A toggle reads as the box it is, so what it is set to is legible without the
+// row having to be under the cursor.
+export const TOGGLE_ON_MARK  = '[X]';
+export const TOGGLE_OFF_MARK = '[ ]';
+
 export function optionEntryText(entry) {
+    if (entry.kind === TOGGLE_ENTRY) {
+        return `${entry.value ? TOGGLE_ON_MARK : TOGGLE_OFF_MARK} ${entry.label}`;
+    }
     if (entry.kind !== OPTION_ENTRY) return entry.label;
     return `${entry.label}  ${OPTION_LEFT_MARK} ${entry.valueLabel} ${OPTION_RIGHT_MARK}`;
 }
@@ -319,6 +383,7 @@ export function createSettingsState(storage = null, environments = ENVIRONMENTS,
  */
 export function syncSettingsEntries(state) {
     const options = state.options ?? SETTINGS_OPTIONS;
+    const start   = startSettings(state);
 
     for (const entry of state.entries) {
         entry.current = entry.kind === ENVIRONMENT_ENTRY && entry.id === state.values.environment;
@@ -328,10 +393,33 @@ export function syncSettingsEntries(state) {
             entry.valueLabel = optionValueLabel(entry.id, entry.value, options);
         }
 
+        // A choice marks the one condition in force, the same way the list of
+        // worlds marks the one being flown.
+        if (entry.kind === CHOICE_ENTRY) {
+            entry.current = state.values[entry.option] === entry.value;
+        }
+
+        // A toggle another setting is holding shows what it is being held at
+        // rather than what the pilot last left it on, because a box that says
+        // one thing while the world does another is a box nobody can read.
+        if (entry.kind === TOGGLE_ENTRY) {
+            entry.locked = isToggleLocked(entry.option, start);
+            entry.value  = entry.locked ? true : state.values[entry.option] === true;
+        }
+
         entry.text = optionEntryText(entry);
     }
 
     return state.entries;
+}
+
+/**
+ * True while a toggle is being held by something other than the pilot. Only the
+ * runway has such a holder: a start that rolls out of one cannot be flown in a
+ * world with no strip in it, so that start owns the box for as long as it is set.
+ */
+export function isToggleLocked(id, start) {
+    return id === 'runway' && runwayForced(start);
 }
 
 export function settingsShowing(state) {
@@ -364,31 +452,65 @@ export function currentOption(state, id) {
  * The start state the panel is holding, as the fields `js/config.js` declares
  * them and nothing else, so a flight is handed a start rather than the whole
  * settings object with a start somewhere inside it.
+ *
+ * Resolved on the way out rather than handed over raw, so what leaves the panel
+ * is a start that hangs together: a takeoff carries the strip it needs, whatever
+ * the pilot last left the box on for the start they were flying then.
  */
 export function startSettings(state) {
-    const start = {};
-    for (const id of START_FIELD_IDS) start[id] = state.values[id];
-    return start;
+    const held = {};
+    for (const id of START_FIELD_IDS) held[id] = state.values[id];
+    return resolveStart(held);
+}
+
+/** The entry a row id belongs to, or null when the panel has no such row. */
+export function settingsEntry(state, id) {
+    return state.entries?.find(entry => entry.id === id) ?? null;
+}
+
+/**
+ * Writes one setting and remembers it. Returns the id of the option that
+ * changed, or null when it was already on that value.
+ */
+function applySetting(state, id, value) {
+    if (state.values[id] === value) return null;
+
+    state.values[id] = value;
+    syncSettingsEntries(state);
+    writeSettings(state.storage, state.values);
+    return id;
 }
 
 /**
  * Steps an option to another of its settings, by one place in either
- * direction. Anything that is not an option is left alone, so the arrow keys
- * mean nothing on a world or on the way out.
+ * direction. A choice steps to the condition its own row stands for, and a
+ * toggle flips, because on a row that is one of a set the only step there is
+ * to take is on to it. Anything else is left alone, so the arrow keys mean
+ * nothing on a world or on the way out.
  *
  * Returns the option's id when it moved, and null when nothing changed.
  */
 export function adjustSetting(state, id, step) {
+    if (!step) return null;
+
+    const entry = settingsEntry(state, id);
+    if (entry?.kind === CHOICE_ENTRY) return applySetting(state, entry.option, entry.value);
+    if (entry?.kind === TOGGLE_ENTRY) return flipToggle(state, entry);
+
     const options = state.options ?? SETTINGS_OPTIONS;
-    if (!step || !settingsOption(id, options)) return null;
+    if (!settingsOption(id, options)) return null;
 
-    const next = cycleOptionValue(id, state.values[id], step, options);
-    if (next === state.values[id]) return null;
+    return applySetting(state, id, cycleOptionValue(id, state.values[id], step, options));
+}
 
-    state.values[id] = next;
-    syncSettingsEntries(state);
-    writeSettings(state.storage, state.values);
-    return id;
+/**
+ * Turns a toggle over, unless something else is holding it. A held box is not
+ * refused because the pilot was wrong to press it: it is refused because the
+ * start state it belongs to has already answered the question.
+ */
+function flipToggle(state, entry) {
+    if (entry.locked) return null;
+    return applySetting(state, entry.option, !(state.values[entry.option] === true));
 }
 
 /**
@@ -397,7 +519,7 @@ export function adjustSetting(state, id, step) {
  * Returns `SETTINGS_BACK_ID` when the panel was closed, the environment id
  * when a different world was picked, the option's id when an option was
  * stepped on to its next setting, and null when the choice changed nothing:
- * an unknown entry, or the environment already being flown.
+ * an unknown entry, a held toggle, or the environment already being flown.
  */
 export function chooseSetting(state, id) {
     if (id === SETTINGS_BACK_ID) {
@@ -405,14 +527,17 @@ export function chooseSetting(state, id) {
         return SETTINGS_BACK_ID;
     }
 
+    const entry = settingsEntry(state, id);
+    if (entry?.kind === CHOICE_ENTRY) return applySetting(state, entry.option, entry.value);
+    if (entry?.kind === TOGGLE_ENTRY) return flipToggle(state, entry);
+
     // An option has no single thing to choose, so choosing one steps it on to
     // its next setting - the same thing the right arrow does to it.
     if (settingsOption(id, state.options ?? SETTINGS_OPTIONS)) return adjustSetting(state, id, 1);
 
     if (!isEnvironmentId(id) || state.values.environment === id) return null;
 
-    state.values.environment = id;
-    syncSettingsEntries(state);
-    writeSettings(state.storage, state.values);
-    return id;
+    // A world answers as itself rather than as the setting holding it, because
+    // what a caller does about a new world depends on which world it is.
+    return applySetting(state, 'environment', id) == null ? null : id;
 }

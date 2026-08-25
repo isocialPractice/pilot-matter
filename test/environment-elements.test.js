@@ -178,7 +178,7 @@ test('no step of a gradient shifts dramatically from the step before it', () => 
 test('every element the world is described in terms of is in the registry', () => {
     const expected = [
         'mountain', 'grass', 'sand', 'water', 'river',
-        'forest', 'canyon', 'desert', 'town', 'snow'
+        'forest', 'canyon', 'desert', 'town', 'snow', 'runway'
     ];
     for (const id of expected) {
         assert.equal(isElementId(id), true, `${id} should be an element`);

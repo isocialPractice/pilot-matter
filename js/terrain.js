@@ -9,13 +9,14 @@ import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './envi
  * geometry and answers the height queries the flight model asks.
  */
 export class Terrain {
-    constructor(scene, environmentId = DEFAULT_ENVIRONMENT_ID) {
+    constructor(scene, environmentId = DEFAULT_ENVIRONMENT_ID, world = {}) {
         this.scene    = scene;
         this.size     = DEFAULT_SIZE;
         this.segments = DEFAULT_SEGMENTS;
         this.mesh     = null;
+        this.built    = null;
 
-        this.setEnvironment(environmentId);
+        this.setEnvironment(environmentId, world);
     }
 
     /**
@@ -23,21 +24,48 @@ export class Terrain {
      * rather than left in the scene, so switching environments from the
      * settings panel does not stack them up behind each other.
      *
+     * A world is more than the preset it is drawn from: the same description
+     * seeded differently, or with a strip in it rather than without one, is a
+     * different world and is rebuilt as one. What is not rebuilt is asking for
+     * the world already on screen, which is what keeps the panel from
+     * regenerating the ground every time a setting near it is touched.
+     *
      * Returns true when the world actually changed.
      */
-    setEnvironment(environmentId) {
+    setEnvironment(environmentId, world = {}) {
         const environment = getEnvironment(environmentId);
-        if (this.mesh && this.environment?.id === environment.id) return false;
+        const asked = {
+            id: environment.id,
+            seed: world.seed ?? environment.seed,
+            runway: world.runway ?? false,
+            base: world.base ?? null
+        };
 
+        if (this.mesh && sameWorld(this.built, asked)) return false;
+
+        this.built       = asked;
         this.environment = environment;
-        this.maxHeight   = environment.base?.maxHeight ?? 480;
+        this.maxHeight   = asked.base?.maxHeight ?? environment.base?.maxHeight ?? 480;
         this.field       = buildEnvironment(environment, {
             size: this.size,
-            segments: this.segments
+            segments: this.segments,
+            seed: asked.seed,
+            base: asked.base,
+            runway: asked.runway
         });
 
         this.build();
         return true;
+    }
+
+    /** The strips cut into the world being flown, for anything landing on one. */
+    getRunways() {
+        return this.field.runways;
+    }
+
+    /** The one strip a world carries, or null for a world generated without one. */
+    getRunway() {
+        return this.field.runways[0] ?? null;
     }
 
     build() {
@@ -76,4 +104,13 @@ export class Terrain {
         const half = this.size / 2;
         return { minX: -half, maxX: half, minZ: -half, maxZ: half };
     }
+}
+
+/** Whether two asks would generate the same ground, down to the strip on it. */
+function sameWorld(built, asked) {
+    return built != null
+        && built.id === asked.id
+        && built.seed === asked.seed
+        && JSON.stringify(built.runway) === JSON.stringify(asked.runway)
+        && JSON.stringify(built.base) === JSON.stringify(asked.base);
 }

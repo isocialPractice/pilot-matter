@@ -1,5 +1,6 @@
 import { AttitudeIndicator, pitchFromForward, bankFromWing } from './attitude.js';
 import { Minimap } from './minimap.js';
+import { LANDED } from './crash.js';
 import {
     FEET_PER_UNIT, SECONDS_PER_MINUTE,
     DEFAULT_SPEED_UNIT, DEFAULT_ALTITUDE_UNIT,
@@ -88,8 +89,15 @@ export class HUD {
         this.cameraElement        = document.getElementById('hud-camera');
         this.lowAltitudeElement   = document.getElementById('low-altitude');
         this.crashElement         = document.getElementById('crashed');
+        this.landedElement        = document.getElementById('landed');
         this.attitude             = new AttitudeIndicator(document.getElementById('attitude'));
         this.minimap              = new Minimap(document.getElementById('minimap'));
+
+        // What the pilot is being asked to do, when they are being asked to do
+        // anything. A free flight leaves these empty and the card off screen.
+        this.modeNameElement      = document.getElementById('game-mode-name');
+        this.modeObjectiveElement = document.getElementById('game-mode-objective');
+        this.modeStatusElement    = document.getElementById('game-mode-status');
 
         // The units the readouts are written beside, which the settings panel
         // can switch without the flight model ever hearing about it.
@@ -123,6 +131,17 @@ export class HUD {
     }
 
     /**
+     * Writes the objective card: what is being played, what it is asking for,
+     * and how far through it the pilot is. Written when the run changes rather
+     * than every frame, because a stage is not something that moves.
+     */
+    setObjective({ name = '', objective = '', status = '' } = {}) {
+        this.modeNameElement.textContent      = name;
+        this.modeObjectiveElement.textContent = objective;
+        this.modeStatusElement.textContent    = status;
+    }
+
+    /**
      * Writes the frame's readings onto the instruments. A frozen simulation -
      * a paused flight, or one still waiting behind the title screen - keeps
      * the warnings quiet: there is nothing for the pilot to do about them
@@ -147,11 +166,15 @@ export class HUD {
         this.minimap.update(aircraft.getPosition(), aircraft.getHeading());
 
         // The crash banner replaces the low altitude warning: once the
-        // ground has been hit there is nothing left to warn about. Both give
-        // the middle of the screen up to the paused indicator.
+        // ground has been hit there is nothing left to warn about. A landing
+        // replaces it for the same reason - the ground under the aircraft has
+        // stopped being a thing to be warned about and started being the point.
+        // All three give the middle of the screen up to the paused indicator.
         const crashed = !frozen && aircraft.isCrashed();
-        const low = !frozen && !crashed && isLowAltitude(aircraft.getHeightAboveTerrain());
+        const landed  = !frozen && !crashed && aircraft.getGroundOutcome?.() === LANDED;
+        const low = !frozen && !crashed && !landed && isLowAltitude(aircraft.getHeightAboveTerrain());
         this.crashElement.style.display = crashed ? 'block' : 'none';
+        this.landedElement.style.display = landed ? 'block' : 'none';
         this.lowAltitudeElement.style.display = low ? 'block' : 'none';
     }
 }

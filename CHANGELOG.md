@@ -5,6 +5,92 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0-alpha] - 2026-08-25
+
+### Added
+
+- A **runway** element, which makes the world somewhere a flight can end as well
+  as somewhere it happens. It is an element like any other - a length range, a
+  width range, a heading range, the height band a strip may be built in, and the
+  reach of the apron either side - but it is the one element that chooses where
+  it goes rather than being scattered: sites are drawn from the world's own
+  seeded stream, each measured across the whole footprint of the strip rather
+  than under the middle of it, and the flattest wins, because what a runway needs
+  is not a particular place but ground that does not move under it. A site
+  outside the band is charged for the part of it that lies outside rather than
+  thrown away, so a world whose ground never quite fits still gets the best
+  ground it has instead of getting no runway at all. The pavement is levelled
+  dead flat and the apron eases back into whatever was there, so a strip sits in
+  the country rather than on a plinth, and it is painted with a stripe down each
+  shoulder and a bar across each threshold so it can be picked out from the air
+- **Landing**, as an outcome in its own right rather than as the absence of a
+  crash. A strip does not raise the bar for how hard an arrival may be so much as
+  give it somewhere to be something else: on one, an arrival soft enough and
+  square enough - inside the sink rate, the bank, the pitch, and the heading a
+  landing is flown at - is a landing, a firmer one still rolls out because
+  prepared ground takes more than a hillside does, and only past the runway's own
+  threshold is it a crash. Either direction down the strip counts, because a
+  runway has two thresholds rather than a start and a finish. Only the frame the
+  aircraft arrives on is judged: a rollout is not a second arrival, and judging
+  every frame of one would turn a landing into a crash as the airspeed bled away
+  underneath it. The outcome is one state the HUD and the game modes both read
+- A **START STATE** setting choosing the condition a flight opens in, as two rows
+  only one of which can be in force: **Start off flying**, the airborne start the
+  simulator has always had, or **Runway takeoff**, stopped at a threshold with the
+  nose level, the engine idling, and the strip running away in front. A takeoff
+  takes nothing from the airborne fields but the camera, because an aircraft held
+  on the ground has no airspeed, no altitude, and no climb of its own to set
+- A **RUNWAY** box beside it, saying whether the generated world carries a
+  landable strip at all. Unchecked, no runway is drawn and there is nowhere to
+  land. A runway takeoff holds it on and greys it out for as long as that start
+  is chosen, because a start that asked to roll out of a world with no strip in
+  it is not a start anything could honour - and the moment the start is put back
+  to flying, the box is back where the pilot left it
+- A **Game Modes** panel, reached from the start screen and the pause menu the
+  same way Controls and Settings are, listing free flight and every mode there
+  is and marking the one being played
+- The first two **game modes**, each four stages long and each getting harder at
+  exactly the thing it is about. **Runway Landing** opens in the air over open
+  country with one strip in it: the first stage puts the strip under the nose
+  over flat ground, and each one after it opens further out, further off the line
+  back to it, over a shorter strip, in higher country. **Flying through Loops**
+  opens lined up on the first gate of a course laid across a shallow valley, and
+  each stage lays more gates, tighter, closer together, on a course that bends
+  more. A gate is tested against the step the aircraft flew rather than against
+  where it ended up, because a hoop is thinner than the distance covered in a
+  frame; only the gate the course is up to counts, because the objective is the
+  course in order; and a crash puts the stage back to its beginning rather than
+  ending the run
+- Two thin worlds for the modes to be played over - open country with a strip in
+  it, and a valley with the air over it left clear - kept out of the settings
+  panel because a mode brings its own ground with it. A stage builds its preset
+  with a seed of its own, mixed rather than added, because two seeds a few apart
+  open the generator's shift register on much the same value and four stages laid
+  from those would have been four goes at the same course
+- `js/game-modes.js` and `js/rings.js`: the modes, the stages, the run state, the
+  course geometry, and the gate test as one pure module with no DOM or Three.js
+  dependency, and the hoops that course is drawn with as another. Unit tests
+  cover the stage progression, the run, the course, the gate from both sides and
+  across a step long enough to jump it, and every stage of every mode opening on
+  a start the configuration can actually hold
+- `runway` and `seed` as Matter API options, `runways` on both halves, `landed`
+  in the telemetry, `onLanding` and `runwayImpactSpeed` on the Pilot API, and the
+  touchdown rules, the strip geometry, and the whole of the game modes published
+  from the entry point, so a host can land on its own strips and play the bundled
+  modes against its own renderer
+
+### Changed
+
+- A flight start now carries where over the world it opens and whether it opens
+  on the ground, so a start is a condition and a place rather than a condition
+  over the middle of the world
+- The world and the start are now worked out in one place from the run and the
+  settings together, so a new world resets the flight, a new start waits for one,
+  and nothing has to know which kind of choice was made
+- An environment is generated without a runway unless one is asked for, and the
+  same description can be built as different ground by asking for a seed, which
+  is what lets one preset stand behind four stages of a mode
+
 ## [1.8.0-alpha] - 2026-08-24
 
 ### Added

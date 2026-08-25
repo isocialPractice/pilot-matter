@@ -191,7 +191,7 @@ test('a control anchor is optional, but it has to be a point when it is given', 
 test('telemetry is a fixed shape, so an external HUD can be written against it', () => {
     assert.deepEqual(TELEMETRY_FIELDS, [
         'airspeed', 'altitude', 'verticalSpeed', 'heading',
-        'throttle', 'heightAboveTerrain', 'crashed', 'stalled'
+        'throttle', 'heightAboveTerrain', 'crashed', 'landed', 'stalled'
     ]);
     assert.deepEqual(Object.keys(createTelemetry({ airspeed: 40 })), TELEMETRY_FIELDS);
 });
@@ -202,6 +202,7 @@ test('a reading that is missing reads as zero rather than as undefined', () => {
         assert.equal(telemetry[field], 0, `${field} should read zero`);
     }
     assert.equal(telemetry.crashed, false);
+    assert.equal(telemetry.landed, false);
     assert.equal(telemetry.stalled, false);
 });
 

@@ -24,12 +24,48 @@
 import { CAMERA_MODES } from './camera-math.js';
 
 /**
+ * The two conditions a flight can open in. Airborne is the one the simulator
+ * has always started in, and the one every other start field is written for. A
+ * runway takeoff throws most of those fields away: an aircraft held on the
+ * ground has no airspeed, no altitude, and no climb of its own to set.
+ */
+export const START_FLYING  = 'flying';
+export const START_TAKEOFF = 'takeoff';
+
+export const START_MODES = Object.freeze([
+    {
+        value: START_FLYING,
+        label: 'START OFF FLYING',
+        note: 'already up, in the climb set below'
+    },
+    {
+        value: START_TAKEOFF,
+        label: 'RUNWAY TAKEOFF',
+        note: 'stopped on the runway, throttle at idle'
+    }
+]);
+
+// The condition a takeoff is held in until the pilot moves the lever: stopped
+// at the threshold, engine idling, nose level, on the strip's own bearing.
+export const TAKEOFF_THROTTLE_PERCENT = 0;
+
+/**
+ * A field that is one of two conditions rather than a value, and one that is
+ * simply on or off. Both are chosen rather than stepped, which is what the
+ * settings panel reads them off to know how to draw them.
+ */
+export const CHOICE_FIELD = 'choice';
+export const TOGGLE_FIELD = 'toggle';
+
+/**
  * The condition every flight opens in, and the one Reset Flight puts it back
  * into. Frozen, because it is the floor every other start is measured from: a
  * caller changing a start changes its own copy, not this.
  */
 export const DEFAULT_CONFIG = Object.freeze({
     start: Object.freeze({
+        startMode:        START_FLYING,
+        runway:           true,
         airspeedKnots:    80,
         altitudeFeet:     1390,
         verticalSpeedFpm: 1260,
@@ -54,6 +90,25 @@ export const DEFAULT_CONFIG = Object.freeze({
  * its `+` so a climb cannot be misread as a descent.
  */
 export const START_FIELDS = Object.freeze([
+    {
+        id: 'startMode',
+        label: 'START STATE',
+        note: 'the condition a flight opens in',
+        kind: CHOICE_FIELD,
+        default: DEFAULT_CONFIG.start.startMode,
+        values: START_MODES
+    },
+    {
+        id: 'runway',
+        label: 'RUNWAY',
+        note: 'whether the generated world has a strip to land on',
+        kind: TOGGLE_FIELD,
+        default: DEFAULT_CONFIG.start.runway,
+        values: [
+            { value: true,  label: 'ON'  },
+            { value: false, label: 'OFF' }
+        ]
+    },
     {
         id: 'airspeedKnots',
         label: 'START AIRSPEED',
@@ -129,9 +184,50 @@ export function isStartValue(id, value) {
         && Number.isInteger((value - field.min) / field.step);
 }
 
+/**
+ * The nearest value a field can actually hold to the one asked for: clamped
+ * into its range and put on one of its steps.
+ *
+ * `isStartValue` refuses a reading between two steps rather than snapping it,
+ * because a value from nowhere is a value from nowhere. This is for the other
+ * case: a caller working a reading out - a game mode placing a flight, a host
+ * converting from its own units - which wants the nearest setting the field
+ * offers rather than to be told the arithmetic came out between two of them.
+ */
+export function snapStartValue(id, value) {
+    const field = startField(id);
+    if (!field) return value;
+    if (field.values) return isStartValue(id, value) ? value : field.default;
+
+    const number = Number(value);
+    if (!Number.isFinite(number)) return field.default;
+
+    const stepped = field.min + Math.round((number - field.min) / field.step) * field.step;
+    return Math.min(Math.max(stepped, field.min), field.max);
+}
+
 /** A fresh copy of the start every flight opens in. */
 export function startDefaults() {
     return { ...DEFAULT_CONFIG.start };
+}
+
+/** True for a start that opens stopped on a runway rather than already flying. */
+export function startsOnRunway(start = {}) {
+    return start.startMode === START_TAKEOFF;
+}
+
+/**
+ * True while the runway toggle is held on by the start that needs one. A
+ * takeoff cannot be rolled out of a world with no strip in it, so the choice is
+ * the start state's rather than the pilot's for as long as that start is set.
+ */
+export function runwayForced(start = {}) {
+    return startsOnRunway(start);
+}
+
+/** Whether the world a start asks for is generated with a strip in it. */
+export function runwayWanted(start = {}) {
+    return runwayForced(start) || start.runway === true;
 }
 
 /**
@@ -139,11 +235,16 @@ export function startDefaults() {
  * host's options, a panel. Every field is checked on its own and falls back to
  * its default alone, so one value this version cannot read does not cost the
  * others theirs.
+ *
+ * The one field that is not read on its own is the runway, which a takeoff
+ * turns on whatever it was stored as: a start that asked to roll out of a world
+ * with no strip in it is not a start anything could honour.
  */
 export function resolveStart(values = {}) {
     const start = startDefaults();
     for (const field of START_FIELDS) {
         if (isStartValue(field.id, values[field.id])) start[field.id] = values[field.id];
     }
+    if (runwayForced(start)) start.runway = true;
     return start;
 }

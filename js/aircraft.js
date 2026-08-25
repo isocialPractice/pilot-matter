@@ -6,9 +6,11 @@ import {
     updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled, controlRates
 } from './flight-model.js';
 import {
-    GROUND_CLEARANCE, CRASH_IMPACT_SPEED, createCrashState, isCrashImpact,
-    beginCrash, clearCrash, updateCrash, controlsLocked
+    GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED,
+    CRASHED, LANDED, createCrashState, clearCrash, updateCrash, controlsLocked,
+    touchdownOutcome, recordTouchdown, releaseGround, groundOutcome, headingOffsetTo
 } from './crash.js';
+import { isOnRunway, nearestRunway } from './environment/elements.js';
 import { wrapPosition } from './world-edge.js';
 
 /**
@@ -32,6 +34,12 @@ export class Aircraft {
         this.gravity     = flight.gravity     ?? GRAVITY;
         this.clearance   = flight.clearance   ?? GROUND_CLEARANCE;
         this.impactSpeed = flight.impactSpeed ?? CRASH_IMPACT_SPEED;
+        this.runwayImpactSpeed = flight.runwayImpactSpeed ?? RUNWAY_IMPACT_SPEED;
+
+        // The strips in the world being flown over. Empty until something hands
+        // them over, which is what leaves a host flying its own terrain with the
+        // rule it has always had: every arrival is an arrival on open ground.
+        this.runways = options.runways ?? [];
 
         this.setSensitivity(flight.sensitivity ?? CONTROL_SENSITIVITY);
 
@@ -66,13 +74,34 @@ export class Aircraft {
             throttle:      flight.throttle      ?? start.throttle,
             verticalSpeed: flight.verticalSpeed ?? start.verticalSpeed,
             cameraMode:    start.cameraMode,
-            position: { x: 0, y: flight.altitude ?? start.position.y, z: 0 },
+            grounded:      flight.grounded === true,
+            position: {
+                x: flight.x ?? start.position.x,
+                y: flight.altitude ?? start.position.y,
+                z: flight.z ?? start.position.z
+            },
             rotation: {
                 x: flight.pitch ?? start.rotation.x,
                 y: flight.yaw   ?? start.rotation.y,
                 z: 0
             }
         };
+    }
+
+    /**
+     * The strips in the world under the aircraft. Handed over rather than
+     * looked up, because the aircraft does not know what it is flying over -
+     * the bundled terrain, a game mode's world, or a host's own ground.
+     */
+    setRunways(runways = []) {
+        this.runways = runways ?? [];
+        return this.runways;
+    }
+
+    /** The strip the aircraft is over, or null when it is over open ground. */
+    runwayUnder(x = this.position.x, z = this.position.z) {
+        const strip = nearestRunway(this.runways, x, z);
+        return isOnRunway(strip, x, z) ? strip : null;
     }
 
     /**
@@ -152,6 +181,11 @@ export class Aircraft {
         // level zero it would only leave on the first frame that runs.
         this.verticalSpeed = start.verticalSpeed;
         clearCrash(this.crash);
+
+        // A flight that opens on the ground has not landed there: it is waiting
+        // to go, and the first arrival it will be judged on is the one it flies
+        // back to after leaving. A flight that opens in the air is already up.
+        this.airborne = !start.grounded;
 
         // Nothing is told about the reset the constructor runs: there is no
         // model to place and no flight to have been interrupted yet, so a host
@@ -237,21 +271,45 @@ export class Aircraft {
             cruiseSpeed: this.cruiseSpeed
         }) * dt;
 
-        // Ground collision. Meeting the terrain gently is a landing and the
-        // aircraft flies on; arriving faster than the impact threshold is a
-        // crash, which locks the controls and resets the flight
+        // Ground contact. Off a runway, meeting the terrain gently is flown out
+        // of and arriving faster than the impact threshold is a crash. On one, a
+        // soft square arrival is a landing, which is an outcome the HUD and the
+        // game modes read rather than something the aircraft acts on itself.
+        //
+        // Only the frame the aircraft arrives on is judged. Everything after it
+        // is a rollout, and a rollout is not a second arrival: judging every
+        // frame of one would turn a landing into a crash as the airspeed - and
+        // with it the lift holding the aircraft up - bled away underneath it.
         const impactRate = dt > 0 ? (this.position.y - startY) / dt : 0;
         const minY = terrainHeight + this.clearance;
-        if (this.position.y < minY) {
+        const onGround = this.position.y <= minY;
+
+        if (onGround) {
             this.position.y = minY;
-            if (isCrashImpact(impactRate, this.impactSpeed) && beginCrash(this.crash)) {
-                this.speed = 0;
-                this.throttle = 0;
-                this.verticalSpeed = 0;
-                this.group.position.copy(this.position);
-                this.group.rotation.copy(this.rotation);
-                return;
+
+            if (this.airborne) {
+                this.airborne = false;
+                const outcome = touchdownOutcome(this.contactAt(impactRate), {
+                    impactSpeed: this.impactSpeed,
+                    runwayImpact: this.runwayImpactSpeed
+                });
+
+                if (recordTouchdown(this.crash, outcome) && outcome === LANDED) {
+                    this.options.onLanding?.(this.runwayUnder());
+                }
+
+                if (outcome === CRASHED) {
+                    this.speed = 0;
+                    this.throttle = 0;
+                    this.verticalSpeed = 0;
+                    this.group.position.copy(this.position);
+                    this.group.rotation.copy(this.rotation);
+                    return;
+                }
             }
+        } else if (!this.airborne) {
+            this.airborne = true;
+            releaseGround(this.crash);
         }
 
         // The vertical speed indicator reads the altitude actually gained or
@@ -274,6 +332,35 @@ export class Aircraft {
     getHeightAboveTerrain() { return this.position.y - this.terrainHeight; }
     isCrashed()    { return controlsLocked(this.crash); }
     isStalling()   { return isStalled(this.speed, this.minSpeed); }
+    isAirborne()   { return this.airborne !== false; }
+
+    /** What the last arrival on the ground turned out to be: flying, landed, or crashed. */
+    getGroundOutcome() { return groundOutcome(this.crash); }
+
+    /** How many landings this flight has made, which is what a game mode counts. */
+    getLandings() { return this.crash.landings; }
+
+    /**
+     * How the aircraft is meeting the ground, as the reading the touchdown rules
+     * are written against: the descent it arrived at, whether there is a strip
+     * under it, and how it is being held.
+     */
+    contactAt(verticalSpeed) {
+        const strip = this.runwayUnder();
+        const forwardY = THREE.MathUtils.clamp(this.getAttitude().forwardY, -1, 1);
+
+        return {
+            verticalSpeed,
+            onRunway: strip != null,
+            bank: this.rotation.z,
+            // The nose's own elevation rather than the pitch that was asked for,
+            // so the aircraft is read the way it is actually being held.
+            pitch: Math.asin(forwardY),
+            headingOffset: strip
+                ? headingOffsetTo(-this.rotation.y, strip.heading * Math.PI / 180)
+                : 0
+        };
+    }
 
     /**
      * Where the nose and the wings are pointing, as the vertical part of each

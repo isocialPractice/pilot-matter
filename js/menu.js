@@ -9,15 +9,17 @@
 // The menu the game opens on, before the first flight.
 export const START_MENU_ENTRIES = [
     { id: 'start',    label: 'START FLIGHT' },
+    { id: 'modes',    label: 'GAME MODES' },
     { id: 'controls', label: 'CONTROLS' },
     { id: 'settings', label: 'SETTINGS' }
 ];
 
-// The menu over a paused flight. Controls and Settings answer to the same ids
-// the start menu uses, so both screens open the same thing.
+// The menu over a paused flight. Game Modes, Controls, and Settings answer to
+// the same ids the start menu uses, so both screens open the same thing.
 export const PAUSE_MENU_ENTRIES = [
     { id: 'resume',   label: 'RESUME' },
     { id: 'reset',    label: 'RESET FLIGHT' },
+    { id: 'modes',    label: 'GAME MODES' },
     { id: 'controls', label: 'CONTROLS' },
     { id: 'settings', label: 'SETTINGS' }
 ];
@@ -145,6 +147,9 @@ export class MenuList {
             item.textContent = entry?.text ?? entry?.label ?? '';
             item.classList.toggle('selected', index === state.index);
             item.classList.toggle('current', entry?.current === true);
+            // An entry something other than the pilot is holding, which is
+            // drawn as set rather than as changeable.
+            item.classList.toggle('locked', entry?.locked === true);
         }
 
         // A panel with more entries than a short window can hold scrolls, and a

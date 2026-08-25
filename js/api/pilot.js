@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { Aircraft } from '../aircraft.js';
 import { CameraController } from '../camera.js';
 import { headingDegrees } from '../units.js';
+import { LANDED } from '../crash.js';
 import { resolvePilotOptions, createTelemetry } from './contract.js';
 
 /**
@@ -26,7 +27,9 @@ import { resolvePilotOptions, createTelemetry } from './contract.js';
  * @param {object} [options.keymap]   bindings to use instead of the bundled ones
  * @param {boolean} [options.controls] false to take the keyboard off entirely
  * @param {boolean} [options.wrap]    false to let the aircraft fly past the bounds
+ * @param {Array}  [options.runways]  strips to land on, instead of the terrain's
  * @param {function} [options.onReset] called whenever the flight resets
+ * @param {function} [options.onLanding] called on an arrival that was a landing
  * @param {object} [options.flight]   overrides for the start state and the model
  */
 export function createPilot(options = {}) {
@@ -41,7 +44,11 @@ export function createPilot(options = {}) {
         keymap: resolved.keymap,
         controls: resolved.controls,
         flight: resolved.flight,
-        onReset: resolved.onReset
+        // A host naming its own strips outranks the ones its terrain carries,
+        // for a world whose landable ground is not part of its heightfield.
+        runways: resolved.runways ?? terrain.runways,
+        onReset: resolved.onReset,
+        onLanding: typeof options.onLanding === 'function' ? options.onLanding : null
     });
 
     const camera = options.camera
@@ -66,8 +73,20 @@ export function createPilot(options = {}) {
          */
         setTerrain(next) {
             terrain = resolvePilotOptions({ terrain: next }).terrain;
+            aircraft.setRunways(terrain.runways);
             return terrain;
         },
+
+        /**
+         * Names the strips a landing can be made on, for a host whose landable
+         * ground is not part of the terrain it handed over. Each one is read
+         * the way the generator writes them: a centre, a bearing, a length, and
+         * a width.
+         */
+        setRunways(runways) { return aircraft.setRunways(runways); },
+
+        /** The strips the aircraft is currently being flown over. */
+        get runways() { return aircraft.runways; },
 
         /**
          * Advances the flight by one frame. The ground under the aircraft is
@@ -105,6 +124,7 @@ export function createPilot(options = {}) {
                 throttle: aircraft.getThrottle(),
                 heightAboveTerrain: aircraft.getHeightAboveTerrain(),
                 crashed: aircraft.isCrashed(),
+                landed: aircraft.getGroundOutcome() === LANDED,
                 stalled: aircraft.isStalling()
             });
         },

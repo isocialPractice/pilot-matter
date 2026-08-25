@@ -248,7 +248,48 @@
             padding-left: 5px;
         }
 
-        #settings {
+        /* What the pilot is being asked to do, on the one edge of the screen
+           no instrument has already claimed. */
+        #game-mode {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 260px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 0, 0.35);
+            padding: 8px 20px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 120;
+        }
+
+        #game-mode-name {
+            font-size: 12px;
+            font-weight: normal;
+            letter-spacing: 4px;
+        }
+
+        #game-mode-objective {
+            margin-top: 4px;
+            color: #ffb000;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+
+        #game-mode-status {
+            margin-top: 3px;
+            color: #f0f2f3;
+            font-size: 11px;
+            letter-spacing: 2px;
+        }
+
+        #settings,
+        #game-modes {
             display: none;
             position: fixed;
             top: 50%;
@@ -270,7 +311,8 @@
             z-index: 340;
         }
 
-        #settings h2 {
+        #settings h2,
+        #game-modes h2 {
             font-size: 26px;
             letter-spacing: 6px;
             padding-left: 6px;
@@ -285,6 +327,7 @@
         }
 
         #settings small,
+        #game-modes small,
         #paused small {
             display: block;
             color: #f0f2f3;
@@ -318,6 +361,7 @@
 
         #pause-menu,
         #start-menu,
+        #game-modes-menu,
         #settings-menu,
         #settings-start,
         #settings-options {
@@ -327,6 +371,7 @@
 
         #pause-menu li,
         #start-menu li,
+        #game-modes-menu li,
         #settings-menu li,
         #settings-start li,
         #settings-options li {
@@ -341,6 +386,7 @@
 
         #pause-menu li.selected,
         #start-menu li.selected,
+        #game-modes-menu li.selected,
         #settings-menu li.selected,
         #settings-start li.selected,
         #settings-options li.selected {
@@ -363,19 +409,31 @@
             margin: 2px 0;
         }
 
-        /* The environment being flown, which is not the same thing as the one
-           under the cursor. */
-        #settings-menu li.current {
+        /* What is in force, which is not the same thing as what is under the
+           cursor: the world being flown, the condition a flight opens in, and
+           the mode being played are all marked the same way. */
+        #settings-menu li.current,
+        #settings-start li.current,
+        #game-modes-menu li.current {
             border-color: rgba(0, 255, 0, 0.55);
         }
 
-        #settings-menu li.current::before {
+        #settings-menu li.current::before,
+        #settings-start li.current::before,
+        #game-modes-menu li.current::before {
             content: '\203A\00a0';
+        }
+
+        /* A box another setting is holding on. It still reads as checked,
+           because it is - it just is not the pilot holding it there. */
+        #settings-start li.locked {
+            opacity: 0.6;
         }
 
         #settings-menu li[data-note]::after,
         #settings-start li[data-note]::after,
-        #settings-options li[data-note]::after {
+        #settings-options li[data-note]::after,
+        #game-modes-menu li[data-note]::after {
             content: attr(data-note);
             display: block;
             margin-top: 2px;
@@ -438,6 +496,35 @@
             letter-spacing: 1px;
         }
 
+        /* The other way an arrival on the ground can end. Same place on the
+           screen as the crash banner, because only one of them can be true. */
+        #landed {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 40px;
+            letter-spacing: 6px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(0, 255, 0, 0.5);
+            padding: 20px 40px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        #landed small {
+            display: block;
+            margin-top: 10px;
+            color: #f0f2f3;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
         @keyframes warn-blink {
             50% { opacity: 0.25; }
         }
@@ -480,9 +567,23 @@
         <small>W/S TO SELECT &middot; A/D TO ADJUST &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
+    <div id="game-modes">
+        <h2>GAME MODES</h2>
+        <ul id="game-modes-menu"></ul>
+        <small>W/S TO SELECT &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
+    </div>
+
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>
 
     <div id="crashed">CRASHED<small>RESETTING FLIGHT</small></div>
+
+    <div id="landed">LANDED<small>ON THE RUNWAY</small></div>
+
+    <div id="game-mode">
+        <h3 id="game-mode-name"></h3>
+        <div id="game-mode-objective"></div>
+        <div id="game-mode-status"></div>
+    </div>
 
     <div id="hud">
         <div>AIRSPEED: <span id="hud-speed">80</span> <span id="hud-speed-unit">knots</span></div>

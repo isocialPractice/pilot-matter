@@ -10,10 +10,12 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 
 - **Arcade flight model** — pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases
 - **Airspeed-driven lift** — hold cruise speed and level flight holds altitude; let the speed decay and the wing stalls and drops
-- **A flight already in the air** - every flight opens at 80 knots, 1390 ft, climbing at 1260 ft/min on a heading of 000, with the throttle set where it holds that airspeed
-- **Crash detection** - settle onto a hillside gently and you have landed; fly into it and the aircraft is wrecked, the controls go dead, and the flight resets itself
+- **A flight already in the air, or held on the ground** - every flight opens at 80 knots, 1390 ft, climbing at 1260 ft/min on a heading of 000, or stopped at a runway threshold with the engine idling, whichever the start state is set to
+- **Crash detection** - settle onto a hillside gently and you fly on; fly into it and the aircraft is wrecked, the controls go dead, and the flight resets itself
+- **Runway landings** - put the aircraft down on the strip softly enough and square enough and it is a landing rather than an arrival, reported as a state the instruments and the game modes both read
+- **Two game modes** - Runway Landing and Flying through Loops, each four stages long and each getting harder at exactly the thing it is about
 - **Procedural terrain** — multi-octave fractal Brownian motion (fBm) noise generates the ground every world is drawn on
-- **The world as data** - ten environment elements (mountain, canyon, desert, grass, sand, water, river, forest, town, snow), each declaring the ranges it can be configured through and the algorithm that draws it, so nothing in the world is a placed asset
+- **The world as data** - eleven environment elements (mountain, canyon, desert, grass, sand, water, river, forest, town, snow, runway), each declaring the ranges it can be configured through and the algorithm that draws it, so nothing in the world is a placed asset
 - **Five assembled environments** - Highlands, River Basin, Canyon Country, Dune Sea, and Lakeside, picked from the settings panel and regenerated on the spot
 - **Element vertex colouring** - every band the ground is painted in is a light-to-dark gradient of one base hue, rendered through vertex colours with no textures
 - **Atmospheric fog** — exponential fog fades the world to sky blue in the distance, hiding the far ground and giving the illusion of an infinite world
@@ -26,10 +28,11 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Photo mode** - `F2` clears every overlay off the screen for one frame and downloads the view as a PNG named for the moment it was taken
 - **Engine and wind audio** - an engine note that rises with the throttle and a wind that rises faster than the airspeed behind it, muted with `M` and remembered for the next session
 - **Low altitude warning** - a blinking caution over the terrain below, measured against the ground rather than sea level
-- **Start screen menu** - the game opens on its name over a menu offering Start Flight, Controls, and Settings, with the flight held on the ramp until one is chosen
-- **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, Controls, and Settings
+- **Start screen menu** - the game opens on its name over a menu offering Start Flight, Game Modes, Controls, and Settings, with the flight held on the ramp until one is chosen
+- **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, Game Modes, Controls, and Settings
+- **Game Modes panel** - opened from either menu, listing free flight and every mode there is, and marking the one being played
 - **Settings panel** - opened with `O` or from either menu, setting the environment, the condition a flight opens in, control sensitivity, fog density, and the units the instruments read in, all remembered for the next session
-- **An editable start** - airspeed, altitude, climb, heading, throttle, and camera are fields a pilot sets rather than constants in the flight code, applied at once before launch and at the next reset after it
+- **An editable start** - the condition a flight opens in, the strip in the world, airspeed, altitude, climb, heading, throttle, and camera are fields a pilot sets rather than constants in the flight code, applied at once before launch and at the next reset after it
 - **A screen you can clear** - `H` collapses the control list to a single hint line and `Tab` clears the instruments off entirely for clean flying, remembered for the next session
 - **A simulator API** - the Pilot API flies the aircraft against a host's own scene, terrain, and model; the Matter API hands a host the world as one detachable group anything can fly over
 - **Zero build step** — runs directly in the browser via ES modules and an import map
@@ -102,10 +105,11 @@ The game opens on its start screen, with the clock held at zero: the aircraft wa
 | Entry | Does |
 |-------|------|
 | `START FLIGHT` | Releases the clock and hands the controls over |
+| `GAME MODES` | Opens the list of modes, and free flight |
 | `CONTROLS` | Puts the control list on screen, over the title, before anything is flying, and takes it back off when chosen again |
 | `SETTINGS` | Opens the settings panel |
 
-This is the opening screen rather than a menu to come back to: once the flight has started, the way back to Controls and Settings is the pause menu.
+This is the opening screen rather than a menu to come back to: once the flight has started, the way back to Game Modes, Controls, and Settings is the pause menu.
 
 ### Pausing
 
@@ -117,6 +121,7 @@ The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between t
 |-------|------|
 | `RESUME` | Unpauses and flies on |
 | `RESET FLIGHT` | Puts the aircraft back at its starting condition and unpauses |
+| `GAME MODES` | Opens the same list the start screen opens |
 | `CONTROLS` | Opens the control list back up, for a screen it has been collapsed on |
 | `SETTINGS` | Opens the same panel the start screen opens |
 
@@ -128,7 +133,18 @@ The settings panel opens on `O`, and from either menu, and holds the same choice
 
 The panel is in three parts. Under `ENVIRONMENT` is the world being flown: every entry is one of the five [assembled environments](#environments), the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.
 
-Under `START STATE` is the condition a flight opens in, which is the same condition `RESET FLIGHT` and `R` put it back into. Each field is read the way a pilot reads it and stepped along a range of its own:
+Under `START STATE` is the condition a flight opens in, which is the same condition `RESET FLIGHT` and `R` put it back into.
+
+The first two rows are the condition itself, and only one of them can be in force. Choosing one clears the other, and the one currently set is marked the same way the world being flown is:
+
+| Row | Opens the flight |
+|-----|------------------|
+| `START OFF FLYING` | Already up, in the climb the rest of the fields describe. The default |
+| `RUNWAY TAKEOFF` | Stopped at a runway threshold, nose level, engine idling, on the strip's own bearing |
+
+Under them is `RUNWAY`, a box that says whether the generated world carries a landable strip at all. Unchecked, no runway is drawn and the world has nowhere to land. `RUNWAY TAKEOFF` holds the box on for as long as it is chosen and greys it out, because a start that asked to roll out of a world with no strip in it is not a start anything could honour. Uncheck it, choose `RUNWAY TAKEOFF`, and it comes back on; go back to `START OFF FLYING` and it is off again, exactly as it was left.
+
+The rest are read the way a pilot reads them and stepped along a range of their own:
 
 | Field | Steps through | Opens on |
 |-------|---------------|----------|
@@ -140,6 +156,8 @@ Under `START STATE` is the condition a flight opens in, which is the same condit
 | `START CAMERA` | `CHASE`, `COCKPIT`, `ORBIT` | `CHASE` |
 
 A range stops at its ends rather than wrapping round them, because the ends of a range mean something a list's do not: past the fastest a flight can open at is not the slowest.
+
+A runway takeoff takes none of those six but the camera: an aircraft held on the ground has no airspeed, no altitude, and no climb of its own to set. They are still there to be edited, and they are what the flight opens in the moment `START OFF FLYING` is chosen again.
 
 Edited from the start screen, a new start takes effect at once - the aircraft is put straight into it, so the world behind the panel shows what was set. Edited mid-flight it waits, because a start is the next flight's condition rather than this one's: carry on flying, and the next reset opens in it.
 
@@ -160,6 +178,23 @@ Every choice is stored in `localStorage`, so the world, the start, and the optio
 
 `O`, `Esc`, or `Backspace` closes the panel, as does its own `BACK` entry.
 
+### Game modes
+
+`GAME MODES`, on the start screen and in the pause menu, opens a list of the flights that are played rather than flown. Choosing one lays out its world and opens its first stage; choosing `FREE FLIGHT` puts the world and the settings you chose back. The one being played is marked, the panel closes behind whatever is chosen, and `Esc` or `BACK` leaves without changing anything.
+
+A mode brings its own world with it, so the `ENVIRONMENT` setting is not consulted while one is being played. The worlds the modes are flown over are deliberately thin - what a mode asks the pilot to read is the objective, not the scenery around it.
+
+Every mode is four stages long, and every stage gets harder at exactly the thing its mode is about. A stage that is flown out is held on screen for a beat and then the next one is laid out; a crash puts the stage back to its beginning rather than ending the run. The card along the bottom of the screen says what is being played, what it wants, and how far through it you are.
+
+| Mode | Objective | Gets harder at |
+|------|-----------|----------------|
+| `RUNWAY LANDING` | Put the aircraft down on the strip | Finding the runway, and reading the ground around it well enough to get down on it |
+| `FLYING THROUGH LOOPS` | Fly the course of loops in order | Holding a line through several gates rather than flying at one at a time |
+
+`RUNWAY LANDING` opens in the air over open country with one strip cut into it. The first stage puts the strip under the nose over flat ground; each one after it opens further out, further off the line back to it, over a shorter strip, in higher country - until the last opens with the runway behind your shoulder in ground you have to read to reach it. A landing counts when it is soft enough and square enough to be one, which is the same rule the rest of the game uses.
+
+`FLYING THROUGH LOOPS` opens lined up on the first gate of a course laid across a shallow valley. The gate the course is waiting on is lit green, the ones still to come are amber, and the ones behind you are dim. Only the gate the course is up to counts: the objective is the course in order, so flying back through one already behind you, or skipping ahead to one further on, is not progress. Each stage lays more gates, tighter, closer together, on a course that bends more.
+
 ### Sound
 
 The engine runs behind the flight, its note and its loudness read off the throttle lever, and the wind rises over it with airspeed - faster than the airspeed itself, so a standstill is silent and a dive is loud. Nothing is heard until the flight is started, because a browser will not let a page make a sound before a key has been pressed at it, and nothing is heard while the simulation is frozen by the pause menu, the start screen, or the settings panel: an engine running behind a paused frame would be a frame that was not paused.
@@ -170,7 +205,7 @@ The engine runs behind the flight, its note and its loudness read off the thrott
 
 Two keys take the overlays off the view. `H` collapses the control list in the bottom left corner down to a single `H - CONTROLS` line, and pressing it again brings the list back - as does the pause menu's `CONTROLS` entry, for a list whose key has been forgotten. `Tab` clears the instruments off entirely, the artificial horizon included, for a clean view out of the window; that choice is stored, so a flight that ends with the instruments off starts the next one the same way. A browser that refuses storage costs the choice its memory and nothing else.
 
-The warnings are not part of what those keys hide. `LOW ALTITUDE` and `CRASHED` still appear over a cleared screen, because they are the two things a pilot needs to be told about whatever the view is set to.
+The warnings are not part of what those keys hide. `LOW ALTITUDE`, `CRASHED`, and `LANDED` still appear over a cleared screen, because they are what a pilot needs to be told about whatever the view is set to.
 
 ### Photo mode
 
@@ -203,7 +238,9 @@ It reads the direction the nose and the wings are actually pointing rather than 
 
 `Tab` clears the instruments, the minimap and the artificial horizon with them, because they are one set of instruments rather than three overlays that happen to share a screen.
 
-Two warnings sit over the middle of the screen. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself. Both stay quiet while the simulation is frozen, whether by the pause menu or by a start screen whose menu has not been answered yet: there is nothing to be done about either warning while the world is holding still.
+Three banners share the middle of the screen, and only one of them can be true at a time. `LOW ALTITUDE` blinks whenever the aircraft is within 200 ft of the terrain directly below it, which is measured against the ground rather than sea level, so a run up a valley warns while the same altitude out over water does not. `CRASHED` appears when the ground has been hit hard enough to wreck the aircraft, and stays up until the flight resets itself. `LANDED` appears when the aircraft is down on a strip after an arrival that was a landing, and stays up until it leaves the ground again - both of them replace the low altitude warning, because once the ground has been arrived on there is nothing left to warn about. All three stay quiet while the simulation is frozen, whether by the pause menu or by a start screen whose menu has not been answered yet: there is nothing to be done about any of them while the world is holding still.
+
+The objective card along the bottom of the screen belongs to a flight being played rather than one being flown, so a free flight never carries it. It names the mode, what the mode wants, and the stage and the gate the run is up to.
 
 ## Project Structure
 
@@ -217,7 +254,9 @@ pilot-matter/
 │   ├── config.js       # Pure simulator start state, and the fields it is set through
 │   ├── flight-state.js # Pure configured start in the units the model flies in
 │   ├── units.js        # Pure conversions between world units and readings
-│   ├── crash.js        # Pure impact threshold and crash countdown
+│   ├── crash.js        # Pure ground rules: impact, landing, and the crash countdown
+│   ├── game-modes.js   # Pure modes, stages, run state, course, and the gate test
+│   ├── rings.js        # A loop course as the hoops it is drawn with
 │   ├── world-edge.js   # Pure crossing that carries the world round at its bounds
 │   ├── input-map.js    # Pure keybinding map and keyboard-to-input-state mapping
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
@@ -234,7 +273,7 @@ pilot-matter/
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
 │   ├── environment/
 │   │   ├── elements.js # Pure element registry, the field, and every generator
-│   │   └── presets.js  # Pure five assembled environments, and the builder
+│   │   └── presets.js  # Pure assembled environments, and the builder
 │   ├── api/
 │   │   ├── index.js    # The public entry point, re-exporting both halves
 │   │   ├── contract.js # Pure option defaults, contract checks, and telemetry
@@ -262,12 +301,16 @@ behaviour at the world's edge, the keybinding map, control rates at every
 sensitivity, the configured start state and the attitude that holds its climb,
 a start edited to any other condition and the attitude that holds that one,
 throttle and lift math, the engine and wind mix and its mute, the crash
-threshold and countdown, the crossing that carries the world round at its edges,
+threshold and countdown, the touchdown rules that tell a landing from a crash,
+the geometry of a runway and the search that sites one, the takeoff a flight is
+held at, the crossing that carries the world round at its edges,
 photo mode's state and the names it writes, camera damping, pause toggling, the
 start screen's rules, start-up progress, menu selection, the settings panel with
-its options, its start state fields, and their stored choices, terrain noise and
+its options, its start state fields, its radio group and its held box, and their
+stored choices, the game modes with their stages, their runs, their courses, and
+the gate test, terrain noise and
 the mountain formula, the element registry and every generator it holds, the
-five assembled environments, the API's option defaults and contract checks, the
+assembled environments, the API's option defaults and contract checks, the
 API document against the surface it describes, page metadata, and the static
 server's path and content type rules) and run on Node 18+ with no dependencies
 to install:
@@ -316,9 +359,25 @@ Two of the values are held to the flight model rather than declared at it. The t
 
 ### The ground is not a floor
 
-Arriving at the terrain is only a crash if it is arrived at hard. Coming down slower than 30 units/s is a landing: the aircraft keeps its 5 units of ground clearance and flies on, which means an engine-out settle onto a hillside survives, because the worst the flight model can sink without the nose pointing down is the 24 units/s of a dead-stop stall.
+Arriving at the terrain is only a crash if it is arrived at hard. Coming down slower than 30 units/s is survived: the aircraft keeps its 5 units of ground clearance and flies on, which means an engine-out settle onto a hillside is not fatal, because the worst the flight model can sink without the nose pointing down is the 24 units/s of a dead-stop stall.
 
 Coming down faster than that - which takes a dive, since it can only be reached by pointing the nose at the ground and adding speed to it - wrecks the aircraft. The controls go dead, the throttle and airspeed drop to zero, the wreck stays where it hit for two and a half seconds behind a `CRASHED` banner, and then the flight resets to its starting condition. Pressing `R` skips the wait. Pausing holds the countdown rather than letting it run out behind the paused frame.
+
+### A runway changes what an arrival means
+
+A strip does not raise the bar for how hard an arrival may be so much as give it somewhere to be something else. On a runway, an arrival is one of three things:
+
+| Arriving | Is |
+|----------|-----|
+| Slower than 18 units/s, wings within 11 degrees of level, nose within 15 degrees of the horizon, heading within 25 degrees of the strip | A **landing** |
+| Firmer than that, but slower than 48 units/s | A rollout - the aircraft is down and flying on, and nothing is counted |
+| Faster than 48 units/s | A **crash**, the same as anywhere else |
+
+Prepared ground takes an arrival a hillside would not, which is why the crash threshold on a strip is 48 rather than 30. The gap between 18 and 48 is what makes a landing something to fly well rather than something that happens to anyone who reaches the runway.
+
+Landing either way down the strip counts: a runway has two thresholds rather than a start and a finish, and the heading is measured to whichever end is nearer. All four limits are read off the aircraft's own nose and wings rather than off the controls behind them, so what is judged is how the aircraft was actually being held.
+
+Only the frame the aircraft arrives on is judged. Everything after it is a rollout, and a rollout is not a second arrival - judging every frame of one would turn a landing into a crash as the airspeed, and with it the lift holding the aircraft up, bled away underneath it. `LANDED` stays on screen until the aircraft leaves the ground again.
 
 ## How the Terrain Works
 
@@ -344,18 +403,23 @@ An element is not a model, a texture, or a placed asset. It is a registry entry 
 | **Forest** | A tree height range, a density, a grove size range, a grove count, a canopy gradient, and the height band trees will grow in |
 | **Town** | A block size, how many blocks are built on, a building height range, the extent of the site, and building and street gradients |
 | **Snow** | A snow line, a coverage, the steepest ground snow will hold on to, and a white gradient |
+| **Runway** | A length range, a width range, a heading range, the height band a strip may be built in, how far the graded apron reaches, and pavement and paint gradients |
 
 Three rules hold across all of them:
 
 - **Every colour is a gradient of one base hue.** An element declares a `light` and a `dark` end of the same colour and blends between them, so nothing shifts hue dramatically across the ground it covers.
 - **Nothing is symmetrical.** Rivers and canyons wander on three waves whose lengths share no common multiple, forests are outlined by three lobes at frequencies that share none either, and dune crests are pushed off their axis by noise. There is no repeating pattern to spot from the air.
-- **The order is the pipeline's, not the preset's.** A preset lists the elements it wants and the builder applies them in a fixed order: landforms shaped first, then ground cover laid over them, then water filling what is left below its line, then the cuts and the built things, and snow settling last. An element never has to know what a preset put beside it.
+- **The order is the pipeline's, not the preset's.** A preset lists the elements it wants and the builder applies them in a fixed order: landforms shaped first, then ground cover laid over them, then water filling what is left below its line, then the cuts and the built things, then snow, and the runway cut last of all over whatever else claimed the ground, because a strip is the one thing in the world that is kept clear. An element never has to know what a preset put beside it.
 
 Mountain density, when a preset does not name a count, is still the formula it has always been:
 
 ```
 count = (terrainArea x 0.10) / (pi x avgRadius^2)  ~  14 to 15 mountains
 ```
+
+The runway is the one element that chooses where it goes rather than being scattered. Sixty-odd sites are drawn from the world's own seeded stream, each measured at twenty-seven points across the whole footprint of the strip rather than under the middle of it, and the flattest one wins - because what a runway needs is not a particular place but ground that does not move under it. A site outside the height band a strip may be built in is charged for the part of it that lies outside rather than thrown away, so a world with no ground inside the band gets the best ground it has instead of getting no runway at all. The pavement is then levelled dead flat to the site's own height and the apron either side eases back into whatever was there, so a strip sits in the country rather than on a plinth.
+
+A world is generated without a strip unless one is asked for. In the game that is the `RUNWAY` box in the [settings panel](#settings); through the [Matter API](#simulator-api) it is the `runway` option.
 
 ### Environments
 
@@ -370,6 +434,8 @@ An assembled environment is a name, a seed, the base ground it is drawn on, and 
 | `LAKESIDE` | A town on the shore of a wide lake, under forested hills and snow-capped peaks |
 
 The seed is what makes a world reproducible: the same preset lays out the same peaks, the same river, and the same streets every time, so a place worth flying back to is still there.
+
+Two more environments are built for the [game modes](#game-modes) rather than to be chosen between, and are kept out of the settings panel because a mode brings its own ground with it: `OPEN COUNTRY`, low rolling ground under a wide sky with one strip cut into it, and `LOOP VALLEY`, a shallow valley with the air over it left clear. Both are deliberately thin - four elements and three - because what a mode asks the pilot to read is the objective, not the scenery around it. A stage builds its preset with a seed of its own, so four stages of one mode are four worlds rather than the same one four times.
 
 ### The edge of the world
 
@@ -414,7 +480,7 @@ The **Matter API** is the world: an assembled environment as one detachable grou
 ```javascript
 import { createEnvironment } from './js/api/index.js';
 
-const world = createEnvironment({ environment: 'lakeside' });
+const world = createEnvironment({ environment: 'lakeside', runway: true });
 
 scene.add(world.group);
 world.applyDepth(scene);                    // the sky and the fog, without the ground
@@ -423,6 +489,7 @@ world.register(myWindsock, { x: 400, z: -900 });  // set down on the ground, not
 const flown = world.attach(myAircraft);     // throws with every gap in the contract
 myFlightModel.setGroundHeight(flown.groundHeight());
 
+world.runways[0];                           // the strip it cut, for something to land on
 world.setEnvironment('dune-sea');           // regenerated in place, registered assets settled
 ```
 
@@ -434,7 +501,9 @@ import { validateAircraftContract, TELEMETRY_FIELDS } from './js/api/contract.js
 const problems = validateAircraftContract(myAircraft);   // every gap at once, or []
 ```
 
-The whole surface is written out in [docs/api.md](docs/api.md): every option and everything that comes back for both halves, the contracts, the configured start, the worlds and the elements, what the stability guarantee does and does not cover, and a worked host page for each half.
+The rules the bundled game is played by are published too, and they are pure as well: the touchdown rules that tell a landing from a crash, the strips they are read against, and the modes, stages, courses, and gate test in `js/game-modes.js`. A host can play them against its own renderer, or read them as a worked example of a game built on the two halves.
+
+The whole surface is written out in [docs/api.md](docs/api.md): every option and everything that comes back for both halves, the contracts, the configured start, the runways and the landing rules, the game modes, the worlds and the elements, what the stability guarantee does and does not cover, and a worked host page for each half.
 
 ## Tech Stack
 

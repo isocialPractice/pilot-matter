@@ -1,9 +1,13 @@
 /**
- * Assembled environments - five worlds put together out of the elements in
+ * Assembled environments - worlds put together out of the elements in
  * `elements.js`, each one a name, a seed, the ground it is drawn on, and the
  * elements placed over it. Nothing here is a mesh or a file: an environment is
  * a description, and the field it becomes is generated from that description
  * every time it is flown.
+ *
+ * Five of them are worlds to choose between, offered by the settings panel. The
+ * rest are the thin worlds the game modes open over, which are not offered
+ * because a mode brings its own ground with it.
  *
  * Pure module with no DOM or Three.js dependency, so the presets and the field
  * they build can be unit tested in Node.
@@ -128,10 +132,69 @@ export const ENVIRONMENTS = [highlands, riverBasin, canyonCountry, duneSea, lake
 
 export const DEFAULT_ENVIRONMENT_ID = highlands.id;
 
-const BY_ID = new Map(ENVIRONMENTS.map(environment => [environment.id, environment]));
+// --- The worlds the game modes are flown over ------------------------------
 
+/**
+ * Low rolling country with room to see a long way, and the world a landing is
+ * practised over. Deliberately thin: four elements and a gentle base, so what
+ * the pilot has to read is the ground around the strip rather than a forest
+ * between them and it.
+ */
+const openCountry = {
+    id: 'open-country',
+    label: 'OPEN COUNTRY',
+    description: 'Low rolling ground under a wide sky, with one strip cut into it',
+    seed: 6180339,
+    base: { maxHeight: 220, scale: 2.2 },
+    runway: { length: [2800, 3400], width: [280, 340] },
+    elements: [
+        { type: 'mountain', config: { count: 4, height: [110, 220], radius: [900, 1900] } },
+        { type: 'grass',    config: { band: [4, 200] } },
+        { type: 'sand',     config: { band: [1, 4] } },
+        { type: 'water',    config: { level: 1 } }
+    ]
+};
+
+/**
+ * A shallow valley with the sky left clear above it, which is what a course of
+ * loops needs: room to turn between one gate and the next, and nothing standing
+ * up into the line between them.
+ */
+const loopValley = {
+    id: 'loop-valley',
+    label: 'LOOP VALLEY',
+    description: 'A shallow valley with clear air over it, for a course of loops',
+    seed: 2718281,
+    base: { maxHeight: 260, scale: 1.8 },
+    elements: [
+        { type: 'mountain', config: { count: 5, height: [140, 300], radius: [1000, 2100], girth: 0.4 } },
+        { type: 'grass',    config: { band: [6, 240] } },
+        { type: 'water',    config: { level: 3 } }
+    ]
+};
+
+/**
+ * The worlds a game mode opens over. They are kept out of `ENVIRONMENTS`
+ * because they are not worlds to choose between: a mode brings its own ground
+ * with it, and offering it in the settings panel would be offering half a game.
+ */
+export const MODE_ENVIRONMENTS = [openCountry, loopValley];
+
+export const OPEN_COUNTRY_ID = openCountry.id;
+export const LOOP_VALLEY_ID  = loopValley.id;
+
+const LISTED = new Map(ENVIRONMENTS.map(environment => [environment.id, environment]));
+const BY_ID  = new Map(
+    [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(environment => [environment.id, environment])
+);
+
+/**
+ * True for a world the settings panel offers. A game mode's world is not one of
+ * them, so a stored setting can never leave a free flight parked in a world that
+ * only makes sense with an objective over it.
+ */
 export function isEnvironmentId(id) {
-    return BY_ID.has(id);
+    return LISTED.has(id);
 }
 
 /** The named environment, or the default one for a name nothing answers to. */
@@ -144,16 +207,42 @@ export function environmentIds() {
 }
 
 /**
+ * The elements an environment is drawn from, with a runway added when one was
+ * asked for and the preset does not already lay one down itself. The strip is
+ * configured from the preset where it says something about the runway it wants,
+ * and from the caller over the top of that, which is what lets a game mode make
+ * the strip smaller as it gets harder to find.
+ */
+export function environmentElements(environment, runway = false) {
+    const elements = environment.elements ?? [];
+    if (!runway || elements.some(placement => placement.type === 'runway')) return elements;
+
+    return [
+        ...elements,
+        { type: 'runway', config: { ...environment.runway, ...(runway === true ? {} : runway) } }
+    ];
+}
+
+/**
  * Generates the height and colour field for an environment. The elements are
  * applied in the pipeline's own order rather than the order the preset lists
  * them, so a preset is a set of elements rather than a sequence to get right.
+ *
+ * `runway` asks for a strip in the generated world: `true` for the one the
+ * preset would lay down on its own, or a configuration to lay one down with.
+ * Left off, the world has no landable strip in it at all.
+ *
+ * `seed` builds the same description as a different world, which is what lets
+ * one preset stand behind several stages of a game mode without any of them
+ * being the same ground twice.
  */
 export function buildEnvironment(environment = getEnvironment(), options = {}) {
-    const field  = createField({ size: DEFAULT_SIZE, segments: DEFAULT_SEGMENTS, ...options });
-    const random = createRandom(environment.seed);
+    const { runway = false, base, elements, seed, ...size } = options;
+    const field  = createField({ size: DEFAULT_SIZE, segments: DEFAULT_SEGMENTS, ...size });
+    const random = createRandom(seed ?? environment.seed);
 
-    applyBase(field, environment.base);
-    for (const placement of orderPlacements(environment.elements)) {
+    applyBase(field, { ...environment.base, ...base });
+    for (const placement of orderPlacements(elements ?? environmentElements(environment, runway))) {
         applyElement(field, placement, random);
     }
 
