@@ -15,7 +15,8 @@ import {
     isMenuKey,
     isMenuAdjustKey,
     menuAdjustStep,
-    applyMenuKey
+    applyMenuKey,
+    applyMenuPointer
 } from '../js/menu.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 
@@ -142,6 +143,48 @@ test('stepping an entry is not choosing it, so a step never runs a menu entry', 
     assert.equal(state.index, 0, 'nor move the cursor');
 });
 
+// --- The pointer over the menu ---
+
+test('the pointer moves the cursor onto the entry it is over', () => {
+    const state = createMenuState();
+    assert.equal(applyMenuPointer(state, 3), null, 'crossing an entry chooses nothing');
+    assert.equal(selectedId(state), 'controls');
+    assert.equal(applyMenuPointer(state, 1), null);
+    assert.equal(selectedId(state), 'reset');
+});
+
+// The keys leave the cursor on the entry they last walked to, and the pointer is
+// somewhere else entirely by then. A click means the entry under the pointer.
+test('a click chooses the entry under the pointer, not the one the keys left', () => {
+    const state = createMenuState();
+    assert.equal(selectedId(state), 'resume', 'the keyboard cursor opens on the first entry');
+    assert.equal(applyMenuPointer(state, 4, true), 'settings');
+    assert.equal(state.index, 4, 'and the cursor is left where the click landed');
+});
+
+test('the mouse and the keys move one cursor rather than two', () => {
+    const state = createMenuState();
+    applyMenuPointer(state, 3);
+    assert.equal(applyMenuKey(state, 'ArrowDown', true), null);
+    assert.equal(selectedId(state), 'settings', 'the keys carry on from where the pointer left off');
+    assert.equal(applyMenuKey(state, 'Enter', true), 'settings');
+});
+
+test('a pointer over nothing moves nothing and chooses nothing', () => {
+    const state = createMenuState();
+    moveSelection(state, 1);
+    for (const index of [-1, state.entries.length, 99, undefined, null]) {
+        assert.equal(applyMenuPointer(state, index, true), null, `${index} names no entry`);
+        assert.equal(state.index, 1, `so the cursor stays where it was for ${index}`);
+    }
+});
+
+test('an empty menu has nothing under the pointer either', () => {
+    const state = createMenuState([]);
+    assert.equal(applyMenuPointer(state, 0, true), null);
+    assert.equal(state.index, 0);
+});
+
 test('reopening the menu puts the cursor back on the first entry', () => {
     const state = createMenuState();
     moveSelection(state, 2);
@@ -160,17 +203,21 @@ test('choosing an entry is not a flight control, so a choice never moves a surfa
 // --- The list the menu is drawn into ---
 
 // Enough of a document for the menu to draw itself into, with no browser to
-// draw it in: elements that remember what was set on them.
+// draw it in: elements that remember what was set on them, and a mouse that is
+// the page reporting itself rather than a hand on a desk.
 function fakeList() {
     const element = () => ({
         children: [],
         dataset: {},
         textContent: '',
         classes: new Set(),
+        listeners: {},
         classList: {
             toggle(name, on) { on ? this.owner.classes.add(name) : this.owner.classes.delete(name); }
         },
-        appendChild(child) { this.children.push(child); return child; }
+        appendChild(child) { this.children.push(child); return child; },
+        addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
+        fire(type) { for (const handler of this.listeners[type] ?? []) handler(); }
     });
 
     globalThis.document = {
@@ -259,6 +306,69 @@ test('an entry carrying its own text is drawn as that text, and redrawn as it ch
     entry.text = 'FOG DENSITY  THICK';
     menu.render(state);
     assert.equal(list.children[0].textContent, 'FOG DENSITY  THICK');
+});
+
+// --- The list under the mouse ---
+
+test('a drawn list reports the entry the pointer crosses and the entry it clicks', () => {
+    const list = fakeList();
+    const menu = new MenuList(list, createMenuState());
+
+    const seen = [];
+    menu.followPointer((index, choose) => seen.push([index, choose]));
+
+    list.children[2].fire('mouseenter');
+    list.children[2].fire('click');
+    assert.deepEqual(seen, [[2, false], [2, true]]);
+});
+
+// A menu nobody hands to the mouse is a menu the mouse does nothing to, which
+// is how the panels stay worked by the keys alone.
+test('a list not handed to the mouse listens for nothing', () => {
+    const list = fakeList();
+    new MenuList(list, createMenuState());
+
+    for (const item of list.children) {
+        assert.deepEqual(Object.keys(item.listeners), []);
+    }
+});
+
+// A filtered list draws some of a menu, so a row's place on screen and its place
+// in the menu are two different numbers. Reporting the wrong one would choose a
+// different entry from the one that was clicked.
+test('a filtered list points at the entry it drew rather than the row it drew it in', () => {
+    const state = createMenuState([
+        { id: 'first',  label: 'FIRST',  kind: 'a' },
+        { id: 'second', label: 'SECOND', kind: 'b' },
+        { id: 'third',  label: 'THIRD',  kind: 'b' }
+    ]);
+
+    const list = fakeList();
+    const menu = new MenuList(list, state, entry => entry.kind === 'b');
+
+    let chosen = null;
+    menu.followPointer((index, choose) => { chosen = applyMenuPointer(state, index, choose); });
+
+    list.children[0].fire('click');
+    assert.equal(chosen, 'second', 'the first row drawn is the second entry of the menu');
+    assert.equal(state.index, 1);
+});
+
+// The cursor is drawn where the state says it is, whichever moved it there, so
+// a menu worked with the mouse is a menu that looks worked.
+test('the cursor is redrawn on the entry the pointer moved it to', () => {
+    const list = fakeList();
+    const state = createMenuState();
+    const menu = new MenuList(list, state);
+
+    menu.followPointer((index, choose) => {
+        applyMenuPointer(state, index, choose);
+        menu.render(state);
+    });
+
+    list.children[3].fire('mouseenter');
+    assert.deepEqual(list.children.map(item => item.classes.has('selected')),
+        [false, false, false, true, false]);
 });
 
 test('an empty menu has nothing to select and does not fall over being asked', () => {

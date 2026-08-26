@@ -84,17 +84,30 @@ test('the instrument readout is labelled for every value the HUD reports', () =>
 });
 
 /**
- * The declarations of the first rule an id is a selector of. Rules that style
- * several things at once are read the same as rules that style one, so grouping
- * two overlays that are drawn the same way does not hide either of them from a
- * check that they are drawn that way.
+ * Every rule in the page's stylesheet, as the selectors it was written for and
+ * the declarations it carries. Rules that style several things at once are read
+ * the same as rules that style one, so grouping two overlays that are drawn the
+ * same way does not hide either of them from a check that they are drawn that
+ * way.
  */
-function styleRule(css, id) {
+function styleRules(css) {
     // Comments come off first: a rule written under one would otherwise read as
     // a rule whose selector is the note above it.
     const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-        .find(rule => rule[1].split(',').some(selector => selector.trim() === `#${id}`))?.[2] ?? null;
+    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(rule => ({
+        selectors: rule[1].split(',').map(selector => selector.trim()),
+        body: rule[2]
+    }));
+}
+
+/** The declarations of the first rule an id is a selector of. */
+function styleRule(css, id) {
+    return styleRules(css).find(rule => rule.selectors.includes(`#${id}`))?.body ?? null;
+}
+
+/** True when some rule written for a selector carries a declaration. */
+function styled(css, selector, declaration) {
+    return styleRules(css).some(rule => rule.selectors.includes(selector) && declaration.test(rule.body));
 }
 
 test('the warning overlays start hidden and wait for the flight to trip them', () => {
@@ -231,6 +244,34 @@ test('every menu has a list to be drawn into, and nothing drawn in it yet', () =
         assert.ok(new RegExp(`<ul id="${id}">\\s*</ul>`).test(indexHtml),
             `the entries are drawn from js/menu.js, so the page should leave #${id} empty`);
     }
+});
+
+// Both cards lie over the flight without taking the mouse from it, so a menu on
+// one has to claim the pointer back or every click would land on the world.
+test('the two menus the mouse works take the pointer their cards let through', () => {
+    for (const id of ['title-screen', 'paused']) {
+        assert.ok(/pointer-events:\s*none/.test(styleRule(indexHtml, id) ?? ''),
+            `#${id} should go on letting the mouse through to the flight behind it`);
+    }
+
+    for (const id of ['start-menu', 'pause-menu']) {
+        assert.ok(styled(indexHtml, `#${id}`, /pointer-events:\s*auto/),
+            `#${id} should take the pointer back off the card it is drawn on`);
+        assert.ok(styled(indexHtml, `#${id} li`, /cursor:\s*pointer/),
+            `and the entries of #${id} should read as something to click`);
+    }
+});
+
+// A menu that answers to the mouse and says only which keys work it is a menu
+// nobody reaches for the mouse on.
+test('both menus worked with the mouse say so under their entries', () => {
+    assert.ok(START_HINT.includes('MOUSE') && START_HINT.includes('CLICK'),
+        'the start screen hint should name the mouse and what a click does');
+
+    const card = indexHtml.match(/<div id="paused">([\s\S]*?)<\/div>/);
+    assert.ok(card, 'index.html should carry the pause card');
+    assert.ok(/MOUSE/.test(card[1]), 'the pause card should name the mouse too');
+    assert.ok(/CLICK/.test(card[1]), 'and say that a click chooses');
 });
 
 // The browser resolves every import itself, and the modules that pull in

@@ -11,9 +11,9 @@
 
 export const TITLE_NAME = 'PILOT MATTER';
 
-// What the screen says under the menu: the keys that work it, in the same
-// words the pause menu uses for the same keys.
-export const START_HINT = 'W/S TO SELECT, ENTER TO CHOOSE';
+// What the screen says under the menu: the keys and the mouse that work it, in
+// the same words the pause menu uses for the same two.
+export const START_HINT = 'W/S OR MOUSE TO SELECT, ENTER OR CLICK TO CHOOSE';
 
 export function createTitleState() {
     return { started: false };

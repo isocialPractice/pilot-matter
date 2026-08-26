@@ -8,7 +8,7 @@ import { INITIAL_CAMERA_MODE, flightStart } from './flight-state.js';
 import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from './pause.js';
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
-    createMenuState, resetSelection, applyMenuKey, isMenuKey, selectedId,
+    createMenuState, resetSelection, applyMenuKey, applyMenuPointer, isMenuKey, selectedId,
     isMenuAdjustKey, menuAdjustStep,
     MenuList, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
@@ -158,6 +158,14 @@ class FlightSimulator {
         this.startMenu    = new MenuList(document.getElementById('start-menu'), this.startMenuState);
         this.pauseMenu    = new MenuList(document.getElementById('pause-menu'), this.pauseMenuState);
         this.modesMenu    = new MenuList(document.getElementById('game-modes-menu'), this.modesState);
+
+        // The screen the game opens on and the screen it pauses on are worked
+        // with the mouse as well as the keys: the cursor follows the pointer
+        // across the entries, and a click chooses the one under it. Both cards
+        // lie over the flight without taking the mouse from it, so it is the
+        // menu on each that takes the pointer rather than the card around it.
+        this.startMenu.followPointer((index, choose) => this.onStartPointer(index, choose));
+        this.pauseMenu.followPointer((index, choose) => this.onPausePointer(index, choose));
 
         // One cursor, three lists: the worlds under one heading of the panel,
         // the start state under the next, and the options that hold whichever
@@ -385,6 +393,17 @@ class FlightSimulator {
         }
     }
 
+    /**
+     * The start menu under the mouse. The card is only on screen while the
+     * flight is held on the ramp with no panel over it, so a pointer that
+     * reaches an entry at all is a pointer over a menu that is being worked.
+     */
+    onStartPointer(index, choose) {
+        const chosen = applyMenuPointer(this.startMenuState, index, choose);
+        if (chosen) this.chooseStartEntry(chosen);
+        this.syncOverlays();
+    }
+
     onKeyDown(e) {
         // A picture is of the world, whatever is over it, so the key that takes
         // one is read ahead of the panels that are otherwise modal over the rest.
@@ -455,6 +474,17 @@ class FlightSimulator {
                 this.openSettingsPanel();
                 break;
         }
+    }
+
+    /**
+     * The pause menu under the mouse. The card comes off the screen the moment
+     * the flight resumes or a panel opens over it, which is the same answer the
+     * key handler gets from a menu that is not there to be worked.
+     */
+    onPausePointer(index, choose) {
+        const chosen = applyMenuPointer(this.pauseMenuState, index, choose);
+        if (chosen) this.chooseMenuEntry(chosen);
+        this.syncOverlays();
     }
 
     openSettingsPanel() {

@@ -1,7 +1,7 @@
 /**
- * Keyboard menu - the entries of the menus the game is flown through, the
- * cursor over them, and the keys that move and choose. The selection rules are
- * pure and have no DOM or Three.js dependency so they can be unit tested in
+ * Menu - the entries of the menus the game is flown through, the cursor over
+ * them, and the keys and the pointer that move and choose. The selection rules
+ * are pure and have no DOM or Three.js dependency so they can be unit tested in
  * Node; the small class at the bottom is the list they are drawn into, and
  * every menu on screen is one of them.
  */
@@ -107,6 +107,24 @@ export function applyMenuKey(state, code, down, repeat = false) {
 }
 
 /**
+ * Applies the pointer to the menu, as the entry it is over and whether it was
+ * clicked there. The cursor follows the pointer, so the mouse and the keys move
+ * one cursor rather than two, and a click chooses the entry under the pointer
+ * rather than the one the keys were last left on.
+ *
+ * An index naming no entry - the gap between two rows, or a row drawn from a
+ * menu that has changed under it - moves nothing and chooses nothing.
+ *
+ * Returns the id of the entry chosen, or null when the pointer only moved the
+ * cursor or was over nothing.
+ */
+export function applyMenuPointer(state, index, choose = false) {
+    if (!state.entries[index]) return null;
+    state.index = index;
+    return choose ? selectedId(state) : null;
+}
+
+/**
  * A menu as a list on screen, with the cursor drawn as the selected row.
  *
  * An entry can also mark itself as the one currently in force - the
@@ -119,6 +137,10 @@ export function applyMenuKey(state, code, down, repeat = false) {
  * still answering to the cursor of the whole menu. That is what lets one set of
  * entries be split across the headings of a panel without splitting the cursor
  * that walks them.
+ *
+ * A list can also be handed to the mouse, and then reports the entry the
+ * pointer crosses onto and the entry it is clicked on. A list that is not
+ * handed to it is worked with the keys alone.
  */
 export class MenuList {
     constructor(listElement, state, include = () => true) {
@@ -139,6 +161,23 @@ export class MenuList {
             this.list.appendChild(item);
             this.items.push({ index, item });
         });
+    }
+
+    /**
+     * Hands the drawn list to the mouse: the handler is called as the pointer
+     * crosses onto an entry, and again when one is clicked. A list nobody hands
+     * to the mouse listens for nothing, which is how a menu stays keyboard-only.
+     *
+     * The handler is given an entry's place in the whole menu rather than its
+     * row in this list, so a filtered list points at the same entry the cursor
+     * walks to rather than at whatever sits that far down the panel.
+     */
+    followPointer(handler) {
+        for (const { index, item } of this.items) {
+            item.addEventListener('mouseenter', () => handler(index, false));
+            item.addEventListener('click',      () => handler(index, true));
+        }
+        return this;
     }
 
     render(state) {

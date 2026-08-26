@@ -395,6 +395,20 @@
             border-color: #0f0;
         }
 
+        /* The title screen and the pause card both lie over the flight without
+           taking the mouse from it. The menu on each is the exception: it is
+           what a pointer over either card is there for, so the entries take back
+           the pointer the card lets through. */
+        #start-menu,
+        #pause-menu {
+            pointer-events: auto;
+        }
+
+        #start-menu li,
+        #pause-menu li {
+            cursor: pointer;
+        }
+
         /* Three lists under three headings sit closer together than one list on
            its own would, so the panel stays as near one screenful as it can. */
         #settings-menu,
@@ -547,13 +561,13 @@
     <div id="title-screen">
         <h1>PILOT MATTER</h1>
         <ul id="start-menu"></ul>
-        <p>W/S TO SELECT, ENTER TO CHOOSE</p>
+        <p>W/S OR MOUSE TO SELECT, ENTER OR CLICK TO CHOOSE</p>
     </div>
 
     <div id="paused">
         <h2>PAUSED</h2>
         <ul id="pause-menu"></ul>
-        <small>W/S TO SELECT &middot; ENTER TO CHOOSE &middot; P TO RESUME</small>
+        <small>W/S OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; P TO RESUME</small>
     </div>
 
     <div id="settings">

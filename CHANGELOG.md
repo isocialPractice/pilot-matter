@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0-alpha] - 2026-08-26
+
+### Added
+
+- **The mouse**, on the two menus a flight is started and paused from. The
+  pointer moving onto an entry puts the cursor there and a click chooses the one
+  it landed on, so `START FLIGHT` is one click from the page loading and a flight
+  paused with a hand on the mouse is resumed with the same hand. It is the cursor
+  the keys already moved rather than a second one beside it: a click chooses what
+  the pointer is over whatever the keys had last walked to, and the keys carry on
+  from wherever the pointer left off, so the two are never pointing at different
+  entries. Both cards go on letting the mouse through to the flight behind them -
+  only the menu drawn on each takes the pointer back, and a click beside the
+  entries falls on the world rather than on the card over it
+- `applyMenuPointer`, the pointer's half of the selection rules, written as a
+  pure function beside `applyMenuKey` and tested the same way: an entry the
+  pointer is over, whether it was clicked there, and the id of whatever that
+  chose. An index naming no entry - the gap between two rows, or a row left over
+  from a menu that has changed under it - moves nothing and chooses nothing
+- `MenuList.followPointer`, which hands a drawn list to the mouse. A list nobody
+  hands to it listens for nothing, which is how the settings and Game Modes
+  panels stay worked by the keys alone, and a list that draws part of a menu
+  reports an entry's place in the whole menu rather than its row on screen, so a
+  filtered list clicks the entry the cursor would have walked to
+
+### Changed
+
+- Both menus now say what works them rather than which keys do: the start screen
+  and the pause card read `W/S OR MOUSE TO SELECT` and `ENTER OR CLICK TO CHOOSE`
+
 ## [1.9.1-alpha] - 2026-08-25
 
 ### Fixed

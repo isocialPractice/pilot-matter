@@ -29,7 +29,8 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Engine and wind audio** - an engine note that rises with the throttle and a wind that rises faster than the airspeed behind it, muted with `M` and remembered for the next session
 - **Low altitude warning** - a blinking caution over the terrain below, measured against the ground rather than sea level
 - **Start screen menu** - the game opens on its name over a menu offering Start Flight, Game Modes, Controls, and Settings, with the flight held on the ramp until one is chosen
-- **Pause menu** - `P` freezes the simulation behind a keyboard menu offering Resume, Reset Flight, Game Modes, Controls, and Settings
+- **Pause menu** - `P` freezes the simulation behind a menu offering Resume, Reset Flight, Game Modes, Controls, and Settings
+- **A mouse on both of them** - the start screen and the pause menu are worked with the pointer as well as the keys: the cursor follows the mouse across the entries and a click chooses the one under it, on one cursor the keyboard goes on moving
 - **Game Modes panel** - opened from either menu, listing free flight and every mode there is, and marking the one being played
 - **Settings panel** - opened with `O` or from either menu, setting the environment, the condition a flight opens in, control sensitivity, fog density, and the units the instruments read in, all remembered for the next session
 - **An editable start** - the condition a flight opens in, the strip in the world, airspeed, altitude, climb, heading, throttle, and camera are fields a pilot sets rather than constants in the flight code, applied at once before launch and at the next reset after it
@@ -88,7 +89,7 @@ Then open `http://localhost:8080` in your browser.
 | `R` | Reset aircraft to starting position |
 | `F2` | Take a picture: clears the screen for one frame and downloads the view as a PNG |
 
-In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one. In the settings panel, `A`/`D` or `←`/`→` step the option under the cursor through its settings. `Esc` backs out of the panel.
+In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space` chooses one. On the start screen and in the pause menu the mouse works as well: moving the pointer onto an entry puts the cursor there, and clicking one chooses it. In the settings panel, `A`/`D` or `←`/`→` step the option under the cursor through its settings. `Esc` backs out of the panel.
 
 **Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft with the throttle set at 20%, which is exactly the setting that holds 80 knots. That airspeed is the stall speed itself, so the wing is carrying with nothing in hand: opening the throttle is still the first thing to do. `Shift` and `Ctrl` move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in [How the Flight Model Works](#how-the-flight-model-works).
 
@@ -109,13 +110,15 @@ The game opens on its start screen, with the clock held at zero: the aircraft wa
 | `CONTROLS` | Puts the control list on screen, over the title, before anything is flying, and takes it back off when chosen again |
 | `SETTINGS` | Opens the settings panel |
 
+The mouse works the screen too. The pointer moving onto an entry puts the cursor there and a click chooses it, so `START FLIGHT` is one click from the page loading. It is the same cursor the keys move rather than a second one beside it: a click chooses the entry it landed on whatever the keys had walked to, and the keys carry on from wherever the pointer left off. The screen is otherwise transparent to the mouse - only the menu on it takes the pointer, and the world behind it goes on being a world rather than a button.
+
 This is the opening screen rather than a menu to come back to: once the flight has started, the way back to Game Modes, Controls, and Settings is the pause menu.
 
 ### Pausing
 
 `P` latches the simulation clock at zero: the flight model, gravity, and the orbit camera all stop, the last frame stays on screen, and a menu opens over it. Pressing `P` again resumes from exactly where the flight left off, with the time spent paused discarded rather than applied in one jump.
 
-The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between the entries, wrapping round both ends, and `Enter` or `Space` chooses the one under the cursor:
+The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between the entries, wrapping round both ends, and `Enter` or `Space` chooses the one under the cursor. The mouse works it the same way the start screen is worked - the pointer moves the cursor and a click chooses - so a flight paused with a hand on the mouse is resumed with the same hand:
 
 | Entry | Does |
 |-------|------|
@@ -125,7 +128,7 @@ The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between t
 | `CONTROLS` | Opens the control list back up, for a screen it has been collapsed on |
 | `SETTINGS` | Opens the same panel the start screen opens |
 
-The cursor starts on `RESUME` every time the menu opens, so resuming is always one key press away from a paused flight.
+The cursor starts on `RESUME` every time the menu opens, so resuming is always one key press away from a paused flight. The pause card, like the title screen, lets the mouse through everywhere but its menu, so a click beside the entries falls on the frozen world rather than on the card over it.
 
 ### Settings
 
@@ -261,7 +264,7 @@ pilot-matter/
 │   ├── input-map.js    # Pure keybinding map and keyboard-to-input-state mapping
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── title-screen.js # Pure start rules and the held pre-flight clock
-│   ├── menu.js         # Pure keyboard menu, and the list any menu is drawn into
+│   ├── menu.js         # Pure keyboard and pointer menu, and the list any menu is drawn into
 │   ├── settings.js     # Pure settings panel state, its options, and their storage
 │   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
 │   ├── audio.js        # Pure engine and wind mix, and the graph it is played through
@@ -305,7 +308,8 @@ threshold and countdown, the touchdown rules that tell a landing from a crash,
 the geometry of a runway and the search that sites one, the takeoff a flight is
 held at, the crossing that carries the world round at its edges,
 photo mode's state and the names it writes, camera damping, pause toggling, the
-start screen's rules, start-up progress, menu selection, the settings panel with
+start screen's rules, start-up progress, menu selection by key and by pointer
+and the one cursor they share, the settings panel with
 its options, its start state fields, its radio group and its held box, and their
 stored choices, the game modes with their stages, their runs, their courses, and
 the gate test, terrain noise and
