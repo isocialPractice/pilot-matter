@@ -7,19 +7,24 @@ that applies when their items are completed.
 
 ## Current
 
-- [ ] **Matter API**: allow an environment to act as one tile of a larger
-  assembled environment, matching heights and materials at shared edges
-  - From: Simulator API
-- [ ] Add an example host page that imports the Pilot API with an external
-  environment and the Matter API with an external aircraft, proving both
-  directions work
-  - From: Simulator API
-- [ ] Add a day-night cycle in `js/sky.js` with gradual light, fog color,
-  and sky color transitions
-  - From: World & Environment
-- [ ] Animate water: give below-water-level vertices a subtle wave motion
-  and specular tint distinct from land shading
-  - From: World & Environment
+- [ ] Add an element editor overlay that lists the placed elements, edits
+  their ranges live, and regenerates the terrain from the algorithm
+  - From: Environment Design
+- [ ] Report a gate that was missed rather than leaving the course silently
+  stalled on it: once the aircraft is past a gate's plane outside the hoop,
+  say so and let it be re-flown
+  - From: Game Modes
+- [ ] Point at the gate the course is waiting on while it is off screen, as a
+  bearing and a distance on the HUD, so a course can be flown without the
+  pilot having to remember which way it ran
+  - From: Game Modes
+- [ ] Time each stage and keep the best time per stage in `localStorage`, so
+  a course already flown is something to beat rather than something to repeat
+  - From: Game Modes
+- [ ] Show the whole course before the stage begins - as an overlay on the
+  minimap, or as a pass down the line of it - so the first gate is not the
+  only one the pilot has ever seen
+  - From: Game Modes
 
 ## Game UI/UX
 
@@ -88,10 +93,6 @@ in this section applies a minor version update.
 
 - [ ] Integrate the weather system from the `local-weather` branch (clouds,
   rain, moon, sky styling) into main once its API stabilizes
-- [ ] Add a day-night cycle in `js/sky.js` with gradual light, fog color,
-  and sky color transitions
-- [ ] Animate water: give below-water-level vertices a subtle wave motion
-  and specular tint distinct from land shading
 
 ## Environment Design
 
@@ -175,15 +176,10 @@ applies a minor version update.
   APIs can fly the environment
 - [ ] **Matter API**: allow caller-supplied meshes and materials to be
   registered as environment elements and placed by the generator
-- [ ] **Matter API**: allow an environment to act as one tile of a larger
-  assembled environment, matching heights and materials at shared edges
 - [ ] **Matter API**: expose environment depth (fog and distance shading) as
   a standalone effect other scenes can apply without importing the terrain
 - [ ] Add unit tests for the pure surfaces of both APIs: option defaults,
   contract validation, and telemetry shape
-- [ ] Add an example host page that imports the Pilot API with an external
-  environment and the Matter API with an external aircraft, proving both
-  directions work
 
 ## Simulator Configuration
 
@@ -407,3 +403,16 @@ in this section applies a patch version update.
   - From: `version.control = null`
 - [x] Add mouse events to the pause and opening menu
   - From: Simulator Configuration
+- [x] **Matter API**: allow an environment to act as one tile of a larger
+  assembled environment, matching heights and materials at shared edges
+  - From: Simulator API
+- [x] Add an example host page that imports the Pilot API with an external
+  environment and the Matter API with an external aircraft, proving both
+  directions work
+  - From: Simulator API
+- [x] Add a day-night cycle in `js/sky.js` with gradual light, fog color,
+  and sky color transitions
+  - From: World & Environment
+- [x] Animate water: give below-water-level vertices a subtle wave motion
+  and specular tint distinct from land shading
+  - From: World & Environment

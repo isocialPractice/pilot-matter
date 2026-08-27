@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Pilot Matter - both halves of the simulator API on one host page: the Pilot API over an external environment, and the Matter API under an external aircraft.">
+    <title>Pilot Matter - API host example</title>
+    <link href="../favicon.png" rel="icon">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #05070c;
+            color: #d8e4f0;
+            font-family: 'Courier New', monospace;
+        }
+
+        #panes {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .pane {
+            position: relative;
+            flex: 1 1 50%;
+            overflow: hidden;
+            border-left: 1px solid rgba(120, 170, 220, 0.35);
+        }
+
+        .pane:first-child {
+            border-left: none;
+        }
+
+        .pane canvas {
+            display: block;
+        }
+
+        .caption {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 10px 14px;
+            background: rgba(4, 8, 16, 0.72);
+            font-size: 13px;
+            letter-spacing: 1px;
+            pointer-events: none;
+        }
+
+        .caption b {
+            color: #7fd1ff;
+        }
+
+        .caption span {
+            display: block;
+            margin-top: 4px;
+            color: #8ba0b8;
+            font-size: 11px;
+            letter-spacing: 0;
+        }
+
+        .readout {
+            position: absolute;
+            left: 14px;
+            bottom: 14px;
+            padding: 8px 10px;
+            background: rgba(4, 8, 16, 0.72);
+            border-radius: 4px;
+            color: #7CFC98;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre;
+            pointer-events: none;
+        }
+
+        #keys {
+            position: fixed;
+            right: 14px;
+            bottom: 14px;
+            padding: 8px 10px;
+            background: rgba(4, 8, 16, 0.72);
+            border-radius: 4px;
+            font-size: 11px;
+            color: #8ba0b8;
+            text-align: right;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="panes">
+        <div class="pane" id="pilot-pane">
+            <div class="caption">
+                <b>PILOT API</b> over an external environment
+                <span>The flight model, flown over ground the host generated itself</span>
+            </div>
+            <div class="readout" id="pilot-readout">starting</div>
+        </div>
+        <div class="pane" id="matter-pane">
+            <div class="caption">
+                <b>MATTER API</b> under an external aircraft
+                <span>An assembled world of four tiles, flown by a model of the host's own</span>
+            </div>
+            <div class="readout" id="matter-readout">starting</div>
+        </div>
+    </div>
+
+    <div id="keys">
+        W/S PITCH &middot; A/D ROLL &middot; Q/E YAW &middot; SHIFT/CTRL THROTTLE &middot; C CAMERA &middot; R RESET
+        <br>the keys fly the left pane; the right one flies itself
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "pilot-matter": "../js/api/index.js"
+            }
+        }
+    </script>
+
+    <script type="module" src="host.js"></script>
+</body>
+</html>

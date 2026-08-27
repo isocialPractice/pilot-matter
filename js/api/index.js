@@ -13,17 +13,33 @@
  */
 
 export { createPilot } from './pilot.js';
-export { createEnvironment } from './matter.js';
+export { createEnvironment, createTiledEnvironment } from './matter.js';
 
 export {
     API_VERSION,
     DEFAULT_KEYMAP, CONTROL_NAMES, RESET_KEYS,
     TELEMETRY_FIELDS,
-    boundsFromSize, flatSampler, isInsideBounds,
+    boundsFromSize, tileOrigin, flatSampler, isInsideBounds,
     resolveTerrain, resolvePilotOptions, resolveEnvironmentOptions,
     validateAircraftContract, isAircraftContractSatisfied,
     createTelemetry
 } from './contract.js';
+
+// The day, as the pure cycle behind it: what hour it is, what the light at that
+// hour amounts to, and where the sun is in it. A host driving its own sky reads
+// these without taking the bundled one.
+export {
+    CYCLE_LENGTH, CYCLE_START, DAY_STOPS, SUN_DISTANCE,
+    createDayNight, advanceDayNight, daylightAt, sunPositionAt, wrapPhase, clockAt
+} from '../day-night.js';
+
+// The water on it, which is the one part of the ground that moves and the one
+// part that shines. Pure, and read off the world rather than off the tile, so an
+// assembly's surface crosses its joins without the tiles agreeing on anything.
+export {
+    WAVE, WATER_SHEEN, SHEEN_STRENGTH,
+    waveHeight, waveSpecular, waterColor, animateWater
+} from '../water.js';
 
 // The configured start, as the values a pilot reads and the fields they are
 // allowed to hold, so a host can offer the same start state its own way. A
@@ -73,6 +89,13 @@ export {
 export {
     ELEMENTS, ELEMENT_ORDER, getElement, isElementId, resolveConfig,
     createField, sampleHeight
+} from '../environment/elements.js';
+
+// Laying one world beside another: where a tile's ground sits, what it is
+// generated from, and the pass that settles what its elements drew at the edges
+// against what its neighbours drew at theirs.
+export {
+    SEAM_BLEND, fieldBounds, tileSeed, matchEdges, waterSurface
 } from '../environment/elements.js';
 
 // Reading a strip: where it runs, how far it reaches, and which end of it a

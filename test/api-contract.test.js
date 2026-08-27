@@ -33,7 +33,8 @@ test('the API says which version of itself a host is holding', () => {
 test('one module gives a host both halves of the simulator', () => {
     const index = source('index.js');
     assert.match(index, /export \{ createPilot \}/, 'the Pilot API should be re-exported');
-    assert.match(index, /export \{ createEnvironment \}/, 'the Matter API should be re-exported');
+    assert.match(index, /export \{ createEnvironment[,\s}]/, 'the Matter API should be re-exported');
+    assert.match(index, /createTiledEnvironment/, 'including the assembly a world can be one square of');
 });
 
 // The contracts are the half of the API a host can hold without a renderer, so

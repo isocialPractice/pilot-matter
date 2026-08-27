@@ -52,8 +52,17 @@ export const ELEMENT_ORDER = [
  * else, but it is the one piece of ground the flight model has to be able to
  * ask about by name - where it is, which way it runs, and how far it reaches -
  * so the generator leaves a record of each one beside the heights it wrote.
+ *
+ * `originX` and `originZ` are where the middle of the square sits in the world,
+ * which is what lets a field be one tile of a larger assembly rather than the
+ * whole of a world. Everything below works in world coordinates rather than in
+ * the tile's own, so an element straddling an origin is drawn from the same
+ * arithmetic wherever the tile was laid, and the noise the ground is shaped from
+ * runs on across the join instead of starting again at it.
  */
-export function createField({ size = DEFAULT_SIZE, segments = DEFAULT_SEGMENTS } = {}) {
+export function createField({
+    size = DEFAULT_SIZE, segments = DEFAULT_SEGMENTS, originX = 0, originZ = 0
+} = {}) {
     const stride = Math.max(2, Math.round(segments)) + 1;
     const count  = stride * stride;
 
@@ -63,18 +72,32 @@ export function createField({ size = DEFAULT_SIZE, segments = DEFAULT_SEGMENTS }
         stride,
         count,
         step: size / (stride - 1),
+        originX,
+        originZ,
         height: new Float32Array(count),
         color: new Float32Array(count * 3),
-        runways: []
+        runways: [],
+        // The level whatever water was laid settled at, for a renderer that
+        // wants to move the surface rather than draw it as painted ground.
+        water: null
     };
 }
 
 export function fieldX(field, index) {
-    return -field.size / 2 + (index % field.stride) * field.step;
+    return field.originX - field.size / 2 + (index % field.stride) * field.step;
 }
 
 export function fieldZ(field, index) {
-    return -field.size / 2 + Math.floor(index / field.stride) * field.step;
+    return field.originZ - field.size / 2 + Math.floor(index / field.stride) * field.step;
+}
+
+/** The square a field covers, in the world rather than in its own coordinates. */
+export function fieldBounds(field) {
+    const half = field.size / 2;
+    return {
+        minX: field.originX - half, maxX: field.originX + half,
+        minZ: field.originZ - half, maxZ: field.originZ + half
+    };
 }
 
 export function paint(field, index, color) {
@@ -123,8 +146,8 @@ export function slopeAt(field, index) {
  */
 export function sampleHeight(field, x, z) {
     const half = field.size / 2;
-    const nx = (x + half) / field.size;
-    const nz = (z + half) / field.size;
+    const nx = (x - field.originX + half) / field.size;
+    const nz = (z - field.originZ + half) / field.size;
     if (nx < 0 || nx > 1 || nz < 0 || nz > 1) return 0;
 
     const seg = field.segments;
@@ -161,6 +184,20 @@ export function createRandom(seed = 1) {
 /** A value somewhere inside a configured range. */
 export function pick(random, [low, high]) {
     return low + random() * (high - low);
+}
+
+/**
+ * The seed one tile of an assembly is generated from. A tile keeps the seed of
+ * the description it was built from and mixes its place in the grid into it, so
+ * neighbouring tiles are the same world without being the same ground, and the
+ * tile at a given place is that ground every time it is laid.
+ */
+export function tileSeed(seed = 1, x = 0, z = 0) {
+    // Halves are kept because an assembly of an even number of tiles is centred
+    // on a join rather than on a tile, which puts every origin on a half.
+    const gx = Math.round(x * 2) | 0;
+    const gz = Math.round(z * 2) | 0;
+    return (Math.trunc(seed) + ((gx * 73856093) ^ (gz * 19349663))) >>> 0;
 }
 
 // --- Configurable ranges --------------------------------------------------
@@ -288,8 +325,8 @@ const mountain = {
 
         for (let i = 0; i < total; i++) {
             peaks.push({
-                x:       (random() * 2 - 1) * half,
-                z:       (random() * 2 - 1) * half,
+                x:       field.originX + (random() * 2 - 1) * half,
+                z:       field.originZ + (random() * 2 - 1) * half,
                 radius:  pick(random, config.radius),
                 peak:    pick(random, config.height),
                 angle:   random() * Math.PI * 2,
@@ -368,8 +405,8 @@ const desert = {
         const half    = field.size / 2;
         const radius  = half * (0.35 + config.coverage * 0.8);
         const drift   = half * (1 - config.coverage) * 0.6;
-        const centerX = (random() * 2 - 1) * drift;
-        const centerZ = (random() * 2 - 1) * drift;
+        const centerX = field.originX + (random() * 2 - 1) * drift;
+        const centerZ = field.originZ + (random() * 2 - 1) * drift;
         const angle   = random() * Math.PI * 2;
         const cos = Math.cos(angle), sin = Math.sin(angle);
         const [low, high] = config.duneHeight;
@@ -437,6 +474,11 @@ const water = {
     generate(field, config) {
         const { level, flatten, color } = config;
         let covered = 0;
+
+        // The surface is left on the field rather than only in the heights, so
+        // a renderer can move the water it is drawing without having to work
+        // out from the ground alone which of it was water.
+        field.water = { level: Math.max(level, field.water?.level ?? -Infinity) };
 
         for (let i = 0; i < field.count; i++) {
             const h = field.height[i];
@@ -510,8 +552,8 @@ const forest = {
 
         for (let i = 0; i < Math.round(config.count); i++) {
             groves.push({
-                x: (random() * 2 - 1) * half,
-                z: (random() * 2 - 1) * half,
+                x: field.originX + (random() * 2 - 1) * half,
+                z: field.originZ + (random() * 2 - 1) * half,
                 radius: pick(random, config.size),
                 // Three lobes at frequencies that share no common multiple, so
                 // the outline never closes back on itself as a rosette. The
@@ -579,8 +621,8 @@ const town = {
 
     generate(field, config, random) {
         const half    = field.size / 2 - field.size * 0.15;
-        const centerX = (random() * 2 - 1) * half;
-        const centerZ = (random() * 2 - 1) * half;
+        const centerX = field.originX + (random() * 2 - 1) * half;
+        const centerZ = field.originZ + (random() * 2 - 1) * half;
         const radius  = pick(random, config.extent);
 
         // A town sits on the ground it was built on rather than pouring its
@@ -777,6 +819,297 @@ export function nearestRunway(runways, x, z) {
     return best;
 }
 
+// --- Tiles and their seams ------------------------------------------------
+
+/**
+ * How far a correction at a seam is eased back into the ground either side of
+ * it, in vertices. Wide enough that a join is a slope rather than a step, and
+ * narrow enough that what an element drew a tile in from the edge is left
+ * alone.
+ */
+export const SEAM_BLEND = 3;
+
+/**
+ * The four sides of a tile, each read off a vertex's index: the line it lies on
+ * along that side, and how far in from that side it is.
+ */
+const SEAM_SIDES = [
+    { id: 'minX', line: (field, i) => Math.floor(i / field.stride), depth: (field, i) => i % field.stride },
+    { id: 'maxX', line: (field, i) => Math.floor(i / field.stride), depth: (field, i) => field.stride - 1 - i % field.stride },
+    { id: 'minZ', line: (field, i) => i % field.stride, depth: (field, i) => Math.floor(i / field.stride) },
+    { id: 'maxZ', line: (field, i) => i % field.stride, depth: (field, i) => field.stride - 1 - Math.floor(i / field.stride) }
+];
+
+// What a seam carries per vertex: the height, and the three channels of the
+// colour, which is the whole of what a tile shows at its edge.
+const SEAM_CHANNELS = 4;
+
+/**
+ * Matches an assembly of fields to each other everywhere they meet.
+ *
+ * The ground a tile is shaped on already runs on across a join, because it is
+ * noise read off the world rather than off the tile. What does not is what the
+ * elements drew: a peak that ended at one tile's edge knows nothing about the
+ * ground its neighbour laid against it. So every place two or more tiles put a
+ * vertex is settled on one height and one colour - the average of what they all
+ * had there - and each tile is walked back to what it was over the next few
+ * vertices in, which leaves the join seamless without flattening the country
+ * behind it.
+ *
+ * A vertex where four tiles meet is matched once, against all four, rather than
+ * twice against two of them, so a corner closes as cleanly as an edge does.
+ *
+ * Every field is read before any is written, so no tile is matched against
+ * ground another match has already moved. Running it twice changes nothing the
+ * first run did not: fields that already agree have nothing to average.
+ *
+ * Returns how many shared vertices were settled.
+ */
+export function matchEdges(fields = [], { blend = SEAM_BLEND } = {}) {
+    const tiles = fields.filter(field => field && field.count > 0);
+    if (tiles.length < 2) return 0;
+
+    const ease = Math.max(1, Math.round(blend));
+    const shared = new Map();
+
+    for (const field of tiles) {
+        for (const index of boundaryIndices(field)) {
+            const key = `${seamKey(fieldX(field, index))}|${seamKey(fieldZ(field, index))}`;
+            const standing = shared.get(key);
+            if (standing) standing.push({ field, index });
+            else shared.set(key, [{ field, index }]);
+        }
+    }
+
+    const corrections = new Map(tiles.map(field => [field, seamCorrections(field)]));
+    let matched = 0;
+
+    for (const group of shared.values()) {
+        if (group.length < 2) continue;
+        matched++;
+
+        const target = averageVertex(group);
+        for (const { field, index } of group) {
+            recordSeam(corrections.get(field), field, index, target);
+        }
+    }
+
+    if (matched > 0) {
+        for (const field of tiles) applySeams(field, corrections.get(field), ease);
+    }
+
+    return matched;
+}
+
+/** Every vertex on the outside of a field, which is all a neighbour can touch. */
+function boundaryIndices(field) {
+    const { stride } = field;
+    const found = [];
+
+    for (let i = 0; i < field.count; i++) {
+        const col = i % stride;
+        const row = Math.floor(i / stride);
+        if (col === 0 || col === stride - 1 || row === 0 || row === stride - 1) found.push(i);
+    }
+
+    return found;
+}
+
+/**
+ * Where a vertex stands, as a key two tiles agree on. Rounded, because two
+ * tiles reach the same place by different arithmetic and a join should not turn
+ * on the last bit of a float.
+ */
+function seamKey(value) {
+    return Math.round(value * 1000) / 1000;
+}
+
+function seamCorrections(field) {
+    const lines = {};
+    for (const side of SEAM_SIDES) {
+        lines[side.id] = {
+            held: new Uint8Array(field.stride),
+            delta: new Float32Array(field.stride * SEAM_CHANNELS)
+        };
+    }
+    return lines;
+}
+
+/** The one height and colour a place several tiles all reach should hold. */
+function averageVertex(group) {
+    const values = new Float32Array(SEAM_CHANNELS);
+
+    for (const { field, index } of group) {
+        values[0] += field.height[index];
+        for (let c = 0; c < 3; c++) values[c + 1] += field.color[index * 3 + c];
+    }
+
+    for (let c = 0; c < SEAM_CHANNELS; c++) values[c] /= group.length;
+    return values;
+}
+
+/** What one tile has to move to reach the settled value, on every side it is on. */
+function recordSeam(corrections, field, index, target) {
+    for (const side of SEAM_SIDES) {
+        if (side.depth(field, index) !== 0) continue;
+
+        const line = corrections[side.id];
+        const at = side.line(field, index) * SEAM_CHANNELS;
+
+        line.held[side.line(field, index)] = 1;
+        line.delta[at] = target[0] - field.height[index];
+        for (let c = 0; c < 3; c++) {
+            line.delta[at + 1 + c] = target[c + 1] - field.color[index * 3 + c];
+        }
+    }
+}
+
+/**
+ * Eases each side's corrections back into the tile.
+ *
+ * A vertex takes the correction of the seam it is nearest, worn down by how far
+ * in from that seam it is: all of it on the join, none of it a few vertices
+ * back. A vertex near two seams at once - the corner of an assembly - takes what
+ * both of them are asking for, weighted by how near it is to each, and wears the
+ * result down by whichever of the two it is nearer. On the corner itself both
+ * seams are asking for the same thing at full strength, which is what makes a
+ * corner close as exactly as an edge does.
+ */
+function applySeams(field, corrections, ease) {
+    for (let i = 0; i < field.count; i++) {
+        let weight = 0;
+        let nearest = 0;
+        let height = 0;
+        const color = [0, 0, 0];
+
+        for (const side of SEAM_SIDES) {
+            const depth = side.depth(field, i);
+            if (depth >= ease) continue;
+
+            const line = corrections[side.id];
+            const on = side.line(field, i);
+            if (!line.held[on]) continue;
+
+            const share = 1 - depth / ease;
+            const at = on * SEAM_CHANNELS;
+
+            weight += share;
+            nearest = Math.max(nearest, share);
+            height += line.delta[at] * share;
+            for (let c = 0; c < 3; c++) color[c] += line.delta[at + 1 + c] * share;
+        }
+
+        if (weight <= 0) continue;
+
+        const eased = nearest / weight;
+        field.height[i] += height * eased;
+        for (let c = 0; c < 3; c++) field.color[i * 3 + c] += color[c] * eased;
+    }
+}
+
+// --- The water surface ----------------------------------------------------
+
+/**
+ * The water a world settled with, as the vertices lying at or under the level
+ * it was laid at, with the height and colour each of them rests at and how far
+ * out from the bank it is.
+ *
+ * Read off the finished field rather than recorded while it was being drawn, so
+ * ground that was claimed back after the water went down - a strip graded over
+ * a shallow, a town levelled onto a shore - is not still being moved as though
+ * it were water. A world with no water in it has no surface at all.
+ */
+export function waterSurface(field) {
+    const level = field.water?.level;
+    if (!Number.isFinite(level)) return null;
+
+    const found = [];
+    for (let i = 0; i < field.count; i++) {
+        if (field.height[i] <= level) found.push(i);
+    }
+    if (found.length === 0) return null;
+
+    const count = found.length;
+    const wet = new Uint8Array(field.count);
+    for (const index of found) wet[index] = 1;
+
+    const surface = {
+        level,
+        count,
+        vertices: Int32Array.from(found),
+        x:     new Float32Array(count),
+        z:     new Float32Array(count),
+        rest:  new Float32Array(count),
+        color: new Float32Array(count * 3),
+        open:  new Float32Array(count)
+    };
+
+    for (let i = 0; i < count; i++) {
+        const index = surface.vertices[i];
+        surface.x[i]    = fieldX(field, index);
+        surface.z[i]    = fieldZ(field, index);
+        surface.rest[i] = field.height[index];
+        surface.open[i] = openness(field, wet, index);
+        for (let c = 0; c < 3; c++) surface.color[i * 3 + c] = field.color[index * 3 + c];
+    }
+
+    // One smoothing pass over the shoreline, so the water eases up to the bank
+    // across a couple of vertices rather than dropping to nothing at the last
+    // one. Read off the first pass and written after it, so a vertex is eased
+    // against what its neighbours were rather than against what they became.
+    const slot = new Int32Array(field.count).fill(-1);
+    for (let i = 0; i < count; i++) slot[surface.vertices[i]] = i;
+
+    const eased = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        let total = surface.open[i];
+        let counted = 1;
+
+        for (const at of neighboursOf(field, surface.vertices[i])) {
+            if (at < 0 || slot[at] < 0) continue;
+            total += surface.open[slot[at]];
+            counted++;
+        }
+
+        eased[i] = total / counted;
+    }
+    surface.open.set(eased);
+
+    return surface;
+}
+
+/** The four vertices around one, with -1 where the field runs out. */
+function neighboursOf(field, index) {
+    const { stride } = field;
+    const col = index % stride;
+    const row = Math.floor(index / stride);
+
+    return [
+        col > 0 ? index - 1 : -1,
+        col < stride - 1 ? index + 1 : -1,
+        row > 0 ? index - stride : -1,
+        row < stride - 1 ? index + stride : -1
+    ];
+}
+
+/**
+ * How far from the bank a water vertex is: nothing at a vertex with dry ground
+ * beside it, and all of it out in open water. The water is held to the bank it
+ * meets, which is what keeps a wave from lapping over the shoreline.
+ */
+function openness(field, wet, index) {
+    const neighbours = neighboursOf(field, index);
+
+    let open = 0;
+    for (const at of neighbours) {
+        // The edge of the field reads as more water rather than as a bank, so
+        // an assembly's tiles do not each draw a shoreline down their join.
+        if (at < 0 || wet[at]) open++;
+    }
+
+    return open / neighbours.length;
+}
+
 // --- The registry ---------------------------------------------------------
 
 export const ELEMENTS = [
@@ -859,7 +1192,12 @@ function meanderPath(field, windiness, length, random) {
         }
 
         const across = clamp(start + offset * windiness * half * 0.5, -half, half);
-        path.push(alongX ? { x: along, z: across } : { x: across, z: along });
+        // The course is laid out in the tile's own coordinates and set down in
+        // the world's, so a river runs the width of the tile it was drawn for
+        // wherever that tile was laid.
+        path.push(alongX
+            ? { x: field.originX + along,  z: field.originZ + across }
+            : { x: field.originX + across, z: field.originZ + along });
     }
 
     return path;
@@ -880,8 +1218,10 @@ function branchPath(field, trunk, windiness, random) {
         const wander = Math.sin(t * Math.PI * 2 * 1.7 + phase) * windiness * reach * 0.25;
 
         path.push({
-            x: clamp(origin.x + (cos * t * reach) - sin * wander, -half, half),
-            z: clamp(origin.z + (sin * t * reach) + cos * wander, -half, half)
+            x: clamp(origin.x + (cos * t * reach) - sin * wander,
+                     field.originX - half, field.originX + half),
+            z: clamp(origin.z + (sin * t * reach) + cos * wander,
+                     field.originZ - half, field.originZ + half)
         });
     }
 
@@ -1041,8 +1381,8 @@ function chooseRunwaySite(field, config, length, width, random) {
     for (let i = 0; i < RUNWAY_SITES; i++) {
         const heading = pick(random, config.heading);
         const site = {
-            x: (random() * 2 - 1) * reach,
-            z: (random() * 2 - 1) * reach,
+            x: field.originX + (random() * 2 - 1) * reach,
+            z: field.originZ + (random() * 2 - 1) * reach,
             heading,
             ...runwayDirection(heading)
         };

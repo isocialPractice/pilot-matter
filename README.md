@@ -19,6 +19,8 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Five assembled environments** - Highlands, River Basin, Canyon Country, Dune Sea, and Lakeside, picked from the settings panel and regenerated on the spot
 - **Element vertex colouring** - every band the ground is painted in is a light-to-dark gradient of one base hue, rendered through vertex colours with no textures
 - **Atmospheric fog** — exponential fog fades the world to sky blue in the distance, hiding the far ground and giving the illusion of an infinite world
+- **A day to fly through** - the sun walks across the sky and the light, the sky, and the fog warm and cool with it, from first light through noon to dusk and back round; midday is the light the world was always drawn in, and a paused flight is a day that waits with it
+- **Moving water** - every surface below the water line rides a swell of two crossing wave trains and catches the sun on the face of each crest, held down to nothing at the bank so the water meets the shore rather than lapping over it, and going flat and dark after dark
 - **Three camera modes** — chase, cockpit, and orbit views, cycled with the `C` key
 - **Trailing chase camera** - the chase view lags behind the aircraft instead of riding a fixed offset, so turns and pitch changes swing the frame around
 - **HUD** — live readout of airspeed, altitude, climb rate, compass heading, throttle (%), and camera mode, on whichever scale the settings panel is set to
@@ -35,7 +37,8 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Settings panel** - opened with `O` or from either menu, setting the environment, the condition a flight opens in, control sensitivity, fog density, and the units the instruments read in, all remembered for the next session
 - **An editable start** - the condition a flight opens in, the strip in the world, airspeed, altitude, climb, heading, throttle, and camera are fields a pilot sets rather than constants in the flight code, applied at once before launch and at the next reset after it
 - **A screen you can clear** - `H` collapses the control list to a single hint line and `Tab` clears the instruments off entirely for clean flying, remembered for the next session
-- **A simulator API** - the Pilot API flies the aircraft against a host's own scene, terrain, and model; the Matter API hands a host the world as one detachable group anything can fly over
+- **A simulator API** - the Pilot API flies the aircraft against a host's own scene, terrain, and model; the Matter API hands a host the world as one detachable group anything can fly over, with both halves worked on one page in `examples/host.html`
+- **Worlds that tile** - an environment can be one square of a larger assembly, generated in the world's coordinates so the ground runs on across the join, with every shared edge settled to one height and one colour
 - **Zero build step** — runs directly in the browser via ES modules and an import map
 
 ## Getting Started
@@ -273,6 +276,8 @@ pilot-matter/
 │   ├── photo.js        # Pure photo mode state and filename, and the download
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
 │   ├── terrain.js      # An assembled environment as scene geometry
+│   ├── day-night.js    # Pure day cycle: the sky, the light, and the sun's arc
+│   ├── water.js        # Pure wave, sheen, and the surface animation both use
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
 │   ├── environment/
 │   │   ├── elements.js # Pure element registry, the field, and every generator
@@ -284,12 +289,15 @@ pilot-matter/
 │   │   └── matter.js   # Matter API: the world, without the aircraft
 │   ├── camera-math.js  # Pure camera modes and framerate-independent damping
 │   ├── camera.js       # Chase, cockpit, and orbit cameras
-│   ├── sky.js          # Lighting, atmospheric fog, and the standalone depth
+│   ├── sky.js          # Lighting, atmospheric fog, the day cycle, and the standalone depth
 │   ├── attitude.js     # Pure artificial horizon geometry, and its SVG face
 │   ├── minimap.js      # Pure world-to-chart projection, and its SVG face
 │   └── hud.js          # On-screen instrument display and warnings
 ├── docs/
 │   └── api.md          # The whole API surface, and its stability guarantee
+├── examples/
+│   ├── host.html       # A host page working both halves of the API side by side
+│   └── host.js         # The Pilot API over host ground, the Matter API under a host aircraft
 ├── tools/
 │   └── serve.mjs       # Zero-dependency static server behind `npm run serve`
 └── test/               # Zero-dependency node:test unit tests
@@ -314,8 +322,12 @@ its options, its start state fields, its radio group and its held box, and their
 stored choices, the game modes with their stages, their runs, their courses, and
 the gate test, terrain noise and
 the mountain formula, the element registry and every generator it holds, the
-assembled environments, the API's option defaults and contract checks, the
-API document against the surface it describes, page metadata, and the static
+assembled environments, a world laid as one tile of an assembly and the pass that
+settles what its elements drew at the joins, the day cycle and the light and the
+sun's place at every hour of it, the wave and the sheen the water is drawn with
+and the surface they are applied to, the API's option defaults and contract
+checks, the API document against the surface it describes, the example host page
+against both halves it is meant to prove, page metadata, and the static
 server's path and content type rules) and run on Node 18+ with no dependencies
 to install:
 
@@ -451,6 +463,20 @@ The world does not repeat seamlessly - the ground at one edge has nothing to do 
 
 The [Pilot API](#simulator-api) does the same for a host's own terrain, from the bounds that terrain declares, and a host whose world continues past what it declared turns it off with `wrap: false`.
 
+### Worlds laid beside each other
+
+A world can also be one square of a larger one. Told which square of a grid it is, an environment is generated in the world's coordinates rather than in its own: its vertices stand where its place in the grid puts them, its sampler answers for that square and nothing outside it, and because the ground is shaped from noise read off the world rather than off the square, the base ground runs on across the join instead of starting again at it.
+
+What does not run on is what the elements drew, since a peak that ended at one square's edge knows nothing about the ground its neighbour laid against it. So the joins are settled: every place two or more squares put a vertex is brought to one height and one colour - the average of what they all had there - and each square is walked back to what it was over the next few vertices in, which closes the seam without flattening the country behind it. A vertex four squares meet at is settled against all four at once, so a corner closes as exactly as an edge does.
+
+Each square is a whole environment - its own elements, its own strips, its own water - laid out from its own place in the grid, so neighbouring squares are the same world without being the same ground. The bundled simulator still flies one square and carries the world round at its edges; the assembly is for a host, through the [Matter API](#simulator-api).
+
+### A day, and water that moves in it
+
+The world is not lit one way any more. A cycle in `js/day-night.js` carries a phase from midnight through dawn, noon, and dusk and back round, and the sky the world fades to, the fog tinted with it, the colour and strength of the sun, and the fill light under it are all read off that phase as the blend between the two moments either side of it - so a sunrise is a gradual thing rather than a switch thrown at a threshold. The sun walks an arc across the sky and is held a little over the horizon after it sets, so the ground keeps its shape after dark. Midday is exactly the light the world was drawn in before it had a day, and time the flight does not spend flying is time the day does not spend passing.
+
+Water is the one part of the ground that moves and the one part that shines. Every vertex at or under the water line rides a swell of two wave trains crossing at an angle, and catches a sheen on the face of each crest - a colour the land is never painted, so water reads as water rather than as blue ground. The swell is held down to nothing at the bank, so the surface meets the shore it was poured against rather than lapping over it, and the sheen is scaled by how much daylight there is to throw back, so a lake goes flat and dark at night. Both are functions of where a point is in the world and what time it is, which is what lets two squares of an assembly work out the same surface at the place they meet without agreeing on anything.
+
 ## Simulator API
 
 The simulator is two halves that can be used without each other, and `js/api/index.js` is the one module a host page imports to get either.
@@ -495,6 +521,20 @@ myFlightModel.setGroundHeight(flown.groundHeight());
 
 world.runways[0];                           // the strip it cut, for something to land on
 world.setEnvironment('dune-sea');           // regenerated in place, registered assets settled
+
+world.setDaylight(0.75);                    // dusk: the sky, the fog, and the sun with it
+world.updateWater(dt, 0.5);                 // and the surface moved on by a frame
+```
+
+A world can be one square of a larger one, and `createTiledEnvironment` builds the whole grid with every join already settled:
+
+```javascript
+import { createTiledEnvironment } from './js/api/index.js';
+
+const world = createTiledEnvironment({ environment: 'lakeside', tiles: 2, size: 8000 });
+
+scene.add(world.group);
+world.sampleHeight(x, z);                   // answered by whichever square the point is over
 ```
 
 Everything under `js/api/contract.js` is pure and imports no renderer, so a host can check its own options, its own aircraft, or the shape of its telemetry with nothing loaded:
@@ -507,7 +547,13 @@ const problems = validateAircraftContract(myAircraft);   // every gap at once, o
 
 The rules the bundled game is played by are published too, and they are pure as well: the touchdown rules that tell a landing from a crash, the strips they are read against, and the modes, stages, courses, and gate test in `js/game-modes.js`. A host can play them against its own renderer, or read them as a worked example of a game built on the two halves.
 
-The whole surface is written out in [docs/api.md](docs/api.md): every option and everything that comes back for both halves, the contracts, the configured start, the runways and the landing rules, the game modes, the worlds and the elements, what the stability guarantee does and does not cover, and a worked host page for each half.
+The whole surface is written out in [docs/api.md](docs/api.md): every option and everything that comes back for both halves, the contracts, the configured start, the runways and the landing rules, the game modes, the worlds and the elements, the day and the water, what the stability guarantee does and does not cover, and a worked host page for each half.
+
+`examples/host.html` is that host page, running. It works both halves side by side - the Pilot API flying over ground the page generated itself, and the Matter API carrying an aircraft the page built over an assembly of four squares, running the day and moving its own water - which is the shortest way to see that each half genuinely works without the other. Serve the project and open `/examples/host.html`:
+
+```bash
+npm run serve   # then open http://localhost:8080/examples/host.html
+```
 
 ## Tech Stack
 

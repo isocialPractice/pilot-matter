@@ -18,7 +18,15 @@ has never heard of this one.
 - [Contracts](#contracts)
 - [Configuration](#configuration)
 - [Worlds and elements](#worlds-and-elements)
+- [The day](#the-day)
+- [The water](#the-water)
 - [The edge of the world](#the-edge-of-the-world)
+
+`examples/host.html` is both halves on one page and is the shortest way to see
+what the rest of this document is describing: the Pilot API flying over ground
+the page generated itself, beside the Matter API carrying an aircraft the page
+built, over a world assembled out of four tiles. Serve the project - `npm run
+serve` - and open `/examples/host.html`.
 
 ## Importing
 
@@ -57,14 +65,16 @@ import { validateAircraftContract } from 'pilot-matter/contract';
 | `pilot-matter/config` | The configured start, and the fields it is set through |
 | `pilot-matter/environment` | The assembled environments |
 | `pilot-matter/elements` | The element registry and the field |
+| `pilot-matter/day-night` | The day cycle: the hour, the light at it, and the sun's arc |
+| `pilot-matter/water` | The wave, the sheen, and the surface animation |
 
 Three.js is reached for by the two halves that build something with it, and by
 the root entry point that re-exports them both. `pilot-matter/contract`,
-`pilot-matter/config`, `pilot-matter/environment`, and `pilot-matter/elements`
-load no renderer at all,
+`pilot-matter/config`, `pilot-matter/environment`, `pilot-matter/elements`,
+`pilot-matter/day-night`, and `pilot-matter/water` load no renderer at all,
 which is the point of the split: a host can check its own options, describe its
-own world, or check the shape of its telemetry on a server, in a worker, or in a
-test, with nothing rendered.
+own world, light its own sky, move its own water, or check the shape of its
+telemetry on a server, in a worker, or in a test, with nothing rendered.
 
 ## Stability
 
@@ -274,6 +284,7 @@ createEnvironment(options) -> environment
 | `segments` | number | `200` | How finely that square is sampled |
 | `elements` | array | the preset's | Element placements, instead of the preset's |
 | `runway` | boolean or object | `false` | A landable strip in the world, or a configuration for one |
+| `tile` | `{x, z}` | `{0, 0}` | Which square of a larger assembly this world is |
 | `seed` | number | the preset's | Builds the same description as different ground |
 | `lights` | boolean | `true` | `false` to light the world yourself |
 | `fog` | boolean | `true` | `false` to keep your own scene depth |
@@ -288,10 +299,15 @@ createEnvironment(options) -> environment
 | `runways` | The strips cut into it, empty for a world built without one |
 | `field` | The height and colour field behind the mesh |
 | `environment` | The preset being drawn |
+| `tile`, `origin` | The square of a larger world this is, and where its middle sits |
 | `setEnvironment(id)` | Regenerates the ground as a different world |
+| `join(...neighbours)` | Settles this world's edges against the worlds laid beside it |
+| `redraw()` | Draws the ground again from the field as it now stands |
 | `register(object, placement)` | Adds a caller-supplied mesh as an element of the world |
 | `attach(aircraft)` | Adopts an aircraft the environment did not build |
 | `applyDepth(scene, depth)` | The sky and the fog, applied to any scene |
+| `setDaylight(phase)` | Sets the hour of the day, and returns the light at it |
+| `updateWater(dt, light)` | Moves the water on by a frame |
 | `dispose()` | Releases the mesh, the geometry, and everything registered |
 
 `register` is placement by the generator rather than by the host: given a
@@ -384,39 +400,96 @@ document.querySelector('#world-picker').addEventListener('change', (event) => {
 
 ### One tile of a larger world
 
-An environment covers a square, and a host assembling several of them moves each
-group to its own place in the larger world. Because the ground is generated from
-a description rather than loaded, a tile costs a few tens of milliseconds and no
-download, and a tile built from the same preset and seed is the same ground
-every time:
+An environment covers a square, and `tile` says which square of a larger world
+that is, counted in squares off the middle of it. A tile is generated in the
+world's coordinates rather than in its own: its vertices stand where its place in
+the grid puts them, its sampler answers for that square and nothing outside it,
+and the noise its ground is shaped from runs on across the join instead of
+starting again at it.
 
 ```javascript
-const tiles = [];
+import { createEnvironment } from 'pilot-matter';
 
-for (const [tx, tz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-    const tile = createEnvironment({ environment: 'highlands', lights: false, fog: false });
-    tile.group.position.set(tx * tile.bounds.maxX * 2, 0, tz * tile.bounds.maxZ * 2);
-    scene.add(tile.group);
-    tiles.push(tile);
-}
+const west = createEnvironment({ environment: 'highlands', size: 8000, tile: { x: -0.5, z: 0 } });
+const east = createEnvironment({ environment: 'highlands', size: 8000, tile: { x:  0.5, z: 0 } });
+
+scene.add(west.group, east.group);
+west.join(east);                 // settles what their elements drew at the join
 ```
 
-Each tile is sampled in its own coordinates, so a host flying across an assembly
-works out which tile it is over and takes the ground from that one:
+There is no coordinate to convert. A tile's mesh is drawn where its field says it
+is, so a host flying across an assembly asks whichever tile the aircraft is over
+and passes it the world position it already has:
 
 ```javascript
-const local = { x: position.x - tile.group.position.x, z: position.z - tile.group.position.z };
-const ground = tile.sampleHeight(local.x, local.z);
+const ground = world.tileAt(position.x, position.z)?.sampleHeight(position.x, position.z) ?? 0;
 ```
 
-Two tiles laid side by side meet at a seam rather than at matched heights: the
-ground each one draws is a description of a whole world rather than of a piece
-of one, and where its east edge lands has nothing to do with where its
-neighbour's west edge does. In the bundled simulator that never shows, because
-the fog reaches its full depth well before the edge does; in an assembly flown
-low it will. A host that needs the join to hold either flies with enough fog to
-cover it, or draws its tiles from a description of its own that carries the
-shared edge in both.
+`join` is what closes the seam. The ground a tile is shaped on already agrees
+with its neighbour's, because it is noise read off the world rather than off the
+tile; what does not is what the elements drew, since a peak that ended at one
+tile's edge knows nothing about the ground its neighbour laid against it. Every
+place two or more tiles put a vertex is settled on one height and one colour -
+the average of what they all had there - and each tile is walked back to what it
+was over the next few vertices in, so the join is seamless without the country
+behind it being flattened to make it so.
+
+Give `join` every neighbour at once rather than one at a time. A vertex four
+tiles all reach has to be settled against all four of them to close.
+
+```javascript
+middle.join(north, south, east, west);
+```
+
+`createTiledEnvironment` does the whole of it: builds the grid, lights it once
+rather than once per square, and settles every join in one pass before anything
+is drawn.
+
+```javascript
+import { createTiledEnvironment } from 'pilot-matter';
+
+const world = createTiledEnvironment({
+    environment: 'lakeside',
+    tiles: 2,                    // 2 by 2, or { x, z } for a rectangle
+    size: 8000,
+    runway: true
+});
+
+scene.add(world.group);
+world.applyDepth(scene);
+
+const flown = world.attach(myAircraft);   // ground reported from whichever square it is over
+```
+
+| Member | Is |
+|--------|-----|
+| `group` | The whole assembly as one `Group` |
+| `tiles` | Each square, as the environment it is |
+| `across` | How many squares the grid runs, as `{x, z}` |
+| `bounds` | The square the whole assembly covers |
+| `seams` | How many shared vertices the joins were settled at |
+| `runways` | Every strip cut into the assembly, whichever square it was cut into |
+| `tileAt(x, z)` | The square a place falls on, or `null` off the whole assembly |
+| `sampleHeight(x, z)` | The ground under a point, from whichever square it is over |
+| `attach(aircraft)` | Adopts an aircraft, reporting the ground under it across the assembly |
+| `register(object, placement)` | Adds a mesh as an element of the square it falls on |
+| `applyDepth(scene, depth)` | The sky and the fog, applied to any scene |
+| `setDaylight(phase)` | The hour of the day, over the whole assembly |
+| `updateWater(dt, light)` | Moves every square's water on together |
+| `dispose()` | Releases every square |
+
+An assembly answers the terrain contract the way a single environment does, so
+the Pilot API flies over the whole grid rather than over one square of it:
+
+```javascript
+const pilot = createPilot({ scene, camera, terrain: world });
+```
+
+Each tile is a whole environment - its own elements, its own strips, its own
+water - laid out from its own place in the grid, so neighbouring squares are the
+same world without being the same ground. Because the ground is generated from a
+description rather than loaded, a tile costs a few tens of milliseconds and no
+download.
 
 ## Contracts
 
@@ -425,7 +498,8 @@ Everything under `js/api/contract.js` is pure and imports no renderer.
 | Export | Is |
 |--------|-----|
 | `API_VERSION` | The version of the contracts a host is holding |
-| `boundsFromSize(size)` | The square a world of that size covers |
+| `boundsFromSize(size, origin)` | The square a world of that size covers, about wherever its middle is |
+| `tileOrigin(tile, size)` | Where the middle of a tile sits in the world it is one square of |
 | `flatSampler(height)` | A height sampler for a host with no terrain of its own |
 | `isInsideBounds(bounds, x, z)` | Whether a point is over the ground |
 | `resolveTerrain(terrain)` | A terrain with its gaps filled in |
@@ -652,6 +726,11 @@ function frame(dt) {
 | `resolveConfig(element, overrides)` | An element's configuration, clamped to its ranges |
 | `createField(options)` | An empty height and colour field |
 | `sampleHeight(field, x, z)` | The ground under a point of a field |
+| `fieldBounds(field)` | The square a field covers, in the world rather than in its own coordinates |
+| `tileSeed(seed, x, z)` | The seed one square of an assembly is laid out from |
+| `matchEdges(fields, options)` | Settles an assembly wherever its fields meet |
+| `SEAM_BLEND` | How far a join is eased back into the ground, in vertices |
+| `waterSurface(field)` | The water a world settled at, as the vertices under its level |
 
 The five worlds a host can ask for by name:
 
@@ -708,9 +787,114 @@ const ground = sampleHeight(field, 120, -400);
 | Field member | Is |
 |--------------|-----|
 | `size`, `segments`, `stride`, `count`, `step` | The grid the world is sampled on |
+| `originX`, `originZ` | Where the middle of that grid sits in the world |
 | `height` | A `Float32Array` of one height per vertex |
 | `color` | A `Float32Array` of three components per vertex |
 | `runways` | The strips cut into it, which a flight model has to be able to ask about by name |
+| `water` | The level whatever water was laid settled at, or `null` for a dry world |
+
+## The day
+
+A world lit one way all flight is a world with one hour in it. The cycle turns
+that hour into a day: the light warms and cools, the sky and the fog it fades to
+go with it rather than after it, and the sun walks across the sky instead of
+hanging in one corner of it. The whole of it is arithmetic - no renderer, no
+scene - so a host can drive its own sky from it, or read the hour without
+drawing one.
+
+| Export | Is |
+|--------|-----|
+| `createDayNight(options)` | A day: how long it runs, and the hour it opens on |
+| `advanceDayNight(state, dt)` | Moves the day on by a frame, and returns the hour |
+| `daylightAt(phase)` | The light at an hour: the sky, the sun, the fill, and how much day it amounts to |
+| `sunPositionAt(phase, distance)` | Where the sun is at that hour |
+| `wrapPhase(phase)` | An hour outside the day, as the hour inside it that it amounts to |
+| `clockAt(phase)` | The hour as a clock reading, for anything that shows it |
+| `CYCLE_LENGTH`, `CYCLE_START` | How long a day takes, and the hour a flight opens on |
+| `DAY_STOPS` | The day as the moments it is read between |
+| `SUN_DISTANCE` | How far the sun is thrown from the middle of the world |
+
+Phase runs `0` to `1` over a whole day: midnight at `0`, dawn around a quarter,
+noon at a half, dusk around three quarters. Midday is the light the world was
+drawn in before it had a day, so a flight at noon is lit exactly as it always
+was.
+
+```javascript
+import { createDayNight, advanceDayNight } from 'pilot-matter';
+
+const day = createDayNight({ length: 600, phase: 0.3 });   // ten minutes, opening mid-morning
+
+renderer.setAnimationLoop(() => {
+    const dt = clock.getDelta();
+    advanceDayNight(day, dt);
+
+    const light = world.setDaylight(day.phase);   // the sky, the fog, and the sun
+    world.updateWater(dt, light.daylight);        // and what there is to glint with
+});
+```
+
+Time a flight did not spend flying is time the day does not spend passing: hand
+the cycle a `dt` of `0` and the sun stays where it was left, which is what keeps
+a paused world paused.
+
+`daylightAt` is the whole reading, for a host lighting its own scene:
+
+| Field | Is |
+|-------|-----|
+| `phase` | The hour it was read at |
+| `label` | What that hour is called - `NOON`, `DUSK`, `NIGHT` |
+| `sky` | The colour the world fades to, as `[r, g, b]` in `0` to `1` |
+| `sun` | `{color, intensity}` for the directional light |
+| `ambient` | `{color, intensity}` for the fill |
+| `daylight` | How much day there is at all, `0` to `1` |
+
+## The water
+
+Water is the one part of the ground that moves and the one part that shines. The
+surface a world settled at is read off the finished field - the vertices lying at
+or under the level the water was laid at - and moved from there, so ground the
+water no longer has, a strip graded over a shallow or a town levelled onto a
+shore, is not still being moved as though it were.
+
+| Export | Is |
+|--------|-----|
+| `waterSurface(field)` | The surface a world settled at, or `null` for a dry world |
+| `waveHeight(x, z, time, wave)` | How far the surface stands off its resting level at a point |
+| `waveSpecular(x, z, time, wave)` | How much of the light that point is throwing back |
+| `waterColor(base, specular, options)` | The colour water is showing, with the light laid over it |
+| `animateWater(surface, time, options)` | Moves a whole surface on to a moment in time |
+| `WAVE` | The swell every world's water is drawn with |
+| `WATER_SHEEN`, `SHEEN_STRENGTH` | The colour the sun leaves on water, and how much of it a crest shows |
+
+The wave is a function of where a point is in the world and what time it is,
+which is what lets two tiles of an assembly work out the same surface at the
+place they meet without agreeing on anything. `animateWater` writes into the
+arrays a renderer is already drawing from, three numbers a vertex, and touches
+nothing but the water:
+
+```javascript
+import { waterSurface, animateWater } from 'pilot-matter';
+
+const surface = waterSurface(myField);
+const position = myMesh.geometry.attributes.position;
+const color = myMesh.geometry.attributes.color;
+
+animateWater(surface, elapsed, { positions: position.array, colors: color.array, light: 0.8 });
+position.needsUpdate = true;
+color.needsUpdate = true;
+```
+
+| Surface member | Is |
+|----------------|-----|
+| `level` | The height the water was laid at |
+| `count`, `vertices` | How many vertices it covers, and which they are |
+| `x`, `z` | Where each of them is in the world |
+| `rest` | The height each of them rests at |
+| `color` | The colour each of them was painted |
+| `open` | How far from the bank each of them is, `0` to `1` |
+
+`open` is what holds the swell down to nothing at the shoreline, so the water
+meets the bank it was poured against rather than lapping over it.
 
 ## The edge of the world
 

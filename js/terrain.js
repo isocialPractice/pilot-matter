@@ -1,6 +1,9 @@
 import * as THREE from 'three';
-import { DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight } from './environment/elements.js';
+import {
+    DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight, waterSurface
+} from './environment/elements.js';
 import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
+import { animateWater } from './water.js';
 
 /**
  * The ground, as the mesh side of an assembled environment. Everything about
@@ -15,6 +18,13 @@ export class Terrain {
         this.segments = DEFAULT_SEGMENTS;
         this.mesh     = null;
         this.built    = null;
+
+        // The water, and how long it has been moving. Time the flight did not
+        // spend flying is time the surface does not spend running, so a paused
+        // world is a still one.
+        this.water   = null;
+        this.time    = 0;
+        this.watered = false;
 
         this.setEnvironment(environmentId, world);
     }
@@ -93,6 +103,45 @@ export class Terrain {
             new THREE.MeshLambertMaterial({ vertexColors: true })
         );
         this.scene.add(this.mesh);
+
+        // Which of the ground is water is read off the finished field, so a
+        // strip graded over a shallow is not still being moved as though the
+        // water it replaced were under it.
+        this.water   = waterSurface(this.field);
+        this.watered = false;
+    }
+
+    /**
+     * Moves the water on by a frame. The land is drawn once and lit by the sun;
+     * the water is the one part of the world that is never still, and the one
+     * part that shines, so it is the only part written again after the ground
+     * was built.
+     *
+     * `light` is how much day there is to glint off it, so a surface under a
+     * night sky goes flat and dark rather than sparkling under a sun that is
+     * not there.
+     *
+     * Returns how many vertices moved.
+     */
+    updateWater(dt = 0, light = 1) {
+        if (!this.water) return 0;
+        if (dt === 0 && this.watered) return 0;
+
+        this.time += dt;
+
+        const position = this.mesh.geometry.attributes.position;
+        const color    = this.mesh.geometry.attributes.color;
+
+        const moved = animateWater(this.water, this.time, {
+            positions: position.array,
+            colors: color.array,
+            light
+        });
+
+        position.needsUpdate = true;
+        color.needsUpdate = true;
+        this.watered = true;
+        return moved;
     }
 
     getTerrainHeightAt(x, z) {

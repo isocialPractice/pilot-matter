@@ -712,7 +712,12 @@ class FlightSimulator {
         this.advanceRun(dt);
 
         this.camera2.update(dt);
-        this.sky.update();
+
+        // The day moves on and the water moves with it: what the surface has to
+        // throw back is whatever the sky is giving it at that hour.
+        this.sky.update(dt);
+        this.terrain.updateWater(dt, this.sky.getDaylight());
+
         this.hud.update(this.aircraft, this.camera2, frozen || capturing);
 
         this.audio.update(audioLevels(this.audioState, {

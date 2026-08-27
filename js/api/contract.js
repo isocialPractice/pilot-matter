@@ -32,10 +32,25 @@ export const API_VERSION = 1;
 // them or replace them with an input source of its own.
 export { DEFAULT_KEYMAP, CONTROL_NAMES, RESET_KEYS } from '../input-map.js';
 
-/** The square the bundled world covers, and the ground outside it. */
-export function boundsFromSize(size = DEFAULT_SIZE) {
+/**
+ * The square a world covers, and the ground outside it. A world that is one
+ * tile of a larger assembly covers a square somewhere other than the middle of
+ * that assembly, so the square is given about wherever its middle is.
+ */
+export function boundsFromSize(size = DEFAULT_SIZE, origin = { x: 0, z: 0 }) {
     const half = Math.abs(size) / 2;
-    return { minX: -half, maxX: half, minZ: -half, maxZ: half };
+    const x = numberOr(origin?.x, 0);
+    const z = numberOr(origin?.z, 0);
+    return { minX: x - half, maxX: x + half, minZ: z - half, maxZ: z + half };
+}
+
+/**
+ * Where the middle of a tile sits in the world it is one square of. Tiles are
+ * counted in squares rather than in world units, so an assembly is laid out by
+ * saying which place in the grid each piece of it takes.
+ */
+export function tileOrigin(tile = {}, size = DEFAULT_SIZE) {
+    return { x: numberOr(tile?.x, 0) * size, z: numberOr(tile?.z, 0) * size };
 }
 
 /** A height sampler for a host with no terrain of its own: flat ground. */
@@ -164,6 +179,10 @@ export function resolveEnvironmentOptions(options = {}) {
         fog: options.fog !== false,
         lights: options.lights !== false,
         elements: Array.isArray(options.elements) ? options.elements : null,
+        // Which square of a larger assembly this world is, counted in squares
+        // off the middle of it. A world nobody placed is the whole of what
+        // there is, which is the square in the middle.
+        tile: { x: numberOr(options.tile?.x, 0), z: numberOr(options.tile?.z, 0) },
         // A world is generated without a strip unless one is asked for, because
         // a runway is a thing a host wants rather than a thing every world has.
         // `true` takes the preset's own, and an object configures one.

@@ -5,6 +5,85 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0-alpha] - 2026-08-27
+
+### Added
+
+- **Worlds that tile**, so an environment can be one square of a larger one
+  rather than the whole of what there is. A world told which square of a grid it
+  is - `tile: { x, z }` - is generated in the world's coordinates rather than in
+  its own: its vertices stand where its place in the grid puts them, its sampler
+  answers for that square and nothing outside it, and its mesh is drawn where its
+  field says it is, so a host flying across an assembly passes the world position
+  it already has rather than converting into and out of each square's own
+  coordinates. Because the ground is shaped from noise read off the world rather
+  than off the square, the base ground now runs on across a join instead of
+  starting again at it
+- `join(...neighbours)` and `matchEdges(fields)`, which close what the base
+  ground cannot. A peak that ended at one square's edge knows nothing about the
+  ground its neighbour laid against it, so every place two or more squares put a
+  vertex is settled on one height and one colour - the average of what they all
+  had there - and each square is walked back to what it was over the next few
+  vertices in, which leaves the join seamless without flattening the country
+  behind it. A vertex four squares meet at is settled against all four at once
+  rather than twice against two of them, so a corner closes as exactly as an edge
+  does, and settling a join that is already settled changes nothing
+- `createTiledEnvironment`, which builds a whole grid: every square generated,
+  every join settled in one pass before anything is drawn, one set of lights over
+  the assembly rather than one per square, and a sampler, an aircraft contract,
+  and a water pass that all work across the grid rather than one square at a
+  time. It answers the terrain contract the way a single environment does, so the
+  Pilot API flies over the whole assembly without knowing it is one
+- **A day to fly through**. The world was lit one way all flight, which is a
+  world with one hour in it. A cycle now carries a phase from midnight through
+  dawn, noon, and dusk and back round, and the sky the world fades to, the fog
+  tinted with it, the colour and the strength of the sun, and the fill light
+  under it are all read off that phase as the blend between the two moments
+  either side of it - so a sunrise is a gradual thing rather than a switch thrown
+  at a threshold. The sun walks an arc across the sky and is held a little over
+  the horizon after it sets, so the ground keeps its shape after dark and it is
+  the colour and the strength of the light that say what time it is. Midday is
+  exactly the light the world was drawn in before it had a day, and time the
+  flight does not spend flying - paused, held behind the title screen, or under a
+  panel - is time the day does not spend passing
+- **Moving water**, which is the one part of the ground that was never still and
+  the one part that shines. Every vertex at or under the water line now rides a
+  swell of two wave trains crossing at an angle, and catches a sheen on the face
+  of each crest - a colour the land is never painted, so water reads as water
+  rather than as blue ground. The swell is held down to nothing at the bank, so
+  the surface meets the shore it was poured against rather than lapping over it,
+  and the sheen is scaled by how much daylight there is to throw back, so a lake
+  goes flat and dark at night. Both are functions of where a point is in the
+  world and what time it is, which is what lets two squares of an assembly work
+  out the same surface at the place they meet without agreeing on anything
+- `js/day-night.js` and `js/water.js`, both pure and both published:
+  `createDayNight`, `advanceDayNight`, `daylightAt`, `sunPositionAt`,
+  `wrapPhase`, and `clockAt` for the day, and `waveHeight`, `waveSpecular`,
+  `waterColor`, `animateWater`, and `waterSurface` for the water. A host can
+  drive its own sky and move its own water from them with no renderer loaded at
+  all, or read the hour without drawing one
+- `examples/host.html`, a host page working both halves of the API side by side:
+  the Pilot API flying over ground the page generated itself, with no terrain of
+  Pilot Matter's loaded at all, beside the Matter API carrying an aircraft the
+  page built and flies with a model of its own, over an assembly of four squares,
+  running the day and moving its own water. It imports by the specifier the
+  manifest publishes, which is what a host page installing the package would
+  write, and the suite checks it against both halves it is meant to prove
+- `setDaylight(phase)` and `updateWater(dt, light)` on an environment and on an
+  assembly, `tileOrigin`, `fieldBounds`, `tileSeed`, `SEAM_BLEND`, and a
+  `boundsFromSize` that takes the middle of the square as well as its size
+
+### Changed
+
+- A field now carries where it sits in the world - `originX` and `originZ` - and
+  every element places what it draws against that origin rather than against the
+  middle of the world. A world nobody placed is the square in the middle, which
+  is the field the simulator has always built, so nothing about the bundled
+  worlds moves
+- The document no longer says that two tiles laid side by side meet at a seam a
+  host has to fly with enough fog to cover. They meet at matched heights and
+  matched colours
+
 ## [1.10.0-alpha] - 2026-08-26
 
 ### Added
