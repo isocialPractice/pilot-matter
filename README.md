@@ -25,8 +25,8 @@ A browser-based 3D flight simulator built with [Three.js](https://threejs.org/).
 - **Trailing chase camera** - the chase view lags behind the aircraft instead of riding a fixed offset, so turns and pitch changes swing the frame around
 - **HUD** — live readout of airspeed, altitude, climb rate, compass heading, throttle (%), and camera mode, on whichever scale the settings panel is set to
 - **Attitude indicator** - an artificial horizon with a pitch ladder and bank marks, reading the aircraft's own nose and wings rather than the controls behind them
-- **A world with no outside** - fly at an edge and the world is carried round: the aircraft comes back in over the opposite edge at the same altitude and heading, so the fog-hidden edge can be flown at and never reached
-- **Minimap** - a north-up chart of the world in the corner, with the aircraft's position and heading marked, crossing one edge and reappearing at the other the way the aircraft does
+- **A world with no edge** - the square an environment describes is one tile of an endless grid of them, each seeded from its own place, drawn out further than the camera can see, so there is always more ground ahead and nothing left to reach
+- **Minimap** - a north-up chart of the tile being flown over, with the aircraft's position and heading marked, moving on to the next square as the aircraft crosses into it
 - **Photo mode** - `F2` clears every overlay off the screen for one frame and downloads the view as a PNG named for the moment it was taken
 - **Engine and wind audio** - an engine note that rises with the throttle and a wind that rises faster than the airspeed behind it, muted with `M` and remembered for the next session
 - **Low altitude warning** - a blinking caution over the terrain below, measured against the ground rather than sea level
@@ -113,7 +113,7 @@ The game opens on its start screen, with the clock held at zero: the aircraft wa
 | `CONTROLS` | Puts the control list on screen, over the title, before anything is flying, and takes it back off when chosen again |
 | `SETTINGS` | Opens the settings panel |
 
-The mouse works the screen too. The pointer moving onto an entry puts the cursor there and a click chooses it, so `START FLIGHT` is one click from the page loading. It is the same cursor the keys move rather than a second one beside it: a click chooses the entry it landed on whatever the keys had walked to, and the keys carry on from wherever the pointer left off. The screen is otherwise transparent to the mouse - only the menu on it takes the pointer, and the world behind it goes on being a world rather than a button.
+The mouse works the screen too, and every menu it opens. The pointer moving onto an entry puts the cursor there and a click chooses it, so `START FLIGHT` is one click from the page loading and a world in the settings panel is one click from being flown. It is the same cursor the keys move rather than a second one beside it: a click chooses the entry it landed on whatever the keys had walked to, and the keys carry on from wherever the pointer left off. The title screen and the pause card are otherwise transparent to the mouse - only the menu on each takes the pointer, and the world behind them goes on being a world rather than a button.
 
 This is the opening screen rather than a menu to come back to: once the flight has started, the way back to Game Modes, Controls, and Settings is the pause menu.
 
@@ -121,7 +121,7 @@ This is the opening screen rather than a menu to come back to: once the flight h
 
 `P` latches the simulation clock at zero: the flight model, gravity, and the orbit camera all stop, the last frame stays on screen, and a menu opens over it. Pressing `P` again resumes from exactly where the flight left off, with the time spent paused discarded rather than applied in one jump.
 
-The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between the entries, wrapping round both ends, and `Enter` or `Space` chooses the one under the cursor. The mouse works it the same way the start screen is worked - the pointer moves the cursor and a click chooses - so a flight paused with a hand on the mouse is resumed with the same hand:
+The menu is flown the way the aircraft is. `W`/`S` or `↑`/`↓` move between the entries, wrapping round both ends, and `Enter` or `Space` chooses the one under the cursor. Every one of those keys also works a control surface, so a menu on screen takes them before the flight behind it can read them: walking a list never also pitches or rolls the aircraft under it. Every other key is read as it always was, so `F2` still takes a picture of a paused world. The mouse works the menu the same way the start screen is worked - the pointer moves the cursor and a click chooses - so a flight paused with a hand on the mouse is resumed with the same hand:
 
 | Entry | Does |
 |-------|------|
@@ -137,7 +137,9 @@ The cursor starts on `RESUME` every time the menu opens, so resuming is always o
 
 The settings panel opens on `O`, and from either menu, and holds the same choices whichever way it was opened. It is the one overlay that clears the screen it was opened from, because the point of picking an environment is seeing the environment, and it holds the simulation clock while it is up, so a setting is changed by looking at the world rather than by flying into it while looking.
 
-The panel is in three parts. Under `ENVIRONMENT` is the world being flown: every entry is one of the five [assembled environments](#environments), the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.
+The panel is in three parts, each under a heading of its own, and one cursor walks all three as though they were one list - with the keys, or with the mouse. A click does whatever choosing that row does: it picks a world, steps an option on to its next setting, or turns a box over.
+
+Under `ENVIRONMENT` is the world being flown: every entry is one of the five [assembled environments](#environments), the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.
 
 Under `START STATE` is the condition a flight opens in, which is the same condition `RESET FLIGHT` and `R` put it back into.
 
@@ -186,7 +188,7 @@ Every choice is stored in `localStorage`, so the world, the start, and the optio
 
 ### Game modes
 
-`GAME MODES`, on the start screen and in the pause menu, opens a list of the flights that are played rather than flown. Choosing one lays out its world and opens its first stage; choosing `FREE FLIGHT` puts the world and the settings you chose back. The one being played is marked, the panel closes behind whatever is chosen, and `Esc` or `BACK` leaves without changing anything.
+`GAME MODES`, on the start screen and in the pause menu, opens a list of the flights that are played rather than flown. Choosing one - with the keys or with a click - lays out its world and opens its first stage; choosing `FREE FLIGHT` puts the world and the settings you chose back. The one being played is marked, the panel closes behind whatever is chosen, and `Esc` or `BACK` leaves without changing anything.
 
 A mode brings its own world with it, so the `ENVIRONMENT` setting is not consulted while one is being played. The worlds the modes are flown over are deliberately thin - what a mode asks the pilot to read is the objective, not the scenery around it.
 
@@ -209,7 +211,7 @@ The engine runs behind the flight, its note and its loudness read off the thrott
 
 ### Clearing the screen
 
-Two keys take the overlays off the view. `H` collapses the control list in the bottom left corner down to a single `H - CONTROLS` line, and pressing it again brings the list back - as does the pause menu's `CONTROLS` entry, for a list whose key has been forgotten. `Tab` clears the instruments off entirely, the artificial horizon included, for a clean view out of the window; that choice is stored, so a flight that ends with the instruments off starts the next one the same way. A browser that refuses storage costs the choice its memory and nothing else.
+Two keys take the overlays off the view. `H` collapses the control list in the bottom left corner down to a single `H - CONTROLS` line, and pressing it again brings the list back - as does the pause menu's `CONTROLS` entry, for a list whose key has been forgotten, and as does clicking the list itself, for a pilot working the menus with the mouse. `Tab` clears the instruments off entirely, the artificial horizon included, for a clean view out of the window; that choice is stored, so a flight that ends with the instruments off starts the next one the same way. A browser that refuses storage costs the choice its memory and nothing else.
 
 The warnings are not part of what those keys hide. `LOW ALTITUDE`, `CRASHED`, and `LANDED` still appear over a cleared screen, because they are what a pilot needs to be told about whatever the view is set to.
 
@@ -236,7 +238,7 @@ The HUD in the top left corner reads:
 
 The scales the first three are read on are set from the [settings panel](#settings). They are conversions of the same reading rather than a second set of tuning numbers, so the flight model never learns which scale is on the dial and the two can never drift apart.
 
-The minimap in the top right corner is a north-up chart of the world: `+Z` is north and runs up the face, `+X` is east and runs across it, and the marker turns under a fixed card rather than the card turning under the marker. It is fitted to whichever environment is being flown, so the marker means the same thing after a world is changed as it did before. Fly at an edge and the marker crosses it and reappears at the opposite one, because [that is what the aircraft does](#the-edge-of-the-world); the red off-map reading it still carries is for a host flying the [Pilot API](#simulator-api) over a world of its own with the crossing turned off.
+The minimap in the top right corner is a north-up chart: `+Z` is north and runs up the face, `+X` is east and runs across it, and the marker turns under a fixed card rather than the card turning under the marker. [The world itself has no bounds to draw](#the-edge-of-the-world), so what the chart is fitted to is the tile being flown over: crossing into the next one moves the marker to the edge it came in over and the chart on to the new square, which is a chart that says where in the country the aircraft is rather than one pinned to a world that does not end. The red off-map reading it still carries is for a host flying the [Pilot API](#simulator-api) over a world of its own with bounds the aircraft has left.
 
 The attitude indicator in the bottom right corner is the artificial horizon. The ball rolls against the bank so its horizon stays where the real one is, and the ladder slides against the pitch, carrying a labelled rung every 10 degrees with a tick between them, out to 60 degrees either side. The marks around the rim read the bank angle at the index on top of the face, at 10, 20, 30, 45, and 60 degrees either side of level, and the amber wings across the middle are the aircraft itself.
 
@@ -263,7 +265,8 @@ pilot-matter/
 │   ├── crash.js        # Pure ground rules: impact, landing, and the crash countdown
 │   ├── game-modes.js   # Pure modes, stages, run state, course, and the gate test
 │   ├── rings.js        # A loop course as the hoops it is drawn with
-│   ├── world-edge.js   # Pure crossing that carries the world round at its bounds
+│   ├── world-edge.js   # Pure crossing that carries a bounded world round at its edges
+│   ├── world-tiles.js  # Pure grid the endless ground is laid on, and what is drawn of it
 │   ├── input-map.js    # Pure keybinding map and keyboard-to-input-state mapping
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── title-screen.js # Pure start rules and the held pre-flight clock
@@ -275,7 +278,7 @@ pilot-matter/
 │   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── photo.js        # Pure photo mode state and filename, and the download
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
-│   ├── terrain.js      # An assembled environment as scene geometry
+│   ├── terrain.js      # An assembled environment as scene geometry, tile by tile
 │   ├── day-night.js    # Pure day cycle: the sky, the light, and the sun's arc
 │   ├── water.js        # Pure wave, sheen, and the surface animation both use
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
@@ -314,10 +317,13 @@ a start edited to any other condition and the attitude that holds that one,
 throttle and lift math, the engine and wind mix and its mute, the crash
 threshold and countdown, the touchdown rules that tell a landing from a crash,
 the geometry of a runway and the search that sites one, the takeoff a flight is
-held at, the crossing that carries the world round at its edges,
+held at, the crossing that carries a bounded world round at its edges, the grid
+the endless ground is laid on and the promise it makes that no position can see
+the end of it,
 photo mode's state and the names it writes, camera damping, pause toggling, the
 start screen's rules, start-up progress, menu selection by key and by pointer
-and the one cursor they share, the settings panel with
+and the one cursor they share, the keys a menu takes back off the flight, the
+settings panel with
 its options, its start state fields, its radio group and its held box, and their
 stored choices, the game modes with their stages, their runs, their courses, and
 the gate test, terrain noise and
@@ -455,13 +461,15 @@ Two more environments are built for the [game modes](#game-modes) rather than to
 
 ### The edge of the world
 
-The ground is a square, and past it there is nothing to sample: an aircraft flown far enough would find itself over a flat nothing that the fog had been promising was more world. Rather than fence the pilot in, the world is carried round. Crossing an edge puts the aircraft back in over the opposite one, at the same distance past it, at the same altitude, on the same heading, and at the same airspeed. The edge can be flown at, and flown over, and never reached.
+There is not one. The square an environment describes is one tile of an endless grid of them, and the tiles around the aircraft are drawn out past everything the camera can see, so the ground the fog was promising is actually there. Fly at an edge and another tile is already laid beyond it. There is nothing left to reach.
 
-Only the horizontal position moves, because the altitude, the attitude, and the heading are the flight, and a flight that changed when the map ran out would be a fence with extra steps. The two axes are carried on their own, so a corner crossed diagonally comes back in at the opposite corner rather than at whichever of its two edges was crossed first. Sitting exactly on a boundary is still inside the world: a position that has only reached the edge has not crossed it.
+Each tile is the same description of a world, seeded from its own place in the grid: the same peaks, the same rivers, and the same streets that preset lays down, arranged differently because the place is different. The tile at a given place is that ground every time it is laid, so a country worth flying back to is still there on the way back. The middle tile is the description untouched - a world laid as the middle of a grid and the same world laid on its own are the same ground - which is what keeps every stored seed, every course, and every runway exactly where it was.
 
-The world does not repeat seamlessly - the ground at one edge has nothing to do with the ground at the other, so the crossing is a cut rather than a join, and the chase camera cuts with it rather than flying the width of the world to catch up. It is a long way to fly: the square is 16000 units across and cruise speed is 120 units per second, so the nearest edge is more than a minute away from the middle. What the crossing replaces is the older behaviour, where the minimap marker held the edge and turned red because there was genuinely nothing left to fly over.
+The ground is drawn out 12000 units past the aircraft, which is as far as the camera is drawn at, rather than out to where the fog happens to end - the fog is a setting the pilot can turn down and the far plane is not. Tiles are laid a few at a time, one per frame, so crossing into new country costs a frame or two rather than a stall, and the tile the aircraft is actually over is always drawn before it is flown over. Ground far enough behind is released, but not the moment it goes out of reach: a tile is held a little past that, so an aircraft weaving over the line does not generate the same country again every time it crosses back.
 
-The [Pilot API](#simulator-api) does the same for a host's own terrain, from the bounds that terrain declares, and a host whose world continues past what it declared turns it off with `wrap: false`.
+What the grid does not yet do is hide its joins. The base ground runs on across a join, because it is noise read off the world rather than off the tile, but what the elements drew stops at the tile they were drawn for - a river reaches the edge and the next tile's river begins somewhere else. Settling those joins the way [an assembly settles them](#worlds-laid-beside-each-other) is the next step; a seam in the distance is a smaller thing than the end of the world.
+
+The [Pilot API](#simulator-api) still carries a host's own terrain round at the bounds that terrain declares, because a host's world is the size the host says it is. A host whose world continues past what it declared turns the crossing off with `wrap: false`.
 
 ### Worlds laid beside each other
 

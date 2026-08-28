@@ -84,6 +84,10 @@
             stroke-linejoin: round;
         }
 
+        /* The list takes the pointer back from the flight behind it, because it
+           is what the Controls entry puts on screen and so is also the way back
+           off it: a click collapses it to its hint line, and a click on what is
+           left opens it again. */
         #controls-help {
             display: none;
             position: fixed;
@@ -95,7 +99,7 @@
             background: rgba(0, 0, 0, 0.5);
             padding: 10px 15px;
             border-radius: 8px;
-            pointer-events: none;
+            cursor: pointer;
             z-index: 100;
         }
 
@@ -318,12 +322,18 @@
             padding-left: 6px;
         }
 
+        /* The headings the panel is divided by. Set large and underlined
+           against the rows beneath them, so a panel long enough to scroll is
+           read as three sections rather than as one run of entries. */
         #settings h3 {
             margin-top: 14px;
             color: #f0f2f3;
-            font-size: 11px;
+            font-size: 24pt;
             font-weight: normal;
             letter-spacing: 4px;
+            text-align: left;
+            text-decoration: underline;
+            text-underline-offset: 5px;
         }
 
         #settings small,
@@ -382,6 +392,13 @@
             letter-spacing: 3px;
             border: 1px solid transparent;
             border-radius: 4px;
+            /* A list is read down its left edge, however the card around it is
+               set: entries of different lengths line up under each other rather
+               than each sitting in its own place across the card. */
+            text-align: left;
+            /* Every menu is worked with the mouse as well as with the keys, so
+               every entry says so under the pointer. */
+            cursor: pointer;
         }
 
         #pause-menu li.selected,
@@ -398,15 +415,12 @@
         /* The title screen and the pause card both lie over the flight without
            taking the mouse from it. The menu on each is the exception: it is
            what a pointer over either card is there for, so the entries take back
-           the pointer the card lets through. */
+           the pointer the card lets through. The settings and modes panels are
+           modal over the flight and already hold the pointer, so their lists
+           need nothing said about it. */
         #start-menu,
         #pause-menu {
             pointer-events: auto;
-        }
-
-        #start-menu li,
-        #pause-menu li {
-            cursor: pointer;
         }
 
         /* Three lists under three headings sit closer together than one list on
@@ -561,13 +575,13 @@
     <div id="title-screen">
         <h1>PILOT MATTER</h1>
         <ul id="start-menu"></ul>
-        <p>W/S OR MOUSE TO SELECT, ENTER OR CLICK TO CHOOSE</p>
+        <p>W/S, ↑/↓ OR MOUSE TO SELECT, ENTER OR CLICK TO CHOOSE</p>
     </div>
 
     <div id="paused">
         <h2>PAUSED</h2>
         <ul id="pause-menu"></ul>
-        <small>W/S OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; P TO RESUME</small>
+        <small>W/S, ↑/↓ OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; P TO RESUME</small>
     </div>
 
     <div id="settings">
@@ -578,13 +592,13 @@
         <ul id="settings-start"></ul>
         <h3>OPTIONS</h3>
         <ul id="settings-options"></ul>
-        <small>W/S TO SELECT &middot; A/D TO ADJUST &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
+        <small>W/S OR ↑/↓ TO SELECT &middot; A/D OR ←/→ TO ADJUST &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
     <div id="game-modes">
         <h2>GAME MODES</h2>
         <ul id="game-modes-menu"></ul>
-        <small>W/S TO SELECT &middot; ENTER TO CHOOSE &middot; ESC TO CLOSE</small>
+        <small>W/S, ↑/↓ OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>

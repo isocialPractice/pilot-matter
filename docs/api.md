@@ -727,7 +727,7 @@ function frame(dt) {
 | `createField(options)` | An empty height and colour field |
 | `sampleHeight(field, x, z)` | The ground under a point of a field |
 | `fieldBounds(field)` | The square a field covers, in the world rather than in its own coordinates |
-| `tileSeed(seed, x, z)` | The seed one square of an assembly is laid out from |
+| `tileSeed(seed, x, z)` | The seed one square of an assembly is laid out from; the middle square is the seed itself, and no two places in a grid share one |
 | `matchEdges(fields, options)` | Settles an assembly wherever its fields meet |
 | `SEAM_BLEND` | How far a join is eased back into the ground, in vertices |
 | `waterSurface(field)` | The water a world settled at, as the vertices under its level |
@@ -924,3 +924,11 @@ if (carried.wrapped) myAircraft.position.set(carried.x, myAircraft.position.y, c
 
 Sitting exactly on a boundary is still inside the world: a position that has
 only reached the edge has not crossed it.
+
+The bundled simulator answers the same question a different way. Rather than
+carry the aircraft round one square, it lays the square down as one tile of an
+endless grid and draws the tiles around the aircraft out past the far plane, so
+the ground it is over is always ground that continues. A host can build the same
+thing out of what is published here - `tileSeed` for the seed a place is laid
+out from, and `createEnvironment({ tile })` for the square it is laid at - or use
+`createTiledEnvironment` for a grid of a fixed size with its joins settled.

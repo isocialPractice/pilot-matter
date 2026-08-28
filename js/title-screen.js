@@ -12,8 +12,10 @@
 export const TITLE_NAME = 'PILOT MATTER';
 
 // What the screen says under the menu: the keys and the mouse that work it, in
-// the same words the pause menu uses for the same two.
-export const START_HINT = 'W/S OR MOUSE TO SELECT, ENTER OR CLICK TO CHOOSE';
+// the same words the pause menu uses for the same two. Both sets of keys the
+// cursor answers to are named, because a pilot who reaches for the arrows and
+// is told only about W/S reads the arrows as not working.
+export const START_HINT = 'W/S, ↑/↓ OR MOUSE TO SELECT, ENTER OR CLICK TO CHOOSE';
 
 export function createTitleState() {
     return { started: false };

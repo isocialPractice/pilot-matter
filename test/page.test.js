@@ -42,6 +42,13 @@ function collectScripts(directory, prefix = '') {
 const scriptDir = fileURLToPath(new URL('../js', import.meta.url));
 const scripts = collectScripts(scriptDir);
 
+// Every menu drawn into the page: the two cards, the panels they open, and the
+// three lists one panel is split across.
+const MENU_LISTS = [
+    'start-menu', 'pause-menu', 'game-modes-menu',
+    'settings-menu', 'settings-start', 'settings-options'
+];
+
 // The browser tab shows the title next to the favicon, so the two should
 // name the same thing rather than a leftover working title.
 test('the page title is the name of the game', () => {
@@ -272,6 +279,61 @@ test('both menus worked with the mouse say so under their entries', () => {
     assert.ok(card, 'index.html should carry the pause card');
     assert.ok(/MOUSE/.test(card[1]), 'the pause card should name the mouse too');
     assert.ok(/CLICK/.test(card[1]), 'and say that a click chooses');
+});
+
+// The panels opened from those two menus are menus as well, and a menu the
+// pointer does nothing on is a menu that reads as broken next to one it does.
+test('every menu on screen reads as something the pointer works', () => {
+    for (const id of MENU_LISTS) {
+        assert.ok(styled(indexHtml, `#${id} li`, /cursor:\s*pointer/),
+            `the entries of #${id} should read as something to click`);
+    }
+});
+
+test('every menu is read down its left edge rather than about its middle', () => {
+    for (const id of MENU_LISTS) {
+        assert.ok(styled(indexHtml, `#${id} li`, /text-align:\s*left/),
+            `the entries of #${id} should line up under each other`);
+    }
+});
+
+// The list is what the Controls entry puts on screen, so it is also the way
+// back off it for a pilot working the menus with the mouse.
+test('the control list takes the pointer rather than passing it to the flight', () => {
+    const rule = styleRule(indexHtml, 'controls-help') ?? '';
+    assert.ok(!/pointer-events:\s*none/.test(rule),
+        '#controls-help should take the click that collapses it');
+    assert.ok(/cursor:\s*pointer/.test(rule),
+        'and should read as something to click');
+});
+
+// The panel is long enough to scroll, so its headings have to be readable as
+// the divisions they are rather than as another row of the list.
+test('the settings headings are set apart from the entries under them', () => {
+    const heading = styleRules(indexHtml)
+        .find(rule => rule.selectors.includes('#settings h3'))?.body ?? '';
+
+    assert.ok(/text-decoration:\s*underline/.test(heading), '#settings h3 should be underlined');
+    assert.ok(/text-underline-offset/.test(heading), 'and hold the rule off the text');
+    assert.ok(/text-align:\s*left/.test(heading), 'and sit over the left edge of the list it heads');
+
+    const size = heading.match(/font-size:\s*(\d+(?:\.\d+)?)(pt|px)/);
+    assert.ok(size, '#settings h3 should set a size of its own');
+    const points = size[2] === 'pt' ? Number(size[1]) : Number(size[1]) * 0.75;
+    assert.ok(points >= 18, `a heading at ${size[1]}${size[2]} does not read as one`);
+});
+
+// Both sets of keys move the cursor, so a card naming only one of them tells a
+// pilot who reached for the arrows that the arrows do not work.
+test('every card that carries a menu names the arrow keys as well as W/S', () => {
+    assert.ok(/↑\/↓/.test(START_HINT), 'the start screen hint should name the arrow keys');
+
+    for (const id of ['paused', 'settings', 'game-modes']) {
+        const card = indexHtml.match(new RegExp(`<div id="${id}">([\\s\\S]*?)</div>`));
+        assert.ok(card, `index.html should carry the ${id} card`);
+        assert.ok(/W\/S/.test(card[1]) && /↑\/↓/.test(card[1]),
+            `the ${id} card should name both ways the cursor is moved`);
+    }
 });
 
 // The browser resolves every import itself, and the modules that pull in

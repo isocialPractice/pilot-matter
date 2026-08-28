@@ -5,6 +5,71 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0-alpha] - 2026-08-28
+
+### Added
+
+- **A world with no edge.** The world was one square with nothing outside it,
+  and carrying the aircraft round at the bounds kept the ground from running out
+  without keeping the edge from being reached: the seam where the world stopped
+  could still be flown at, and crossing it moved the flight rather than
+  continuing it. The square is now one tile of an endless grid of them, each
+  tile the same description of a world seeded from its own place in that grid,
+  and the tiles around the aircraft are drawn out as far as the camera is drawn
+  at - so the ground the fog was promising is actually there and there is nothing
+  left to reach. The tile at a given place is that ground every time it is laid,
+  so a country worth flying back to is still there on the way back, and the
+  middle tile is the description untouched, which leaves every stored seed, every
+  course, and every runway exactly where it was
+- `js/world-tiles.js`, the arithmetic of that grid and nothing else: which tile a
+  place is in, where a tile sits, which tiles have to be drawn for an aircraft
+  somewhere in it, and which are worth holding on to. Pure, so the promise it
+  makes - that from any position the ground runs further in every direction than
+  the camera can see - is a property the tests check across the whole of a tile
+  rather than a claim about one position
+- **Every menu answers to the mouse**, not only the two the flight opens on. The
+  modes panel and all three lists of the settings panel now follow the pointer
+  and choose on a click, and a click does whatever choosing that row does: picks
+  a world, steps an option on to its next setting, or turns a box over. The
+  control list takes the pointer too, so a click collapses it and a click on what
+  is left opens it again, which is the way back off it for a pilot who never
+  reached for `H`
+
+### Changed
+
+- **A menu takes its keys back off the flight behind it.** Every key that works a
+  menu also works a control surface, and only the start screen was taking them,
+  so walking the pause menu or the settings panel was also pitching and rolling
+  the aircraft under it. A menu on screen now reads the cursor and adjust keys
+  ahead of the flight and stops them there; every other key is read as it always
+  was, so `F2` still takes a picture of a paused world and `Esc` still closes a
+  panel. Both sets of keys the cursor answers to are named on every card that
+  carries a menu, because a pilot who reaches for the arrows and is told only
+  about `W`/`S` reads the arrows as not working
+- The chart in the corner is fitted to the tile being flown over rather than to a
+  world that no longer has bounds to draw. Crossing into the next tile moves the
+  marker to the edge it came in over and the chart on to the new square, which
+  says where in the country the aircraft is instead of pinning it to an edge
+- Menu entries are read down their left edge rather than about their middle, so
+  entries of different lengths line up under each other, and every one of them
+  reads as something to click. The settings panel's headings are set large,
+  underlined, and over the left edge of the list each heads, so a panel long
+  enough to scroll reads as three sections rather than one run of rows
+- The ground is laid a tile at a time, one per frame, so changing world costs a
+  few slow frames rather than one long stall - and the tile the aircraft is
+  actually over is always drawn before it is flown over, never on a budget
+
+### Fixed
+
+- `tileSeed` gave a place and the place opposite it the same seed, because taking
+  one coordinate against the other is only as good as its symmetries: an endless
+  world laid out from it would have been folded in half about its middle, with
+  the country north-east of the start laid out again to the south-west. The two
+  coordinates are now stirred together rather than combined, and no two places in
+  a grid share a seed. The middle tile is still the seed itself, so a world laid
+  as one square of a grid and the same world laid on its own remain the same
+  ground
+
 ## [1.11.0-alpha] - 2026-08-27
 
 ### Added

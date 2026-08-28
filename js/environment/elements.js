@@ -191,13 +191,35 @@ export function pick(random, [low, high]) {
  * the description it was built from and mixes its place in the grid into it, so
  * neighbouring tiles are the same world without being the same ground, and the
  * tile at a given place is that ground every time it is laid.
+ *
+ * The middle tile is the description itself, untouched, so a world laid as one
+ * square of a grid and the same world laid on its own are the same ground.
  */
 export function tileSeed(seed = 1, x = 0, z = 0) {
     // Halves are kept because an assembly of an even number of tiles is centred
     // on a join rather than on a tile, which puts every origin on a half.
     const gx = Math.round(x * 2) | 0;
     const gz = Math.round(z * 2) | 0;
-    return (Math.trunc(seed) + ((gx * 73856093) ^ (gz * 19349663))) >>> 0;
+    return (Math.trunc(seed) + tileMix(gx, gz)) >>> 0;
+}
+
+/**
+ * What a place in the grid contributes to the seed laid there: nothing at the
+ * middle, and a well spread value everywhere else.
+ *
+ * The two coordinates are stirred together rather than combined, because a
+ * combination is only as good as its symmetries. Multiplying each by a constant
+ * and taking one against the other reads as scattered but is not: it gives the
+ * same answer at a place and at its opposite, which would fold an endless world
+ * in half about its middle and lay the same ground out twice.
+ */
+function tileMix(gx, gz) {
+    if (gx === 0 && gz === 0) return 0;
+
+    let h = (Math.imul(gx, 0x27d4eb2d) + Math.imul(gz, 0x165667b1) + 0x9e3779b9) | 0;
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+    h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+    return (h ^ (h >>> 15)) >>> 0;
 }
 
 // --- Configurable ranges --------------------------------------------------

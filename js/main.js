@@ -9,10 +9,10 @@ import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from '
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
     createMenuState, resetSelection, applyMenuKey, applyMenuPointer, isMenuKey, selectedId,
-    isMenuAdjustKey, menuAdjustStep,
-    MenuList, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
+    isMenuAdjustKey, isMenuControlKey, menuAdjustStep,
+    MenuList, followPointers, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
-import { createHelpState, applyHelpKey, expandHelp } from './controls-help.js';
+import { createHelpState, applyHelpKey, expandHelp, toggleHelp } from './controls-help.js';
 import {
     createHudVisibilityState, applyHudToggleKey, isHudToggleKey, defaultStorage
 } from './hud-visibility.js';
@@ -159,13 +159,14 @@ class FlightSimulator {
         this.pauseMenu    = new MenuList(document.getElementById('pause-menu'), this.pauseMenuState);
         this.modesMenu    = new MenuList(document.getElementById('game-modes-menu'), this.modesState);
 
-        // The screen the game opens on and the screen it pauses on are worked
-        // with the mouse as well as the keys: the cursor follows the pointer
-        // across the entries, and a click chooses the one under it. Both cards
-        // lie over the flight without taking the mouse from it, so it is the
-        // menu on each that takes the pointer rather than the card around it.
+        // Every menu on screen is worked with the mouse as well as the keys: the
+        // cursor follows the pointer across the entries, and a click chooses the
+        // one under it. The cards lie over the flight without taking the mouse
+        // from it, so it is the menu on each that takes the pointer rather than
+        // the card around it.
         this.startMenu.followPointer((index, choose) => this.onStartPointer(index, choose));
         this.pauseMenu.followPointer((index, choose) => this.onPausePointer(index, choose));
+        this.modesMenu.followPointer((index, choose) => this.onGameModesPointer(index, choose));
 
         // One cursor, three lists: the worlds under one heading of the panel,
         // the start state under the next, and the options that hold whichever
@@ -182,6 +183,20 @@ class FlightSimulator {
             document.getElementById('settings-options'), this.settingsState,
             entry => entry.kind !== ENVIRONMENT_ENTRY && entry.group !== START_GROUP
         );
+
+        // Three lists, one cursor, and so one pointer: an entry is reported by
+        // its place in the whole panel rather than by its row in the list it was
+        // drawn into, so the mouse and the keys walk the same panel.
+        followPointers(
+            [this.settingsMenu, this.settingsStart, this.settingsOptions],
+            (index, choose) => this.onSettingsPointer(index, choose)
+        );
+
+        // The control list is the one thing the Controls entry puts on screen,
+        // so it is also the way back off it for a pilot working the menus with
+        // the mouse: clicking the list collapses it, and clicking what is left
+        // opens it again.
+        this.overlays.help.addEventListener('click', () => this.onHelpClick());
 
         this.setupKeys();
         this.applySettings();
@@ -313,19 +328,32 @@ class FlightSimulator {
         } : {});
     }
 
+    /** True while something the pilot works with the menu keys is on screen. */
+    menuShowing() {
+        return this.modesOpen || settingsShowing(this.settings) || this.pauseState.paused;
+    }
+
     setupKeys() {
-        // The start screen swallows every key it sees, so working its menu
-        // never also moves a control surface. This listener runs on the way
-        // down to the page, ahead of the aircraft's and the camera's, which
-        // listen on the way back up.
+        // A menu takes the keys that work it before the flight behind it can
+        // read them, so walking a list never also pitches an aircraft. This
+        // listener runs on the way down to the page, ahead of the aircraft's and
+        // the camera's, which listen on the way back up.
+        //
+        // The start screen takes every key it sees, because there is no flight
+        // yet for any of them to be part of. A menu over a flight takes only the
+        // keys it works with - the same keys that fly the aircraft - and leaves
+        // the rest to be read as they always were.
         window.addEventListener('keydown', (e) => {
-            if (!titleShowing(this.titleState)) return;
             // A key held with a modifier is a browser shortcut rather than a
             // menu key, and is left to the browser
             if (e.ctrlKey || e.altKey || e.metaKey) return;
 
+            const onTitle = titleShowing(this.titleState);
+            if (!onTitle && !(this.menuShowing() && isMenuControlKey(e.code))) return;
+
             if (SWALLOWED_KEYS.includes(e.code)) e.preventDefault();
-            this.onStartKey(e);
+            if (onTitle) this.onStartKey(e);
+            else this.onKeyDown(e);
             e.stopPropagation();
         }, true);
 
@@ -487,10 +515,38 @@ class FlightSimulator {
         this.syncOverlays();
     }
 
+    /**
+     * The control list under the mouse. It is what the Controls entry puts on
+     * screen, so it is also the way back off it: a click collapses the list to
+     * its hint line and another opens it again, which is the H key's job for a
+     * pilot working the menus with the keyboard.
+     *
+     * Over the title screen the list is not a toggle but a panel the start menu
+     * opened, so a click there closes it the way choosing Controls again would.
+     */
+    onHelpClick() {
+        if (titleShowing(this.titleState)) this.titleHelp = false;
+        else toggleHelp(this.helpState);
+
+        this.syncOverlays();
+    }
+
     openSettingsPanel() {
         this.modesOpen = false;
         openSettings(this.settings);
         resetSelection(this.settingsState);
+    }
+
+    /**
+     * The settings panel under the mouse. Every choice the panel offers goes
+     * through the same place a chosen entry does, so a click on a world picks
+     * it, a click on an option steps it on, and a click on a box turns it over -
+     * the same answers the keys get.
+     */
+    onSettingsPointer(index, choose) {
+        const chosen = applyMenuPointer(this.settingsState, index, choose);
+        if (chosen) this.chooseSettingsEntry(chosen);
+        this.syncOverlays();
     }
 
     onSettingsKey(e) {
@@ -555,6 +611,17 @@ class FlightSimulator {
     }
 
     /**
+     * The modes panel under the mouse. The panel is modal over whatever it was
+     * opened from, so a pointer that reaches an entry is a pointer over the one
+     * list being worked.
+     */
+    onGameModesPointer(index, choose) {
+        const chosen = applyMenuPointer(this.modesState, index, choose);
+        if (chosen) this.chooseGameMode(chosen);
+        this.syncOverlays();
+    }
+
+    /**
      * Starts a mode, or stops the one being played. Either way it is a fresh
      * world and a fresh flight, so the panel closes behind it rather than
      * leaving the pilot looking at a list over the world they asked for.
@@ -598,16 +665,28 @@ class FlightSimulator {
     }
 
     /**
+     * Lays the ground around the aircraft and takes the chart with it. The map
+     * in the corner is drawn to the tile being flown over rather than to a world
+     * that has no bounds to draw, so crossing into the next tile is a new square
+     * on the chart rather than a marker pinned to an edge.
+     */
+    flyOver(position) {
+        if (!this.terrain.focusOn(position.x, position.z)) return;
+
+        this.bounds = this.terrain.getBounds();
+        this.hud.setBounds(this.bounds);
+    }
+
+    /**
      * Watches the step the aircraft just flew for the gate the course is
      * waiting on. A step rather than a position, because a gate is thinner than
-     * the distance covered in a frame; and never across a world edge, because
-     * the far side of the world is not somewhere the aircraft flew to.
+     * the distance covered in a frame.
      */
-    trackCourse(wrapped) {
+    trackCourse() {
         const position = this.aircraft.getPosition();
         const gate = nextGate(this.run);
 
-        if (wrapped || gate < 0 || !this.lastPosition) {
+        if (gate < 0 || !this.lastPosition) {
             this.lastPosition = position;
             return;
         }
@@ -702,13 +781,14 @@ class FlightSimulator {
 
         this.aircraft.update(dt, groundH);
 
-        // The world has no outside: an aircraft that reaches an edge comes back
-        // in over the opposite one. Carried before the camera is placed, so the
-        // chase view cuts across with it rather than flying the width of the
-        // world to catch up.
-        const wrapped = this.aircraft.wrapInside(this.bounds);
+        // The world has no end to it: the ground is laid on ahead of the
+        // aircraft as it flies, out past everything the camera can see, so the
+        // edge the fog used to be hiding is never there to be reached. Drawn
+        // before the camera is placed, so the chase view never swings out over
+        // ground that has not been laid yet.
+        this.flyOver(this.aircraft.getPosition());
 
-        this.trackCourse(wrapped);
+        this.trackCourse();
         this.advanceRun(dt);
 
         this.camera2.update(dt);

@@ -12,13 +12,17 @@ import {
     selectedId,
     moveSelection,
     resetSelection,
+    MENU_UP_KEYS,
+    MENU_DOWN_KEYS,
     isMenuKey,
     isMenuAdjustKey,
+    isMenuControlKey,
     menuAdjustStep,
     applyMenuKey,
-    applyMenuPointer
+    applyMenuPointer,
+    followPointers
 } from '../js/menu.js';
-import { createInputState, applyKeyToInput } from '../js/input-map.js';
+import { createInputState, applyKeyToInput, DEFAULT_KEYMAP } from '../js/input-map.js';
 
 test('the pause menu offers a way out, a way back to the start, and the three panels', () => {
     const ids = PAUSE_MENU_ENTRIES.map(entry => entry.id);
@@ -141,6 +145,30 @@ test('stepping an entry is not choosing it, so a step never runs a menu entry', 
         assert.equal(applyMenuKey(state, code, true), null, `${code} should not choose an entry`);
     }
     assert.equal(state.index, 0, 'nor move the cursor');
+});
+
+// Every key a menu works with is also a key that flies the aircraft, which is
+// why a menu on screen has to take its keys before the flight behind it reads
+// them: walking a list would otherwise pitch and roll the aircraft under it.
+test('isMenuControlKey names every key a menu works with, cursor and value alike', () => {
+    for (const code of ['ArrowUp', 'ArrowDown', 'KeyW', 'KeyS', ...MENU_SELECT_KEYS,
+                        ...MENU_LEFT_KEYS, ...MENU_RIGHT_KEYS]) {
+        assert.equal(isMenuControlKey(code), true, `${code} should be taken by an open menu`);
+    }
+});
+
+test('a key no menu works with is left to the flight it belongs to', () => {
+    for (const code of ['KeyQ', 'KeyE', 'KeyC', 'KeyH', 'KeyM', 'KeyP', 'KeyR',
+                        'Tab', 'Escape', 'F2', 'ShiftLeft', 'ControlLeft']) {
+        assert.equal(isMenuControlKey(code), false, `${code} is not a menu's to take`);
+    }
+});
+
+test('every key that moves a menu also flies the aircraft, which is why it is taken', () => {
+    const flown = new Set(Object.values(DEFAULT_KEYMAP).flat());
+    for (const code of [...MENU_UP_KEYS, ...MENU_DOWN_KEYS, ...MENU_LEFT_KEYS, ...MENU_RIGHT_KEYS]) {
+        assert.ok(flown.has(code), `${code} works a menu, so it is a control surface it must not also move`);
+    }
 });
 
 // --- The pointer over the menu ---
@@ -322,15 +350,46 @@ test('a drawn list reports the entry the pointer crosses and the entry it clicks
     assert.deepEqual(seen, [[2, false], [2, true]]);
 });
 
-// A menu nobody hands to the mouse is a menu the mouse does nothing to, which
-// is how the panels stay worked by the keys alone.
-test('a list not handed to the mouse listens for nothing', () => {
+// A menu nobody hands to the mouse is a menu the mouse does nothing to, and a
+// list says which of the two it is, so a panel can be checked for having been
+// wired rather than assumed to have been.
+test('a list not handed to the mouse listens for nothing and says so', () => {
     const list = fakeList();
-    new MenuList(list, createMenuState());
+    const menu = new MenuList(list, createMenuState());
 
+    assert.equal(menu.pointed, false);
     for (const item of list.children) {
         assert.deepEqual(Object.keys(item.listeners), []);
     }
+
+    menu.followPointer(() => {});
+    assert.equal(menu.pointed, true);
+});
+
+// The settings panel draws one menu across three lists under three headings.
+// All three answer to one cursor, so all three answer to one pointer.
+test('every list of a panel is handed to the pointer at once', () => {
+    const state = createMenuState([
+        { id: 'world',  label: 'WORLD',  kind: 'a' },
+        { id: 'start',  label: 'START',  kind: 'b' },
+        { id: 'option', label: 'OPTION', kind: 'c' }
+    ]);
+
+    const lists = ['a', 'b', 'c'].map(kind => new MenuList(fakeList(), state, entry => entry.kind === kind));
+
+    const chosen = [];
+    assert.equal(followPointers(lists, (index, choose) => chosen.push([index, choose])), lists);
+
+    for (const menu of lists) assert.equal(menu.pointed, true);
+
+    lists[2].items[0].item.fire('click');
+    assert.deepEqual(chosen, [[2, true]],
+        'a click on the third list should report the third entry of the whole menu');
+});
+
+test('handing nothing to the pointer is not an error', () => {
+    assert.deepEqual(followPointers([], () => {}), []);
+    assert.deepEqual(followPointers([null], () => {}), [null]);
 });
 
 // A filtered list draws some of a menu, so a row's place on screen and its place

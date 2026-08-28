@@ -26,60 +26,6 @@ that applies when their items are completed.
   only one the pilot has ever seen
   - From: Game Modes
 
-### User Overrides
-
-#### Resolve Issues
-
-- [ ] Add mouse events to the pause and opening menu
-  - **Issue**: Mouse events are only applied to the inital menu
-  - **Goal**: Apply mouse events to nested menus e.g. "Game Modes", "Controls",
-    "Settings"
-  - From: Simulator Configuration
-- [ ] Handle the world edge: either wrap the aircraft position across the
-  16000-unit terrain bounds or recenter terrain tiles around the aircraft
-  so the fog-hidden edge can never be reached
-  - **Issue**: World edge can be reached
-  - **Goal**: Duplicate tile using a seed algorithm that redraws tile so edge is
-    not reachable
-    - **Hold Goal Context**:
-      - **Nested Goal**: Add a todo item to create a test to verify the edge
-        algorithm, placing it in the **World & Environment** section
-      - **Nested Goal**: Add a todo item to make a smart algorithm so that the
-        edge algorithm seeds new tiles seemlessly, blending them as a seemless
-        tile pattern, placing it in the **World & Environment** section
-      - **Nested Goal**: Add 2 new todo item to reassemble existing environments
-        relative to the edge algorithm
-        - First when seed algorithm redraws tiles, creating endless environment
-        - Second whenn smart algorithm is complete to create seemless endless
-          environment
-    - *Release Goal Context*
-  - From: World & Environment
-
-#### Overrides
-<!-- ()-> Define **Menus** as "For pause, opening, and nested menus"; -->
-- [ ] **Menus**; update styles like:
-<!-- exclude css when listed as complete -->
-```css
-div#settings h3, ul li {
-  text-align: left;
-}
-#settings h3 {
-  font-size: 24pt !important;
-  text-decoration: underline;
-  text-underline-offset: 5px;
-}
-```
-
-  - From: Simulator Configuration
-
-- [ ] **Menus**; improve UX like:
-  - Allow keydown of the "up arrow key" and the "down arrow key" to navigate
-    the menu list items
-  - From: Simulator Configuration
-- [ ] Add a todo item to **Game UI/UX** to use device tilt controls, and set
-  the use of tilt controls to default; but **only** when the simulator is
-  played on a phone or tablet without a keyboard
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -88,6 +34,10 @@ version update.
 
 - [ ] Add on-screen touch controls so the simulator is playable on a phone
   or tablet without a keyboard
+- [ ] Fly by tilting the device: read the orientation sensors for pitch and
+  roll, and make tilt the control the simulator opens in - but only on a
+  phone or tablet with no keyboard, so a machine that has keys is still
+  flown with them
 
 ## Game Modes UI/UX
 
@@ -145,6 +95,18 @@ minor version update.
 Grow the procedural world beyond the single terrain tile. Completing items
 in this section applies a minor version update.
 
+- [ ] Test the edge algorithm against the promise it makes: that from any
+  position, at any heading, the ground drawn reaches further than the camera
+  can see, and that the tile at a given place is the same ground every time
+  it is laid
+- [ ] Reassemble the five environments against the edge algorithm as it
+  stands, so a preset reads as one endless country rather than as the same
+  square laid again and again with a different seed
+- [ ] Make the edge algorithm seed a new tile against the tiles already
+  beside it, so neighbouring ground blends into a seamless pattern rather
+  than meeting at a join
+- [ ] Reassemble the five environments once the seamless algorithm lands, so
+  each is an endless world with no join anywhere in it
 - [ ] Integrate the weather system from the `local-weather` branch (clouds,
   rain, moon, sky styling) into main once its API stabilizes
 
@@ -468,3 +430,39 @@ in this section applies a patch version update.
 - [x] Animate water: give below-water-level vertices a subtle wave motion
   and specular tint distinct from land shading
   - From: World & Environment
+- [x] Add mouse events to the pause and opening menu
+  - **Issue**: Mouse events are only applied to the inital menu
+  - **Goal**: Apply mouse events to nested menus e.g. "Game Modes", "Controls",
+    "Settings"
+  - From: Simulator Configuration
+- [x] Handle the world edge: either wrap the aircraft position across the
+  16000-unit terrain bounds or recenter terrain tiles around the aircraft
+  so the fog-hidden edge can never be reached
+  - **Issue**: World edge can be reached
+  - **Goal**: Duplicate tile using a seed algorithm that redraws tile so edge is
+    not reachable
+    - **Hold Goal Context**:
+      - **Nested Goal**: Add a todo item to create a test to verify the edge
+        algorithm, placing it in the **World & Environment** section
+      - **Nested Goal**: Add a todo item to make a smart algorithm so that the
+        edge algorithm seeds new tiles seemlessly, blending them as a seemless
+        tile pattern, placing it in the **World & Environment** section
+      - **Nested Goal**: Add 2 new todo item to reassemble existing environments
+        relative to the edge algorithm
+        - First when seed algorithm redraws tiles, creating endless environment
+        - Second whenn smart algorithm is complete to create seemless endless
+          environment
+    - *Release Goal Context*
+  - From: World & Environment
+- [x] **Menus** (the pause menu, the opening menu, and the nested menus);
+  update styles
+  - From: Simulator Configuration
+- [x] **Menus** (the pause menu, the opening menu, and the nested menus);
+  improve UX like:
+  - Allow keydown of the "up arrow key" and the "down arrow key" to navigate
+    the menu list items
+  - From: Simulator Configuration
+- [x] Add a todo item to **Game UI/UX** to use device tilt controls, and set
+  the use of tilt controls to default; but **only** when the simulator is
+  played on a phone or tablet without a keyboard
+  - From: User Overrides `->` Overrides

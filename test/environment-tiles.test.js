@@ -115,6 +115,36 @@ test('a tile is laid out from its own place in the grid, every time it is laid',
     assert.ok(Number.isFinite(tileSeed(100, -0.5, 0.5)), 'an assembly can be centred on a join');
 });
 
+// The middle tile is the world the description always was, so a world laid as
+// one square of a grid and the same world laid on its own are the same ground.
+test('the middle of an assembly is the world its description asked for', () => {
+    assert.equal(tileSeed(100, 0, 0), 100);
+    assert.equal(tileSeed(4242, 0, 0), 4242);
+});
+
+// A grid whose seeds repeat is a world that repeats. Taking one coordinate
+// against the other used to give a place and its opposite the same seed, which
+// folded a world in half about its middle.
+test('no two places in a grid are laid out from the same seed', () => {
+    const seen = new Map();
+
+    for (let z = -12; z <= 12; z++) {
+        for (let x = -12; x <= 12; x++) {
+            const seed = tileSeed(1234, x, z);
+            assert.ok(!seen.has(seed),
+                `${x},${z} is the same ground as ${seen.get(seed)}`);
+            seen.set(seed, `${x},${z}`);
+        }
+    }
+});
+
+test('a place and the place opposite it are different ground', () => {
+    for (const [x, z] of [[1, 1], [1, -1], [2, -2], [3, -1], [4, -4]]) {
+        assert.notEqual(tileSeed(1234, x, z), tileSeed(1234, -x, -z),
+            `${x},${z} should not be the ground at ${-x},${-z}`);
+    }
+});
+
 test('an element drawn on a tile is drawn on the tile it was given', () => {
     const field = tile(1, 0);
     const before = Float32Array.from(field.height);

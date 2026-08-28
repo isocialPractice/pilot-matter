@@ -81,6 +81,18 @@ export function isMenuAdjustKey(code) {
 }
 
 /**
+ * True for any key a menu works with at all, whether it moves the cursor,
+ * chooses an entry, or steps the value under it.
+ *
+ * Every one of them also flies the aircraft, which is the reason this exists:
+ * a menu on screen has to be able to take its keys before the flight behind it
+ * reads them, or walking a list would pitch and roll the aircraft under it.
+ */
+export function isMenuControlKey(code) {
+    return isMenuKey(code) || isMenuAdjustKey(code);
+}
+
+/**
  * Which way an adjust key steps a value, as a number of places along the list
  * of settings it can take. A key that steps nothing is zero.
  */
@@ -125,6 +137,19 @@ export function applyMenuPointer(state, index, choose = false) {
 }
 
 /**
+ * Hands several lists to one pointer handler, which is what a panel drawing one
+ * menu across more than one list needs: the entry a click reports is its place
+ * in the whole menu whichever list it was drawn into, so three lists under three
+ * headings are worked as the one menu the cursor already treats them as.
+ *
+ * Returns the lists, so the wiring reads as one statement.
+ */
+export function followPointers(lists = [], handler) {
+    for (const list of lists) list?.followPointer(handler);
+    return lists;
+}
+
+/**
  * A menu as a list on screen, with the cursor drawn as the selected row.
  *
  * An entry can also mark itself as the one currently in force - the
@@ -149,6 +174,9 @@ export class MenuList {
         // Where the cursor was when the list was last drawn, so a redraw can
         // tell a cursor that moved from a list that was simply redrawn.
         this.cursor = null;
+        // Who is told about the pointer, and null for a list nobody has handed
+        // to it, which is a list worked with the keys alone.
+        this.handler = null;
 
         state.entries.forEach((entry, index) => {
             if (!include(entry, index)) return;
@@ -173,11 +201,21 @@ export class MenuList {
      * walks to rather than at whatever sits that far down the panel.
      */
     followPointer(handler) {
+        this.handler = handler;
+
         for (const { index, item } of this.items) {
             item.addEventListener('mouseenter', () => handler(index, false));
             item.addEventListener('click',      () => handler(index, true));
         }
         return this;
+    }
+
+    /**
+     * True once the list has been handed to the mouse, so a caller can tell a
+     * list that is worked with the pointer from one worked with the keys alone.
+     */
+    get pointed() {
+        return this.handler != null;
     }
 
     render(state) {
