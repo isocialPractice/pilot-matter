@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Game modes - Pilot Matter</title>
+    <meta name="description" content="Runway Landing and Flying through Loops, their stages, and what each gets harder at.">
+    <link rel="icon" href="../../favicon.png">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script src="../assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="../index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../quickstart.html">Quickstart</a></li>
+                <li><a href="../getting-started.html">Getting started</a></li>
+                <li><a href="../features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group" open>
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="../controls/index.html">The keys</a></li>
+                    <li><a href="../controls/loading.html">Loading</a></li>
+                    <li><a href="../controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="../controls/pausing.html">Pausing</a></li>
+                    <li><a href="../controls/settings.html">Settings</a></li>
+                    <li><a href="../controls/game-modes.html">Game modes</a></li>
+                    <li><a href="../controls/sound.html">Sound</a></li>
+                    <li><a href="../controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="../controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="../controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="../flight-model.html">The flight model</a></li>
+                <li><a href="../terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="../api.html">Simulator API</a></li>
+                <li><a href="../project-structure.html">Project structure</a></li>
+                <li><a href="../testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="../cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="../about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="../index.html">Documentation</a> / <a href="../controls/index.html">Controls</a> / Game modes</p>
+            <h1>Game modes</h1>
+
+<p><code>GAME MODES</code>, on the start screen and in the pause menu, opens a list of the flights that are played rather than flown. Choosing one - with the keys or with a click - lays out its world and opens its first stage; choosing <code>FREE FLIGHT</code> puts the world and the settings you chose back. The one being played is marked, the panel closes behind whatever is chosen, and <kbd>Esc</kbd> or <code>BACK</code> leaves without changing anything.</p>
+
+<p>A mode brings its own world with it, so the <code>ENVIRONMENT</code> setting is not consulted while one is being played. The worlds the modes are flown over are deliberately thin - what a mode asks the pilot to read is the objective, not the scenery around it.</p>
+
+<p>Every mode is four stages long, and every stage gets harder at exactly the thing its mode is about. A stage that is flown out is held on screen for a beat and then the next one is laid out; a crash puts the stage back to its beginning rather than ending the run. The card along the bottom of the screen says what is being played, what it wants, and how far through it you are.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Mode</th><th>Objective</th><th>Gets harder at</th></tr></thead>
+    <tbody>
+        <tr><td><code>RUNWAY LANDING</code></td><td>Put the aircraft down on the strip</td><td>Finding the runway, and reading the ground around it well enough to get down on it</td></tr>
+        <tr><td><code>FLYING THROUGH LOOPS</code></td><td>Fly the course of loops in order</td><td>Holding a line through several gates rather than flying at one at a time</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="runway-landing">Runway Landing</h2>
+
+<p><code>RUNWAY LANDING</code> opens in the air over open country with one strip cut into it. The first stage puts the strip under the nose over flat ground; each one after it opens further out, further off the line back to it, over a shorter strip, in higher country - until the last opens with the runway behind your shoulder in ground you have to read to reach it. A landing counts when it is soft enough and square enough to be one, which is the same rule the rest of the game uses.</p>
+
+<h2 id="flying-through-loops">Flying through Loops</h2>
+
+<p><code>FLYING THROUGH LOOPS</code> opens lined up on the first gate of a course laid across a shallow valley. The gate the course is waiting on is lit green, the ones still to come are amber, and the ones behind you are dim. Only the gate the course is up to counts: the objective is the course in order, so flying back through one already behind you, or skipping ahead to one further on, is not progress. Each stage lays more gates, tighter, closer together, on a course that bends more.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="../controls/settings.html" rel="prev">&#8592; Settings</a>
+                <a href="../controls/sound.html" rel="next">Sound &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../../index.html">Play it</a>, or read the <a href="../api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Controls - Pilot Matter</title>
+    <meta name="description" content="Every key Pilot Matter reads, and how the menus are worked with the keyboard and the mouse.">
+    <link rel="icon" href="../../favicon.png">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script src="../assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="../index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../quickstart.html">Quickstart</a></li>
+                <li><a href="../getting-started.html">Getting started</a></li>
+                <li><a href="../features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group" open>
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="../controls/index.html">The keys</a></li>
+                    <li><a href="../controls/loading.html">Loading</a></li>
+                    <li><a href="../controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="../controls/pausing.html">Pausing</a></li>
+                    <li><a href="../controls/settings.html">Settings</a></li>
+                    <li><a href="../controls/game-modes.html">Game modes</a></li>
+                    <li><a href="../controls/sound.html">Sound</a></li>
+                    <li><a href="../controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="../controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="../controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="../flight-model.html">The flight model</a></li>
+                <li><a href="../terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="../api.html">Simulator API</a></li>
+                <li><a href="../project-structure.html">Project structure</a></li>
+                <li><a href="../testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="../cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="../about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="../index.html">Documentation</a> / Controls</p>
+            <h1>Controls</h1>
+
+<p class="lead">Every key the simulator reads, and the menus behind them. Each part of the interface has a page of its own beneath this one.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+        <tr><td><kbd>W</kbd> / <kbd>&uarr;</kbd></td><td>Pitch up (nose up)</td></tr>
+        <tr><td><kbd>S</kbd> / <kbd>&darr;</kbd></td><td>Pitch down (nose down)</td></tr>
+        <tr><td><kbd>A</kbd> / <kbd>&larr;</kbd></td><td>Roll left</td></tr>
+        <tr><td><kbd>D</kbd> / <kbd>&rarr;</kbd></td><td>Roll right</td></tr>
+        <tr><td><kbd>Q</kbd></td><td>Yaw left</td></tr>
+        <tr><td><kbd>E</kbd></td><td>Yaw right</td></tr>
+        <tr><td><kbd>Shift</kbd></td><td>Throttle up (hold to open the lever)</td></tr>
+        <tr><td><kbd>Ctrl</kbd></td><td>Throttle down (hold to close it)</td></tr>
+        <tr><td><kbd>C</kbd></td><td>Cycle camera (chase, cockpit, orbit)</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Pause / resume, and open the pause menu</td></tr>
+        <tr><td><kbd>O</kbd></td><td>Open the settings panel, and close it again</td></tr>
+        <tr><td><kbd>M</kbd></td><td>Mute or unmute the engine and wind</td></tr>
+        <tr><td><kbd>H</kbd></td><td>Collapse the control list to a hint line, and open it again</td></tr>
+        <tr><td><kbd>Tab</kbd></td><td>Show or hide the instruments</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Reset aircraft to starting position</td></tr>
+        <tr><td><kbd>F2</kbd></td><td>Take a picture: clears the screen for one frame and downloads the view as a PNG</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="working-a-menu">Working a menu</h2>
+
+<p>In any menu, <kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> move between entries and <kbd>Enter</kbd> or <kbd>Space</kbd> chooses one. On the start screen and in the pause menu the mouse works as well: moving the pointer onto an entry puts the cursor there, and clicking one chooses it. In the settings panel, <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> step the option under the cursor through its settings. <kbd>Esc</kbd> backs out of the panel.</p>
+
+<div class="note">
+    <span class="note-title">Tip</span>
+    <p>Flight begins in the air and already climbing, at 80 knots and 1390 ft with the throttle set at 20%, which is exactly the setting that holds 80 knots. That airspeed is the stall speed itself, so the wing is carrying with nothing in hand: opening the throttle is still the first thing to do. <kbd>Shift</kbd> and <kbd>Ctrl</kbd> move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in <a href="../flight-model.html">How the flight model works</a>.</p>
+</div>
+
+<h2 id="the-rest-of-the-interface">The rest of the interface</h2>
+
+<ul class="card-grid">
+    <li class="card">
+        <h3><a href="../controls/loading.html">Loading</a></h3>
+        <p>The screen the page opens on, and the frame it waits for before it fades.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/starting-a-flight.html">Starting a flight</a></h3>
+        <p>The start screen, its four entries, and the mouse that works them.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/pausing.html">Pausing</a></h3>
+        <p>What <kbd>P</kbd> freezes, and the menu it opens over the frozen frame.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/settings.html">Settings</a></h3>
+        <p>The environment, the start state, and the options, all remembered.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/game-modes.html">Game modes</a></h3>
+        <p>The flights that are played rather than flown.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/sound.html">Sound</a></h3>
+        <p>The engine, the wind, and the mute that is remembered.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/clearing-the-screen.html">Clearing the screen</a></h3>
+        <p><kbd>H</kbd> and <kbd>Tab</kbd>, and the warnings neither of them hides.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/photo-mode.html">Photo mode</a></h3>
+        <p><kbd>F2</kbd>, and the one frame it takes the overlays off for.</p>
+    </li>
+    <li class="card">
+        <h3><a href="../controls/instruments.html">Instruments</a></h3>
+        <p>The HUD, the minimap, the artificial horizon, and the banners.</p>
+    </li>
+</ul>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="../features.html" rel="prev">&#8592; Features</a>
+                <a href="../controls/loading.html" rel="next">Loading &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../../index.html">Play it</a>, or read the <a href="../api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Getting started - Pilot Matter</title>
+    <meta name="description" content="What Pilot Matter needs to run, and every way to serve it locally.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / Getting started</p>
+            <h1>Getting started</h1>
+
+<p class="lead">There is no install, no bundler, and no build step. The simulator is a page, some modules, and a renderer loaded from a CDN.</p>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<p>A modern browser with ES module support (Chrome, Firefox, Edge, Safari). No Node.js, no bundler, no install needed - Three.js is loaded from a CDN.</p>
+
+<div class="note">
+    <span class="note-title">Node is optional</span>
+    <p>Node 18 or newer is needed only for the bundled static server and for <a href="testing.html">running the tests</a>. Neither is needed to fly.</p>
+</div>
+
+<h2 id="running-locally">Running locally</h2>
+
+<p>Because ES modules require a server context, open the project with any static file server. The bundled one needs no install and no dependencies:</p>
+
+<pre><code>npm run serve           # http://localhost:8080
+npm run serve -- 3000   # or pick another port (the PORT variable works too)</code></pre>
+
+<p>Any other static server works just as well:</p>
+
+<pre><code># Python
+python -m http.server 8080
+
+# Node (npx, no install)
+npx serve .
+
+# VS Code
+# Install the "Live Server" extension and click "Go Live"</code></pre>
+
+<p>Then open <code>http://localhost:8080</code> in your browser.</p>
+
+<div class="caution">
+    <span class="caution-title">Opening the file directly will not work</span>
+    <p>A page opened from the filesystem cannot load ES modules, so the simulator has to be served rather than double-clicked. Any of the servers above is enough.</p>
+</div>
+
+<h2 id="what-to-do-next">What to do next</h2>
+
+<p>The <a href="quickstart.html">quickstart</a> gets the aircraft climbing in about a minute. The <a href="controls/index.html">controls</a> cover every key from there.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="quickstart.html" rel="prev">&#8592; Quickstart</a>
+                <a href="features.html" rel="next">Features &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

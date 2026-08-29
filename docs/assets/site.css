@@ -1,0 +1,703 @@
+/*
+ * Pilot Matter documentation site.
+ *
+ * Every colour here is in DESIGN_LANGUAGE.md at the repository root, and
+ * every one of them was sampled from logo.png or derived from a hue in it.
+ * Change a value here and change it there: the contrast table in that
+ * document is what says these pairs are readable.
+ */
+
+:root {
+    /* Sampled from logo.png */
+    --sky:        #87CEEB;
+    --paper:      #FFFFFF;
+    --sage:       #90C090;
+    --tan:        #8B7355;
+    --tan-light:  #A0826D;
+    --navy-mid:   #1E3C5C;
+    --navy:       #133059;
+    --navy-deep:  #061D43;
+
+    /* Type scale: a major third off a 1rem base */
+    --step--1: 0.833rem;
+    --step-0:  1rem;
+    --step-1:  1.25rem;
+    --step-2:  1.563rem;
+    --step-3:  1.953rem;
+    --step-4:  2.441rem;
+    --step-5:  3.052rem;
+
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* A 4px base, doubling */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 64px;
+
+    /* Round, from the disc the aircraft flies out of */
+    --radius-sm:   6px;
+    --radius:      12px;
+    --radius-lg:   20px;
+    --radius-pill: 999px;
+
+    --menu-width: 268px;
+    --measure: 72ch;
+
+    /* Light, the default */
+    --bg:          #F5FAFD;
+    --surface:     #FFFFFF;
+    --surface-alt: #EAF4FA;
+    --text:        #133059;
+    --text-muted:  #4A5F7A;
+    --link:        #0D5F80;
+    --rule:        #CFE4F0;
+    --accent:      #87CEEB;
+    --on-accent:   #133059;
+    --note-edge:   #3E7A3E;
+    --warn-edge:   #7A5F3C;
+    --shadow:      0 1px 2px rgba(19, 48, 89, 0.08);
+
+    color-scheme: light;
+}
+
+[data-theme="dark"] {
+    --bg:          #061D43;
+    --surface:     #0C2A55;
+    --surface-alt: #133059;
+    --text:        #E8F4FA;
+    --text-muted:  #9FB8D0;
+    --link:        #87CEEB;
+    --rule:        #1E3C5C;
+    --accent:      #87CEEB;
+    --on-accent:   #133059;
+    --note-edge:   #A8D4A8;
+    --warn-edge:   #C8A987;
+    --shadow:      0 1px 2px rgba(6, 29, 67, 0.5);
+
+    color-scheme: dark;
+}
+
+/* A reader who has asked their system for dark and never touched the toggle */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg:          #061D43;
+        --surface:     #0C2A55;
+        --surface-alt: #133059;
+        --text:        #E8F4FA;
+        --text-muted:  #9FB8D0;
+        --link:        #87CEEB;
+        --rule:        #1E3C5C;
+        --accent:      #87CEEB;
+        --on-accent:   #133059;
+        --note-edge:   #A8D4A8;
+        --warn-edge:   #C8A987;
+        --shadow:      0 1px 2px rgba(6, 29, 67, 0.5);
+
+        color-scheme: dark;
+    }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: var(--space-8); }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--step-0);
+    line-height: 1.65;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* ---- The skip link, first in the tab order and hidden until it is used ---- */
+
+.skip-link {
+    position: absolute;
+    left: var(--space-4);
+    top: calc(-1 * var(--space-8));
+    z-index: 60;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--link);
+    font-weight: 600;
+    text-decoration: none;
+    transition: top 150ms ease;
+}
+
+.skip-link:focus { top: var(--space-4); }
+
+/* ---- The bar across the top ---- */
+
+.topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 56px;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--rule);
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.topbar a { color: var(--on-accent); }
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 600;
+    font-size: var(--step-1);
+    letter-spacing: 0.02em;
+    text-decoration: none;
+}
+
+.brand svg { display: block; }
+
+.brand-sub {
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+.topbar-spacer { flex: 1 1 auto; }
+
+.topbar-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--on-accent);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--on-accent);
+    font: inherit;
+    font-size: var(--step--1);
+    cursor: pointer;
+    transition: background 150ms ease;
+}
+
+.topbar-button:hover { background: rgba(19, 48, 89, 0.12); }
+
+/* The button only does something once the script that works it has run */
+.menu-toggle { display: none; }
+
+.js .menu-toggle { display: inline-flex; }
+
+/* ---- The side menu ---- */
+
+/*
+ * Without script, the menu is part of the page: it stands above the content
+ * and is reached by scrolling, because a drawer with nothing to open it is a
+ * menu that cannot be reached at all. With script, and below 960px, it
+ * becomes that drawer.
+ */
+.sidebar {
+    padding: calc(56px + var(--space-5)) var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface);
+}
+
+.js .sidebar {
+    position: fixed;
+    z-index: 50;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    width: var(--menu-width);
+    padding: var(--space-5) var(--space-4) var(--space-8);
+    overflow-y: auto;
+    border-right: 1px solid var(--rule);
+    border-bottom: 0;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 200ms ease;
+}
+
+/* Hidden rather than merely moved, so a closed drawer is out of the tab
+   order instead of being twenty links a reader tabs through off screen. */
+.js .sidebar[data-open="true"] {
+    transform: translateX(0);
+    visibility: visible;
+}
+
+.sidebar h2 {
+    margin: 0 0 var(--space-3);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sidebar ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sidebar li { margin: 0; }
+
+.sidebar a {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border-left: 3px solid transparent;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text);
+    text-decoration: none;
+    transition: background 150ms ease, border-color 150ms ease;
+}
+
+.sidebar a:hover { background: var(--surface-alt); }
+
+.sidebar a[aria-current="page"] {
+    border-left-color: var(--accent);
+    background: var(--surface-alt);
+    font-weight: 600;
+}
+
+.nav-group { margin-bottom: var(--space-2); }
+
+.nav-group > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+}
+
+.nav-group > summary::-webkit-details-marker { display: none; }
+
+.nav-group > summary::before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 6px solid var(--text-muted);
+    transition: transform 150ms ease;
+}
+
+.nav-group[open] > summary::before { transform: rotate(90deg); }
+
+.nav-group > summary:hover { background: var(--surface-alt); }
+
+.nav-group ul { padding-left: var(--space-4); }
+
+.nav-sep {
+    height: 1px;
+    margin: var(--space-4) var(--space-3);
+    background: var(--rule);
+    border: 0;
+}
+
+.scrim { display: none; }
+
+.js .scrim {
+    display: block;
+    position: fixed;
+    inset: 56px 0 0 0;
+    z-index: 45;
+    background: rgba(6, 29, 67, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 200ms ease, visibility 200ms ease;
+}
+
+.js .scrim[data-open="true"] { opacity: 1; visibility: visible; }
+
+/* ---- The content ---- */
+
+/* The static menu above has already cleared the fixed top bar; once the menu
+   is a drawer or a fixed column, the content has to clear it itself. */
+.page {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+}
+
+.js .page { padding-top: calc(56px + var(--space-6)); }
+
+.content {
+    max-width: var(--measure);
+    margin: 0 auto;
+}
+
+.breadcrumb {
+    margin: 0 0 var(--space-3);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+}
+
+.breadcrumb a { color: var(--text-muted); }
+
+h1, h2, h3, h4 {
+    line-height: 1.2;
+    margin: var(--space-7) 0 var(--space-3);
+    font-weight: 600;
+}
+
+h1 {
+    margin-top: 0;
+    font-size: var(--step-4);
+    letter-spacing: 0.02em;
+}
+
+h2 {
+    font-size: var(--step-3);
+    letter-spacing: 0.02em;
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--rule);
+}
+
+h3 { font-size: var(--step-2); }
+h4 { font-size: var(--step-1); }
+
+/* Present to anyone who reaches for it, quiet for everyone else */
+.heading-anchor {
+    font-weight: 400;
+    color: var(--text-muted);
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+h2:hover .heading-anchor,
+h3:hover .heading-anchor,
+h4:hover .heading-anchor,
+.heading-anchor:focus-visible { opacity: 1; }
+
+p, ul, ol { margin: 0 0 var(--space-4); }
+
+ul, ol { padding-left: var(--space-5); }
+
+li { margin-bottom: var(--space-1); }
+
+.lead {
+    font-size: var(--step-1);
+    color: var(--text-muted);
+}
+
+a { color: var(--link); }
+
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+hr {
+    height: 1px;
+    margin: var(--space-7) 0;
+    border: 0;
+    background: var(--rule);
+}
+
+/* ---- Code, keys, and readouts ---- */
+
+code, kbd, samp, pre {
+    font-family: var(--font-mono);
+    font-size: 0.925em;
+}
+
+code {
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-sm);
+    background: var(--surface-alt);
+}
+
+pre {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-4);
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    line-height: 1.5;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+}
+
+kbd {
+    display: inline-block;
+    min-width: 1.9em;
+    padding: 0.1em 0.4em;
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    font-size: 0.85em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* ---- Tables, which scroll rather than widening the page ---- */
+
+.table-wrap {
+    margin: 0 0 var(--space-4);
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--step-0);
+}
+
+th, td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--rule);
+    text-align: left;
+    vertical-align: top;
+}
+
+thead th {
+    background: var(--surface-alt);
+    font-size: var(--step--1);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+
+/* ---- Callouts ---- */
+
+.note, .caution {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--note-edge);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.caution { border-left-color: var(--warn-edge); }
+
+.note > p:last-child, .caution > p:last-child { margin-bottom: 0; }
+
+.note-title, .caution-title {
+    display: block;
+    margin-bottom: var(--space-1);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--note-edge);
+}
+
+.caution-title { color: var(--warn-edge); }
+
+/* ---- The home page ---- */
+
+.hero {
+    margin-bottom: var(--space-7);
+    padding: var(--space-7) var(--space-5);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: var(--step-5);
+    margin-bottom: var(--space-3);
+}
+
+.hero p { margin-left: auto; margin-right: auto; max-width: 60ch; }
+
+.hero-mark { margin-bottom: var(--space-4); }
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: center;
+    margin-top: var(--space-5);
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-5);
+    border: 1px solid var(--link);
+    border-radius: var(--radius-pill);
+    color: var(--link);
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 150ms ease;
+}
+
+.button:hover { background: var(--surface-alt); }
+
+.button-primary {
+    background: var(--link);
+    color: var(--surface);
+}
+
+.button-primary:hover {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: var(--paper);
+}
+
+.card-grid {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin-bottom: var(--space-6);
+    padding: 0;
+    list-style: none;
+}
+
+.card {
+    margin: 0;
+    padding: var(--space-5);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.card h3 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--step-1);
+}
+
+.card p {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+}
+
+.card a { text-decoration: none; }
+
+.card a:hover { text-decoration: underline; }
+
+/* ---- On this page ---- */
+
+.toc {
+    margin: 0 0 var(--space-6);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.toc h2 {
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    border: 0;
+    font-size: var(--step--1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.toc ul { margin: 0; padding-left: var(--space-5); }
+
+/* ---- Foot of the page ---- */
+
+.page-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: space-between;
+    margin-top: var(--space-7);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--rule);
+}
+
+.page-nav a { text-decoration: none; font-weight: 600; }
+
+.page-nav a:hover { text-decoration: underline; }
+
+.ridge {
+    display: block;
+    width: 100%;
+    height: 48px;
+    margin-top: var(--space-7);
+}
+
+.site-footer {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+    border-top: 3px solid var(--sage);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: var(--step--1);
+    text-align: center;
+}
+
+.site-footer p { margin: 0 0 var(--space-2); }
+
+/* ---- Wide enough for the menu to stand open ---- */
+
+/* ---- Wide enough for the menu to stand open beside the content ---- */
+
+@media (min-width: 960px) {
+    .sidebar, .js .sidebar {
+        position: fixed;
+        z-index: 50;
+        top: 56px;
+        left: 0;
+        bottom: 0;
+        width: var(--menu-width);
+        padding: var(--space-5) var(--space-4) var(--space-8);
+        overflow-y: auto;
+        border-right: 1px solid var(--rule);
+        border-bottom: 0;
+        transform: none;
+        visibility: visible;
+    }
+
+    .js .menu-toggle { display: none; }
+    .js .scrim { display: none; }
+
+    .page, .js .page {
+        padding-top: calc(56px + var(--space-6));
+        padding-left: calc(var(--menu-width) + var(--space-6));
+        padding-right: var(--space-6);
+    }
+
+    .site-footer { padding-left: calc(var(--menu-width) + var(--space-6)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
+    *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+
+@media print {
+    .topbar, .sidebar, .scrim, .skip-link, .page-nav, .ridge { display: none; }
+    .page { padding: 0; }
+    body { background: #FFFFFF; color: #133059; }
+}

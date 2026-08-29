@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simulator API - Pilot Matter</title>
+    <meta name="description" content="The Pilot API and the Matter API: two halves that can be used without each other.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / Simulator API</p>
+            <h1>Simulator API</h1>
+
+<p class="lead">The simulator is two halves that can be used without each other, and <code>js/api/index.js</code> is the one module a host page imports to get either.</p>
+
+<div class="note">
+    <span class="note-title">The full reference</span>
+    <p>This page is the overview. Every option and everything that comes back, for both halves, is written out in <a href="api.md">the API reference</a>: the contracts, the configured start, the runways and the landing rules, the game modes, the worlds and the elements, the day and the water, what the stability guarantee does and does not cover, and a worked host page for each half.</p>
+</div>
+
+<h2 id="the-pilot-api">The Pilot API</h2>
+
+<p>The <strong>Pilot API</strong> is the aircraft: the flight model, the controls, and the telemetry, flown against a scene, a terrain, and an aircraft model the host supplies.</p>
+
+<pre><code>import { createPilot } from './js/api/index.js';
+
+const pilot = createPilot({
+    scene,                                  // your scene
+    camera,                                 // optional, placed behind the aircraft
+    aircraft: myModel,                      // any Object3D, or a loader result
+    anchor: { x: 0, y: 0, z: 0 },           // the point in it the flight model moves
+    terrain: {                              // your world, or none for flat ground
+        sampleHeight: (x, z) =&gt; myHeightAt(x, z),
+        bounds: { minX: -5000, maxX: 5000, minZ: -5000, maxZ: 5000 }
+    },
+    keymap: { yawLeft: ['KeyZ'] },          // remap what you like, keep the rest
+    flight: { sensitivity: 1.5 }            // how hard the controls bite, 0.1 to 4
+});
+
+function frame(dt) {
+    const { airspeed, altitude, verticalSpeed, heading, throttle } = pilot.update(dt);
+    myHud.render({ airspeed, altitude, verticalSpeed, heading, throttle });
+}</code></pre>
+
+<h2 id="the-matter-api">The Matter API</h2>
+
+<p>The <strong>Matter API</strong> is the world: an assembled environment as one detachable group, a height sampler for whatever is flying over it, and a contract any aircraft can satisfy, including one driven by a control API that has never heard of this one.</p>
+
+<pre><code>import { createEnvironment } from './js/api/index.js';
+
+const world = createEnvironment({ environment: 'lakeside', runway: true });
+
+scene.add(world.group);
+world.applyDepth(scene);                    // the sky and the fog, without the ground
+world.register(myWindsock, { x: 400, z: -900 });  // set down on the ground, not over it
+
+const flown = world.attach(myAircraft);     // throws with every gap in the contract
+myFlightModel.setGroundHeight(flown.groundHeight());
+
+world.runways[0];                           // the strip it cut, for something to land on
+world.setEnvironment('dune-sea');           // regenerated in place, registered assets settled
+
+world.setDaylight(0.75);                    // dusk: the sky, the fog, and the sun with it
+world.updateWater(dt, 0.5);                 // and the surface moved on by a frame</code></pre>
+
+<h2 id="an-assembly-of-squares">An assembly of squares</h2>
+
+<p>A world can be one square of a larger one, and <code>createTiledEnvironment</code> builds the whole grid with every join already settled:</p>
+
+<pre><code>import { createTiledEnvironment } from './js/api/index.js';
+
+const world = createTiledEnvironment({ environment: 'lakeside', tiles: 2, size: 8000 });
+
+scene.add(world.group);
+world.sampleHeight(x, z);                   // answered by whichever square the point is over</code></pre>
+
+<h2 id="the-pure-half">The pure half</h2>
+
+<p>Everything under <code>js/api/contract.js</code> is pure and imports no renderer, so a host can check its own options, its own aircraft, or the shape of its telemetry with nothing loaded:</p>
+
+<pre><code>import { validateAircraftContract, TELEMETRY_FIELDS } from './js/api/contract.js';
+
+const problems = validateAircraftContract(myAircraft);   // every gap at once, or []</code></pre>
+
+<p>The rules the bundled game is played by are published too, and they are pure as well: the touchdown rules that tell a landing from a crash, the strips they are read against, and the modes, stages, courses, and gate test in <code>js/game-modes.js</code>. A host can play them against its own renderer, or read them as a worked example of a game built on the two halves.</p>
+
+<h2 id="the-worked-example">The worked example</h2>
+
+<p><a href="../examples/host.html"><code>examples/host.html</code></a> is a host page, running. It works both halves side by side - the Pilot API flying over ground the page generated itself, and the Matter API carrying an aircraft the page built over an assembly of four squares, running the day and moving its own water - which is the shortest way to see that each half genuinely works without the other. Serve the project and open <code>/examples/host.html</code>:</p>
+
+<pre><code>npm run serve   # then open http://localhost:8080/examples/host.html</code></pre>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="terrain.html" rel="prev">&#8592; How the terrain works</a>
+                <a href="project-structure.html" rel="next">Project structure &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

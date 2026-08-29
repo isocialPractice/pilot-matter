@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Features - Pilot Matter</title>
+    <meta name="description" content="Everything Pilot Matter does, from the flight model to the endless world it is flown over.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / Features</p>
+            <h1>Features</h1>
+
+<p class="lead">Everything Pilot Matter does, in the order the parts of it were built.</p>
+
+<h2 id="flying-it">Flying it</h2>
+
+<ul>
+    <li><strong>Arcade flight model</strong> - pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases</li>
+    <li><strong>Airspeed-driven lift</strong> - hold cruise speed and level flight holds altitude; let the speed decay and the wing stalls and drops</li>
+    <li><strong>A flight already in the air, or held on the ground</strong> - every flight opens at 80 knots, 1390 ft, climbing at 1260 ft/min on a heading of 000, or stopped at a runway threshold with the engine idling, whichever the start state is set to</li>
+    <li><strong>Crash detection</strong> - settle onto a hillside gently and you fly on; fly into it and the aircraft is wrecked, the controls go dead, and the flight resets itself</li>
+    <li><strong>Runway landings</strong> - put the aircraft down on the strip softly enough and square enough and it is a landing rather than an arrival, reported as a state the instruments and the game modes both read</li>
+    <li><strong>Two game modes</strong> - Runway Landing and Flying through Loops, each four stages long and each getting harder at exactly the thing it is about</li>
+</ul>
+
+<h2 id="the-world">The world</h2>
+
+<ul>
+    <li><strong>Procedural terrain</strong> - multi-octave fractal Brownian motion (fBm) noise generates the ground every world is drawn on</li>
+    <li><strong>The world as data</strong> - eleven environment elements (mountain, canyon, desert, grass, sand, water, river, forest, town, snow, runway), each declaring the ranges it can be configured through and the algorithm that draws it, so nothing in the world is a placed asset</li>
+    <li><strong>Five assembled environments</strong> - Highlands, River Basin, Canyon Country, Dune Sea, and Lakeside, picked from the settings panel and regenerated on the spot</li>
+    <li><strong>Element vertex colouring</strong> - every band the ground is painted in is a light-to-dark gradient of one base hue, rendered through vertex colours with no textures</li>
+    <li><strong>Atmospheric fog</strong> - exponential fog fades the world to sky blue in the distance, hiding the far ground and giving the illusion of an infinite world</li>
+    <li><strong>A day to fly through</strong> - the sun walks across the sky and the light, the sky, and the fog warm and cool with it, from first light through noon to dusk and back round; midday is the light the world was always drawn in, and a paused flight is a day that waits with it</li>
+    <li><strong>Moving water</strong> - every surface below the water line rides a swell of two crossing wave trains and catches the sun on the face of each crest, held down to nothing at the bank so the water meets the shore rather than lapping over it, and going flat and dark after dark</li>
+    <li><strong>A world with no edge</strong> - the square an environment describes is one tile of an endless grid of them, each seeded from its own place, drawn out further than the camera can see, so there is always more ground ahead and nothing left to reach</li>
+    <li><strong>Worlds that tile</strong> - an environment can be one square of a larger assembly, generated in the world's coordinates so the ground runs on across the join, with every shared edge settled to one height and one colour</li>
+</ul>
+
+<h2 id="seeing-it">Seeing it</h2>
+
+<ul>
+    <li><strong>Three camera modes</strong> - chase, cockpit, and orbit views, cycled with the <kbd>C</kbd> key</li>
+    <li><strong>Trailing chase camera</strong> - the chase view lags behind the aircraft instead of riding a fixed offset, so turns and pitch changes swing the frame around</li>
+    <li><strong>HUD</strong> - live readout of airspeed, altitude, climb rate, compass heading, throttle (%), and camera mode, on whichever scale the settings panel is set to</li>
+    <li><strong>Attitude indicator</strong> - an artificial horizon with a pitch ladder and bank marks, reading the aircraft's own nose and wings rather than the controls behind them</li>
+    <li><strong>Minimap</strong> - a north-up chart of the tile being flown over, with the aircraft's position and heading marked, moving on to the next square as the aircraft crosses into it</li>
+    <li><strong>Low altitude warning</strong> - a blinking caution over the terrain below, measured against the ground rather than sea level</li>
+    <li><strong>Photo mode</strong> - <kbd>F2</kbd> clears every overlay off the screen for one frame and downloads the view as a PNG named for the moment it was taken</li>
+    <li><strong>A screen you can clear</strong> - <kbd>H</kbd> collapses the control list to a single hint line and <kbd>Tab</kbd> clears the instruments off entirely for clean flying, remembered for the next session</li>
+</ul>
+
+<h2 id="working-it">Working it</h2>
+
+<ul>
+    <li><strong>Start screen menu</strong> - the game opens on its name over a menu offering Start Flight, Game Modes, Controls, and Settings, with the flight held on the ramp until one is chosen</li>
+    <li><strong>Pause menu</strong> - <kbd>P</kbd> freezes the simulation behind a menu offering Resume, Reset Flight, Game Modes, Controls, and Settings</li>
+    <li><strong>A mouse on both of them</strong> - the start screen and the pause menu are worked with the pointer as well as the keys: the cursor follows the mouse across the entries and a click chooses the one under it, on one cursor the keyboard goes on moving</li>
+    <li><strong>Game Modes panel</strong> - opened from either menu, listing free flight and every mode there is, and marking the one being played</li>
+    <li><strong>Settings panel</strong> - opened with <kbd>O</kbd> or from either menu, setting the environment, the condition a flight opens in, control sensitivity, fog density, and the units the instruments read in, all remembered for the next session</li>
+    <li><strong>An editable start</strong> - the condition a flight opens in, the strip in the world, airspeed, altitude, climb, heading, throttle, and camera are fields a pilot sets rather than constants in the flight code, applied at once before launch and at the next reset after it</li>
+    <li><strong>Engine and wind audio</strong> - an engine note that rises with the throttle and a wind that rises faster than the airspeed behind it, muted with <kbd>M</kbd> and remembered for the next session</li>
+</ul>
+
+<h2 id="building-on-it-features">Building on it</h2>
+
+<ul>
+    <li><strong>A simulator API</strong> - the Pilot API flies the aircraft against a host's own scene, terrain, and model; the Matter API hands a host the world as one detachable group anything can fly over, with both halves worked on one page in <a href="../examples/host.html"><code>examples/host.html</code></a></li>
+    <li><strong>Zero build step</strong> - runs directly in the browser via ES modules and an import map</li>
+</ul>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="getting-started.html" rel="prev">&#8592; Getting started</a>
+                <a href="controls/index.html" rel="next">Controls &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

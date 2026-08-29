@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>How the flight model works - Pilot Matter</title>
+    <meta name="description" content="Throttle, lift, stall, the configured start, and what a runway does to an arrival.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / How the flight model works</p>
+            <h1>How the flight model works</h1>
+
+<p class="lead">The physics is arcade, not aerodynamic: there is no angle of attack, no drag polar, and no engine model. Four rules carry the whole thing, and all four live in <code>js/flight-model.js</code> and <code>js/crash.js</code> as plain functions with no Three.js dependency, so they can be unit tested in Node.</p>
+
+<p>Speeds below are given in world units per second, with the HUD reading in knots at two knots per unit.</p>
+
+<div class="toc">
+    <h2>On this page</h2>
+    <ul>
+        <li><a href="#the-throttle-is-a-setting-not-a-shove">The throttle is a setting, not a shove</a></li>
+        <li><a href="#lift-is-read-off-airspeed">Lift is read off airspeed</a></li>
+        <li><a href="#below-the-stall-speed-the-wing-gives-up">Below the stall speed the wing gives up</a></li>
+        <li><a href="#the-start-is-a-condition-not-a-set-of-numbers">The start is a condition, not a set of numbers</a></li>
+        <li><a href="#the-ground-is-not-a-floor">The ground is not a floor</a></li>
+        <li><a href="#a-runway-changes-what-an-arrival-means">A runway changes what an arrival means</a></li>
+    </ul>
+</div>
+
+<h2 id="the-throttle-is-a-setting-not-a-shove">The throttle is a setting, not a shove</h2>
+
+<p><kbd>Shift</kbd> and <kbd>Ctrl</kbd> move a lever between 0 and 100%, at a rate that takes two seconds to sweep the whole travel. The lever picks a target speed - 100% asks for 200 units/s, 50% asks for 100 - and airspeed then converges on that target rather than jumping to it. The engine pulls harder than drag pushes back, so speed builds faster than it bleeds off.</p>
+
+<p>This is why the HUD throttle reads the setting you asked for while the airspeed needle is still catching up, and why a closed throttle is a request for a dead stop rather than a request to coast.</p>
+
+<h2 id="lift-is-read-off-airspeed">Lift is read off airspeed</h2>
+
+<p>Lift rises with the square of airspeed and is capped at the weight of the aircraft, so:</p>
+
+<ul>
+    <li><strong>At or above cruise speed (120 units/s)</strong> lift cancels gravity exactly, and level flight holds altitude. Extra speed never lifts on its own, so a fast pass stays level instead of ballooning; climbing is done with the nose.</li>
+    <li><strong>Below cruise speed</strong> lift only covers part of the weight, and the aircraft sinks by the difference.</li>
+    <li><strong>At a standstill</strong> there is no lift at all and the full weight pulls down.</li>
+</ul>
+
+<p>Climbing is therefore a trade rather than a free gain: pulling the nose up spends airspeed, and spending too much of it costs the lift the climb depends on.</p>
+
+<h2 id="below-the-stall-speed-the-wing-gives-up">Below the stall speed the wing gives up</h2>
+
+<p>Under 40 units/s the wing is stalled and the sink rate is multiplied on top of the lost lift, easing in from no penalty at the stall speed up to double at a dead stop. The penalty eases rather than snapping on, so a stall is a mush and a sag rather than a switch being thrown.</p>
+
+<p>Every flight starts at exactly 40 units/s, which is 80 knots and the stall speed itself: the wing is carrying, but there is nothing in hand. Opening the throttle is still the first thing to do.</p>
+
+<h2 id="the-start-is-a-condition-not-a-set-of-numbers">The start is a condition, not a set of numbers</h2>
+
+<p>The start is data rather than a set of literals scattered through the flight code. It lives in <code>js/config.js</code> as one object, written the way a pilot reads it - 80 knots, 1390 ft, +1260 ft/min, heading 000, 20% throttle, chase camera - and converted into world units by the same factors the instruments read back through, so the HUD shows those numbers on the first frame rather than something near them.</p>
+
+<p>The same file declares what each of those fields is allowed to be: its range, the step it moves by, and the units it is read in. That is what lets the <a href="controls/settings.html">settings panel</a> offer the start without knowing anything about flight, and what a host embedding the <a href="api.html">Pilot API</a> reads to offer it its own way.</p>
+
+<p>Two of the values are held to the flight model rather than declared at it. The throttle setting is the one that asks for exactly 80 knots, so airspeed is not converging on anything when the flight begins. The pitch is not configured at all: it is the angle that turns enough of 80 knots into height to cover both the 1260 ft/min climb and the sink the wing is losing at that airspeed, worked out from whatever climb and airspeed the start was set to. The result is a flight that holds its opening condition until the pilot changes it, rather than settling out of it over the first second.</p>
+
+<p><kbd>R</kbd>, and the pause menu's <code>RESET FLIGHT</code>, put the aircraft back into that same condition, the camera it opens in included.</p>
+
+<h2 id="the-ground-is-not-a-floor">The ground is not a floor</h2>
+
+<p>Arriving at the terrain is only a crash if it is arrived at hard. Coming down slower than 30 units/s is survived: the aircraft keeps its 5 units of ground clearance and flies on, which means an engine-out settle onto a hillside is not fatal, because the worst the flight model can sink without the nose pointing down is the 24 units/s of a dead-stop stall.</p>
+
+<p>Coming down faster than that - which takes a dive, since it can only be reached by pointing the nose at the ground and adding speed to it - wrecks the aircraft. The controls go dead, the throttle and airspeed drop to zero, the wreck stays where it hit for two and a half seconds behind a <code>CRASHED</code> banner, and then the flight resets to its starting condition. Pressing <kbd>R</kbd> skips the wait. Pausing holds the countdown rather than letting it run out behind the paused frame.</p>
+
+<h2 id="a-runway-changes-what-an-arrival-means">A runway changes what an arrival means</h2>
+
+<p>A strip does not raise the bar for how hard an arrival may be so much as give it somewhere to be something else. On a runway, an arrival is one of three things:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Arriving</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td>Slower than 18 units/s, wings within 11 degrees of level, nose within 15 degrees of the horizon, heading within 25 degrees of the strip</td><td>A <strong>landing</strong></td></tr>
+        <tr><td>Firmer than that, but slower than 48 units/s</td><td>A rollout - the aircraft is down and flying on, and nothing is counted</td></tr>
+        <tr><td>Faster than 48 units/s</td><td>A <strong>crash</strong>, the same as anywhere else</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Prepared ground takes an arrival a hillside would not, which is why the crash threshold on a strip is 48 rather than 30. The gap between 18 and 48 is what makes a landing something to fly well rather than something that happens to anyone who reaches the runway.</p>
+
+<p>Landing either way down the strip counts: a runway has two thresholds rather than a start and a finish, and the heading is measured to whichever end is nearer. All four limits are read off the aircraft's own nose and wings rather than off the controls behind them, so what is judged is how the aircraft was actually being held.</p>
+
+<p>Only the frame the aircraft arrives on is judged. Everything after it is a rollout, and a rollout is not a second arrival - judging every frame of one would turn a landing into a crash as the airspeed, and with it the lift holding the aircraft up, bled away underneath it. <code>LANDED</code> stays on screen until the aircraft leaves the ground again.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="controls/instruments.html" rel="prev">&#8592; Instruments</a>
+                <a href="terrain.html" rel="next">How the terrain works &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

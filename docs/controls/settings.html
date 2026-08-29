@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Settings - Pilot Matter</title>
+    <meta name="description" content="The settings panel: the environment, the start state, and the options, and where they are stored.">
+    <link rel="icon" href="../../favicon.png">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script src="../assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="../index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../quickstart.html">Quickstart</a></li>
+                <li><a href="../getting-started.html">Getting started</a></li>
+                <li><a href="../features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group" open>
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="../controls/index.html">The keys</a></li>
+                    <li><a href="../controls/loading.html">Loading</a></li>
+                    <li><a href="../controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="../controls/pausing.html">Pausing</a></li>
+                    <li><a href="../controls/settings.html">Settings</a></li>
+                    <li><a href="../controls/game-modes.html">Game modes</a></li>
+                    <li><a href="../controls/sound.html">Sound</a></li>
+                    <li><a href="../controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="../controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="../controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="../flight-model.html">The flight model</a></li>
+                <li><a href="../terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="../api.html">Simulator API</a></li>
+                <li><a href="../project-structure.html">Project structure</a></li>
+                <li><a href="../testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="../cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="../about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="../index.html">Documentation</a> / <a href="../controls/index.html">Controls</a> / Settings</p>
+            <h1>Settings</h1>
+
+<p>The settings panel opens on <kbd>O</kbd>, and from either menu, and holds the same choices whichever way it was opened. It is the one overlay that clears the screen it was opened from, because the point of picking an environment is seeing the environment, and it holds the simulation clock while it is up, so a setting is changed by looking at the world rather than by flying into it while looking.</p>
+
+<p>The panel is in three parts, each under a heading of its own, and one cursor walks all three as though they were one list - with the keys, or with the mouse. A click does whatever choosing that row does: it picks a world, steps an option on to its next setting, or turns a box over.</p>
+
+<h2 id="environment">Environment</h2>
+
+<p>Under <code>ENVIRONMENT</code> is the world being flown: every entry is one of the five <a href="../terrain.html#environments">assembled environments</a>, the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.</p>
+
+<h2 id="start-state">Start state</h2>
+
+<p>Under <code>START STATE</code> is the condition a flight opens in, which is the same condition <code>RESET FLIGHT</code> and <kbd>R</kbd> put it back into.</p>
+
+<p>The first two rows are the condition itself, and only one of them can be in force. Choosing one clears the other, and the one currently set is marked the same way the world being flown is:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Opens the flight</th></tr></thead>
+    <tbody>
+        <tr><td><code>START OFF FLYING</code></td><td>Already up, in the climb the rest of the fields describe. The default</td></tr>
+        <tr><td><code>RUNWAY TAKEOFF</code></td><td>Stopped at a runway threshold, nose level, engine idling, on the strip's own bearing</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Under them is <code>RUNWAY</code>, a box that says whether the generated world carries a landable strip at all. Unchecked, no runway is drawn and the world has nowhere to land. <code>RUNWAY TAKEOFF</code> holds the box on for as long as it is chosen and greys it out, because a start that asked to roll out of a world with no strip in it is not a start anything could honour. Uncheck it, choose <code>RUNWAY TAKEOFF</code>, and it comes back on; go back to <code>START OFF FLYING</code> and it is off again, exactly as it was left.</p>
+
+<p>The rest are read the way a pilot reads them and stepped along a range of their own:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Field</th><th>Steps through</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>START AIRSPEED</code></td><td>0 to 200 knots, by 5</td><td>80 knots</td></tr>
+        <tr><td><code>START ALTITUDE</code></td><td>0 to 8000 ft, by 10</td><td>1390 ft</td></tr>
+        <tr><td><code>START CLIMB</code></td><td>-2000 to +3000 ft/min, by 20</td><td>+1260 ft/min</td></tr>
+        <tr><td><code>START HEADING</code></td><td>000 to 355 degrees, by 5</td><td>000</td></tr>
+        <tr><td><code>START THROTTLE</code></td><td>0 to 100%, by 5</td><td>20%</td></tr>
+        <tr><td><code>START CAMERA</code></td><td><code>CHASE</code>, <code>COCKPIT</code>, <code>ORBIT</code></td><td><code>CHASE</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A range stops at its ends rather than wrapping round them, because the ends of a range mean something a list's do not: past the fastest a flight can open at is not the slowest.</p>
+
+<p>A runway takeoff takes none of those six but the camera: an aircraft held on the ground has no airspeed, no altitude, and no climb of its own to set. They are still there to be edited, and they are what the flight opens in the moment <code>START OFF FLYING</code> is chosen again.</p>
+
+<p>Edited from the start screen, a new start takes effect at once - the aircraft is put straight into it, so the world behind the panel shows what was set. Edited mid-flight it waits, because a start is the next flight's condition rather than this one's: carry on flying, and the next reset opens in it.</p>
+
+<p>The throttle is a lever the airspeed converges on rather than the airspeed itself, so a start whose throttle asks for a different speed than it was given is flown exactly as written and then settles toward the lever over the next second or two. The pitch is not a field at all: it is worked out from the climb and the airspeed, as the attitude that holds that climb at that speed, so a start opens in the climb it was set to rather than settling out of it.</p>
+
+<h2 id="options">Options</h2>
+
+<p>Under <code>OPTIONS</code> are the settings that hold whichever world is flown. Each is a value stepped through a list rather than a slider, so no combination of keys can land one between two settings:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Option</th><th>Steps through</th><th>Changes</th></tr></thead>
+    <tbody>
+        <tr><td><code>CONTROL SENSITIVITY</code></td><td>50% to 200%</td><td>How far pitch, roll, and yaw move per key press. All three scale together, so the aircraft stays the same aircraft</td></tr>
+        <tr><td><code>FOG DENSITY</code></td><td><code>CLEAR</code> to <code>THICK</code></td><td>How far into the distance the world is visible. <code>CLEAR</code> is the thinnest offered rather than none at all, because the fog is what hides the world repeating</td></tr>
+        <tr><td><code>AIRSPEED IN</code></td><td><code>KNOTS</code>, <code>MPH</code></td><td>The scale the airspeed readout is on</td></tr>
+        <tr><td><code>ALTITUDE IN</code></td><td><code>FEET</code>, <code>METERS</code></td><td>The scale the altimeter and the climb rate are on</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="walking-the-panel">Walking the panel</h2>
+
+<p><kbd>W</kbd>/<kbd>S</kbd> moves the cursor over all three parts as though they were one list, scrolling the panel to keep the cursor in view on a window too short to hold it. <kbd>A</kbd>/<kbd>D</kbd> steps the option under the cursor, and <kbd>Enter</kbd> steps it forward as well, because an option has no single thing to choose.</p>
+
+<p>Every choice is stored in <code>localStorage</code>, so the world, the start, and the options a session ends on are the ones the next session opens on. A setting from a version that had one this one does not reads as the default on its own, without costing the others their memory, and a browser that refuses storage costs the choices their memory and nothing else.</p>
+
+<p><kbd>O</kbd>, <kbd>Esc</kbd>, or <kbd>Backspace</kbd> closes the panel, as does its own <code>BACK</code> entry.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="../controls/pausing.html" rel="prev">&#8592; Pausing</a>
+                <a href="../controls/game-modes.html" rel="next">Game modes &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../../index.html">Play it</a>, or read the <a href="../api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

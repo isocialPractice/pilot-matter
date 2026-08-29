@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cheatsheet - Pilot Matter</title>
+    <meta name="description" content="Every key, option, element, and API call on one page, for a reader who has already read the rest.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / Cheatsheet</p>
+            <h1>Cheatsheet</h1>
+
+<p class="lead">Everything on one page, for a reader who has already read the rest. No teaching, no explanation: the keys, the options, the elements, and the calls.</p>
+
+<h2 id="keys">Keys</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+        <tr><td><kbd>W</kbd> <kbd>&uarr;</kbd></td><td>Pitch up</td></tr>
+        <tr><td><kbd>S</kbd> <kbd>&darr;</kbd></td><td>Pitch down</td></tr>
+        <tr><td><kbd>A</kbd> <kbd>&larr;</kbd></td><td>Roll left</td></tr>
+        <tr><td><kbd>D</kbd> <kbd>&rarr;</kbd></td><td>Roll right</td></tr>
+        <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>Yaw left / right</td></tr>
+        <tr><td><kbd>Shift</kbd> / <kbd>Ctrl</kbd></td><td>Throttle up / down</td></tr>
+        <tr><td><kbd>C</kbd></td><td>Cycle camera: chase, cockpit, orbit</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Pause, and the pause menu</td></tr>
+        <tr><td><kbd>O</kbd></td><td>Settings panel, and close it</td></tr>
+        <tr><td><kbd>M</kbd></td><td>Mute the engine and wind</td></tr>
+        <tr><td><kbd>H</kbd></td><td>Collapse the control list</td></tr>
+        <tr><td><kbd>Tab</kbd></td><td>Show or hide the instruments</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Reset to the start condition</td></tr>
+        <tr><td><kbd>F2</kbd></td><td>Photo: download the view as a PNG</td></tr>
+        <tr><td><kbd>Esc</kbd> <kbd>Backspace</kbd></td><td>Back out of a panel</td></tr>
+        <tr><td><kbd>Enter</kbd> <kbd>Space</kbd></td><td>Choose the menu entry under the cursor</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="flight-numbers">Flight numbers</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Quantity</th><th>Value</th></tr></thead>
+    <tbody>
+        <tr><td>HUD scale</td><td>2 knots per world unit/s</td></tr>
+        <tr><td>Stall speed</td><td>40 units/s (80 knots)</td></tr>
+        <tr><td>Cruise speed</td><td>120 units/s</td></tr>
+        <tr><td>Full throttle</td><td>200 units/s</td></tr>
+        <tr><td>Throttle sweep</td><td>2 seconds, 0 to 100%</td></tr>
+        <tr><td>Terrain crash</td><td>Faster than 30 units/s down</td></tr>
+        <tr><td>Runway crash</td><td>Faster than 48 units/s down</td></tr>
+        <tr><td>Runway landing</td><td>Under 18 units/s, wings 11 deg, nose 15 deg, heading 25 deg</td></tr>
+        <tr><td>Ground clearance</td><td>5 units</td></tr>
+        <tr><td>Crash countdown</td><td>2.5 seconds, then reset</td></tr>
+        <tr><td>Low altitude warning</td><td>Within 200 ft of the ground below</td></tr>
+        <tr><td>Terrain tile</td><td>16000 x 16000 units, 200 x 200 segments</td></tr>
+        <tr><td>Ground drawn to</td><td>12000 units past the aircraft</td></tr>
+        <tr><td>fBm octaves</td><td>7</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="the-start-state">The start state</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Field</th><th>Range</th><th>Step</th><th>Default</th></tr></thead>
+    <tbody>
+        <tr><td><code>START AIRSPEED</code></td><td>0 to 200 knots</td><td>5</td><td>80 knots</td></tr>
+        <tr><td><code>START ALTITUDE</code></td><td>0 to 8000 ft</td><td>10</td><td>1390 ft</td></tr>
+        <tr><td><code>START CLIMB</code></td><td>-2000 to +3000 ft/min</td><td>20</td><td>+1260 ft/min</td></tr>
+        <tr><td><code>START HEADING</code></td><td>000 to 355 deg</td><td>5</td><td>000</td></tr>
+        <tr><td><code>START THROTTLE</code></td><td>0 to 100%</td><td>5</td><td>20%</td></tr>
+        <tr><td><code>START CAMERA</code></td><td>chase, cockpit, orbit</td><td>-</td><td><code>CHASE</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Radio group: <code>START OFF FLYING</code> (default) or <code>RUNWAY TAKEOFF</code>. Checkbox: <code>RUNWAY</code>, forced on and disabled under <code>RUNWAY TAKEOFF</code>. Pitch is derived, never set.</p>
+
+<h2 id="options-cheat">Options</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Option</th><th>Steps through</th></tr></thead>
+    <tbody>
+        <tr><td><code>CONTROL SENSITIVITY</code></td><td>50% to 200%</td></tr>
+        <tr><td><code>FOG DENSITY</code></td><td><code>CLEAR</code> to <code>THICK</code></td></tr>
+        <tr><td><code>AIRSPEED IN</code></td><td><code>KNOTS</code>, <code>MPH</code></td></tr>
+        <tr><td><code>ALTITUDE IN</code></td><td><code>FEET</code>, <code>METERS</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Everything above is stored in <code>localStorage</code> and reopens with the next session.</p>
+
+<h2 id="worlds">Worlds</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Environment</th><th>Id</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>HIGHLANDS</code></td><td><code>highlands</code></td><td>Peaks over fBm ground, snow above 300. The default</td></tr>
+        <tr><td><code>RIVER BASIN</code></td><td><code>river-basin</code></td><td>A river the width of the world, low forested country</td></tr>
+        <tr><td><code>CANYON COUNTRY</code></td><td><code>canyon-country</code></td><td>Branching canyons in a high plateau, no standing water</td></tr>
+        <tr><td><code>DUNE SEA</code></td><td><code>dune-sea</code></td><td>Dunes, outcrops, one desert river, palm groves</td></tr>
+        <tr><td><code>LAKESIDE</code></td><td><code>lakeside</code></td><td>A town on a lake, forested hills, snow peaks</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Two more are built for the modes and kept out of the panel: <code>OPEN COUNTRY</code> and <code>LOOP VALLEY</code>.</p>
+
+<h2 id="elements-cheat">Elements</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Element</th><th>Configured through</th></tr></thead>
+    <tbody>
+        <tr><td>Mountain</td><td>Count, height, radius, girth</td></tr>
+        <tr><td>Canyon</td><td>Depth, width, steepness, branches, wander</td></tr>
+        <tr><td>Desert</td><td>Dune height, crest spacing, coverage, sand gradient</td></tr>
+        <tr><td>Grass</td><td>Green gradient, height band</td></tr>
+        <tr><td>Sand</td><td>Brown gradient, height band</td></tr>
+        <tr><td>Water body</td><td>Water line, blue gradient by depth, basin pull</td></tr>
+        <tr><td>River</td><td>Blue gradient, windiness, width, depth</td></tr>
+        <tr><td>Forest</td><td>Tree height, density, grove size, grove count, canopy, band</td></tr>
+        <tr><td>Town</td><td>Block size, block count, building height, extent, gradients</td></tr>
+        <tr><td>Snow</td><td>Snow line, coverage, slope limit, white gradient</td></tr>
+        <tr><td>Runway</td><td>Length, width, heading, height band, apron, gradients</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Pipeline order: landforms, ground cover, water, cuts and built things, snow, runway last.</p>
+
+<h2 id="game-modes-cheat">Game modes</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Mode</th><th>Stages</th><th>Objective</th></tr></thead>
+    <tbody>
+        <tr><td><code>RUNWAY LANDING</code></td><td>4</td><td>Land on the strip. Harder: further out, off the line, shorter strip, higher country</td></tr>
+        <tr><td><code>FLYING THROUGH LOOPS</code></td><td>4</td><td>Fly the gates in order. Harder: more gates, tighter, closer, bending more</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Gate colours: green is the one the course is waiting on, amber is still to come, dim is behind you. A crash restarts the stage.</p>
+
+<h2 id="api-cheat">API</h2>
+
+<pre><code>import { createPilot, createEnvironment, createTiledEnvironment } from './js/api/index.js';
+
+createPilot({ scene, camera, aircraft, anchor, terrain, keymap, flight })
+    .update(dt)          // returns { airspeed, altitude, verticalSpeed, heading, throttle }
+
+createEnvironment({ environment, runway })
+    .group               // one detachable Object3D
+    .applyDepth(scene)   // the sky and the fog, without the ground
+    .attach(aircraft)    // throws with every gap in the contract
+    .register(mesh, { x, z })
+    .runways[0]
+    .setEnvironment(id)
+    .setDaylight(phase)  // 0 to 1
+    .updateWater(dt, phase)
+
+createTiledEnvironment({ environment, tiles, size })
+    .sampleHeight(x, z)  // answered by whichever square the point is over</code></pre>
+
+<pre><code>import { validateAircraftContract, TELEMETRY_FIELDS, API_VERSION } from './js/api/contract.js';
+
+validateAircraftContract(aircraft)   // every gap at once, or []</code></pre>
+
+<h2 id="commands">Commands</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Command</th><th>Does</th></tr></thead>
+    <tbody>
+        <tr><td><code>npm run serve</code></td><td>Static server on <code>http://localhost:8080</code></td></tr>
+        <tr><td><code>npm run serve -- 3000</code></td><td>Another port, and <code>PORT</code> works too</td></tr>
+        <tr><td><code>npm test</code></td><td>The whole suite, no dependencies</td></tr>
+        <tr><td><code>node --test</code></td><td>The same thing without npm</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="file-photo-names">Photo names</h2>
+
+<p><code>pilot-matter-YYYYMMDD-HHMMSS.png</code>, for example <code>pilot-matter-20260824-050709.png</code>.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="testing.html" rel="prev">&#8592; Testing</a>
+                <a href="about.html" rel="next">Tech stack and license &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

@@ -26,6 +26,40 @@ that applies when their items are completed.
   only one the pilot has ever seen
   - From: Game Modes
 
+### Code Review Override - the world with no edge
+
+- [ ] Nothing holds the ground out as far as the camera is drawn
+  - **Issue**: `TILE_REACH` in `js/world-tiles.js` is 12000 and the camera's
+    far plane in `js/main.js` is 12000, and the two are matched by a comment
+    rather than by anything that fails when they drift apart. The promise the
+    whole grid rests on - that the ground always runs further than the camera
+    can see - breaks the moment either is changed on its own, and it breaks
+    back into the void edge this run removed
+  - **Goal**: Tie the two together, either by drawing the far plane from
+    `TILE_REACH` or by a test that fails once the far plane outruns the reach
+  - From: Code Review Override - the world with no edge
+
+#### Found Issues
+
+- [ ] A stage opening is still carried round one square
+  - **Issue**: `stageStart` in `js/game-modes.js` wraps a stage's opening
+    position into a single 16000-unit square, explaining that the world has no
+    outside so the opening is carried round it "the same way a flight is". A
+    flight is no longer carried round: the tile grid replaced `wrapInside` in
+    `js/main.js`, so a wrapped opening is now a different place rather than the
+    same one. Nothing reaches it yet - all four Runway Landing stages open at
+    the bearing and distance they ask for - but `DOWNWIND` opens 184 units
+    inside the line the wrap fires at, so a stage given a longer
+    `approach.distance`, or a runway sited nearer a tile edge, would open the
+    aircraft on the far side of the strip at a bearing and a distance the stage
+    never asked for
+  - **Goal**: Drop the wrap from `stageStart` now that the ground continues
+    past the tile, let an opening stand where its bearing and distance put it,
+    and correct the comment justifying it. Cover it with a test that a stage
+    opens at the distance and bearing it asked for from a runway sited anywhere
+    in the tile
+  - From: Code Review Override - the world with no edge
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -466,3 +500,23 @@ in this section applies a patch version update.
   the use of tilt controls to default; but **only** when the simulator is
   played on a phone or tablet without a keyboard
   - From: User Overrides `->` Overrides
+- [x] Plan the site: where the documentation lives, which tool builds it, the
+  design language derived from the repository's own artwork, the pages the
+  README splits into, and where the menu goes
+  - From: Create and Deploy GitHub Pages Override
+- [x] Write `DESIGN_LANGUAGE.md` from the palette and the forms in `logo.png`,
+  with the contrast ratio checked for every text and background pair
+  - From: Create and Deploy GitHub Pages Override
+- [x] Add the Pages deploy workflow and the `.nojekyll` the site needs to be
+  served whole
+  - From: Create and Deploy GitHub Pages Override
+- [x] Split the README's sections into site pages under `docs/`, moving the
+  full text rather than summarizing it, with a fixed side menu matching the
+  folder structure
+  - From: Create and Deploy GitHub Pages Override
+- [x] Write `QUICKSTART.md` and `CHEATSHEET.md`, and the site pages carrying
+  them
+  - From: Create and Deploy GitHub Pages Override
+- [x] Cut `README.md` back to a front door: what it is, how to run it, the
+  controls, and a link from every section heading to its page on the site
+  - From: Create and Deploy GitHub Pages Override

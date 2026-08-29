@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>How the terrain works - Pilot Matter</title>
+    <meta name="description" content="Fractal noise, the element registry, the assembled environments, and the world with no edge.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / How the terrain works</p>
+            <h1>How the terrain works</h1>
+
+<p class="lead">The ground is a <code>16000 x 16000</code> unit <code>PlaneGeometry</code> (200 x 200 segments) whose vertices are displaced vertically by a <strong>fractal Brownian motion</strong> function - seven octaves of smooth value noise layered together. Low-frequency octaves define broad valleys and mountain ranges; high-frequency octaves add fine surface detail. A remapping curve flattens values below a threshold into wide plains and water, then exaggerates values above the threshold into steep peaks.</p>
+
+<p>The noise, the remapping curve, and the mountain falloff live in <code>js/terrain-math.js</code> as plain functions with no Three.js dependency, so the world's shape can be unit tested in Node.</p>
+
+<p>Everything drawn over that base ground is an <strong>environment element</strong>.</p>
+
+<div class="toc">
+    <h2>On this page</h2>
+    <ul>
+        <li><a href="#elements">Elements</a></li>
+        <li><a href="#environments">Environments</a></li>
+        <li><a href="#the-edge-of-the-world">The edge of the world</a></li>
+        <li><a href="#worlds-laid-beside-each-other">Worlds laid beside each other</a></li>
+        <li><a href="#a-day-and-water-that-moves-in-it">A day, and water that moves in it</a></li>
+    </ul>
+</div>
+
+<h2 id="elements">Elements</h2>
+
+<p>An element is not a model, a texture, or a placed asset. It is a registry entry in <code>js/environment/elements.js</code> carrying two things: the ranges it can be configured through, and the algorithm that draws it into a height and colour field. Adding a landform to the world means adding an entry, not another bespoke terrain pass, and reconfiguring one means changing a number rather than commissioning new art.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Element</th><th>Configured through</th></tr></thead>
+    <tbody>
+        <tr><td><strong>Mountain</strong></td><td>Peak count, a height range, a radius range, and a girth that stretches a peak along an axis of its own</td></tr>
+        <tr><td><strong>Canyon</strong></td><td>A depth range, a width range, a steepness, a branch count, and how far the cut wanders</td></tr>
+        <tr><td><strong>Desert</strong></td><td>A dune height range, the spacing between crests, how much of the world the dune sea covers, and a sand gradient</td></tr>
+        <tr><td><strong>Grass</strong></td><td>A green gradient, and the height band it covers</td></tr>
+        <tr><td><strong>Sand</strong></td><td>A brown gradient, and the height band it covers</td></tr>
+        <tr><td><strong>Water body</strong></td><td>A water line, a blue gradient read by depth, and how far the basin is pulled up to a flat surface</td></tr>
+        <tr><td><strong>River</strong></td><td>A blue gradient, a windiness, a width range, and a depth range</td></tr>
+        <tr><td><strong>Forest</strong></td><td>A tree height range, a density, a grove size range, a grove count, a canopy gradient, and the height band trees will grow in</td></tr>
+        <tr><td><strong>Town</strong></td><td>A block size, how many blocks are built on, a building height range, the extent of the site, and building and street gradients</td></tr>
+        <tr><td><strong>Snow</strong></td><td>A snow line, a coverage, the steepest ground snow will hold on to, and a white gradient</td></tr>
+        <tr><td><strong>Runway</strong></td><td>A length range, a width range, a heading range, the height band a strip may be built in, how far the graded apron reaches, and pavement and paint gradients</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Three rules hold across all of them:</p>
+
+<ul>
+    <li><strong>Every colour is a gradient of one base hue.</strong> An element declares a <code>light</code> and a <code>dark</code> end of the same colour and blends between them, so nothing shifts hue dramatically across the ground it covers.</li>
+    <li><strong>Nothing is symmetrical.</strong> Rivers and canyons wander on three waves whose lengths share no common multiple, forests are outlined by three lobes at frequencies that share none either, and dune crests are pushed off their axis by noise. There is no repeating pattern to spot from the air.</li>
+    <li><strong>The order is the pipeline's, not the preset's.</strong> A preset lists the elements it wants and the builder applies them in a fixed order: landforms shaped first, then ground cover laid over them, then water filling what is left below its line, then the cuts and the built things, then snow, and the runway cut last of all over whatever else claimed the ground, because a strip is the one thing in the world that is kept clear. An element never has to know what a preset put beside it.</li>
+</ul>
+
+<p>Mountain density, when a preset does not name a count, is still the formula it has always been:</p>
+
+<pre><code>count = (terrainArea x 0.10) / (pi x avgRadius^2)  ~  14 to 15 mountains</code></pre>
+
+<p>The runway is the one element that chooses where it goes rather than being scattered. Sixty-odd sites are drawn from the world's own seeded stream, each measured at twenty-seven points across the whole footprint of the strip rather than under the middle of it, and the flattest one wins - because what a runway needs is not a particular place but ground that does not move under it. A site outside the height band a strip may be built in is charged for the part of it that lies outside rather than thrown away, so a world with no ground inside the band gets the best ground it has instead of getting no runway at all. The pavement is then levelled dead flat to the site's own height and the apron either side eases back into whatever was there, so a strip sits in the country rather than on a plinth.</p>
+
+<p>A world is generated without a strip unless one is asked for. In the game that is the <code>RUNWAY</code> box in the <a href="controls/settings.html">settings panel</a>; through the <a href="api.html">Matter API</a> it is the <code>runway</code> option.</p>
+
+<h2 id="environments">Environments</h2>
+
+<p>An assembled environment is a name, a seed, the base ground it is drawn on, and the elements placed over it. It carries no geometry: the world is generated from that description every time it is flown, which is why switching one from the settings panel takes a few tens of milliseconds and no download.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Environment</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>HIGHLANDS</code></td><td>fBm ground under scattered peaks, with snow above 300. The world the simulator has always generated, and the one a fresh install opens on</td></tr>
+        <tr><td><code>RIVER BASIN</code></td><td>A meandering river the width of the world, through low forested country</td></tr>
+        <tr><td><code>CANYON COUNTRY</code></td><td>A branching canyon system cut into a high plateau. The only one of the five with no standing water in it</td></tr>
+        <tr><td><code>DUNE SEA</code></td><td>Wind-blown dunes and rock outcrops, cut by one desert river with palm groves along it</td></tr>
+        <tr><td><code>LAKESIDE</code></td><td>A town on the shore of a wide lake, under forested hills and snow-capped peaks</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The seed is what makes a world reproducible: the same preset lays out the same peaks, the same river, and the same streets every time, so a place worth flying back to is still there.</p>
+
+<p>Two more environments are built for the <a href="controls/game-modes.html">game modes</a> rather than to be chosen between, and are kept out of the settings panel because a mode brings its own ground with it: <code>OPEN COUNTRY</code>, low rolling ground under a wide sky with one strip cut into it, and <code>LOOP VALLEY</code>, a shallow valley with the air over it left clear. Both are deliberately thin - four elements and three - because what a mode asks the pilot to read is the objective, not the scenery around it. A stage builds its preset with a seed of its own, so four stages of one mode are four worlds rather than the same one four times.</p>
+
+<h2 id="the-edge-of-the-world">The edge of the world</h2>
+
+<p>There is not one. The square an environment describes is one tile of an endless grid of them, and the tiles around the aircraft are drawn out past everything the camera can see, so the ground the fog was promising is actually there. Fly at an edge and another tile is already laid beyond it. There is nothing left to reach.</p>
+
+<p>Each tile is the same description of a world, seeded from its own place in the grid: the same peaks, the same rivers, and the same streets that preset lays down, arranged differently because the place is different. The tile at a given place is that ground every time it is laid, so a country worth flying back to is still there on the way back. The middle tile is the description untouched - a world laid as the middle of a grid and the same world laid on its own are the same ground - which is what keeps every stored seed, every course, and every runway exactly where it was.</p>
+
+<p>The ground is drawn out 12000 units past the aircraft, which is as far as the camera is drawn at, rather than out to where the fog happens to end - the fog is a setting the pilot can turn down and the far plane is not. Tiles are laid a few at a time, one per frame, so crossing into new country costs a frame or two rather than a stall, and the tile the aircraft is actually over is always drawn before it is flown over. Ground far enough behind is released, but not the moment it goes out of reach: a tile is held a little past that, so an aircraft weaving over the line does not generate the same country again every time it crosses back.</p>
+
+<p>What the grid does not yet do is hide its joins. The base ground runs on across a join, because it is noise read off the world rather than off the tile, but what the elements drew stops at the tile they were drawn for - a river reaches the edge and the next tile's river begins somewhere else. Settling those joins the way <a href="#worlds-laid-beside-each-other">an assembly settles them</a> is the next step; a seam in the distance is a smaller thing than the end of the world.</p>
+
+<p>The <a href="api.html">Pilot API</a> still carries a host's own terrain round at the bounds that terrain declares, because a host's world is the size the host says it is. A host whose world continues past what it declared turns the crossing off with <code>wrap: false</code>.</p>
+
+<h2 id="worlds-laid-beside-each-other">Worlds laid beside each other</h2>
+
+<p>A world can also be one square of a larger one. Told which square of a grid it is, an environment is generated in the world's coordinates rather than in its own: its vertices stand where its place in the grid puts them, its sampler answers for that square and nothing outside it, and because the ground is shaped from noise read off the world rather than off the square, the base ground runs on across the join instead of starting again at it.</p>
+
+<p>What does not run on is what the elements drew, since a peak that ended at one square's edge knows nothing about the ground its neighbour laid against it. So the joins are settled: every place two or more squares put a vertex is brought to one height and one colour - the average of what they all had there - and each square is walked back to what it was over the next few vertices in, which closes the seam without flattening the country behind it. A vertex four squares meet at is settled against all four at once, so a corner closes as exactly as an edge does.</p>
+
+<p>Each square is a whole environment - its own elements, its own strips, its own water - laid out from its own place in the grid, so neighbouring squares are the same world without being the same ground. The bundled simulator still flies one square and carries the world round at its edges; the assembly is for a host, through the <a href="api.html">Matter API</a>.</p>
+
+<h2 id="a-day-and-water-that-moves-in-it">A day, and water that moves in it</h2>
+
+<p>The world is not lit one way any more. A cycle in <code>js/day-night.js</code> carries a phase from midnight through dawn, noon, and dusk and back round, and the sky the world fades to, the fog tinted with it, the colour and strength of the sun, and the fill light under it are all read off that phase as the blend between the two moments either side of it - so a sunrise is a gradual thing rather than a switch thrown at a threshold. The sun walks an arc across the sky and is held a little over the horizon after it sets, so the ground keeps its shape after dark. Midday is exactly the light the world was drawn in before it had a day, and time the flight does not spend flying is time the day does not spend passing.</p>
+
+<p>Water is the one part of the ground that moves and the one part that shines. Every vertex at or under the water line rides a swell of two wave trains crossing at an angle, and catches a sheen on the face of each crest - a colour the land is never painted, so water reads as water rather than as blue ground. The swell is held down to nothing at the bank, so the surface meets the shore it was poured against rather than lapping over it, and the sheen is scaled by how much daylight there is to throw back, so a lake goes flat and dark at night. Both are functions of where a point is in the world and what time it is, which is what lets two squares of an assembly work out the same surface at the place they meet without agreeing on anything.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="flight-model.html" rel="prev">&#8592; How the flight model works</a>
+                <a href="api.html" rel="next">Simulator API &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

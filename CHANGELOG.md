@@ -5,6 +5,53 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Documentation only. Nothing about the simulator changed, so no version was
+applied; this work ships with whatever version comes next.
+
+### Added
+
+- **A documentation site**, at `docs/`, because the README had become a manual
+  rather than a front door: 576 lines and 55,000 characters, which is a
+  document nobody reads to the end of and everybody scrolls past the middle
+  of. Every section it carried is now a page of its own, with the text moved
+  across whole rather than summarized down, so nothing that was written is
+  lost and the thing a reader wants is one entry in a menu rather than one
+  scroll position in a file. Twenty-one pages, a fixed side menu whose groups
+  collapse, and a folder structure the menu matches, so where a page sits in
+  the tree and where it sits in the menu are the same answer
+- `DESIGN_LANGUAGE.md`, which is why the site looks like the project rather
+  than like a template it was poured into. There is no vector art here, so the
+  palette is sampled out of `logo.png`: the sky the aircraft is flying out of,
+  the navy it is drawn in, the sage of the banner, and the two tans of the
+  mountains, each at the frequency it actually occurs in the file. Two of them
+  cannot carry text - sky reaches 1.74:1 against white and sage 2.07:1 - so
+  both are held to fills and darker tones of the same hues are used wherever
+  something has to be read. Every pair the site renders is measured and
+  written down, and the lowest of them is 5.17:1
+- `QUICKSTART.md` and `CHEATSHEET.md`, the two documents a long manual always
+  needs and never contains: one for a reader who wants it working now, one for
+  a reader who has already read the long version and needs the numbers back.
+  Both are site pages as well as Markdown
+- A Pages deploy workflow, and the `.nojekyll` that stops a site not built by
+  Jekyll from silently losing every path beginning with an underscore. The
+  tree it publishes is the tree that was already being published, so the
+  simulator stays exactly where it is
+- Twenty-one tests over the site: that every page carries the head it needs,
+  that the twenty-one copies of the menu are still the same menu, that every
+  link reaches a file and every anchor reaches an id, that nothing is linked by
+  an absolute path - which works locally and breaks on a project site - that
+  every colour on the site is one the design document declares, and that the
+  README stayed short enough to be the front door it was cut back to
+
+### Changed
+
+- **The README is a front door rather than the manual.** 576 lines down to
+  190: what it is, how to run it, the keys, and where the rest of it lives.
+  Every section heading it kept is a link to the page carrying that section in
+  full, so the short version is never the whole story pretending to be
+
 ## [1.12.0-alpha] - 2026-08-28
 
 ### Added

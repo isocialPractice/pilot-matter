@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quickstart - Pilot Matter</title>
+    <meta name="description" content="Serve the project, open the page, and fly: the essentials for getting Pilot Matter running now.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / Quickstart</p>
+            <h1>Quickstart</h1>
+
+<p class="lead">The shortest path from a clone to a climb. Everything here is covered at length elsewhere in this documentation; this page is what you need to be flying in about a minute.</p>
+
+<h2 id="if-you-only-want-to-fly">If you only want to fly</h2>
+
+<p>There is nothing to install and nothing to clone. <a href="../index.html">Open the simulator</a> and it runs.</p>
+
+<h2 id="run-it-locally">Run it locally</h2>
+
+<p>You need a modern browser with ES module support. Node 18 or newer is needed only for the bundled server and the tests, not for the simulator itself.</p>
+
+<pre><code>git clone https://github.com/isocialPractice/pilot-matter.git
+cd pilot-matter
+npm run serve</code></pre>
+
+<p>Then open <code>http://localhost:8080</code>. Any static file server works just as well; the bundled one is there because it needs no install and no dependencies.</p>
+
+<h2 id="the-first-minute">The first minute</h2>
+
+<p>The game opens on its start screen with the clock held at zero. Choose <code>START FLIGHT</code>, with <kbd>Enter</kbd> or a click, and the controls are yours.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Step</th><th>Do</th><th>Because</th></tr></thead>
+    <tbody>
+        <tr><td>1</td><td>Hold <kbd>Shift</kbd></td><td>The flight opens at 80 knots, which is the stall speed itself. Opening the throttle is the first thing to do.</td></tr>
+        <tr><td>2</td><td>Ease the nose down with <kbd>S</kbd></td><td>The aircraft opens in a climb. Trading a little of it back for airspeed is what buys the lift.</td></tr>
+        <tr><td>3</td><td>Turn with <kbd>A</kbd> and <kbd>D</kbd></td><td>Roll, and the nose follows through a coordinated turn.</td></tr>
+        <tr><td>4</td><td>Watch <code>ALTITUDE</code> and the ground</td><td>A gentle arrival is a landing. Flying into a hillside wrecks the aircraft.</td></tr>
+        <tr><td>5</td><td>Press <kbd>R</kbd></td><td>Puts the aircraft back at its starting condition, whenever it has gone wrong.</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="the-keys-worth-knowing-first">The keys worth knowing first</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+        <tr><td><kbd>W</kbd> <kbd>S</kbd> <kbd>A</kbd> <kbd>D</kbd></td><td>Pitch and roll, and the arrow keys do the same</td></tr>
+        <tr><td><kbd>Shift</kbd> <kbd>Ctrl</kbd></td><td>Open and close the throttle lever</td></tr>
+        <tr><td><kbd>C</kbd></td><td>Cycle the camera: chase, cockpit, orbit</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Pause, and open the pause menu</td></tr>
+        <tr><td><kbd>O</kbd></td><td>Open the settings panel</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Reset to the starting condition</td></tr>
+        <tr><td><kbd>F2</kbd></td><td>Take a picture and download it</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The <a href="controls/index.html">full control list</a> has the rest, and the <a href="cheatsheet.html">cheatsheet</a> has all of it on one page.</p>
+
+<h2 id="try-a-mode">Try a mode</h2>
+
+<p>Choose <code>GAME MODES</code> from the start screen or the pause menu and pick one. Both are four stages long, and a crash puts the stage back to its beginning rather than ending the run.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Mode</th><th>Objective</th></tr></thead>
+    <tbody>
+        <tr><td><code>RUNWAY LANDING</code></td><td>Put the aircraft down on the strip</td></tr>
+        <tr><td><code>FLYING THROUGH LOOPS</code></td><td>Fly the course of loops in order</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="where-to-go-next">Where to go next</h2>
+
+<ul>
+    <li><a href="controls/index.html">Controls</a> for every key, and the menus behind them.</li>
+    <li><a href="flight-model.html">How the flight model works</a> for the four rules the whole thing rests on.</li>
+    <li><a href="terrain.html">How the terrain works</a> for the world, the elements, and why it has no edge.</li>
+    <li><a href="api.html">Simulator API</a> to fly the aircraft over your own world, or your own aircraft over this one.</li>
+</ul>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="index.html" rel="prev">&#8592; Pilot Matter documentation</a>
+                <a href="getting-started.html" rel="next">Getting started &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

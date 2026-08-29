@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pausing - Pilot Matter</title>
+    <meta name="description" content="What P freezes, the menu it opens, and the keys a menu takes back off the flight.">
+    <link rel="icon" href="../../favicon.png">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script src="../assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="../index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../quickstart.html">Quickstart</a></li>
+                <li><a href="../getting-started.html">Getting started</a></li>
+                <li><a href="../features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group" open>
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="../controls/index.html">The keys</a></li>
+                    <li><a href="../controls/loading.html">Loading</a></li>
+                    <li><a href="../controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="../controls/pausing.html">Pausing</a></li>
+                    <li><a href="../controls/settings.html">Settings</a></li>
+                    <li><a href="../controls/game-modes.html">Game modes</a></li>
+                    <li><a href="../controls/sound.html">Sound</a></li>
+                    <li><a href="../controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="../controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="../controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="../flight-model.html">The flight model</a></li>
+                <li><a href="../terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="../api.html">Simulator API</a></li>
+                <li><a href="../project-structure.html">Project structure</a></li>
+                <li><a href="../testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="../cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="../about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="../index.html">Documentation</a> / <a href="../controls/index.html">Controls</a> / Pausing</p>
+            <h1>Pausing</h1>
+
+<p><kbd>P</kbd> latches the simulation clock at zero: the flight model, gravity, and the orbit camera all stop, the last frame stays on screen, and a menu opens over it. Pressing <kbd>P</kbd> again resumes from exactly where the flight left off, with the time spent paused discarded rather than applied in one jump.</p>
+
+<p>The menu is flown the way the aircraft is. <kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> move between the entries, wrapping round both ends, and <kbd>Enter</kbd> or <kbd>Space</kbd> chooses the one under the cursor. Every one of those keys also works a control surface, so a menu on screen takes them before the flight behind it can read them: walking a list never also pitches or rolls the aircraft under it. Every other key is read as it always was, so <kbd>F2</kbd> still takes a picture of a paused world. The mouse works the menu the same way the start screen is worked - the pointer moves the cursor and a click chooses - so a flight paused with a hand on the mouse is resumed with the same hand:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Entry</th><th>Does</th></tr></thead>
+    <tbody>
+        <tr><td><code>RESUME</code></td><td>Unpauses and flies on</td></tr>
+        <tr><td><code>RESET FLIGHT</code></td><td>Puts the aircraft back at its starting condition and unpauses</td></tr>
+        <tr><td><code>GAME MODES</code></td><td>Opens the same list the start screen opens</td></tr>
+        <tr><td><code>CONTROLS</code></td><td>Opens the control list back up, for a screen it has been collapsed on</td></tr>
+        <tr><td><code>SETTINGS</code></td><td>Opens the same panel the start screen opens</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The cursor starts on <code>RESUME</code> every time the menu opens, so resuming is always one key press away from a paused flight. The pause card, like the title screen, lets the mouse through everywhere but its menu, so a click beside the entries falls on the frozen world rather than on the card over it.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="../controls/starting-a-flight.html" rel="prev">&#8592; Starting a flight</a>
+                <a href="../controls/settings.html" rel="next">Settings &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../../index.html">Play it</a>, or read the <a href="../api.md">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

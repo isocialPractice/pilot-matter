@@ -1,0 +1,57 @@
+name: Deploy to GitHub Pages
+
+# The published tree is the repository itself: the simulator at the root and
+# the documentation site under docs/. There is no build step to run, so the
+# repository is uploaded as it stands.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and a queued one is not cancelled, so a push that
+# lands during a deploy publishes rather than being dropped for the next.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        # enablement switches the repository from a branch build to this
+        # workflow the first time it runs. The tree it publishes is the same
+        # tree the branch build was publishing, so the simulator stays where
+        # it is at /pilot-matter/index.html.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Run the tests
+        # The site is checked by the same suite the rest of the project is,
+        # so a page that has drifted from the README does not deploy.
+        run: node --test
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
