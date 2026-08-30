@@ -20,11 +20,14 @@
  */
 
 /**
- * How far past the aircraft the ground has to run, in world units. Matched to
- * the far plane the world is drawn to rather than to the fog in front of it,
- * because the fog is a setting the pilot can turn down and the far plane is
- * not: ground that reaches as far as the camera can see is ground with no
- * visible end whatever the air is doing.
+ * How far past the aircraft the ground has to run, in world units. This is the
+ * far plane the world is drawn to rather than the fog in front of it, because
+ * the fog is a setting the pilot can turn down and the far plane is not: ground
+ * that reaches as far as the camera can see is ground with no visible end
+ * whatever the air is doing.
+ *
+ * `js/main.js` builds its camera from this rather than naming a number that
+ * matches it, so the two cannot drift apart and put the edge back in frame.
  */
 export const TILE_REACH = 12000;
 

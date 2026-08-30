@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, posix, relative, resolve } from 'node:path';
+import { START_FIELDS } from '../js/config.js';
+import { ENVIRONMENTS, MODE_ENVIRONMENTS } from '../js/environment/presets.js';
+import { GAME_MODES } from '../js/game-modes.js';
+import { renderApiReference, PAGE } from '../tools/build-api-reference.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SITE = join(ROOT, 'docs');
@@ -33,6 +37,33 @@ test('the site is the whole documentation rather than a landing page', () => {
     assert.ok(pages.includes('docs/index.html'), 'the site needs a home page');
     assert.ok(pages.includes('docs/quickstart.html'), 'QUICKSTART.md is a site page too');
     assert.ok(pages.includes('docs/cheatsheet.html'), 'CHEATSHEET.md is a site page too');
+    assert.ok(pages.includes(PAGE.output),            'and so is the API reference');
+});
+
+// Pages serves by extension, and a type the browser will not render is a link
+// that downloads a file rather than opening a page. The reference was exactly
+// that for a while: docs/api.md, served as text/markdown, linked from the
+// footer of every page on the site and from the home page as a card.
+const RENDERED = new Set(['.html', '.css', '.js', '.png', '.svg', '.jpg', '.webp', '.ico']);
+
+test('every document the site links is one the browser opens rather than downloads', () => {
+    for (const [page, source] of sources) {
+        for (const target of localTargets(source)) {
+            const file = target.split(/[#?]/)[0];
+            const extension = posix.extname(file).toLowerCase();
+
+            assert.ok(RENDERED.has(extension),
+                `${page} links ${target}, which a browser downloads rather than opens`);
+        }
+    }
+});
+
+// The reference is generated from the document rather than written beside it,
+// so the deepest thing on the site cannot go stale against the deepest thing in
+// the repository. Regenerating it here is what makes that true.
+test('the API reference page is the API document, rendered', () => {
+    assert.equal(sources.get(PAGE.output), renderApiReference(),
+        `${PAGE.output} has drifted from ${PAGE.markdown} - run npm run docs:api`);
 });
 
 // A page that has lost its head is a page that renders unstyled, at the wrong
@@ -64,7 +95,7 @@ test('every page opens on one heading and a way past the menu', () => {
 /**
  * The menu is written into every page rather than fetched, because a
  * documentation site that cannot be navigated without script is one that
- * cannot be navigated. The cost of that is twenty-one copies, so the copies
+ * cannot be navigated. The cost of that is a copy per page, so the copies
  * are checked: the relative prefix and the open group are the only two things
  * allowed to differ between them.
  */
@@ -100,9 +131,17 @@ test('the group a page sits in is open when that page is being read', () => {
     }
 });
 
+/**
+ * A page with its sample code taken out. The reference page prints a host
+ * page's own markup - `<script src="app.js">` and the like - and a sample is
+ * something to read rather than something the site links, so a link check that
+ * followed one would be failing on a file the site never claimed to have.
+ */
+const linkable = (source) => source.replace(/<pre>[\s\S]*?<\/pre>/g, '');
+
 /** Every href and src on a page, minus the ones that leave the site. */
 function localTargets(source) {
-    return [...source.matchAll(/(?:href|src)="([^"]+)"/g)]
+    return [...linkable(source).matchAll(/(?:href|src)="([^"]+)"/g)]
         .map(match => match[1])
         .filter(target => !/^(?:https?:|mailto:|#)/.test(target));
 }
@@ -141,7 +180,7 @@ test('every anchor a page links to is an id that page has', () => {
 });
 
 function sameePageAnchors(source) {
-    return [...source.matchAll(/href="(#[^"]+)"/g)]
+    return [...linkable(source).matchAll(/href="(#[^"]+)"/g)]
         .map(match => match[1])
         .filter(anchor => anchor !== '#content');
 }
@@ -231,6 +270,38 @@ test('CHEATSHEET.md and its page say the same things', () => {
     ]) {
         assert.ok(cheatsheetDoc.includes(essential), `CHEATSHEET.md should carry ${essential}`);
         assert.ok(page.includes(essential),          `the cheatsheet page should carry ${essential}`);
+    }
+});
+
+/**
+ * Which page lists which of the things the code publishes.
+ *
+ * `docs/api.md` and the README are held to the source by `test/docs.test.js`,
+ * so adding a start field or a world fails there until they name it. The site
+ * says the same things over twenty-two pages and was held to none of it: the
+ * settings page lists all eight start fields by label, the terrain page and the
+ * cheatsheet list every world, and all three could go stale with nothing
+ * failing. These are the pages carrying that material, so these are the pages
+ * the code is read against.
+ */
+const CARRIES = [
+    ['docs/controls/settings.html',   'start field', START_FIELDS.map(field => field.label)],
+    ['docs/terrain.html',             'environment', [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(world => world.label)],
+    ['docs/cheatsheet.html',          'environment', [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(world => world.label)],
+    ['docs/controls/game-modes.html', 'game mode',   GAME_MODES.map(mode => mode.label)],
+    ['docs/cheatsheet.html',          'game mode',   GAME_MODES.map(mode => mode.label)]
+];
+
+test('the pages listing what the simulator offers list what it actually offers', () => {
+    for (const [page, material, labels] of CARRIES) {
+        const source = sources.get(page);
+        assert.ok(source, `${page} is not on the site`);
+        assert.ok(labels.length > 0, `there are no ${material} labels to hold ${page} to`);
+
+        for (const label of labels) {
+            assert.ok(source.includes(label),
+                `${page} does not name the ${label} ${material}, which the code publishes`);
+        }
     }
 });
 

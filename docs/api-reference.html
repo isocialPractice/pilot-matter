@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API reference - Pilot Matter</title>
+    <meta name="description" content="Every export of both halves, every option, and everything that comes back.">
+    <link rel="icon" href="../favicon.png">
+    <link rel="stylesheet" href="assets/site.css">
+    <script src="assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="quickstart.html">Quickstart</a></li>
+                <li><a href="getting-started.html">Getting started</a></li>
+                <li><a href="features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group">
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="controls/index.html">The keys</a></li>
+                    <li><a href="controls/loading.html">Loading</a></li>
+                    <li><a href="controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="controls/pausing.html">Pausing</a></li>
+                    <li><a href="controls/settings.html">Settings</a></li>
+                    <li><a href="controls/game-modes.html">Game modes</a></li>
+                    <li><a href="controls/sound.html">Sound</a></li>
+                    <li><a href="controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="flight-model.html">The flight model</a></li>
+                <li><a href="terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="api.html">Simulator API</a></li>
+                <li><a href="api-reference.html">API reference</a></li>
+                <li><a href="project-structure.html">Project structure</a></li>
+                <li><a href="testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="index.html">Documentation</a> / API reference</p>
+            <h1>API reference</h1>
+
+<p>Pilot Matter is two halves that can be used without each other.</p>
+
+<p>The <strong>Pilot API</strong> is the aircraft: the flight model, the controls, and the telemetry, flown against a scene, a terrain, and an aircraft model the host supplies. The <strong>Matter API</strong> is the world: an assembled environment as one detachable group, a height sampler for whatever is flying over it, and a contract any aircraft can satisfy, including one driven by a control API that has never heard of this one.</p>
+
+<p><code>js/api/index.js</code> is the one module a host page imports to get either.</p>
+
+<ul>
+    <li><a href="#importing">Importing</a></li>
+    <li><a href="#stability">Stability</a></li>
+    <li><a href="#pilot-api">Pilot API</a></li>
+    <li><a href="#matter-api">Matter API</a></li>
+    <li><a href="#contracts">Contracts</a></li>
+    <li><a href="#configuration">Configuration</a></li>
+    <li><a href="#worlds-and-elements">Worlds and elements</a></li>
+    <li><a href="#the-day">The day</a></li>
+    <li><a href="#the-water">The water</a></li>
+    <li><a href="#the-edge-of-the-world">The edge of the world</a></li>
+</ul>
+
+<p><code>examples/host.html</code> is both halves on one page and is the shortest way to see what the rest of this document is describing: the Pilot API flying over ground the page generated itself, beside the Matter API carrying an aircraft the page built, over a world assembled out of four tiles. Serve the project - <code>npm run serve</code> - and open <code>/examples/host.html</code>.</p>
+
+<h2 id="importing">Importing</h2>
+
+<p>There is no build step. The modules are ES modules, and Three.js is resolved through an import map on the host page:</p>
+
+<pre><code>&lt;script type="importmap"&gt;
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        }
+    }
+&lt;/script&gt;
+&lt;script type="module" src="app.js"&gt;&lt;/script&gt;</code></pre>
+
+<pre><code>import { createPilot, createEnvironment } from './js/api/index.js';</code></pre>
+
+<p>Under a package manager the same entry points are published by name:</p>
+
+<pre><code>import { createPilot } from 'pilot-matter';
+import { createEnvironment } from 'pilot-matter/matter';
+import { validateAircraftContract } from 'pilot-matter/contract';</code></pre>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Specifier</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>pilot-matter</code></td><td>Both halves, and everything below</td></tr>
+        <tr><td><code>pilot-matter/pilot</code></td><td>The Pilot API on its own</td></tr>
+        <tr><td><code>pilot-matter/matter</code></td><td>The Matter API on its own</td></tr>
+        <tr><td><code>pilot-matter/contract</code></td><td>The contracts, which load no renderer</td></tr>
+        <tr><td><code>pilot-matter/config</code></td><td>The configured start, and the fields it is set through</td></tr>
+        <tr><td><code>pilot-matter/environment</code></td><td>The assembled environments</td></tr>
+        <tr><td><code>pilot-matter/elements</code></td><td>The element registry and the field</td></tr>
+        <tr><td><code>pilot-matter/day-night</code></td><td>The day cycle: the hour, the light at it, and the sun's arc</td></tr>
+        <tr><td><code>pilot-matter/water</code></td><td>The wave, the sheen, and the surface animation</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Three.js is reached for by the two halves that build something with it, and by the root entry point that re-exports them both. <code>pilot-matter/contract</code>, <code>pilot-matter/config</code>, <code>pilot-matter/environment</code>, <code>pilot-matter/elements</code>, <code>pilot-matter/day-night</code>, and <code>pilot-matter/water</code> load no renderer at all, which is the point of the split: a host can check its own options, describe its own world, light its own sky, move its own water, or check the shape of its telemetry on a server, in a worker, or in a test, with nothing rendered.</p>
+
+<h2 id="stability">Stability</h2>
+
+<p>The API carries a version of its own, <code>API_VERSION</code>, which moves when the contracts move rather than when the simulator does. A release that changes how an aircraft flies does not change the API; a release that changes what an aircraft has to be does.</p>
+
+<pre><code>import { API_VERSION } from 'pilot-matter';
+
+if (API_VERSION !== 1) console.warn('this host was written against API 1');</code></pre>
+
+<p><strong>What is guaranteed to hold within a major API version:</strong></p>
+
+<ul>
+    <li>The names and call signatures of the exported functions</li>
+    <li>The <strong>shape</strong> of what they return - the fields a telemetry object carries, the fields a resolved option set carries, the members of a pilot and of an environment</li>
+    <li>The names of the option fields that go in, and the meaning of each</li>
+    <li>That an option a host does not name is filled in from the configured default rather than left undefined</li>
+    <li>That a validator reports its problems rather than throwing, and that a constructor throws rather than half-building</li>
+</ul>
+
+<p><strong>What is not guaranteed, and is expected to move:</strong></p>
+
+<ul>
+    <li>The <strong>numbers</strong>. Tuning is not a contract: the stall speed, the cruise speed, the sink rate, the terrain seeds, and the shape of the ground a preset draws are all free to change between releases. A telemetry object will always carry an <code>airspeed</code>; what that airspeed reads is the simulator's business.</li>
+    <li>Anything not exported from <code>js/api/index.js</code>. The internals are reachable, as everything in a no-build-step project is, but importing <code>js/aircraft.js</code> directly is reading over the fence rather than through the window.</li>
+    <li>The rendered look: materials, colours, lighting, and the geometry an element generates.</li>
+</ul>
+
+<p>New optional fields may be added to an options object or to a returned object within a version. A host reading a field it knows is safe; a host asserting on the exact set of keys is not.</p>
+
+<h2 id="pilot-api">Pilot API</h2>
+
+<pre><code>createPilot(options) -&gt; pilot</code></pre>
+
+<h3 id="options">Options</h3>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>scene</code></td><td><code>Object3D</code></td><td>a fresh <code>Scene</code></td><td>What the aircraft is added to</td></tr>
+        <tr><td><code>camera</code></td><td><code>Camera</code></td><td>none</td><td>A camera to place behind the aircraft</td></tr>
+        <tr><td><code>aircraft</code></td><td><code>Object3D</code> or loader result</td><td>the bundled model</td><td>The model to fly</td></tr>
+        <tr><td><code>anchor</code></td><td><code>{x, y, z}</code></td><td><code>{0, 0, 0}</code></td><td>The point in that model the flight model moves</td></tr>
+        <tr><td><code>terrain</code></td><td><code>{sampleHeight, bounds}</code></td><td>flat ground</td><td>The world being flown over</td></tr>
+        <tr><td><code>keymap</code></td><td>object</td><td><code>DEFAULT_KEYMAP</code></td><td>Bindings, merged over the bundled ones</td></tr>
+        <tr><td><code>controls</code></td><td>boolean</td><td><code>true</code></td><td><code>false</code> takes the keyboard off entirely</td></tr>
+        <tr><td><code>wrap</code></td><td>boolean</td><td><code>true</code></td><td><code>false</code> lets the aircraft fly past the bounds</td></tr>
+        <tr><td><code>runways</code></td><td>array</td><td>the terrain's</td><td>Strips a landing can be made on</td></tr>
+        <tr><td><code>cameraMode</code></td><td><code>'CHASE'</code>, <code>'COCKPIT'</code>, <code>'ORBIT'</code></td><td><code>'CHASE'</code></td><td>The view to open in</td></tr>
+        <tr><td><code>onReset</code></td><td>function</td><td>none</td><td>Called whenever the flight resets</td></tr>
+        <tr><td><code>onLanding</code></td><td>function</td><td>none</td><td>Called on an arrival that was a landing</td></tr>
+        <tr><td><code>flight</code></td><td>object</td><td>the configured start</td><td>Overrides for the start and the model</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>flight</code> takes the start state and the flight model's own numbers, all in world units. Everything it does not name comes from the configured start, so a pilot created with no options at all flies exactly the way the bundled simulator does.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th><code>flight</code> field</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>speed</code>, <code>throttle</code>, <code>altitude</code>, <code>verticalSpeed</code>, <code>pitch</code>, <code>yaw</code></td><td>The condition the flight opens in, and resets to</td></tr>
+        <tr><td><code>x</code>, <code>z</code></td><td>Where over the world it opens, which defaults to the middle of it</td></tr>
+        <tr><td><code>grounded</code></td><td>True for a start held on the ground, so the first arrival judged is the one flown back to it</td></tr>
+        <tr><td><code>sensitivity</code></td><td>How hard the controls bite, <code>0.1</code> to <code>4</code></td></tr>
+        <tr><td><code>minSpeed</code>, <code>cruiseSpeed</code>, <code>maxSpeed</code></td><td>The stall speed, the speed lift cancels gravity at, and the speed a full throttle asks for</td></tr>
+        <tr><td><code>gravity</code></td><td>The pull before lift is subtracted</td></tr>
+        <tr><td><code>clearance</code></td><td>How far above the ground the aircraft sits when it meets it</td></tr>
+        <tr><td><code>impactSpeed</code></td><td>The sink rate that turns an arrival into a crash</td></tr>
+        <tr><td><code>runwayImpactSpeed</code></td><td>The same, over a strip, where prepared ground takes more</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>An anchor is the one thing an external model has to declare. The bundled aircraft is built nose-first along <code>+Z</code> with its control anchor at the origin; a model built around some other point is shifted so that point sits where the flight model puts the aircraft, rather than the host having to rebuild it.</p>
+
+<h3 id="what-comes-back">What comes back</h3>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Member</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>update(dt)</code></td><td>Advances one frame and returns the telemetry</td></tr>
+        <tr><td><code>telemetry()</code></td><td>The same reading without advancing</td></tr>
+        <tr><td><code>pose()</code></td><td><code>{position, rotation, quaternion, attitude}</code>, for an external camera</td></tr>
+        <tr><td><code>setTerrain(terrain)</code></td><td>Flies a different world without rebuilding the aircraft</td></tr>
+        <tr><td><code>setRunways(runways)</code></td><td>Names the strips a landing can be made on</td></tr>
+        <tr><td><code>setStart(flight)</code></td><td>Changes what a reset resets to, without resetting</td></tr>
+        <tr><td><code>reset()</code></td><td>Back to the start state</td></tr>
+        <tr><td><code>dispose()</code></td><td>Takes the aircraft out of the scene, keyboard and all</td></tr>
+        <tr><td><code>bounds</code></td><td>The square being flown over, as the terrain declares it</td></tr>
+        <tr><td><code>runways</code></td><td>The strips currently being flown over</td></tr>
+        <tr><td><code>aircraft</code>, <code>camera</code>, <code>scene</code>, <code>object3D</code>, <code>input</code>, <code>keymap</code></td><td>The parts, for a host that wants them</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>input</code> is the control state the flight model reads each frame. A host that created its pilot with <code>controls: false</code> writes it directly, from a gamepad, a touch surface, or a replay:</p>
+
+<pre><code>pilot.input.pitchUp = stick.y &gt; 0.2;
+pilot.input.throttleUp = trigger &gt; 0.5;</code></pre>
+
+<h3 id="telemetry">Telemetry</h3>
+
+<p>Every field is in world units, and the object carries these fields and no others. It is a reading rather than a handle: mutating it changes nothing.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Field</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>airspeed</code></td><td>Units per second</td></tr>
+        <tr><td><code>altitude</code></td><td>Height above sea level</td></tr>
+        <tr><td><code>verticalSpeed</code></td><td>Units per second, positive on a climb</td></tr>
+        <tr><td><code>heading</code></td><td>Whole degrees, <code>0</code> to <code>359</code>, clockwise from north</td></tr>
+        <tr><td><code>throttle</code></td><td>The lever setting, <code>0</code> to <code>1</code></td></tr>
+        <tr><td><code>heightAboveTerrain</code></td><td>Height above the ground directly below</td></tr>
+        <tr><td><code>crashed</code></td><td>True while the controls are locked by an impact</td></tr>
+        <tr><td><code>landed</code></td><td>True while the aircraft is down on a strip after an arrival that was a landing</td></tr>
+        <tr><td><code>stalled</code></td><td>True while airspeed is below the stall speed</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>TELEMETRY_FIELDS</code> is the same list, for a host checking its own.</p>
+
+<h3 id="worked-example-the-pilot-api-over-an-external-environment">Worked example: the Pilot API over an external environment</h3>
+
+<p>A host page that has its own ground and wants the aircraft that flies over it. Here the ground is a plain sine field, which is enough to show what the terrain contract is: something that answers the height under a point, and says how far its ground goes.</p>
+
+<pre><code>import * as THREE from 'three';
+import { createPilot, boundsFromSize } from 'pilot-matter';
+
+const scene    = new THREE.Scene();
+const camera   = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 12000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.DirectionalLight(0xffffff, 1.2), new THREE.AmbientLight(0x8899aa, 0.6));
+
+// The host's own world: any function of x and z will do, and the bounds say
+// where it stops being one.
+const myTerrain = {
+    sampleHeight: (x, z) =&gt; 60 * Math.sin(x / 900) * Math.cos(z / 900),
+    bounds: boundsFromSize(10000)
+};
+
+// The host's own aircraft, nose along +Z, with the point the flight model
+// should move declared as the anchor.
+const myAircraft = new THREE.Mesh(
+    new THREE.ConeGeometry(2, 10, 8).rotateX(Math.PI / 2),
+    new THREE.MeshPhongMaterial({ color: 0xdddddd })
+);
+
+const pilot = createPilot({
+    scene,
+    camera,
+    terrain: myTerrain,
+    aircraft: myAircraft,
+    anchor: { x: 0, y: 0, z: 0 },
+    keymap: { yawLeft: ['KeyZ'], yawRight: ['KeyX'] },   // remap two, keep the rest
+    flight: { sensitivity: 1.5 },
+    onReset: () =&gt; console.log('back at the start')
+});
+
+const clock = new THREE.Clock();
+
+renderer.setAnimationLoop(() =&gt; {
+    const { airspeed, altitude, verticalSpeed, heading, throttle, stalled } =
+        pilot.update(clock.getDelta());
+
+    myHud.textContent =
+        `${Math.round(airspeed * 2)} kt  ${Math.round(altitude * 3.28)} ft  ` +
+        `${heading.toString().padStart(3, '0')}  ${Math.round(throttle * 100)}%` +
+        (stalled ? '  STALL' : '');
+
+    renderer.render(scene, camera);
+});</code></pre>
+
+<p>The aircraft is flown with the bundled keys, less the two that were remapped. Nothing in the host page reaches into the flight model: the HUD is written from the telemetry, and the world is read through the sampler.</p>
+
+<h2 id="matter-api">Matter API</h2>
+
+<pre><code>createEnvironment(options) -&gt; environment</code></pre>
+
+<h3 id="options">Options</h3>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>environment</code></td><td>string</td><td><code>'highlands'</code></td><td>The assembled environment to build</td></tr>
+        <tr><td><code>size</code></td><td>number</td><td><code>16000</code></td><td>The square the world covers</td></tr>
+        <tr><td><code>segments</code></td><td>number</td><td><code>200</code></td><td>How finely that square is sampled</td></tr>
+        <tr><td><code>elements</code></td><td>array</td><td>the preset's</td><td>Element placements, instead of the preset's</td></tr>
+        <tr><td><code>runway</code></td><td>boolean or object</td><td><code>false</code></td><td>A landable strip in the world, or a configuration for one</td></tr>
+        <tr><td><code>tile</code></td><td><code>{x, z}</code></td><td><code>{0, 0}</code></td><td>Which square of a larger assembly this world is</td></tr>
+        <tr><td><code>seed</code></td><td>number</td><td>the preset's</td><td>Builds the same description as different ground</td></tr>
+        <tr><td><code>lights</code></td><td>boolean</td><td><code>true</code></td><td><code>false</code> to light the world yourself</td></tr>
+        <tr><td><code>fog</code></td><td>boolean</td><td><code>true</code></td><td><code>false</code> to keep your own scene depth</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h3 id="what-comes-back">What comes back</h3>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Member</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>group</code></td><td>The world as one <code>Group</code> any scene can add</td></tr>
+        <tr><td><code>sampleHeight(x, z)</code></td><td>The ground under a point - the terrain contract itself</td></tr>
+        <tr><td><code>bounds</code></td><td>The square the world covers</td></tr>
+        <tr><td><code>runways</code></td><td>The strips cut into it, empty for a world built without one</td></tr>
+        <tr><td><code>field</code></td><td>The height and colour field behind the mesh</td></tr>
+        <tr><td><code>environment</code></td><td>The preset being drawn</td></tr>
+        <tr><td><code>tile</code>, <code>origin</code></td><td>The square of a larger world this is, and where its middle sits</td></tr>
+        <tr><td><code>setEnvironment(id)</code></td><td>Regenerates the ground as a different world</td></tr>
+        <tr><td><code>join(...neighbours)</code></td><td>Settles this world's edges against the worlds laid beside it</td></tr>
+        <tr><td><code>redraw()</code></td><td>Draws the ground again from the field as it now stands</td></tr>
+        <tr><td><code>register(object, placement)</code></td><td>Adds a caller-supplied mesh as an element of the world</td></tr>
+        <tr><td><code>attach(aircraft)</code></td><td>Adopts an aircraft the environment did not build</td></tr>
+        <tr><td><code>applyDepth(scene, depth)</code></td><td>The sky and the fog, applied to any scene</td></tr>
+        <tr><td><code>setDaylight(phase)</code></td><td>Sets the hour of the day, and returns the light at it</td></tr>
+        <tr><td><code>updateWater(dt, light)</code></td><td>Moves the water on by a frame</td></tr>
+        <tr><td><code>dispose()</code></td><td>Releases the mesh, the geometry, and everything registered</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>register</code> is placement by the generator rather than by the host: given a position the object is set down on the ground there, and given none it is dropped somewhere inside the bounds by the environment's own seeded stream. Anything registered is settled again when the world is regenerated, so an object placed on a hillside that is no longer there is set down on what is.</p>
+
+<pre><code>world.register(myWindsock, { x: 400, z: -900, offset: 2 });</code></pre>
+
+<p><code>attach</code> checks the aircraft against the contract and throws with every problem at once rather than one per reload. What it returns is the aircraft and a <code>groundHeight()</code> for whatever is flying it.</p>
+
+<p><code>applyDepth</code> is the world's depth without the world: the sky it fades to and the fog that fades it, applied to any scene. An environment created with <code>fog: false</code> leaves the scene's own depth alone.</p>
+
+<h3 id="the-aircraft-contract">The aircraft contract</h3>
+
+<p>What an aircraft has to be before the Matter API will fly it:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Requirement</th><th>Why</th></tr></thead>
+    <tbody>
+        <tr><td><code>position</code> with numeric <code>x</code>, <code>y</code>, <code>z</code></td><td>The world has to know where to sample under it</td></tr>
+        <tr><td><code>rotation</code> with a numeric <code>x</code>, <strong>or</strong> a <code>getQuaternion()</code></td><td>The world has to know which way it points</td></tr>
+        <tr><td><code>anchor</code> as a point, if given at all</td><td>The point in the model that is being moved</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>An aircraft that is also an <code>Object3D</code> is added to the group; one that is not is still flown, and stays wherever the host is drawing it.</p>
+
+<h3 id="worked-example-the-matter-api-under-an-external-aircraft">Worked example: the Matter API under an external aircraft</h3>
+
+<p>A host page with an aircraft of its own, driven by a flight model of its own, that wants a world to fly it over.</p>
+
+<pre><code>import * as THREE from 'three';
+import { createEnvironment, isAircraftContractSatisfied } from 'pilot-matter';
+
+const scene    = new THREE.Scene();
+const camera   = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 12000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const world = createEnvironment({ environment: 'lakeside' });
+
+scene.add(world.group);
+world.applyDepth(scene);                 // the sky and the fog, without the ground
+
+// The host's own aircraft, flown by the host's own model. All the world asks
+// of it is a position and an orientation it can read.
+const myAircraft = new THREE.Group();
+myAircraft.position.set(0, 900, 0);
+myAircraft.add(new THREE.Mesh(
+    new THREE.BoxGeometry(12, 1, 3),
+    new THREE.MeshLambertMaterial({ color: 0x4477aa })
+));
+
+console.assert(isAircraftContractSatisfied(myAircraft));
+
+const flown = world.attach(myAircraft);  // throws with every gap in the contract
+
+// A landmark of the host's own, set down on the ground rather than over it.
+world.register(new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 30, 6),
+    new THREE.MeshLambertMaterial({ color: 0xdd4422 })
+), { x: 1200, z: -400, offset: 15 });
+
+const clock = new THREE.Clock();
+
+renderer.setAnimationLoop(() =&gt; {
+    myFlightModel.update(clock.getDelta(), flown.groundHeight());
+
+    camera.position.copy(myAircraft.position).add(new THREE.Vector3(0, 12, -36));
+    camera.lookAt(myAircraft.position);
+
+    renderer.render(scene, camera);
+});
+
+// A different world under the same aircraft, regenerated in place.
+document.querySelector('#world-picker').addEventListener('change', (event) =&gt; {
+    world.setEnvironment(event.target.value);
+});</code></pre>
+
+<h3 id="one-tile-of-a-larger-world">One tile of a larger world</h3>
+
+<p>An environment covers a square, and <code>tile</code> says which square of a larger world that is, counted in squares off the middle of it. A tile is generated in the world's coordinates rather than in its own: its vertices stand where its place in the grid puts them, its sampler answers for that square and nothing outside it, and the noise its ground is shaped from runs on across the join instead of starting again at it.</p>
+
+<pre><code>import { createEnvironment } from 'pilot-matter';
+
+const west = createEnvironment({ environment: 'highlands', size: 8000, tile: { x: -0.5, z: 0 } });
+const east = createEnvironment({ environment: 'highlands', size: 8000, tile: { x:  0.5, z: 0 } });
+
+scene.add(west.group, east.group);
+west.join(east);                 // settles what their elements drew at the join</code></pre>
+
+<p>There is no coordinate to convert. A tile's mesh is drawn where its field says it is, so a host flying across an assembly asks whichever tile the aircraft is over and passes it the world position it already has:</p>
+
+<pre><code>const ground = world.tileAt(position.x, position.z)?.sampleHeight(position.x, position.z) ?? 0;</code></pre>
+
+<p><code>join</code> is what closes the seam. The ground a tile is shaped on already agrees with its neighbour's, because it is noise read off the world rather than off the tile; what does not is what the elements drew, since a peak that ended at one tile's edge knows nothing about the ground its neighbour laid against it. Every place two or more tiles put a vertex is settled on one height and one colour - the average of what they all had there - and each tile is walked back to what it was over the next few vertices in, so the join is seamless without the country behind it being flattened to make it so.</p>
+
+<p>Give <code>join</code> every neighbour at once rather than one at a time. A vertex four tiles all reach has to be settled against all four of them to close.</p>
+
+<pre><code>middle.join(north, south, east, west);</code></pre>
+
+<p><code>createTiledEnvironment</code> does the whole of it: builds the grid, lights it once rather than once per square, and settles every join in one pass before anything is drawn.</p>
+
+<pre><code>import { createTiledEnvironment } from 'pilot-matter';
+
+const world = createTiledEnvironment({
+    environment: 'lakeside',
+    tiles: 2,                    // 2 by 2, or { x, z } for a rectangle
+    size: 8000,
+    runway: true
+});
+
+scene.add(world.group);
+world.applyDepth(scene);
+
+const flown = world.attach(myAircraft);   // ground reported from whichever square it is over</code></pre>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Member</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>group</code></td><td>The whole assembly as one <code>Group</code></td></tr>
+        <tr><td><code>tiles</code></td><td>Each square, as the environment it is</td></tr>
+        <tr><td><code>across</code></td><td>How many squares the grid runs, as <code>{x, z}</code></td></tr>
+        <tr><td><code>bounds</code></td><td>The square the whole assembly covers</td></tr>
+        <tr><td><code>seams</code></td><td>How many shared vertices the joins were settled at</td></tr>
+        <tr><td><code>runways</code></td><td>Every strip cut into the assembly, whichever square it was cut into</td></tr>
+        <tr><td><code>tileAt(x, z)</code></td><td>The square a place falls on, or <code>null</code> off the whole assembly</td></tr>
+        <tr><td><code>sampleHeight(x, z)</code></td><td>The ground under a point, from whichever square it is over</td></tr>
+        <tr><td><code>attach(aircraft)</code></td><td>Adopts an aircraft, reporting the ground under it across the assembly</td></tr>
+        <tr><td><code>register(object, placement)</code></td><td>Adds a mesh as an element of the square it falls on</td></tr>
+        <tr><td><code>applyDepth(scene, depth)</code></td><td>The sky and the fog, applied to any scene</td></tr>
+        <tr><td><code>setDaylight(phase)</code></td><td>The hour of the day, over the whole assembly</td></tr>
+        <tr><td><code>updateWater(dt, light)</code></td><td>Moves every square's water on together</td></tr>
+        <tr><td><code>dispose()</code></td><td>Releases every square</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>An assembly answers the terrain contract the way a single environment does, so the Pilot API flies over the whole grid rather than over one square of it:</p>
+
+<pre><code>const pilot = createPilot({ scene, camera, terrain: world });</code></pre>
+
+<p>Each tile is a whole environment - its own elements, its own strips, its own water - laid out from its own place in the grid, so neighbouring squares are the same world without being the same ground. Because the ground is generated from a description rather than loaded, a tile costs a few tens of milliseconds and no download.</p>
+
+<h2 id="contracts">Contracts</h2>
+
+<p>Everything under <code>js/api/contract.js</code> is pure and imports no renderer.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>API_VERSION</code></td><td>The version of the contracts a host is holding</td></tr>
+        <tr><td><code>boundsFromSize(size, origin)</code></td><td>The square a world of that size covers, about wherever its middle is</td></tr>
+        <tr><td><code>tileOrigin(tile, size)</code></td><td>Where the middle of a tile sits in the world it is one square of</td></tr>
+        <tr><td><code>flatSampler(height)</code></td><td>A height sampler for a host with no terrain of its own</td></tr>
+        <tr><td><code>isInsideBounds(bounds, x, z)</code></td><td>Whether a point is over the ground</td></tr>
+        <tr><td><code>resolveTerrain(terrain)</code></td><td>A terrain with its gaps filled in</td></tr>
+        <tr><td><code>resolvePilotOptions(options)</code></td><td>The Pilot API's options, resolved</td></tr>
+        <tr><td><code>resolveEnvironmentOptions(options)</code></td><td>The Matter API's options, resolved</td></tr>
+        <tr><td><code>validateAircraftContract(aircraft)</code></td><td>Every problem with an aircraft, as an array</td></tr>
+        <tr><td><code>isAircraftContractSatisfied(aircraft)</code></td><td>The same question as a yes or no</td></tr>
+        <tr><td><code>createTelemetry(values)</code></td><td>A telemetry object of the stable shape</td></tr>
+        <tr><td><code>TELEMETRY_FIELDS</code></td><td>The fields every telemetry object carries</td></tr>
+        <tr><td><code>DEFAULT_KEYMAP</code>, <code>CONTROL_NAMES</code>, <code>RESET_KEYS</code></td><td>The bundled bindings</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The resolvers are worth calling on their own: they are how a host finds out what its options actually came to before anything is built.</p>
+
+<pre><code>import { resolvePilotOptions, validateAircraftContract } from 'pilot-matter/contract';
+
+const problems = validateAircraftContract(myAircraft);   // every gap at once, or []
+if (problems.length) throw new TypeError(problems.join('; '));
+
+const resolved = resolvePilotOptions({ flight: { sensitivity: 400 } });
+resolved.flight.sensitivity;   // 4 - clamped onto the range, not refused</code></pre>
+
+<h2 id="configuration">Configuration</h2>
+
+<p>The condition a flight opens in is data rather than a set of literals, and a host can read it, offer it, and hand back an edited one.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>DEFAULT_CONFIG</code></td><td>The configured start, frozen</td></tr>
+        <tr><td><code>START_FIELDS</code></td><td>Each field of the start, with what it may hold</td></tr>
+        <tr><td><code>START_FIELD_IDS</code></td><td>The field names, in the order they are offered</td></tr>
+        <tr><td><code>START_MODES</code>, <code>START_FLYING</code>, <code>START_TAKEOFF</code></td><td>The two conditions a flight can open in</td></tr>
+        <tr><td><code>CHOICE_FIELD</code>, <code>TOGGLE_FIELD</code></td><td>What a field that is chosen or switched calls itself</td></tr>
+        <tr><td><code>startField(id)</code></td><td>One field's declaration</td></tr>
+        <tr><td><code>isStartValue(id, value)</code></td><td>Whether a field can be left holding a value</td></tr>
+        <tr><td><code>snapStartValue(id, value)</code></td><td>The nearest value a field can hold to a worked-out one</td></tr>
+        <tr><td><code>startDefaults()</code></td><td>A fresh copy of the configured start</td></tr>
+        <tr><td><code>resolveStart(values)</code></td><td>A start with its gaps filled in, field by field</td></tr>
+        <tr><td><code>startsOnRunway(start)</code>, <code>runwayForced(start)</code>, <code>runwayWanted(start)</code></td><td>What the start says about the strip</td></tr>
+        <tr><td><code>flightStart(start, world)</code></td><td>The same start in the world units <code>flight</code> takes</td></tr>
+        <tr><td><code>takeoffStart(start, runway)</code></td><td>A flight held at a threshold, ready to roll</td></tr>
+        <tr><td><code>createFlightState(start, world)</code></td><td>The same start as a position and a rotation</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A start is written the way a pilot reads it:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Field</th><th>Reads in</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>startMode</code></td><td><code>'flying'</code> or <code>'takeoff'</code></td><td><code>'flying'</code></td></tr>
+        <tr><td><code>runway</code></td><td>Whether the generated world carries a strip</td><td><code>true</code></td></tr>
+        <tr><td><code>airspeedKnots</code></td><td>Knots</td><td><code>80</code></td></tr>
+        <tr><td><code>altitudeFeet</code></td><td>Feet above sea level</td><td><code>1390</code></td></tr>
+        <tr><td><code>verticalSpeedFpm</code></td><td>Feet per minute, signed</td><td><code>1260</code></td></tr>
+        <tr><td><code>headingDegrees</code></td><td>Degrees on the card, clockwise from north</td><td><code>0</code></td></tr>
+        <tr><td><code>throttlePercent</code></td><td>Percent of lever travel</td><td><code>20</code></td></tr>
+        <tr><td><code>cameraMode</code></td><td><code>'CHASE'</code>, <code>'COCKPIT'</code>, <code>'ORBIT'</code></td><td><code>'CHASE'</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>startMode</code> decides which of the others mean anything. <code>'flying'</code> opens the flight already up, in the condition the rest of the fields describe. <code>'takeoff'</code> opens it stopped at a runway threshold with the engine idling, and takes nothing from the airborne fields but the camera - an aircraft held on the ground has no airspeed, no altitude, and no climb of its own to set. A takeoff also turns <code>runway</code> on and holds it there, because a start that asked to roll out of a world with no strip in it is not a start anything could honour.</p>
+
+<p><code>flightStart</code> is the one place those become world units. A start that opens on a strip is resolved against the strip it opens on, so the world it is being flown over is passed in beside it:</p>
+
+<pre><code>import { startDefaults, flightStart, createPilot, START_TAKEOFF } from 'pilot-matter';
+
+const start = { ...startDefaults(), airspeedKnots: 140, altitudeFeet: 3000 };
+const pilot = createPilot({ scene, flight: flightStart(start) });
+
+// Or held at the threshold of the strip the world carries:
+const held = { ...startDefaults(), startMode: START_TAKEOFF };
+pilot.setStart(flightStart(held, { runway: world.runways[0] }));</code></pre>
+
+<p>The pitch is not part of a start, it is worked out from one: the attitude that holds the configured climb at the configured airspeed, so a flight opens in the climb it was configured for rather than settling out of it over the first second.</p>
+
+<p>Each field declares its own range and step, or the list of settings it may take, which is what lets a host build a control for it without knowing anything about flight:</p>
+
+<pre><code>import { START_FIELDS, CHOICE_FIELD, TOGGLE_FIELD } from 'pilot-matter';
+
+for (const field of START_FIELDS) {
+    if (field.kind === CHOICE_FIELD) makeRadioGroup(field.label, field.values);
+    else if (field.kind === TOGGLE_FIELD) makeCheckbox(field.label, field.default);
+    else if (field.values) makeDropdown(field.label, field.values);
+    else makeSlider(field.label, field.min, field.max, field.step, field.unit);
+}</code></pre>
+
+<p><code>isStartValue</code> refuses a reading between two steps rather than snapping it, because a value the configuration never offered is a value from somewhere else. <code>snapStartValue</code> is for the other case - a reading worked out rather than chosen, which wants the nearest setting the field actually has.</p>
+
+<h2 id="runways-and-landings">Runways and landings</h2>
+
+<p>A runway is an element of the world like a river or a forest: generated by algorithm rather than placed as an asset, cut into whichever ground the site search found flattest, and levelled with an apron that eases back into the country around it. A world is built without one unless one is asked for.</p>
+
+<pre><code>import { createEnvironment, createPilot, flightStart, startDefaults, START_TAKEOFF } from 'pilot-matter';
+
+const world = createEnvironment({ environment: 'highlands', runway: true });
+const strip = world.runways[0];
+
+const pilot = createPilot({
+    scene, terrain: world, camera,
+    flight: flightStart({ ...startDefaults(), startMode: START_TAKEOFF }, { runway: strip }),
+    onLanding: (runway) =&gt; console.log('down on', runway.heading)
+});</code></pre>
+
+<p>A strip is a plain description, and everything that reads one is published:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Strip field</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>x</code>, <code>z</code></td><td>The middle of the pavement</td></tr>
+        <tr><td><code>heading</code></td><td>The bearing it runs on, in degrees clockwise from north</td></tr>
+        <tr><td><code>alongX</code>, <code>alongZ</code></td><td>The same bearing as a unit vector</td></tr>
+        <tr><td><code>length</code>, <code>width</code></td><td>The paved rectangle</td></tr>
+        <tr><td><code>elevation</code></td><td>The height it was levelled to</td></tr>
+    </tbody>
+</table>
+</div>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>runwayDirection(heading)</code></td><td>A bearing as the vector a strip runs along</td></tr>
+        <tr><td><code>runwayPoint(runway, along, across)</code></td><td>A place on a strip, as a place in the world</td></tr>
+        <tr><td><code>runwayOffsets(runway, x, z)</code></td><td>The same reading the other way round</td></tr>
+        <tr><td><code>isOnRunway(runway, x, z, margin)</code></td><td>Whether a place is over the pavement</td></tr>
+        <tr><td><code>runwayThresholds(runway)</code></td><td>Both ends, each with the bearing a takeoff from it runs on</td></tr>
+        <tr><td><code>nearestRunway(runways, x, z)</code></td><td>The strip nearest a place, or null</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A strip changes what an arrival on the ground means rather than how hard one is allowed to be. Off a runway the rule is the one it has always been: too fast a descent breaks the aircraft, and anything gentler is flown out of. On one, an arrival inside the landing limits and flown in the attitude a landing is flown in is a landing; a firmer arrival still rolls out, because prepared ground takes more than a hillside does; and only past the runway's own threshold is it a crash.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>FLYING</code>, <code>LANDED</code>, <code>CRASHED</code></td><td>What an arrival amounted to</td></tr>
+        <tr><td><code>GROUND_OUTCOMES</code></td><td>The three of them, for a host checking its own</td></tr>
+        <tr><td><code>touchdownOutcome(contact, limits)</code></td><td>Which one an arrival was</td></tr>
+        <tr><td><code>withinLandingAttitude(contact, limits)</code></td><td>Whether it was being held the way a landing is flown</td></tr>
+        <tr><td><code>headingOffsetTo(heading, runwayHeading)</code></td><td>How far off the strip the nose is, to whichever end is nearer</td></tr>
+        <tr><td><code>LANDING_LIMITS</code></td><td>The thresholds all of the above default to</td></tr>
+        <tr><td><code>GROUND_CLEARANCE</code>, <code>CRASH_IMPACT_SPEED</code>, <code>RUNWAY_IMPACT_SPEED</code></td><td>The tuning behind them</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>contact</code> is <code>{verticalSpeed, onRunway, bank, pitch, headingOffset}</code>, in world units and radians. The telemetry's <code>landed</code> is the same reading for a host that would rather not work it out.</p>
+
+<h2 id="game-modes">Game modes</h2>
+
+<p>The bundled game is played in modes, and the rules behind them are pure: the stages, the run state, the course a set of loops is laid out as, and the test for whether a gate was flown through. A host can play them against its own renderer, or read them as a worked example of a game built on the two APIs.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>GAME_MODES</code>, <code>GAME_MODE_IDS</code></td><td>The modes there are</td></tr>
+        <tr><td><code>RUNWAY_LANDING</code>, <code>LOOP_COURSE</code></td><td>The two of them by name</td></tr>
+        <tr><td><code>LAND_OBJECTIVE</code>, <code>LOOP_OBJECTIVE</code></td><td>What a mode is asking for</td></tr>
+        <tr><td><code>getGameMode(id)</code>, <code>isGameModeId(id)</code></td><td>Looking one up</td></tr>
+        <tr><td><code>createRunState(modeId)</code>, <code>startRun(state, id)</code>, <code>endRun(state)</code></td><td>A run, started and stopped</td></tr>
+        <tr><td><code>runningMode(state)</code>, <code>currentStage(state)</code>, <code>advanceStage(state)</code>, <code>restartStage(state)</code></td><td>Where it is up to</td></tr>
+        <tr><td><code>recordLanding(state)</code>, <code>recordGate(state, index)</code>, <code>recordCrash(state)</code></td><td>Telling it what happened</td></tr>
+        <tr><td><code>stageProgress(state)</code>, <code>isStageComplete(state)</code>, <code>nextGate(state)</code></td><td>How far through it is</td></tr>
+        <tr><td><code>runObjective(state)</code>, <code>runStatus(state)</code></td><td>What to write on the screen</td></tr>
+        <tr><td><code>stageWorld(state)</code></td><td>The world the stage is flown over</td></tr>
+        <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
+        <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
+        <tr><td><code>gatePassed(ring, from, to)</code>, <code>gateOffset(ring, point)</code></td><td>Whether a step went through one</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A gate is tested against the step the aircraft flew rather than against where it ended up, because a hoop is thinner than the distance covered in a frame and a point test would fly straight through one without noticing:</p>
+
+<pre><code>import { createRunState, LOOP_COURSE, buildCourse, currentStage, nextGate, recordGate } from 'pilot-matter';
+
+const run = createRunState(LOOP_COURSE);
+const rings = buildCourse(currentStage(run), { seed: 1, sampleHeight: world.sampleHeight });
+
+let last = pilot.pose().position;
+function frame(dt) {
+    pilot.update(dt);
+    const now = pilot.pose().position;
+    const gate = nextGate(run);
+    if (gate &gt;= 0 &amp;&amp; gatePassed(rings[gate], last, now)) recordGate(run, gate);
+    last = now;
+}</code></pre>
+
+<h2 id="worlds-and-elements">Worlds and elements</h2>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>ENVIRONMENTS</code></td><td>The five assembled environments</td></tr>
+        <tr><td><code>MODE_ENVIRONMENTS</code></td><td>The thin worlds the game modes are played over</td></tr>
+        <tr><td><code>DEFAULT_ENVIRONMENT_ID</code></td><td>The one a fresh install opens on</td></tr>
+        <tr><td><code>getEnvironment(id)</code>, <code>environmentIds()</code>, <code>isEnvironmentId(id)</code></td><td>Looking one up</td></tr>
+        <tr><td><code>environmentElements(environment, runway)</code></td><td>A description's placements, with a strip added if asked</td></tr>
+        <tr><td><code>buildEnvironment(environment, options)</code></td><td>The field a description becomes</td></tr>
+        <tr><td><code>ELEMENTS</code>, <code>ELEMENT_ORDER</code></td><td>The element registry, and the order it applies in</td></tr>
+        <tr><td><code>getElement(id)</code>, <code>isElementId(id)</code></td><td>Looking one up</td></tr>
+        <tr><td><code>resolveConfig(element, overrides)</code></td><td>An element's configuration, clamped to its ranges</td></tr>
+        <tr><td><code>createField(options)</code></td><td>An empty height and colour field</td></tr>
+        <tr><td><code>sampleHeight(field, x, z)</code></td><td>The ground under a point of a field</td></tr>
+        <tr><td><code>fieldBounds(field)</code></td><td>The square a field covers, in the world rather than in its own coordinates</td></tr>
+        <tr><td><code>tileSeed(seed, x, z)</code></td><td>The seed one square of an assembly is laid out from; the middle square is the seed itself, and no two places in a grid share one</td></tr>
+        <tr><td><code>matchEdges(fields, options)</code></td><td>Settles an assembly wherever its fields meet</td></tr>
+        <tr><td><code>SEAM_BLEND</code></td><td>How far a join is eased back into the ground, in vertices</td></tr>
+        <tr><td><code>waterSurface(field)</code></td><td>The water a world settled at, as the vertices under its level</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The five worlds a host can ask for by name:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Id</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>'highlands'</code></td><td>fBm ground under scattered peaks, with snow above 300</td></tr>
+        <tr><td><code>'river-basin'</code></td><td>A meandering river the width of the world, through low forested country</td></tr>
+        <tr><td><code>'canyon-country'</code></td><td>A branching canyon system cut into a high plateau</td></tr>
+        <tr><td><code>'dune-sea'</code></td><td>Wind-blown dunes and rock outcrops, cut by one desert river</td></tr>
+        <tr><td><code>'lakeside'</code></td><td>A town on the shore of a wide lake, under forested hills</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Two more are built for the game modes rather than to be chosen between, and are deliberately thin - what a mode asks the pilot to read is the objective, not the scenery around it. <code>isEnvironmentId</code> answers no for both, so a stored choice can never leave a free flight parked in one; <code>getEnvironment</code> still finds them by name.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Id</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>'open-country'</code></td><td>Low rolling ground under a wide sky, with one strip cut into it</td></tr>
+        <tr><td><code>'loop-valley'</code></td><td>A shallow valley with clear air over it, for a course of loops</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>An environment is a description rather than geometry: a name, a seed, the base ground, and the elements placed over it. A host can pass its own list of placements instead of a preset's, and every value in one is clamped into the range the element declares, so a placement cannot configure an element outside what it says it supports.</p>
+
+<pre><code>import { createEnvironment } from 'pilot-matter';
+
+const world = createEnvironment({
+    size: 8000,
+    elements: [
+        { type: 'mountain', config: { count: 12, height: [200, 700], radius: [300, 900] } },
+        { type: 'grass',    config: { band: [10, 200] } },
+        { type: 'water',    config: { level: 6 } },
+        { type: 'snow',     config: { line: 400, coverage: 0.8 } }
+    ]
+});</code></pre>
+
+<p>The field itself is a plain object of typed arrays, sampled row by row from the low <code>z</code> edge to the high one, which is the order a renderer walks a plane grid in. A host that wants the ground without a mesh can build one and read it:</p>
+
+<pre><code>import { buildEnvironment, getEnvironment, sampleHeight } from 'pilot-matter';
+
+const field = buildEnvironment(getEnvironment('canyon-country'), { size: 8000, segments: 128 });
+const ground = sampleHeight(field, 120, -400);</code></pre>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Field member</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>size</code>, <code>segments</code>, <code>stride</code>, <code>count</code>, <code>step</code></td><td>The grid the world is sampled on</td></tr>
+        <tr><td><code>originX</code>, <code>originZ</code></td><td>Where the middle of that grid sits in the world</td></tr>
+        <tr><td><code>height</code></td><td>A <code>Float32Array</code> of one height per vertex</td></tr>
+        <tr><td><code>color</code></td><td>A <code>Float32Array</code> of three components per vertex</td></tr>
+        <tr><td><code>runways</code></td><td>The strips cut into it, which a flight model has to be able to ask about by name</td></tr>
+        <tr><td><code>water</code></td><td>The level whatever water was laid settled at, or <code>null</code> for a dry world</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="the-day">The day</h2>
+
+<p>A world lit one way all flight is a world with one hour in it. The cycle turns that hour into a day: the light warms and cools, the sky and the fog it fades to go with it rather than after it, and the sun walks across the sky instead of hanging in one corner of it. The whole of it is arithmetic - no renderer, no scene - so a host can drive its own sky from it, or read the hour without drawing one.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>createDayNight(options)</code></td><td>A day: how long it runs, and the hour it opens on</td></tr>
+        <tr><td><code>advanceDayNight(state, dt)</code></td><td>Moves the day on by a frame, and returns the hour</td></tr>
+        <tr><td><code>daylightAt(phase)</code></td><td>The light at an hour: the sky, the sun, the fill, and how much day it amounts to</td></tr>
+        <tr><td><code>sunPositionAt(phase, distance)</code></td><td>Where the sun is at that hour</td></tr>
+        <tr><td><code>wrapPhase(phase)</code></td><td>An hour outside the day, as the hour inside it that it amounts to</td></tr>
+        <tr><td><code>clockAt(phase)</code></td><td>The hour as a clock reading, for anything that shows it</td></tr>
+        <tr><td><code>CYCLE_LENGTH</code>, <code>CYCLE_START</code></td><td>How long a day takes, and the hour a flight opens on</td></tr>
+        <tr><td><code>DAY_STOPS</code></td><td>The day as the moments it is read between</td></tr>
+        <tr><td><code>SUN_DISTANCE</code></td><td>How far the sun is thrown from the middle of the world</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Phase runs <code>0</code> to <code>1</code> over a whole day: midnight at <code>0</code>, dawn around a quarter, noon at a half, dusk around three quarters. Midday is the light the world was drawn in before it had a day, so a flight at noon is lit exactly as it always was.</p>
+
+<pre><code>import { createDayNight, advanceDayNight } from 'pilot-matter';
+
+const day = createDayNight({ length: 600, phase: 0.3 });   // ten minutes, opening mid-morning
+
+renderer.setAnimationLoop(() =&gt; {
+    const dt = clock.getDelta();
+    advanceDayNight(day, dt);
+
+    const light = world.setDaylight(day.phase);   // the sky, the fog, and the sun
+    world.updateWater(dt, light.daylight);        // and what there is to glint with
+});</code></pre>
+
+<p>Time a flight did not spend flying is time the day does not spend passing: hand the cycle a <code>dt</code> of <code>0</code> and the sun stays where it was left, which is what keeps a paused world paused.</p>
+
+<p><code>daylightAt</code> is the whole reading, for a host lighting its own scene:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Field</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>phase</code></td><td>The hour it was read at</td></tr>
+        <tr><td><code>label</code></td><td>What that hour is called - <code>NOON</code>, <code>DUSK</code>, <code>NIGHT</code></td></tr>
+        <tr><td><code>sky</code></td><td>The colour the world fades to, as <code>[r, g, b]</code> in <code>0</code> to <code>1</code></td></tr>
+        <tr><td><code>sun</code></td><td><code>{color, intensity}</code> for the directional light</td></tr>
+        <tr><td><code>ambient</code></td><td><code>{color, intensity}</code> for the fill</td></tr>
+        <tr><td><code>daylight</code></td><td>How much day there is at all, <code>0</code> to <code>1</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="the-water">The water</h2>
+
+<p>Water is the one part of the ground that moves and the one part that shines. The surface a world settled at is read off the finished field - the vertices lying at or under the level the water was laid at - and moved from there, so ground the water no longer has, a strip graded over a shallow or a town levelled onto a shore, is not still being moved as though it were.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>waterSurface(field)</code></td><td>The surface a world settled at, or <code>null</code> for a dry world</td></tr>
+        <tr><td><code>waveHeight(x, z, time, wave)</code></td><td>How far the surface stands off its resting level at a point</td></tr>
+        <tr><td><code>waveSpecular(x, z, time, wave)</code></td><td>How much of the light that point is throwing back</td></tr>
+        <tr><td><code>waterColor(base, specular, options)</code></td><td>The colour water is showing, with the light laid over it</td></tr>
+        <tr><td><code>animateWater(surface, time, options)</code></td><td>Moves a whole surface on to a moment in time</td></tr>
+        <tr><td><code>WAVE</code></td><td>The swell every world's water is drawn with</td></tr>
+        <tr><td><code>WATER_SHEEN</code>, <code>SHEEN_STRENGTH</code></td><td>The colour the sun leaves on water, and how much of it a crest shows</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The wave is a function of where a point is in the world and what time it is, which is what lets two tiles of an assembly work out the same surface at the place they meet without agreeing on anything. <code>animateWater</code> writes into the arrays a renderer is already drawing from, three numbers a vertex, and touches nothing but the water:</p>
+
+<pre><code>import { waterSurface, animateWater } from 'pilot-matter';
+
+const surface = waterSurface(myField);
+const position = myMesh.geometry.attributes.position;
+const color = myMesh.geometry.attributes.color;
+
+animateWater(surface, elapsed, { positions: position.array, colors: color.array, light: 0.8 });
+position.needsUpdate = true;
+color.needsUpdate = true;</code></pre>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Surface member</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>level</code></td><td>The height the water was laid at</td></tr>
+        <tr><td><code>count</code>, <code>vertices</code></td><td>How many vertices it covers, and which they are</td></tr>
+        <tr><td><code>x</code>, <code>z</code></td><td>Where each of them is in the world</td></tr>
+        <tr><td><code>rest</code></td><td>The height each of them rests at</td></tr>
+        <tr><td><code>color</code></td><td>The colour each of them was painted</td></tr>
+        <tr><td><code>open</code></td><td>How far from the bank each of them is, <code>0</code> to <code>1</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>open</code> is what holds the swell down to nothing at the shoreline, so the water meets the bank it was poured against rather than lapping over it.</p>
+
+<h2 id="the-edge-of-the-world">The edge of the world</h2>
+
+<p>A terrain declares bounds and answers nothing outside them, so an aircraft flown far enough would find itself over a flat nothing the fog had been promising was more world. By default the Pilot API carries the aircraft round instead: crossing an edge puts it back in over the opposite one, at the same distance past it, at the same altitude, and on the same heading. Only the horizontal position moves.</p>
+
+<p>A host whose own world continues past the bounds it declared, or which would rather handle the edge itself, creates its pilot with <code>wrap: false</code>. The rule is published either way, so a host handling its own edge can match it:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>wrapValue(value, low, high)</code></td><td>A value carried back inside a span</td></tr>
+        <tr><td><code>wrapPosition(bounds, x, z)</code></td><td><code>{x, z, wrapped}</code> - a position carried back inside a world</td></tr>
+        <tr><td><code>isOutsideBounds(bounds, x, z)</code></td><td>Whether a point is past one of the edges</td></tr>
+    </tbody>
+</table>
+</div>
+
+<pre><code>import { wrapPosition } from 'pilot-matter';
+
+const carried = wrapPosition(world.bounds, myAircraft.position.x, myAircraft.position.z);
+if (carried.wrapped) myAircraft.position.set(carried.x, myAircraft.position.y, carried.z);</code></pre>
+
+<p>Sitting exactly on a boundary is still inside the world: a position that has only reached the edge has not crossed it.</p>
+
+<p>The bundled simulator answers the same question a different way. Rather than carry the aircraft round one square, it lays the square down as one tile of an endless grid and draws the tiles around the aircraft out past the far plane, so the ground it is over is always ground that continues. A host can build the same thing out of what is published here - <code>tileSeed</code> for the seed a place is laid out from, and <code>createEnvironment({ tile })</code> for the square it is laid at - or use <code>createTiledEnvironment</code> for a grid of a fixed size with its joins settled.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="api.html" rel="prev">&#8592; Simulator API</a>
+                <a href="project-structure.html" rel="next">Project structure &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api-reference.html">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>

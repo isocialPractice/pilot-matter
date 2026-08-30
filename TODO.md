@@ -7,6 +7,10 @@ that applies when their items are completed.
 
 ## Current
 
+The work queued for the next run, copied here from the roadmap sections below.
+Each item carries a nested `From:` line recording the section it came from, so
+its context survives being archived.
+
 - [ ] Add an element editor overlay that lists the placed elements, edits
   their ranges live, and regenerates the terrain from the algorithm
   - From: Environment Design
@@ -25,40 +29,6 @@ that applies when their items are completed.
   minimap, or as a pass down the line of it - so the first gate is not the
   only one the pilot has ever seen
   - From: Game Modes
-
-### Code Review Override - the world with no edge
-
-- [ ] Nothing holds the ground out as far as the camera is drawn
-  - **Issue**: `TILE_REACH` in `js/world-tiles.js` is 12000 and the camera's
-    far plane in `js/main.js` is 12000, and the two are matched by a comment
-    rather than by anything that fails when they drift apart. The promise the
-    whole grid rests on - that the ground always runs further than the camera
-    can see - breaks the moment either is changed on its own, and it breaks
-    back into the void edge this run removed
-  - **Goal**: Tie the two together, either by drawing the far plane from
-    `TILE_REACH` or by a test that fails once the far plane outruns the reach
-  - From: Code Review Override - the world with no edge
-
-#### Found Issues
-
-- [ ] A stage opening is still carried round one square
-  - **Issue**: `stageStart` in `js/game-modes.js` wraps a stage's opening
-    position into a single 16000-unit square, explaining that the world has no
-    outside so the opening is carried round it "the same way a flight is". A
-    flight is no longer carried round: the tile grid replaced `wrapInside` in
-    `js/main.js`, so a wrapped opening is now a different place rather than the
-    same one. Nothing reaches it yet - all four Runway Landing stages open at
-    the bearing and distance they ask for - but `DOWNWIND` opens 184 units
-    inside the line the wrap fires at, so a stage given a longer
-    `approach.distance`, or a runway sited nearer a tile edge, would open the
-    aircraft on the far side of the strip at a bearing and a distance the stage
-    never asked for
-  - **Goal**: Drop the wrap from `stageStart` now that the ground continues
-    past the tile, let an opening stand where its bearing and distance put it,
-    and correct the comment justifying it. Cover it with a test that a stage
-    opens at the distance and bearing it asked for from a runway sited anywhere
-    in the tile
-  - From: Code Review Override - the world with no edge
 
 ## Game UI/UX
 
@@ -259,6 +229,9 @@ Keep the docs accurate and improve first-run experience. Completing items
 in this section applies a patch version update.
 
 ## Complete
+
+Everything already done, in the order it was finished, kept as the record of
+how the simulator got here rather than as a list still to be worked.
 
 - [x] Create `CHANGELOG.md` with a `1.0.0` baseline entry describing the
   current feature set, and add a minimal `package.json` manifest (name,
@@ -520,3 +493,62 @@ in this section applies a patch version update.
 - [x] Cut `README.md` back to a front door: what it is, how to run it, the
   controls, and a link from every section heading to its page on the site
   - From: Create and Deploy GitHub Pages Override
+- [x] Nothing holds the ground out as far as the camera is drawn
+  - **Issue**: `TILE_REACH` in `js/world-tiles.js` is 12000 and the camera's
+    far plane in `js/main.js` is 12000, and the two are matched by a comment
+    rather than by anything that fails when they drift apart. The promise the
+    whole grid rests on - that the ground always runs further than the camera
+    can see - breaks the moment either is changed on its own, and it breaks
+    back into the void edge this run removed
+  - **Goal**: Tie the two together, either by drawing the far plane from
+    `TILE_REACH` or by a test that fails once the far plane outruns the reach
+  - From: Code Review Override - the world with no edge
+- [x] A stage opening is still carried round one square
+  - **Issue**: `stageStart` in `js/game-modes.js` wraps a stage's opening
+    position into a single 16000-unit square, explaining that the world has no
+    outside so the opening is carried round it "the same way a flight is". A
+    flight is no longer carried round: the tile grid replaced `wrapInside` in
+    `js/main.js`, so a wrapped opening is now a different place rather than the
+    same one. Nothing reaches it yet - all four Runway Landing stages open at
+    the bearing and distance they ask for - but `DOWNWIND` opens 184 units
+    inside the line the wrap fires at, so a stage given a longer
+    `approach.distance`, or a runway sited nearer a tile edge, would open the
+    aircraft on the far side of the strip at a bearing and a distance the stage
+    never asked for
+  - **Goal**: Drop the wrap from `stageStart` now that the ground continues
+    past the tile, let an opening stand where its bearing and distance put it,
+    and correct the comment justifying it. Cover it with a test that a stage
+    opens at the distance and bearing it asked for from a runway sited anywhere
+    in the tile
+  - From: Code Review Override - the world with no edge
+- [x] The site's API reference is a file the browser downloads
+  - **Issue**: `docs/api.md` is 934 lines and is the deepest reference the
+    project has, and the site links it as "full API reference" from the footer
+    of all twenty-one pages, from a card on `docs/index.html`, and from the
+    body of `docs/api.html`. GitHub Pages serves `.md` as `text/markdown`,
+    which a browser downloads rather than renders, so the most-linked
+    destination on the site is the one destination that is not a page. Every
+    other link on the site reaches styled HTML
+  - **Goal**: Give the reference a page of its own - `docs/api-reference.html`
+    - carrying `docs/api.md` in full under the same head, menu, and prev/next
+    chain the other pages use, and point the footers, the home card, and
+    `docs/api.html` at it. Leave `docs/api.md` where it is: `test/docs.test.js`
+    reads it, and the README links it for a reader on GitHub rather than on
+    the site
+  - From: Code Review Override - the documentation site
+- [x] Nothing checks the site's pages against the code they describe
+  - **Issue**: `test/docs.test.js` reads the source and holds `docs/api.md`
+    and `README.md` to it - every published API name, every telemetry field,
+    every `START_FIELD_IDS` entry, every environment id. `test/site.test.js`
+    imports nothing from `js/`, so the twenty-one pages are checked for
+    structure and for a handful of hardcoded strings and nothing else. Adding
+    a field to `START_FIELDS` in `js/config.js` fails `docs.test.js` because
+    `docs/api.md` must name it, while `docs/controls/settings.html`, which
+    lists all eight start fields by label, and `docs/cheatsheet.html` go stale
+    with nothing failing
+  - **Goal**: Have `test/site.test.js` read the same modules `docs.test.js`
+    does and assert the pages carrying that material stay current: the start
+    field labels on `docs/controls/settings.html`, and the environment and
+    game mode labels on `docs/terrain.html`,
+    `docs/controls/game-modes.html`, and `docs/cheatsheet.html`
+  - From: Code Review Override - the documentation site

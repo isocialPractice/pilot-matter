@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     TILE_REACH, TILE_KEEP,
     tileIndexAt, tileKey, tileCenter, tileBounds, tilesInReach,
@@ -103,6 +104,33 @@ test('no position asks for more than nine tiles at a time', () => {
     }
     assert.ok(most <= 9, `a position asked for ${most} tiles at once`);
     assert.ok(TILE_REACH < SIZE * 1.5, 'the reach has to stay inside a tile and a half for that to hold');
+});
+
+/**
+ * The grid's whole promise is that the ground runs further than the camera can
+ * see, and for a while that rested on a comment: `TILE_REACH` was 12000 here
+ * and the far plane was 12000 in `js/main.js`, with nothing failing if either
+ * were changed on its own. The camera is built from the reach now, and this is
+ * what fails if a number is ever put back in its place.
+ *
+ * `js/main.js` loads a renderer and a document, so it is read rather than
+ * imported - the same way `test/docs.test.js` reads the entry point.
+ */
+test('the camera is drawn no further than the ground is laid', () => {
+    const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+
+    const camera = main.match(/new THREE\.PerspectiveCamera\(([^)]*)\)/);
+    assert.ok(camera, 'js/main.js should still be building a camera');
+
+    const far = camera[1].split(',')[3]?.trim();
+    assert.match(far ?? '', /TILE_REACH/,
+        `the far plane reads ${far}, which is a number to be matched rather than the reach itself`);
+
+    // Drawn shorter than the ground is laid is fine; drawn further is the void
+    // edge back in frame, so the expression is worked out rather than matched.
+    const drawn = Function('TILE_REACH', `return (${far});`)(TILE_REACH);
+    assert.ok(Number.isFinite(drawn) && drawn <= TILE_REACH,
+        `the camera is drawn to ${drawn} and the ground only to ${TILE_REACH}`);
 });
 
 test('the same place always asks for the same ground', () => {

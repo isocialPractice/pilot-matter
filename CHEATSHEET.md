@@ -151,6 +151,7 @@ The whole surface is in [docs/api.md](docs/api.md).
 | `npm run serve -- 3000` | Another port, and `PORT` works too |
 | `npm test` | The whole suite, no dependencies |
 | `node --test` | The same thing without npm |
+| `npm run docs:api` | Builds the site's API reference page from `docs/api.md` |
 
 ## Photo names
 

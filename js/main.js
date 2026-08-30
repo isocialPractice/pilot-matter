@@ -32,6 +32,7 @@ import {
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE
 } from './game-modes.js';
 import { LoopCourse } from './rings.js';
+import { TILE_REACH } from './world-tiles.js';
 import {
     createLoadingState, advanceLoading, loadingComplete, LoadingScreen
 } from './loading.js';
@@ -72,11 +73,16 @@ class FlightSimulator {
 
         this.scene = new THREE.Scene();
 
+        // The far plane is the reach the ground is laid to rather than a number
+        // of its own. Everything the tile grid promises rests on the ground
+        // running further than the camera can see, and two numbers that agree
+        // only agree until one of them is changed on its own - which would put
+        // the void edge back in frame with nothing to say it had.
         this.camera = new THREE.PerspectiveCamera(
             70,
             window.innerWidth / window.innerHeight,
             0.1,
-            12000
+            TILE_REACH
         );
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -301,9 +307,7 @@ class FlightSimulator {
         const runway = this.terrain.getRunway();
 
         if (isRunning(this.run)) {
-            const opening = stageStart(this.run, {
-                runway, rings: this.course, size: this.terrain.size
-            });
+            const opening = stageStart(this.run, { runway, rings: this.course });
             return { ...flightStart(opening.start, { runway }), ...opening.position };
         }
 

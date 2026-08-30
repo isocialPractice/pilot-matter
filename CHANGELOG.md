@@ -5,10 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.1-alpha] - 2026-08-30
 
-Documentation only. Nothing about the simulator changed, so no version was
-applied; this work ships with whatever version comes next.
+The documentation site, and the two things a code review found once it was
+standing: a stage opening still being carried round a square the world no
+longer has, and the ground's reach and the camera's far plane holding together
+only because two numbers happened to match.
 
 ### Added
 
@@ -18,7 +20,7 @@ applied; this work ships with whatever version comes next.
   of. Every section it carried is now a page of its own, with the text moved
   across whole rather than summarized down, so nothing that was written is
   lost and the thing a reader wants is one entry in a menu rather than one
-  scroll position in a file. Twenty-one pages, a fixed side menu whose groups
+  scroll position in a file. Twenty-two pages, a fixed side menu whose groups
   collapse, and a folder structure the menu matches, so where a page sits in
   the tree and where it sits in the menu are the same answer
 - `DESIGN_LANGUAGE.md`, which is why the site looks like the project rather
@@ -38,12 +40,39 @@ applied; this work ships with whatever version comes next.
   Jekyll from silently losing every path beginning with an underscore. The
   tree it publishes is the tree that was already being published, so the
   simulator stays exactly where it is
-- Twenty-one tests over the site: that every page carries the head it needs,
-  that the twenty-one copies of the menu are still the same menu, that every
-  link reaches a file and every anchor reaches an id, that nothing is linked by
-  an absolute path - which works locally and breaks on a project site - that
-  every colour on the site is one the design document declares, and that the
-  README stayed short enough to be the front door it was cut back to
+- Tests over the site: that every page carries the head it needs, that every
+  copy of the menu is still the same menu, that every link reaches a file and
+  every anchor reaches an id, that nothing is linked by an absolute path -
+  which works locally and breaks on a project site - that every colour on the
+  site is one the design document declares, and that the README stayed short
+  enough to be the front door it was cut back to
+- **The API reference is a page.** `docs/api.md` is 934 lines and the deepest
+  reference the project has, and the site linked it from the footer of every
+  page, from a card on the home page, and from the body of the API overview -
+  as the markdown file itself, which Pages serves as `text/markdown` and a
+  browser downloads rather than renders. The most linked destination on the
+  site was the one destination that was not a page. It has one now,
+  `docs/api-reference.html`, carrying the document in full under the same head,
+  menu, and prev/next chain as everything else. The file stays where it is: the
+  tests read it, and the README links it for a reader on GitHub rather than on
+  the site
+- `npm run docs:api`, which is what builds that page. The reference is
+  generated from the markdown rather than written beside it, and its head,
+  menu, and footer are lifted off `docs/api.html` rather than copied, so it can
+  drift from neither the document nor the rest of the site. A test renders it
+  again and fails when what is committed is not what the markdown now comes to
+- The site read against the code it describes. `test/docs.test.js` holds
+  `docs/api.md` and the README to the source - every published name, every
+  telemetry field, every start field, every environment id - while
+  `test/site.test.js` imported nothing from `js/` and checked the pages for
+  structure and a handful of hardcoded strings. Adding a field to the
+  configuration failed the document while `docs/controls/settings.html`, which
+  lists all eight start fields by label, went stale with nothing failing. The
+  pages carrying that material are now read against the modules publishing it:
+  the start fields on the settings page, and every world and every game mode on
+  the terrain page, the game modes page, and the cheatsheet
+- A check that every document the site links is one a browser opens rather than
+  one it downloads, so the reference cannot quietly become a file again
 
 ### Changed
 
@@ -51,6 +80,31 @@ applied; this work ships with whatever version comes next.
   190: what it is, how to run it, the keys, and where the rest of it lives.
   Every section heading it kept is a link to the page carrying that section in
   full, so the short version is never the whole story pretending to be
+
+### Fixed
+
+- **A stage opening was still being carried round one square.** `stageStart`
+  wrapped a stage's opening into a single 16,000-unit square, on the reasoning
+  that the world had no outside and an opening was carried round it the same
+  way a flight was. A flight is not carried round any more - the tile grid
+  replaced that last release - so a wrapped opening had become a different
+  place rather than the same one. Nothing had reached it yet, but DOWNWIND
+  opened 184 units inside the line the wrap fired at, so a stage given a longer
+  approach, or a runway sited nearer a tile edge, would have opened the
+  aircraft on the far side of the strip at a bearing and a distance the stage
+  never asked for. An opening now stands where its bearing and its distance put
+  it, and a test flies all four landing stages off a strip sited at seven
+  places across the tile - twelve of those openings are ones the wrap would
+  have moved
+- **Nothing held the ground out as far as the camera was drawn.** `TILE_REACH`
+  was 12,000 and the camera's far plane was 12,000, and the two were tied by a
+  comment rather than by anything that failed when they drifted apart. The
+  promise the whole grid rests on - that the ground always runs further than the
+  camera can see - would have broken the moment either was changed on its own,
+  back into the void edge the grid removed. The camera is built from the reach
+  now, and a test reads it: the far plane has to be drawn from `TILE_REACH`
+  rather than named as a number that matches it, and it can never be drawn
+  further than the ground is laid
 
 ## [1.12.0-alpha] - 2026-08-28
 

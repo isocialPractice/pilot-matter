@@ -73,6 +73,7 @@
             <h2>Building on it</h2>
             <ul>
                 <li><a href="api.html">Simulator API</a></li>
+                <li><a href="api-reference.html">API reference</a></li>
                 <li><a href="project-structure.html">Project structure</a></li>
                 <li><a href="testing.html">Testing</a></li>
             </ul>
@@ -95,11 +96,11 @@
 
 <h2 id="what-is-covered">What is covered</h2>
 
-<p>Unit conversions in both directions and on both scales, heading and climb rate readouts, the low altitude warning, the artificial horizon's angles and ladder, the minimap's projection and its behaviour at the world's edge, the keybinding map, control rates at every sensitivity, the configured start state and the attitude that holds its climb, a start edited to any other condition and the attitude that holds that one, throttle and lift math, the engine and wind mix and its mute, the crash threshold and countdown, the touchdown rules that tell a landing from a crash, the geometry of a runway and the search that sites one, the takeoff a flight is held at, the crossing that carries a bounded world round at its edges, the grid the endless ground is laid on and the promise it makes that no position can see the end of it, photo mode's state and the names it writes, camera damping, pause toggling, the start screen's rules, start-up progress, menu selection by key and by pointer and the one cursor they share, the keys a menu takes back off the flight, the settings panel with its options, its start state fields, its radio group and its held box, and their stored choices, the game modes with their stages, their runs, their courses, and the gate test, terrain noise and the mountain formula, the element registry and every generator it holds, the assembled environments, a world laid as one tile of an assembly and the pass that settles what its elements drew at the joins, the day cycle and the light and the sun's place at every hour of it, the wave and the sheen the water is drawn with and the surface they are applied to, the API's option defaults and contract checks, the API document against the surface it describes, the example host page against both halves it is meant to prove, page metadata, this documentation site against the pages it claims to have, and the static server's path and content type rules.</p>
+<p>Unit conversions in both directions and on both scales, heading and climb rate readouts, the low altitude warning, the artificial horizon's angles and ladder, the minimap's projection and its behaviour at the world's edge, the keybinding map, control rates at every sensitivity, the configured start state and the attitude that holds its climb, a start edited to any other condition and the attitude that holds that one, throttle and lift math, the engine and wind mix and its mute, the crash threshold and countdown, the touchdown rules that tell a landing from a crash, the geometry of a runway and the search that sites one, the takeoff a flight is held at, the crossing that carries a bounded world round at its edges, the grid the endless ground is laid on and the promise it makes that no position can see the end of it, photo mode's state and the names it writes, camera damping, pause toggling, the start screen's rules, start-up progress, menu selection by key and by pointer and the one cursor they share, the keys a menu takes back off the flight, the settings panel with its options, its start state fields, its radio group and its held box, and their stored choices, the game modes with their stages, their runs, their courses, and the gate test, terrain noise and the mountain formula, the element registry and every generator it holds, the assembled environments, a world laid as one tile of an assembly and the pass that settles what its elements drew at the joins, the day cycle and the light and the sun's place at every hour of it, the wave and the sheen the water is drawn with and the surface they are applied to, the API's option defaults and contract checks, the API document against the surface it describes, the example host page against both halves it is meant to prove, page metadata, this documentation site against the pages it claims to have and against the code its pages list - the start fields, the worlds, and the game modes - the API reference page against the document it is built from, and the static server's path and content type rules.</p>
 
 <div class="note">
     <span class="note-title">The documents are tested too</span>
-    <p>The suite reads <a href="api.md">the API reference</a>, the README, and the pages of this site, and fails when one of them has drifted from the code or from the others. A document that has gone stale is a bug the tests catch rather than one a reader finds.</p>
+    <p>The suite reads <a href="api-reference.html">the API reference</a>, the README, and the pages of this site, and fails when one of them has drifted from the code or from the others. A document that has gone stale is a bug the tests catch rather than one a reader finds. The reference page is built from <code>docs/api.md</code> by <code>npm run docs:api</code> rather than written beside it, and the suite renders it again and compares, so what is published is always what the document now says.</p>
 </div>
 
             <nav class="page-nav" aria-label="Nearby pages">
@@ -114,7 +115,7 @@
     </main>
 
     <footer class="site-footer">
-        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api-reference.html">full API reference</a>.</p>
         <p>Built with no build step: ES modules, an import map, and one renderer.</p>
     </footer>
 </body>

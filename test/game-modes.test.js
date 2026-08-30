@@ -370,22 +370,22 @@ test('a stage opens on a start the configuration can actually hold', () => {
                     `${id} stage ${stageNumber(state)} asked for a ${field} of ${start[field]}`);
             }
 
-            assert.ok(Math.abs(position.x) <= WORLD_SIZE / 2 && Math.abs(position.z) <= WORLD_SIZE / 2,
-                `${id} stage ${stageNumber(state)} opens outside the world it is flown in`);
+            assert.ok(Number.isFinite(position.x) && Number.isFinite(position.z),
+                `${id} stage ${stageNumber(state)} opens at ${position.x},${position.z}`);
         } while (advanceStage(state));
     }
 });
 
-// The world has no outside, so an opening the stage put past an edge comes back
-// in at the opposite one. Where the aircraft sits relative to the strip is the
-// same reading either way, once it is taken the short way round.
-function toroidal(delta, size = WORLD_SIZE) {
-    const wrapped = ((delta % size) + size) % size;
-    return wrapped > size / 2 ? wrapped - size : wrapped;
+// The ground is an endless grid of tiles rather than one square, so an opening
+// is read off the strip as it stands rather than the short way round an edge.
+function offsetToRunway(position, runway) {
+    return { x: position.x - runway.x, z: position.z - runway.z };
 }
 
-function offsetToRunway(position, runway) {
-    return { x: toroidal(position.x - runway.x), z: toroidal(position.z - runway.z) };
+/** The bearing from the strip out to a place, in degrees clockwise from north. */
+function bearingFromRunway(position, runway) {
+    const out = offsetToRunway(position, runway);
+    return wrapDegrees(Math.atan2(out.x, out.z) * 180 / Math.PI);
 }
 
 test('a landing stage opens where it said it would, pointing where it said', () => {
@@ -417,6 +417,44 @@ test('a landing stage opens on the approach side, so the strip is ahead not behi
     const from = offsetToRunway(position, runway);
     assert.ok(from.x * out.x + from.z * out.z < 0,
         'the first stage should open short of the threshold, not past the far end');
+});
+
+// An opening is a bearing and a distance out from the strip, and that has to
+// hold wherever in the tile the site search put the strip. Nothing carries the
+// opening back inside the square any more, because the ground continues past
+// it: a wrapped opening would put the aircraft out on the far side of the
+// runway, at a bearing and a distance the stage never asked for.
+test('a landing stage opens the distance and bearing out it asked for, from a strip sited anywhere', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    const { runway: generated } = worldFor(state);
+    const edge = WORLD_SIZE / 2;
+
+    const sites = [
+        { x: 0, z: 0 },
+        { x: edge - 400, z: 0 }, { x: -edge + 400, z: 0 },
+        { x: 0, z: edge - 400 }, { x: 0, z: -edge + 400 },
+        { x: edge - 200, z: edge - 200 }, { x: -edge + 200, z: -edge + 200 }
+    ];
+
+    do {
+        const stage = currentStage(state);
+        const asked = wrapDegrees(runwayThresholds(generated)[0].heading + 180 + stage.approach.bearing);
+
+        for (const site of sites) {
+            const runway = { ...generated, ...site };
+            const { position } = stageStart(state, { runway });
+            const where = `${stage.label} from a strip at ${site.x},${site.z}`;
+
+            const from = offsetToRunway(position, runway);
+            const out  = Math.hypot(from.x, from.z);
+            assert.ok(Math.abs(out - stage.approach.distance) < 1,
+                `${where} opens ${Math.round(out)} out rather than the ${stage.approach.distance} it asked for`);
+
+            const off = Math.abs(wrapRadians((bearingFromRunway(position, runway) - asked) * Math.PI / 180));
+            assert.ok(off < 0.01,
+                `${where} opens ${(off * 180 / Math.PI).toFixed(1)} degrees off the bearing it asked for`);
+        }
+    } while (advanceStage(state));
 });
 
 test('a course stage opens lined up on the first loop at the height it was laid', () => {

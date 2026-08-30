@@ -13,7 +13,6 @@
  */
 
 import { createRandom, runwayThresholds, DEFAULT_SIZE } from './environment/elements.js';
-import { wrapPosition } from './world-edge.js';
 import { OPEN_COUNTRY_ID, LOOP_VALLEY_ID } from './environment/presets.js';
 import {
     START_FLYING, startDefaults, snapStartValue, startField
@@ -405,15 +404,13 @@ export function stageStart(state, world = {}) {
         ? approachOpening(stage, world.runway)
         : courseOpening(stage, world.rings);
 
-    // A stage can ask to open further out than there is world to open in. The
-    // world has no outside, so the opening is carried round it the same way a
-    // flight is: the bearing and the distance to the objective are what the
-    // stage asked for either way, and the aircraft is inside the ground.
-    const half = (world.size ?? DEFAULT_SIZE) / 2;
-    const inside = wrapPosition(
-        { minX: -half, maxX: half, minZ: -half, maxZ: half }, opening.x, opening.z
-    );
-
+    // An opening stands where its bearing and its distance put it, however far
+    // out that is. The ground is an endless grid of tiles rather than one
+    // square with an outside, so a stage that opens past the edge of the tile
+    // its objective was laid in opens over ground like any other; there is no
+    // edge left to be carried back from. Carrying it back is what would break
+    // the stage - the aircraft would open on the far side of the objective, at
+    // a bearing and a distance nothing asked for.
     return {
         start: {
             ...startDefaults(),
@@ -425,7 +422,7 @@ export function stageStart(state, world = {}) {
             headingDegrees:   snapStartValue('headingDegrees', wrapDegrees(opening.headingDegrees)),
             throttlePercent:  snapStartValue('throttlePercent', opening.throttlePercent)
         },
-        position: { x: inside.x, z: inside.z }
+        position: { x: opening.x, z: opening.z }
     };
 }
 

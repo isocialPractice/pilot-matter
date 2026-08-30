@@ -73,6 +73,7 @@
             <h2>Building on it</h2>
             <ul>
                 <li><a href="api.html">Simulator API</a></li>
+                <li><a href="api-reference.html">API reference</a></li>
                 <li><a href="project-structure.html">Project structure</a></li>
                 <li><a href="testing.html">Testing</a></li>
             </ul>
@@ -137,16 +138,18 @@
 ├── docs/
 │   ├── index.html      # This documentation site
 │   ├── assets/         # The site's stylesheet and its one script
-│   └── api.md          # The whole API surface, and its stability guarantee
+│   ├── api.md          # The whole API surface, and its stability guarantee
+│   └── api-reference.html # The same document as a page, built from it
 ├── examples/
 │   ├── host.html       # A host page working both halves of the API side by side
 │   └── host.js         # The Pilot API over host ground, the Matter API under a host aircraft
 ├── tools/
-│   └── serve.mjs       # Zero-dependency static server behind `npm run serve`
+│   ├── serve.mjs       # Zero-dependency static server behind `npm run serve`
+│   └── build-api-reference.mjs # Renders docs/api.md into its page
 └── test/               # Zero-dependency node:test unit tests</code></pre>
 
             <nav class="page-nav" aria-label="Nearby pages">
-                <a href="api.html" rel="prev">&#8592; Simulator API</a>
+                <a href="api-reference.html" rel="prev">&#8592; API reference</a>
                 <a href="testing.html" rel="next">Testing &#8594;</a>
             </nav>
         </article>
@@ -157,7 +160,7 @@
     </main>
 
     <footer class="site-footer">
-        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api.md">full API reference</a>.</p>
+        <p>Pilot Matter is published under the MIT licence. <a href="../index.html">Play it</a>, or read the <a href="api-reference.html">full API reference</a>.</p>
         <p>Built with no build step: ES modules, an import map, and one renderer.</p>
     </footer>
 </body>
