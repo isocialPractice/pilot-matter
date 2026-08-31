@@ -552,3 +552,31 @@ how the simulator got here rather than as a list still to be worked.
     game mode labels on `docs/terrain.html`,
     `docs/controls/game-modes.html`, and `docs/cheatsheet.html`
   - From: Code Review Override - the documentation site
+- [x] A line the reference builder cannot parse hangs it rather than failing it
+  - **Issue**: `markdownToHtml` in `tools/build-api-reference.mjs` treats a
+    line beginning with `|` as a table only when the line after it is the
+    `|---|---|` rule. A `|` line that is not - a table whose rule row is
+    mistyped, a one-row pipe line, a paragraph that happens to open with one -
+    matches no branch, so it falls through to the paragraph branch, whose own
+    guard stops it on the same `|`. That leaves the paragraph empty, `at--`
+    undoes the loop's `at++`, and the same line is read forever, appending an
+    empty `<p></p>` each pass until the process runs out of memory. Adding
+    `| a | b |` to `docs/api.md` with no rule under it hangs both
+    `npm run docs:api` and `npm test`, and `npm test` is what CI runs, so the
+    hang lands in a GitHub Actions job that has no output to say why
+  - **Goal**: Make every branch of the loop consume at least the line it was
+    entered on, so an unparseable line is emitted as the text it is rather than
+    read again. Cover it with a test that a `|` line with no rule under it
+    renders and returns
+  - From: Code Review Override - the reference page
+- [x] The link check rejects a directory the browser would open
+  - **Issue**: `every document the site links is one the browser opens rather
+    than downloads` in `test/site.test.js` reads a target's extension and
+    requires it be one of `RENDERED`. A link to a directory has no extension -
+    `posix.extname('controls/')` is `''` - so `href="controls/"` fails a test
+    meant to catch `text/markdown`, even though a browser opens it as the
+    folder's index. No page links one today, so the test passes; the first page
+    that does is failed for a link that works
+  - **Goal**: Let a target with no extension, or one ending in `/`, pass as the
+    directory index it is, and keep failing the extensions a browser downloads
+  - From: Code Review Override - the reference page

@@ -46,15 +46,46 @@ test('the site is the whole documentation rather than a landing page', () => {
 // footer of every page on the site and from the home page as a card.
 const RENDERED = new Set(['.html', '.css', '.js', '.png', '.svg', '.jpg', '.webp', '.ico']);
 
+/**
+ * Whether a link is one the browser opens rather than hands to the filesystem.
+ *
+ * A folder is opened as its own index.html, and it has no extension to read -
+ * `posix.extname('controls/')` is `''`, and so is `posix.extname('controls')`.
+ * Reading a target's extension and requiring it be one of `RENDERED` therefore
+ * failed a link to a folder for having none, which is a link that works. So a
+ * trailing slash, or no extension at all, is the directory index it names, and
+ * what is left to fail is a target that names a type the browser downloads.
+ */
+function opensInBrowser(target) {
+    const file = target.split(/[#?]/)[0];
+    if (file === '' || file.endsWith('/')) return true;
+
+    const extension = posix.extname(file).toLowerCase();
+    return extension === '' || RENDERED.has(extension);
+}
+
 test('every document the site links is one the browser opens rather than downloads', () => {
     for (const [page, source] of sources) {
         for (const target of localTargets(source)) {
-            const file = target.split(/[#?]/)[0];
-            const extension = posix.extname(file).toLowerCase();
-
-            assert.ok(RENDERED.has(extension),
+            assert.ok(opensInBrowser(target),
                 `${page} links ${target}, which a browser downloads rather than opens`);
         }
+    }
+});
+
+// No page links a folder today, so the check above passes either way and the
+// first page to link one would have been the one to find out. These are the
+// forms it has to read, held here rather than waiting on a page to carry them.
+test('a folder is a page the browser opens, and a document is still a download', () => {
+    for (const opened of [
+        'controls/', 'controls', '../controls/', 'controls/#settings',
+        'index.html', 'assets/site.css', 'assets/logo.png'
+    ]) {
+        assert.ok(opensInBrowser(opened), `${opened} is a link a browser opens`);
+    }
+
+    for (const downloaded of ['api.md', '../docs/api.md', 'notes.txt', 'world.zip', 'manual.pdf']) {
+        assert.ok(!opensInBrowser(downloaded), `${downloaded} is a file a browser downloads`);
     }
 });
 
@@ -184,6 +215,23 @@ function sameePageAnchors(source) {
         .map(match => match[1])
         .filter(anchor => anchor !== '#content');
 }
+
+// An id is only an address if it names one place, and the check above only asks
+// that an anchor finds an id rather than that it finds one id. The generated
+// reference is where that matters: the document heads a section `Options` under
+// each half of the API, so the page carried two headings at `#options` and two
+// at `#what-comes-back`, and a reader linking either reached the first one
+// whichever they meant.
+test('no page gives the same id to two things', () => {
+    for (const [page, source] of sources) {
+        const seen = new Set();
+
+        for (const [, id] of source.matchAll(/\sid="([^"]+)"/g)) {
+            assert.ok(!seen.has(id), `${page} carries more than one id="${id}"`);
+            seen.add(id);
+        }
+    }
+});
 
 // The project site is served from /pilot-matter/ rather than from /, so an
 // absolute path is a link that works locally and breaks the moment it is

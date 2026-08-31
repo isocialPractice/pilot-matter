@@ -5,6 +5,53 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2-alpha] - 2026-08-31
+
+Three things a code review found around the reference page built last release:
+an address that named two places, a line the builder read forever rather than
+failed on, and a link check that turned down a folder for having no extension.
+
+### Fixed
+
+- **Four headings on the API reference page shared two addresses.** The page
+  built for `1.12.1-alpha` slugged a heading from its own text and nothing
+  else, and the document heads a section `Options` and a section `What comes
+  back` under each half of the API. So the page went out carrying two headings
+  at `#options` and two at `#what-comes-back`: a reader linking either one
+  landed on the Pilot API's whichever they meant, the Matter API's two had no
+  address at all, and duplicate ids are invalid markup that no other page on
+  the site had. A repeat now takes a counted suffix, `#options-1`, which is
+  what GitHub does to the same document, so an anchor copied from there reaches
+  the same section on the site. A test holds every page to one id per address
+- **A line the builder could not parse was read forever rather than failed
+  on.** `markdownToHtml` took a line beginning with `|` for a table only when
+  the line under it was the `|---|---|` rule. A `|` line that was not one - a
+  table whose rule row is mistyped, a single pipe line, a paragraph that
+  happens to open with one - matched no branch and fell through to the
+  paragraph branch, whose own guard stopped it on that same `|` before it had
+  taken anything. So the paragraph closed empty, the reader went back to where
+  it had started, and it read that line again for as long as there was memory
+  to hold the empty paragraphs it produced. One `| a | b |` with no rule under
+  it in `docs/api.md` hung `npm run docs:api` and `npm test` both, and
+  `npm test` is what CI runs, so it hung a job with nothing in the log to say
+  why. Every branch now consumes at least the line it was entered on, so a
+  line none of them describes is written out as the text it is and the
+  document carries on past it. The tests convert in a process of their own
+  under a clock, because a loop that consumes nothing is a synchronous one and
+  no timeout inside the runner can interrupt it: a regression fails now,
+  rather than hanging the suite that is supposed to catch it
+- **The link check turned down a link to a folder.** The check that no page
+  links a file the browser downloads read a target's extension and required it
+  be one the browser renders. A folder has no extension to read -
+  `posix.extname('controls/')` is `''` - so `href="controls/"` failed a test
+  written to catch `text/markdown`, though Pages answers a folder with that
+  folder's own `index.html`, which is a page. No page links one today, so the
+  check passed and the first page to link a folder would have been the one to
+  find out. A trailing slash, or no extension at all, is now read as the
+  directory index it names, and what is left to fail is a target naming a type
+  the browser hands to the filesystem. Both readings are held by a test of
+  their own rather than by whatever the site happens to link that day
+
 ## [1.12.1-alpha] - 2026-08-30
 
 The documentation site, and the two things a code review found once it was

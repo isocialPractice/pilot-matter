@@ -45,12 +45,36 @@ const escapeHtml = (text) => text
 /**
  * A heading's anchor, slugged the way the document's own contents list expects
  * it: lower case, punctuation dropped, spaces closed up with hyphens.
+ *
+ * Two headings can slug the same - the document has an `Options` and a `What
+ * comes back` under each half of the API - so this is the address a heading
+ * wants rather than the one it gets. `anchors()` settles that.
  */
 export function slug(text) {
     return text.toLowerCase()
         .replace(/[^a-z0-9 -]/g, '')
         .trim()
         .replace(/\s+/g, '-');
+}
+
+/**
+ * Hands out heading anchors, unique within one page. An id is only an address
+ * if it names one place: the document has four headings that slug to two
+ * anchors, and left as they were, `#options` opened the Pilot API's options
+ * whichever of the two a reader meant, while the Matter API's had no address at
+ * all. Repeats take a counted suffix, which is what GitHub does to the same
+ * document, so an anchor copied from there reaches the same section here.
+ */
+export function anchors() {
+    const seen = new Map();
+
+    return (text) => {
+        const wanted = slug(text);
+        const taken = seen.get(wanted) ?? 0;
+
+        seen.set(wanted, taken + 1);
+        return taken ? `${wanted}-${taken}` : wanted;
+    };
 }
 
 /** Code spans, bold, and links, over text that has already been escaped. */
@@ -68,6 +92,10 @@ function inline(text) {
 const cellsOf = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(cell => cell.trim());
 
 const isTableRule = (line = '') => /^\|[\s:|-]+\|$/.test(line.trim());
+
+/** The line kinds that close a paragraph by opening something of their own. */
+const opensBlock = (line) => line.startsWith('```') || line.startsWith('|')
+    || line.startsWith('- ') || /^#{1,6}\s/.test(line);
 
 function renderTable(rows) {
     const head = cellsOf(rows[0]).map(cell => `<th>${inline(cell)}</th>`).join('');
@@ -90,13 +118,17 @@ function renderTable(rows) {
  * The document as the site's own markup. Only what `docs/api.md` is written in
  * is understood - headings, paragraphs, bullets, fenced code, and pipe tables -
  * because a converter that handles everything is a dependency, and this one is
- * held to the document by a test.
+ * held to the document by a test. A line none of those describes is written out
+ * as the text it is, so a table with a mistyped rule row is something to read on
+ * the page and correct, rather than something to find in a build that stopped
+ * saying anything.
  *
  * The level 1 heading is dropped: it becomes the page's own `h1`, and a page
  * carrying two would be a page with no one subject.
  */
 export function markdownToHtml(markdown) {
     const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+    const anchor = anchors();
     const blocks = [];
 
     for (let at = 0; at < lines.length; at++) {
@@ -115,7 +147,7 @@ export function markdownToHtml(markdown) {
         if (heading) {
             const level = heading[1].length;
             if (level > 1) {
-                blocks.push(`<h${level} id="${slug(heading[2])}">${inline(heading[2])}</h${level}>`);
+                blocks.push(`<h${level} id="${anchor(heading[2])}">${inline(heading[2])}</h${level}>`);
             }
             continue;
         }
@@ -139,12 +171,21 @@ export function markdownToHtml(markdown) {
             continue;
         }
 
-        const paragraph = [];
-        while (at < lines.length && lines[at].trim()
-               && !lines[at].startsWith('```') && !lines[at].startsWith('|')
-               && !/^#{1,6}\s/.test(lines[at]) && !lines[at].startsWith('- ')) {
+        // Whatever is left is a paragraph, and it takes the line it was entered
+        // on whatever that line looks like. The guard closes a paragraph at the
+        // block after it, and it is only allowed to do that from the second
+        // line on. A `|` line with no rule under it matches no branch above and
+        // arrives here, and a guard read before the first line was taken would
+        // close the paragraph empty, put `at` back where it started, and read
+        // that same line for as long as there was memory to hold the empty
+        // paragraphs it produced - a hang rather than a failure, and `npm test`
+        // is what CI runs.
+        const paragraph = [lines[at++].trim()];
+
+        while (at < lines.length && lines[at].trim() && !opensBlock(lines[at])) {
             paragraph.push(lines[at++].trim());
         }
+
         at--;
         blocks.push(`<p>${inline(paragraph.join(' '))}</p>`);
     }
