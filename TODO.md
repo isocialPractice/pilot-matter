@@ -30,6 +30,37 @@ its context survives being archived.
   only one the pilot has ever seen
   - From: Game Modes
 
+### Code Review Override - the checks the id fix left behind
+
+- [ ] The `1.12.3-alpha` entry is ordered against the file's own convention
+  - **Issue**: It heads `### Fixed` before `### Changed`. Every other entry in
+    `CHANGELOG.md` carrying both puts `### Changed` first - `1.12.1-alpha` and
+    `1.12.0-alpha` each run Added, Changed, Fixed - which is the Keep a
+    Changelog order the file's own header cites
+  - **Goal**: Move the `### Changed` section above `### Fixed` in the
+    `1.12.3-alpha` entry, leaving both bodies as they are
+  - From: Code Review Override - the checks the id fix left behind
+
+#### Resolve Issues
+
+- [ ] The duplicate id check reads sample markup as markup
+  - **Issue**: The fix taught `no page gives the same id to two things` to read
+    `linkable()` first, and the comment it was given says the scan does that
+    "the way every other check here does". The check above it does not: `every
+    anchor a page links to is an id that page has` still asks whether the
+    unstripped source `includes` the literal text `id="<fragment>"`, so
+    `test/site.test.js` now holds two answers to what an id is. On a page whose
+    only `id="app"` sits inside a printed sample, `idsOn()` says the page hands
+    out no such address and the anchor check says it has one. Give `docs/api.md`
+    a worked example printing `<div id="app">` and a line linking `#app`, and
+    `npm test` passes on a link that scrolls nowhere. No page prints an id
+    today, so nothing reaches it yet, which is why it was left rather than fixed
+  - **Goal**: Resolve a fragment against `idsOn(target_source)` rather than
+    against the raw source, lifting `idsOn` above the check that uses it, and
+    hold it with a case of its own: an anchor into a sample block is not an
+    address the page offers
+  - From: Code Review Override - the reference page's own checks
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -580,3 +611,48 @@ how the simulator got here rather than as a list still to be worked.
   - **Goal**: Let a target with no extension, or one ending in `/`, pass as the
     directory index it is, and keep failing the extensions a browser downloads
   - From: Code Review Override - the reference page
+- [x] `docs/testing.html` names two of the three checks this release added
+  - **Issue**: The "What is covered" paragraph was extended with "the
+    converter that builds it and the line it has no rule for" and "the link
+    check that tells a page the browser opens from a file it downloads", but
+    not `no page gives the same id to two things` in `test/site.test.js`,
+    which is the check behind the first and longest entry in the
+    `1.12.2-alpha` changelog. The paragraph reads as the whole list and
+    nothing holds it to the suite, so the page under-reports the release it
+    was edited for
+  - **Goal**: Name the duplicate id check in that sentence, in the voice of
+    the two beside it
+  - From: Code Review Override - the reference page's own checks
+- [x] The duplicate id check reads sample markup as markup
+  - **Issue**: `no page gives the same id to two things` in
+    `test/site.test.js` matches `/\sid="([^"]+)"/g` against each page's raw
+    source, while every other check in that file reads `linkable()` first,
+    whose own comment says why: the reference page prints a host page's own
+    markup, and a sample is something to read rather than something the page
+    does. `escapeHtml` in `tools/build-api-reference.mjs` escapes `<`, `>`,
+    and `&` but not quotes, so an `id` inside a fenced block reaches the page
+    as the literal text ` id="app"` and the regex matches it. `docs/api.md`
+    already prints host page markup in a fence, and `examples/host.html` -
+    the host its worked examples describe - carries `id="panes"`,
+    `id="pilot-pane"`, and `id="pilot-readout"`. A worked example printing
+    two of those, or one that matches a heading's slug, fails `npm test` over
+    text that is not an id, on a page whose ids are all unique
+  - **Goal**: Read the ids out of `linkable(source)` rather than `source`,
+    the way the checks around it do. Lift the scan into a named function the
+    way `opensInBrowser` was lifted, so a sample block that repeats an id and
+    a page that repeats one can each be held by a case of their own rather
+    than by whatever the site happens to print that day
+  - From: Code Review Override - the reference page's own checks
+- [x] Two headings can still be handed the same anchor
+  - **Issue**: `anchors()` in `tools/build-api-reference.mjs` counts how
+    often a slug has been asked for and appends that count, without asking
+    whether the anchor it just built is itself already taken. Headings
+    `Options`, `Options`, and `Options 1` come to `options`, `options-1`, and
+    `options-1` - the defect this release set out to remove, returned by the
+    fix for it. No such heading is in `docs/api.md`, and the duplicate id
+    check above fails the build rather than letting it ship, so this is a
+    build that stops rather than a page that misleads
+  - **Goal**: Carry the suffix on until it names an anchor no heading on the
+    page has taken. Hold it with a test of `anchors()` itself, which is
+    exported and which nothing exercises directly
+  - From: Code Review Override - the reference page's own checks
