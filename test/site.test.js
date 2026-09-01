@@ -216,6 +216,20 @@ function sameePageAnchors(source) {
         .filter(anchor => anchor !== '#content');
 }
 
+/**
+ * Every id a page hands out, which is not every `id="..."` its source contains.
+ *
+ * The reference page prints a host page's own markup, and `escapeHtml` in the
+ * builder escapes `<`, `>`, and `&` but not quotes, so an `id` inside a fenced
+ * block reaches the page as the literal text ` id="app"`. Reading the raw
+ * source counted that as an address: a worked example printing two of
+ * `examples/host.html`'s ids, or one matching a heading's slug, would fail this
+ * file over text that is not an id, on a page whose ids are all unique. So the
+ * scan reads `linkable()` first, the way every other check here does, and a
+ * sample block stays something to read rather than something the page does.
+ */
+const idsOn = (source) => [...linkable(source).matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
+
 // An id is only an address if it names one place, and the check above only asks
 // that an anchor finds an id rather than that it finds one id. The generated
 // reference is where that matters: the document heads a section `Options` under
@@ -226,11 +240,27 @@ test('no page gives the same id to two things', () => {
     for (const [page, source] of sources) {
         const seen = new Set();
 
-        for (const [, id] of source.matchAll(/\sid="([^"]+)"/g)) {
+        for (const id of idsOn(source)) {
             assert.ok(!seen.has(id), `${page} carries more than one id="${id}"`);
             seen.add(id);
         }
     }
+});
+
+// No worked example prints an id today, so the check above passes either way
+// and the first one to print a pair would have been the one to find out. Both
+// halves are held here rather than left to whatever the site prints that day:
+// what a sample says is not an address, and what the page itself says is.
+test('a sample block prints markup rather than hands out ids', () => {
+    const sample = '<p id="the-only-one">See:</p>\n'
+        + '<pre><code>&lt;div id="app"&gt;&lt;p id="app"&gt;&lt;/p&gt;&lt;/div&gt;</code></pre>';
+
+    assert.deepEqual(idsOn(sample), ['the-only-one'],
+        'a sample block is something to read rather than markup the page carries');
+
+    assert.deepEqual(idsOn('<h2 id="options">Options</h2>\n<h2 id="options">Options</h2>'),
+        ['options', 'options'],
+        'while a page that really does repeat an id still repeats it');
 });
 
 // The project site is served from /pilot-matter/ rather than from /, so an

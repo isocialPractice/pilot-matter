@@ -5,6 +5,52 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.3-alpha] - 2026-09-01
+
+Two things a code review found in last release's own fixes - a check reading a
+sample as markup, and an address the counted suffix could still hand out twice -
+and the reference page's account of what it now covers.
+
+### Fixed
+
+- **The check for duplicate ids read printed markup as markup.** `no page gives
+  the same id to two things` matched `id="..."` against each page's raw source,
+  while every other check in `test/site.test.js` reads `linkable()` first, whose
+  own comment says why: the reference page prints a host page's markup, and a
+  sample is something to read rather than something the page does. `escapeHtml`
+  in `tools/build-api-reference.mjs` escapes `<`, `>`, and `&` but not quotes,
+  so an `id` inside a fenced block arrives on the page as the literal text
+  ` id="app"` and the scan counted it. `examples/host.html` - the host the
+  worked examples describe - carries `id="panes"`, `id="pilot-pane"`, and
+  `id="pilot-readout"`, so a worked example printing two of those, or one
+  matching a heading's slug, would have failed `npm test` over text that is not
+  an id, on a page whose ids are all unique. The scan reads `linkable()` now,
+  and it is a named function rather than a regex inside the loop, so a sample
+  block that repeats an id and a page that repeats one are each held by a case
+  of their own rather than by whatever the site prints that day
+- **Two headings could still be handed the same anchor.** `anchors()` counted
+  how often a slug had been asked for and appended that count, without asking
+  whether the anchor it had just built was itself already taken. `Options`,
+  `Options`, and `Options 1` came to `options`, `options-1`, and `options-1` -
+  the defect `1.12.2-alpha` set out to remove, handed back by the fix for it.
+  No heading in `docs/api.md` collides that way, and the duplicate id check
+  above fails the build rather than letting a page ship, so this was a build
+  that stops rather than a page that misleads. The count carries on now until it
+  names an anchor no heading has taken, from either direction, and `anchors()`
+  is held by tests of its own - it is exported, and nothing exercised it except
+  through whatever headings the document happened to carry
+
+### Changed
+
+- **The site's testing page names the third check last release added.** Its
+  "What is covered" paragraph had been extended with the converter and the link
+  check but not with the duplicate id check, which is the first and longest
+  entry in the `1.12.2-alpha` notes. The paragraph reads as the whole list and
+  nothing holds it to the suite, so the page under-reported the release it was
+  edited for. It now names the addresses the reference page hands its headings,
+  the sample markup it prints rather than carries, and the one id per address
+  every page is held to
+
 ## [1.12.2-alpha] - 2026-08-31
 
 Three things a code review found around the reference page built last release:

@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { markdownToHtml } from '../tools/build-api-reference.mjs';
+import { anchors, markdownToHtml, PAGE, slug } from '../tools/build-api-reference.mjs';
 
 const BUILDER = new URL('../tools/build-api-reference.mjs', import.meta.url).href;
+
+const document = readFileSync(new URL(`../${PAGE.markdown}`, import.meta.url), 'utf8');
 
 /**
  * Converts in a process of its own, under a clock.
@@ -69,6 +72,55 @@ test('a table with the rule under it is still a table', () => {
 
     assert.match(html, /<th>Option<\/th><th>Default<\/th>/, 'a head row');
     assert.match(html, /<td><code>seed<\/code><\/td><td><code>1<\/code><\/td>/, 'and a body row');
+});
+
+// `anchors()` is exported and was exercised only through whatever headings
+// `docs/api.md` happens to carry, which is a document with no heading that
+// collides. So the addresses it hands out are held here directly.
+test('a slug is the address a heading wants, punctuation and case dropped', () => {
+    assert.equal(slug('What comes back'), 'what-comes-back');
+    assert.equal(slug('  Options: the full set!  '), 'options-the-full-set');
+    assert.equal(slug('createPilot(options)'), 'createpilotoptions');
+});
+
+test('a heading that slugs the same as one above it takes the next free address', () => {
+    const anchor = anchors();
+
+    assert.equal(anchor('Options'), 'options', 'the first asks for it and gets it');
+    assert.equal(anchor('Options'), 'options-1', 'the second takes a counted suffix');
+    assert.equal(anchor('Options'), 'options-2', 'and the count carries on');
+    assert.equal(anchor('What comes back'), 'what-comes-back', 'a different slug is unaffected');
+});
+
+// The suffix is itself a slug something can ask for, from either direction, and
+// a count that does not look at what it has already given out answers both with
+// the same address - which is the defect, returned by the fix for it.
+test('a heading that slugs to a suffix already handed out does not get it twice', () => {
+    const forwards = anchors();
+    assert.equal(forwards('Options'), 'options');
+    assert.equal(forwards('Options'), 'options-1');
+    assert.equal(forwards('Options 1'), 'options-1-1', 'rather than a second #options-1');
+
+    const backwards = anchors();
+    assert.equal(backwards('Options 1'), 'options-1', 'it asked first, so it keeps it');
+    assert.equal(backwards('Options'), 'options');
+    assert.equal(backwards('Options'), 'options-2', 'and the repeat steps past the taken one');
+    assert.equal(backwards('Options'), 'options-3', 'without offering it again either');
+});
+
+test('every heading in the document is given an address of its own', () => {
+    const anchor = anchors();
+    const seen = new Set();
+
+    // Fenced blocks go first: the converter never reads a heading out of one,
+    // and a sample that opens a line with `##` is not a section of the page.
+    const prose = document.replace(/^```[\s\S]*?^```/gm, '');
+
+    for (const [, text] of prose.matchAll(/^#{2,6}\s+(.*)$/gm)) {
+        const given = anchor(text);
+        assert.ok(!seen.has(given), `${text} was handed #${given}, which is already taken`);
+        seen.add(given);
+    }
 });
 
 test('the blocks the document is written in still render as themselves', () => {

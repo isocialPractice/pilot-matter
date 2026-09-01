@@ -62,18 +62,31 @@ export function slug(text) {
  * if it names one place: the document has four headings that slug to two
  * anchors, and left as they were, `#options` opened the Pilot API's options
  * whichever of the two a reader meant, while the Matter API's had no address at
- * all. Repeats take a counted suffix, which is what GitHub does to the same
- * document, so an anchor copied from there reaches the same section here.
+ * all. Repeats take a counted suffix, the form GitHub gives the same document,
+ * so an anchor copied from there reaches the same section here.
+ *
+ * Counting how often a slug was asked for is not enough on its own, because the
+ * suffix it appends can be a slug in its own right. `Options`, `Options`, and
+ * `Options 1` ask for `options`, `options`, and `options-1`, and a bare count
+ * answers the last two with `options-1` both times - the defect this was
+ * written to remove, handed back by the fix for it. So the count carries on
+ * until it names an anchor no heading has taken, and `Options 1` gets
+ * `options-1-1` rather than a second copy of the address above it.
  */
 export function anchors() {
-    const seen = new Map();
+    const wanted = new Map();
+    const given = new Set();
 
     return (text) => {
-        const wanted = slug(text);
-        const taken = seen.get(wanted) ?? 0;
+        const base = slug(text);
+        let count = wanted.get(base) ?? 0;
+        let anchor = count ? `${base}-${count}` : base;
 
-        seen.set(wanted, taken + 1);
-        return taken ? `${wanted}-${taken}` : wanted;
+        while (given.has(anchor)) anchor = `${base}-${++count}`;
+
+        wanted.set(base, count + 1);
+        given.add(anchor);
+        return anchor;
     };
 }
 
