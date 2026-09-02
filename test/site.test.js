@@ -177,6 +177,26 @@ function localTargets(source) {
         .filter(target => !/^(?:https?:|mailto:|#)/.test(target));
 }
 
+/**
+ * Every id a page hands out, which is not every `id="..."` its source contains.
+ *
+ * The reference page prints a host page's own markup, and `escapeHtml` in the
+ * builder escapes `<`, `>`, and `&` but not quotes, so an `id` inside a fenced
+ * block reaches the page as the literal text ` id="app"`. Reading the raw
+ * source counted that as an address: a worked example printing two of
+ * `examples/host.html`'s ids, or one matching a heading's slug, would fail this
+ * file over text that is not an id, on a page whose ids are all unique. So the
+ * scan reads `linkable()` first, and a sample block stays something to read
+ * rather than something the page does.
+ *
+ * Both of the checks that read an id read this one, which is why it sits above
+ * the first of them. It did not before: the anchor check asked whether the
+ * unstripped source `includes` the text `id="<fragment>"` while the duplicate
+ * check asked here, so the file held two answers to what an id is, and a page
+ * could offer an address by printing one.
+ */
+const idsOn = (source) => [...linkable(source).matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
+
 test('every link on every page reaches a file that exists', () => {
     for (const [page, source] of sources) {
         const from = dirname(join(ROOT, page));
@@ -204,7 +224,7 @@ test('every anchor a page links to is an id that page has', () => {
                 ? source
                 : readFileSync(path, 'utf8');
 
-            assert.ok(target_source.includes(`id="${fragment}"`),
+            assert.ok(idsOn(target_source).includes(fragment),
                 `${page} links #${fragment} in ${file || 'itself'}, which has no such id`);
         }
     }
@@ -216,21 +236,30 @@ function sameePageAnchors(source) {
         .filter(anchor => anchor !== '#content');
 }
 
-/**
- * Every id a page hands out, which is not every `id="..."` its source contains.
- *
- * The reference page prints a host page's own markup, and `escapeHtml` in the
- * builder escapes `<`, `>`, and `&` but not quotes, so an `id` inside a fenced
- * block reaches the page as the literal text ` id="app"`. Reading the raw
- * source counted that as an address: a worked example printing two of
- * `examples/host.html`'s ids, or one matching a heading's slug, would fail this
- * file over text that is not an id, on a page whose ids are all unique. So the
- * scan reads `linkable()` first, the way every other check here does, and a
- * sample block stays something to read rather than something the page does.
- */
-const idsOn = (source) => [...linkable(source).matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
+// The pair the check above compares, on a page that prints an id rather than
+// hands one out. It used to ask the raw source whether it carried the text
+// `id="app"`, which a printed `<div id="app">` answers for a page offering no
+// such address, so a link to `#app` passed while scrolling nowhere. No page on
+// the site prints an id today, and the first worked example to print one would
+// have been what found that out.
+test('an anchor into a sample block is not an address the page offers', () => {
+    const page = '<h2 id="worked-example">Worked example</h2>\n'
+        + '<p><a href="#app">the element it mounts on</a></p>\n'
+        + '<pre><code>&lt;div id="app"&gt;&lt;/div&gt;</code></pre>';
 
-// An id is only an address if it names one place, and the check above only asks
+    const offered = idsOn(page);
+
+    assert.deepEqual(sameePageAnchors(page), ['#app'],
+        'the page links a fragment only its sample carries');
+    assert.ok(offered.includes('worked-example'),
+        'a heading is an address a link reaches');
+    assert.ok(!offered.includes('app'),
+        'an id inside a sample is text to read rather than a place to scroll to');
+    assert.ok(page.includes('id="app"'),
+        'though the source carries that text, which is what the check used to read');
+});
+
+// An id is only an address if it names one place, and the anchor check only asks
 // that an anchor finds an id rather than that it finds one id. The generated
 // reference is where that matters: the document heads a section `Options` under
 // each half of the API, so the page carried two headings at `#options` and two

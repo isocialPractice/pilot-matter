@@ -5,11 +5,55 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.4-alpha] - 2026-09-02
+
+The two checks that read an id now read the same one, and the release notes
+above are in the order the rest of the file keeps.
+
+### Changed
+
+- **The `1.12.3-alpha` notes lead with what changed, the way the entries around
+  them do.** They headed `### Fixed` before `### Changed`, and every other entry
+  carrying both runs Added, Changed, Fixed - `1.12.1-alpha` and `1.12.0-alpha`
+  each do - which is the Keep a Changelog order this file's own header cites.
+  Both bodies are as they were; only the sections trade places
+- **The site's testing page names the anchor check.** Its "What is covered"
+  paragraph already named the addresses the reference page hands its headings
+  and the one id per address every page is held to, and now names the check
+  below, which is the third thing in that file to have an opinion about an id
+
+### Fixed
+
+- **The suite held two answers to what an id is.** Last release taught `no page
+  gives the same id to two things` to read `linkable()` first, so a printed
+  `<div id="app">` is markup to read rather than an address the page hands out.
+  The check above it was left as it was: `every anchor a page links to is an id
+  that page has` still asked whether the unstripped source `includes` the text
+  `id="<fragment>"`, so on a page whose only `id="app"` sat inside a worked
+  example, one check said the page offers no such address and the other said it
+  does. A reference page printing `<div id="app">` and a line linking `#app`
+  would have passed `npm test` on a link that scrolls nowhere. An anchor now
+  resolves against `idsOn()`, which is lifted above the first check to read it
+  rather than sitting between the two, and a case of its own holds the pair the
+  check compares: the page links `#app`, the sample prints it, and the address
+  is not one the page offers
+
 ## [1.12.3-alpha] - 2026-09-01
 
 Two things a code review found in last release's own fixes - a check reading a
 sample as markup, and an address the counted suffix could still hand out twice -
 and the reference page's account of what it now covers.
+
+### Changed
+
+- **The site's testing page names the third check last release added.** Its
+  "What is covered" paragraph had been extended with the converter and the link
+  check but not with the duplicate id check, which is the first and longest
+  entry in the `1.12.2-alpha` notes. The paragraph reads as the whole list and
+  nothing holds it to the suite, so the page under-reported the release it was
+  edited for. It now names the addresses the reference page hands its headings,
+  the sample markup it prints rather than carries, and the one id per address
+  every page is held to
 
 ### Fixed
 
@@ -39,17 +83,6 @@ and the reference page's account of what it now covers.
   names an anchor no heading has taken, from either direction, and `anchors()`
   is held by tests of its own - it is exported, and nothing exercised it except
   through whatever headings the document happened to carry
-
-### Changed
-
-- **The site's testing page names the third check last release added.** Its
-  "What is covered" paragraph had been extended with the converter and the link
-  check but not with the duplicate id check, which is the first and longest
-  entry in the `1.12.2-alpha` notes. The paragraph reads as the whole list and
-  nothing holds it to the suite, so the page under-reported the release it was
-  edited for. It now names the addresses the reference page hands its headings,
-  the sample markup it prints rather than carries, and the one id per address
-  every page is held to
 
 ## [1.12.2-alpha] - 2026-08-31
 
