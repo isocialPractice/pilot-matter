@@ -30,36 +30,27 @@ its context survives being archived.
   only one the pilot has ever seen
   - From: Game Modes
 
-### Code Review Override - the checks the id fix left behind
+### Code Review Override - the case that holds the anchor check
 
-- [ ] The `1.12.3-alpha` entry is ordered against the file's own convention
-  - **Issue**: It heads `### Fixed` before `### Changed`. Every other entry in
-    `CHANGELOG.md` carrying both puts `### Changed` first - `1.12.1-alpha` and
-    `1.12.0-alpha` each run Added, Changed, Fixed - which is the Keep a
-    Changelog order the file's own header cites
-  - **Goal**: Move the `### Changed` section above `### Fixed` in the
-    `1.12.3-alpha` entry, leaving both bodies as they are
-  - From: Code Review Override - the checks the id fix left behind
-
-#### Resolve Issues
-
-- [ ] The duplicate id check reads sample markup as markup
-  - **Issue**: The fix taught `no page gives the same id to two things` to read
-    `linkable()` first, and the comment it was given says the scan does that
-    "the way every other check here does". The check above it does not: `every
-    anchor a page links to is an id that page has` still asks whether the
-    unstripped source `includes` the literal text `id="<fragment>"`, so
-    `test/site.test.js` now holds two answers to what an id is. On a page whose
-    only `id="app"` sits inside a printed sample, `idsOn()` says the page hands
-    out no such address and the anchor check says it has one. Give `docs/api.md`
-    a worked example printing `<div id="app">` and a line linking `#app`, and
-    `npm test` passes on a link that scrolls nowhere. No page prints an id
-    today, so nothing reaches it yet, which is why it was left rather than fixed
-  - **Goal**: Resolve a fragment against `idsOn(target_source)` rather than
-    against the raw source, lifting `idsOn` above the check that uses it, and
-    hold it with a case of its own: an anchor into a sample block is not an
-    address the page offers
-  - From: Code Review Override - the reference page's own checks
+- [ ] The case added for the anchor fix holds its parts rather than the check
+  - **Issue**: The fix itself is right - `every anchor a page links to is an id
+    that page has` resolves through `idsOn()` now, so a page whose only
+    `id="app"` sits inside a printed sample no longer answers a link to `#app`.
+    What was added to hold it does not. `an anchor into a sample block is not an
+    address the page offers` asserts on `idsOn()` and `sameePageAnchors()`
+    directly and never on the check that reads them, so putting that line back
+    to the raw `includes` it used before leaves all 28 checks in
+    `test/site.test.js` passing and the fix silently gone. Verified by making
+    that edit and running `node --test test/site.test.js`: 28 pass, 0 fail. This
+    is the third release running to move this pair of checks, and nothing yet
+    fails when they come apart, which is the reason they keep coming apart
+  - **Goal**: Hold the check rather than the helpers under it. Lift the
+    per-anchor resolution out of the loop into a named function, the way
+    `opensInBrowser` and `idsOn` were each lifted, and point the existing case
+    at it: a fragment a page only prints does not resolve, and one a heading on
+    that page carries does. The case passing while the check reads the raw
+    source again is what it has to stop
+  - From: Code Review Override - the case that holds the anchor check
 
 ## Game UI/UX
 
@@ -655,4 +646,29 @@ how the simulator got here rather than as a list still to be worked.
   - **Goal**: Carry the suffix on until it names an anchor no heading on the
     page has taken. Hold it with a test of `anchors()` itself, which is
     exported and which nothing exercises directly
+  - From: Code Review Override - the reference page's own checks
+- [x] The `1.12.3-alpha` entry is ordered against the file's own convention
+  - **Issue**: It heads `### Fixed` before `### Changed`. Every other entry in
+    `CHANGELOG.md` carrying both puts `### Changed` first - `1.12.1-alpha` and
+    `1.12.0-alpha` each run Added, Changed, Fixed - which is the Keep a
+    Changelog order the file's own header cites
+  - **Goal**: Move the `### Changed` section above `### Fixed` in the
+    `1.12.3-alpha` entry, leaving both bodies as they are
+  - From: Code Review Override - the checks the id fix left behind
+- [x] The duplicate id check reads sample markup as markup
+  - **Issue**: The fix taught `no page gives the same id to two things` to read
+    `linkable()` first, and the comment it was given says the scan does that
+    "the way every other check here does". The check above it does not: `every
+    anchor a page links to is an id that page has` still asks whether the
+    unstripped source `includes` the literal text `id="<fragment>"`, so
+    `test/site.test.js` now holds two answers to what an id is. On a page whose
+    only `id="app"` sits inside a printed sample, `idsOn()` says the page hands
+    out no such address and the anchor check says it has one. Give `docs/api.md`
+    a worked example printing `<div id="app">` and a line linking `#app`, and
+    `npm test` passes on a link that scrolls nowhere. No page prints an id
+    today, so nothing reaches it yet, which is why it was left rather than fixed
+  - **Goal**: Resolve a fragment against `idsOn(target_source)` rather than
+    against the raw source, lifting `idsOn` above the check that uses it, and
+    hold it with a case of its own: an anchor into a sample block is not an
+    address the page offers
   - From: Code Review Override - the reference page's own checks
