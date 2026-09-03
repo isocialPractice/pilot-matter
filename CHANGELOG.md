@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.5-alpha] - 2026-09-03
+
+The case standing over the anchor check now holds the resolution that check
+runs, rather than the helpers underneath it.
+
+### Fixed
+
+- **Nothing failed when the anchor check came apart.** Last release taught
+  `every anchor a page links to is an id that page has` to resolve a fragment
+  through `idsOn()`, so a page whose only `id="app"` sits inside a printed
+  sample no longer answers a link to `#app`. What was added to hold it does
+  not: `an anchor into a sample block is not an address the page offers`
+  asserted on `idsOn()` and `sameePageAnchors()` directly and never on the
+  resolution that reads them, so putting that line back to the raw `includes`
+  left all 28 checks in `test/site.test.js` passing and the fix silently gone.
+  This is the third release running to move this pair, and nothing yet failed
+  when they came apart, which is the reason they kept coming apart. The
+  per-anchor resolution is now `resolvesOn()`, lifted out of the loop the way
+  `opensInBrowser` and `idsOn` were each lifted, and the case asserts on that
+  rather than on the helpers under it: a fragment a page only prints does not
+  resolve, and one a heading on that page carries does. A `resolvesOn()` that
+  reads the raw source again fails the case now. The line that calls it does
+  not: a check inlining that read again leaves `resolvesOn()` behind, unused,
+  and all 28 checks still pass, which is the shape this pair came apart in
+  before and is queued as the next thing to hold
+
 ## [1.12.4-alpha] - 2026-09-02
 
 The two checks that read an id now read the same one, and the release notes

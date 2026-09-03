@@ -209,6 +209,20 @@ test('every link on every page reaches a file that exists', () => {
     }
 });
 
+/**
+ * Whether a fragment names an address a page hands out.
+ *
+ * One line, and the lift is the whole point of it. The check below resolved
+ * each anchor inline, so the case standing beside it could only reach the
+ * helpers underneath - `idsOn` and `sameePageAnchors` - and never the
+ * resolution they were read by. Putting that line back to the raw `includes`
+ * it used before left every check in this file passing and the fix gone, which
+ * is how this pair came apart three releases running. Named, it is a thing a
+ * case can assert on, the way `opensInBrowser` and `idsOn` were each lifted out
+ * of the checks that read them.
+ */
+const resolvesOn = (fragment, source) => idsOn(source).includes(fragment);
+
 test('every anchor a page links to is an id that page has', () => {
     for (const [page, source] of sources) {
         const from = dirname(join(ROOT, page));
@@ -224,7 +238,7 @@ test('every anchor a page links to is an id that page has', () => {
                 ? source
                 : readFileSync(path, 'utf8');
 
-            assert.ok(idsOn(target_source).includes(fragment),
+            assert.ok(resolvesOn(fragment, target_source),
                 `${page} links #${fragment} in ${file || 'itself'}, which has no such id`);
         }
     }
@@ -236,24 +250,30 @@ function sameePageAnchors(source) {
         .filter(anchor => anchor !== '#content');
 }
 
-// The pair the check above compares, on a page that prints an id rather than
+// The resolution the check above runs, on a page that prints an id rather than
 // hands one out. It used to ask the raw source whether it carried the text
 // `id="app"`, which a printed `<div id="app">` answers for a page offering no
 // such address, so a link to `#app` passed while scrolling nowhere. No page on
 // the site prints an id today, and the first worked example to print one would
 // have been what found that out.
+//
+// This asserts on `resolvesOn` rather than on the helpers under it, so a
+// `resolvesOn` that reads the raw source again fails here rather than passing
+// quietly. The line that calls it is not held yet: a check inlining that read
+// again leaves `resolvesOn` behind, unused, and this case goes on reading it
+// and passing - 28 green checks over a fix that is gone, which is the shape
+// this pair came apart in before. Holding that wants the loop above lifted
+// into something a case can run, rather than the one line inside it.
 test('an anchor into a sample block is not an address the page offers', () => {
     const page = '<h2 id="worked-example">Worked example</h2>\n'
         + '<p><a href="#app">the element it mounts on</a></p>\n'
         + '<pre><code>&lt;div id="app"&gt;&lt;/div&gt;</code></pre>';
 
-    const offered = idsOn(page);
-
     assert.deepEqual(sameePageAnchors(page), ['#app'],
         'the page links a fragment only its sample carries');
-    assert.ok(offered.includes('worked-example'),
+    assert.ok(resolvesOn('worked-example', page),
         'a heading is an address a link reaches');
-    assert.ok(!offered.includes('app'),
+    assert.ok(!resolvesOn('app', page),
         'an id inside a sample is text to read rather than a place to scroll to');
     assert.ok(page.includes('id="app"'),
         'though the source carries that text, which is what the check used to read');
