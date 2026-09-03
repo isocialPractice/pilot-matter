@@ -30,26 +30,32 @@ its context survives being archived.
   only one the pilot has ever seen
   - From: Game Modes
 
-### Code Review Override - the case that holds the anchor check
+### Code Review Override - the line that calls the anchor resolution
+
+#### Resolve Issues
 
 - [ ] The case added for the anchor fix holds its parts rather than the check
-  - **Issue**: The fix itself is right - `every anchor a page links to is an id
-    that page has` resolves through `idsOn()` now, so a page whose only
-    `id="app"` sits inside a printed sample no longer answers a link to `#app`.
-    What was added to hold it does not. `an anchor into a sample block is not an
-    address the page offers` asserts on `idsOn()` and `sameePageAnchors()`
-    directly and never on the check that reads them, so putting that line back
-    to the raw `includes` it used before leaves all 28 checks in
-    `test/site.test.js` passing and the fix silently gone. Verified by making
-    that edit and running `node --test test/site.test.js`: 28 pass, 0 fail. This
-    is the third release running to move this pair of checks, and nothing yet
-    fails when they come apart, which is the reason they keep coming apart
-  - **Goal**: Hold the check rather than the helpers under it. Lift the
-    per-anchor resolution out of the loop into a named function, the way
-    `opensInBrowser` and `idsOn` were each lifted, and point the existing case
-    at it: a fragment a page only prints does not resolve, and one a heading on
-    that page carries does. The case passing while the check reads the raw
-    source again is what it has to stop
+  - **Issue**: The lift is right and holds half of what comes apart. Editing
+    `resolvesOn` at `test/site.test.js:224` back to
+    ``source.includes(`id="${fragment}"`)`` now fails `an anchor into a sample
+    block is not an address the page offers`, verified: 27 pass, 1 fail. The
+    line that calls it is still unheld, and it is the line this pair has come
+    apart on. Replacing `test/site.test.js:241` with
+    ``assert.ok(target_source.includes(`id="${fragment}"`),`` leaves
+    `resolvesOn` defined, unused, and read only by the case, which goes on
+    passing: verified 28 pass, 0 fail, the fix silently gone for the fourth
+    release running. Before `1.12.4-alpha` the raw read sat at exactly that
+    call site, so this is the shape it reverts to
+  - **Goal**: Give the resolution one home the case runs end to end. Lift the
+    per-anchor loop out of `every anchor a page links to is an id that page
+    has` into a named function taking a page, its source, and a way to read a
+    linked page - returning the anchors that resolve nowhere - so the check
+    becomes a call on it and the case can run that same function over the
+    synthetic sample page and assert `#app` comes back unresolved while a
+    heading's own fragment does not. Then there is no line left between the
+    check and the case for a raw read to move back into. Correct the comment
+    at `test/site.test.js:260` and the `1.12.5-alpha` note, both of which
+    record this gap as open
   - From: Code Review Override - the case that holds the anchor check
 
 ## Game UI/UX
@@ -672,3 +678,22 @@ how the simulator got here rather than as a list still to be worked.
     hold it with a case of its own: an anchor into a sample block is not an
     address the page offers
   - From: Code Review Override - the reference page's own checks
+- [x] The case added for the anchor fix holds its parts rather than the check
+  - **Issue**: The fix itself is right - `every anchor a page links to is an id
+    that page has` resolves through `idsOn()` now, so a page whose only
+    `id="app"` sits inside a printed sample no longer answers a link to `#app`.
+    What was added to hold it does not. `an anchor into a sample block is not an
+    address the page offers` asserts on `idsOn()` and `sameePageAnchors()`
+    directly and never on the check that reads them, so putting that line back
+    to the raw `includes` it used before leaves all 28 checks in
+    `test/site.test.js` passing and the fix silently gone. Verified by making
+    that edit and running `node --test test/site.test.js`: 28 pass, 0 fail. This
+    is the third release running to move this pair of checks, and nothing yet
+    fails when they come apart, which is the reason they keep coming apart
+  - **Goal**: Hold the check rather than the helpers under it. Lift the
+    per-anchor resolution out of the loop into a named function, the way
+    `opensInBrowser` and `idsOn` were each lifted, and point the existing case
+    at it: a fragment a page only prints does not resolve, and one a heading on
+    that page carries does. The case passing while the check reads the raw
+    source again is what it has to stop
+  - From: Code Review Override - the case that holds the anchor check
