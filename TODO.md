@@ -30,33 +30,41 @@ its context survives being archived.
   only one the pilot has ever seen
   - From: Game Modes
 
-### Code Review Override - the line that calls the anchor resolution
+### Code Review Override - the linked page the anchor resolution never reads
 
-#### Resolve Issues
-
-- [ ] The case added for the anchor fix holds its parts rather than the check
-  - **Issue**: The lift is right and holds half of what comes apart. Editing
-    `resolvesOn` at `test/site.test.js:224` back to
-    ``source.includes(`id="${fragment}"`)`` now fails `an anchor into a sample
-    block is not an address the page offers`, verified: 27 pass, 1 fail. The
-    line that calls it is still unheld, and it is the line this pair has come
-    apart on. Replacing `test/site.test.js:241` with
-    ``assert.ok(target_source.includes(`id="${fragment}"`),`` leaves
-    `resolvesOn` defined, unused, and read only by the case, which goes on
-    passing: verified 28 pass, 0 fail, the fix silently gone for the fourth
-    release running. Before `1.12.4-alpha` the raw read sat at exactly that
-    call site, so this is the shape it reverts to
-  - **Goal**: Give the resolution one home the case runs end to end. Lift the
-    per-anchor loop out of `every anchor a page links to is an id that page
-    has` into a named function taking a page, its source, and a way to read a
-    linked page - returning the anchors that resolve nowhere - so the check
-    becomes a call on it and the case can run that same function over the
-    synthetic sample page and assert `#app` comes back unresolved while a
-    heading's own fragment does not. Then there is no line left between the
-    check and the case for a raw read to move back into. Correct the comment
-    at `test/site.test.js:260` and the `1.12.5-alpha` note, both of which
-    record this gap as open
-  - From: Code Review Override - the case that holds the anchor check
+- [ ] The case runs the anchor resolution without ever letting it read a linked
+  page
+  - **Issue**: The lift is right and the case now runs the whole resolution, so
+    a raw read put anywhere inside `unresolvedAnchors` fails it - verified by
+    replacing `test/site.test.js:244` with
+    ``target_source.includes(`id="${fragment}"`)``: 27 pass, 1 fail, and the one
+    that fails is the case. One branch of that resolution is outside what the
+    case reaches. `unresolvedAnchors` takes `readPage` so a case can answer it,
+    which the comment at `test/site.test.js:227` states outright, and the case
+    answers with `nothingOffPage` at `test/site.test.js:285`, which asserts the
+    reader is never called. Every anchor on its synthetic page is a same-page
+    one, so `test/site.test.js:242` always takes the `path === here` branch and
+    a case has never once run the half that reads another page's ids. What runs
+    it is the site: `docs/controls/settings.html:99` links
+    `../terrain.html#environments` and `docs/controls/instruments.html:115`
+    links `../terrain.html#the-edge-of-the-world`, and those are the only two
+    cross-page anchors on twenty-two pages. Replacing `test/site.test.js:242`
+    with `const target_source = source;`, which resolves every anchor against
+    the page that links it rather than the page it points at, leaves the case
+    passing and fails only `every anchor a page links to is an id that page
+    has`, verified: 27 pass, 1 fail. So that branch is held by two links in the
+    documentation rather than by anything in the suite, and an edit that drops
+    the fragment from both leaves it held by nothing
+  - **Goal**: Hold the linked-page branch the way `a folder is a page the
+    browser opens, and a document is still a download` holds a form no page
+    carries yet, rather than waiting on the site to keep carrying it. Give the
+    case a second page to link and a `readPage` that returns that page's source:
+    an anchor into a sample block the linked page prints comes back unresolved,
+    and one into a heading the linked page really carries does not. Then
+    `readPage` is a seam a case takes rather than one it asserts is never taken,
+    and resolving a fragment against the wrong source fails the case rather than
+    only the check
+  - From: Code Review Override - the linked page the anchor resolution never reads
 
 ## Game UI/UX
 
@@ -696,4 +704,27 @@ how the simulator got here rather than as a list still to be worked.
     at it: a fragment a page only prints does not resolve, and one a heading on
     that page carries does. The case passing while the check reads the raw
     source again is what it has to stop
+  - From: Code Review Override - the case that holds the anchor check
+- [x] The case added for the anchor fix holds its parts rather than the check
+  - **Issue**: The lift is right and holds half of what comes apart. Editing
+    `resolvesOn` at `test/site.test.js:224` back to
+    ``source.includes(`id="${fragment}"`)`` now fails `an anchor into a sample
+    block is not an address the page offers`, verified: 27 pass, 1 fail. The
+    line that calls it is still unheld, and it is the line this pair has come
+    apart on. Replacing `test/site.test.js:241` with
+    ``assert.ok(target_source.includes(`id="${fragment}"`),`` leaves
+    `resolvesOn` defined, unused, and read only by the case, which goes on
+    passing: verified 28 pass, 0 fail, the fix silently gone for the fourth
+    release running. Before `1.12.4-alpha` the raw read sat at exactly that
+    call site, so this is the shape it reverts to
+  - **Goal**: Give the resolution one home the case runs end to end. Lift the
+    per-anchor loop out of `every anchor a page links to is an id that page
+    has` into a named function taking a page, its source, and a way to read a
+    linked page - returning the anchors that resolve nowhere - so the check
+    becomes a call on it and the case can run that same function over the
+    synthetic sample page and assert `#app` comes back unresolved while a
+    heading's own fragment does not. Then there is no line left between the
+    check and the case for a raw read to move back into. Correct the comment
+    at `test/site.test.js:260` and the `1.12.5-alpha` note, both of which
+    record this gap as open
   - From: Code Review Override - the case that holds the anchor check
