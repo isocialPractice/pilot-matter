@@ -210,36 +210,49 @@ test('every link on every page reaches a file that exists', () => {
 });
 
 /**
- * Whether a fragment names an address a page hands out.
+ * Every anchor a page links that reaches no id, as the `{ file, fragment }`
+ * pairs that resolve nowhere. An empty list is a page whose links all land.
  *
- * One line, and the lift is the whole point of it. The check below resolved
- * each anchor inline, so the case standing beside it could only reach the
- * helpers underneath - `idsOn` and `sameePageAnchors` - and never the
- * resolution they were read by. Putting that line back to the raw `includes`
- * it used before left every check in this file passing and the fix gone, which
- * is how this pair came apart three releases running. Named, it is a thing a
- * case can assert on, the way `opensInBrowser` and `idsOn` were each lifted out
- * of the checks that read them.
+ * The lift is the whole point of it. The check below did this inline, so the
+ * case standing beside it could only reach the helpers underneath - `idsOn`
+ * and `sameePageAnchors` - and never the resolution that read them. Naming
+ * that resolution as a line of its own was not enough either: a check inlining
+ * the raw `includes` again left the named line behind, unused and still read
+ * by the case, which went on passing over a fix that was gone. So the whole
+ * resolution lives here, the check is a call on it, and the case is the same
+ * call over a page of its own - there is no line between the two left for a
+ * raw read to move back into, which is what this pair came apart on three
+ * releases running.
+ *
+ * `readPage` is how a page linked from this one is read, which the check
+ * answers with the filesystem and a case answers with whatever it wants read.
  */
-const resolvesOn = (fragment, source) => idsOn(source).includes(fragment);
+function unresolvedAnchors(page, source, readPage) {
+    const here = join(ROOT, page);
+    const from = dirname(here);
+    const unresolved = [];
+
+    for (const target of [...localTargets(source), ...sameePageAnchors(source)]) {
+        const [file, fragment] = target.split('#');
+        if (!fragment) continue;
+
+        const path = file === '' ? here : resolve(from, file);
+        if (!path.endsWith('.html')) continue;
+
+        const target_source = path === here ? source : readPage(path);
+
+        if (!idsOn(target_source).includes(fragment)) unresolved.push({ file, fragment });
+    }
+
+    return unresolved;
+}
 
 test('every anchor a page links to is an id that page has', () => {
+    const readPage = (path) => readFileSync(path, 'utf8');
+
     for (const [page, source] of sources) {
-        const from = dirname(join(ROOT, page));
-
-        for (const target of [...localTargets(source), ...sameePageAnchors(source)]) {
-            const [file, fragment] = target.split('#');
-            if (!fragment) continue;
-
-            const path = file === '' ? join(ROOT, page) : resolve(from, file);
-            if (!path.endsWith('.html')) continue;
-
-            const target_source = path === join(ROOT, page)
-                ? source
-                : readFileSync(path, 'utf8');
-
-            assert.ok(resolvesOn(fragment, target_source),
-                `${page} links #${fragment} in ${file || 'itself'}, which has no such id`);
+        for (const { file, fragment } of unresolvedAnchors(page, source, readPage)) {
+            assert.fail(`${page} links #${fragment} in ${file || 'itself'}, which has no such id`);
         }
     }
 });
@@ -250,31 +263,32 @@ function sameePageAnchors(source) {
         .filter(anchor => anchor !== '#content');
 }
 
-// The resolution the check above runs, on a page that prints an id rather than
-// hands one out. It used to ask the raw source whether it carried the text
-// `id="app"`, which a printed `<div id="app">` answers for a page offering no
-// such address, so a link to `#app` passed while scrolling nowhere. No page on
-// the site prints an id today, and the first worked example to print one would
+// The check above, run over a page that prints an id rather than hands one
+// out. It used to ask the raw source whether it carried the text `id="app"`,
+// which a printed `<div id="app">` answers for a page offering no such
+// address, so a link to `#app` passed while scrolling nowhere. No page on the
+// site prints an id today, and the first worked example to print one would
 // have been what found that out.
 //
-// This asserts on `resolvesOn` rather than on the helpers under it, so a
-// `resolvesOn` that reads the raw source again fails here rather than passing
-// quietly. The line that calls it is not held yet: a check inlining that read
-// again leaves `resolvesOn` behind, unused, and this case goes on reading it
-// and passing - 28 green checks over a fix that is gone, which is the shape
-// this pair came apart in before. Holding that wants the loop above lifted
-// into something a case can run, rather than the one line inside it.
+// This runs `unresolvedAnchors` end to end rather than the helpers under it,
+// and so does the check, so the two now share every line of the resolution: a
+// raw read put back anywhere in it answers `#app` here and fails this case.
+// That is the gap three releases left open. The fix could be undone with all
+// 28 checks still green, because whatever the case asserted on and whatever
+// the check ran were never quite the same thing.
 test('an anchor into a sample block is not an address the page offers', () => {
     const page = '<h2 id="worked-example">Worked example</h2>\n'
         + '<p><a href="#app">the element it mounts on</a></p>\n'
+        + '<p><a href="#worked-example">and the section carrying it</a></p>\n'
         + '<pre><code>&lt;div id="app"&gt;&lt;/div&gt;</code></pre>';
 
-    assert.deepEqual(sameePageAnchors(page), ['#app'],
-        'the page links a fragment only its sample carries');
-    assert.ok(resolvesOn('worked-example', page),
-        'a heading is an address a link reaches');
-    assert.ok(!resolvesOn('app', page),
-        'an id inside a sample is text to read rather than a place to scroll to');
+    const nothingOffPage = () => assert.fail('the sample page links nothing but itself');
+
+    assert.deepEqual(unresolvedAnchors('docs/sample.html', page, nothingOffPage),
+        [{ file: '', fragment: 'app' }],
+        'an id inside a sample is text to read rather than a place to scroll to, '
+        + 'while the heading beside it is an address a link reaches');
+
     assert.ok(page.includes('id="app"'),
         'though the source carries that text, which is what the check used to read');
 });

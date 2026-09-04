@@ -5,6 +5,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.6-alpha] - 2026-09-04
+
+The anchor check and the case standing over it are one call now, so the
+resolution has a single home and nothing is left between them for a raw read to
+move back into.
+
+### Changed
+
+- **The `1.12.5-alpha` notes no longer close on work still to do.** Their last
+  sentence recorded the unheld call site as the next thing to hold, which it was
+  for a day. It now names the release that held it, so the entry reads as the
+  account of what that release did rather than as a promise about the one after
+
+### Fixed
+
+- **The line that called the anchor resolution was still unheld.** Last release
+  named that resolution `resolvesOn()` and pointed `an anchor into a sample block
+  is not an address the page offers` at it, so a `resolvesOn()` reading the raw
+  source again failed. The line calling it was another matter: replacing it with
+  the raw ``target_source.includes(`id="${fragment}"`)`` left `resolvesOn()`
+  defined, unused, and read only by the case, which went on passing. That is 28
+  green checks over a fix that is gone, for the fourth release running, and it is
+  the shape the raw read sat in before `1.12.4-alpha`, so it is the shape this
+  reverts to. The per-anchor loop is now `unresolvedAnchors()`, taking a page,
+  its source, and a way to read a page linked from it, and returning the anchors
+  that resolve nowhere. The check is a call on it, and the case is the same call
+  over a synthetic page that prints `<div id="app">` in a sample and links
+  `#app`: the printed id comes back unresolved while the heading's own fragment
+  does not. There is no line left between the check and the case, and a raw read
+  put anywhere inside the resolution now fails the case, verified by making that
+  edit - 27 pass, 1 fail, where the same edit left all 28 passing before
+
 ## [1.12.5-alpha] - 2026-09-03
 
 The case standing over the anchor check now holds the resolution that check
@@ -29,7 +61,8 @@ runs, rather than the helpers underneath it.
   reads the raw source again fails the case now. The line that calls it does
   not: a check inlining that read again leaves `resolvesOn()` behind, unused,
   and all 28 checks still pass, which is the shape this pair came apart in
-  before and is queued as the next thing to hold
+  before. `1.12.6-alpha` closed that, putting the whole resolution behind one
+  call the case runs end to end
 
 ## [1.12.4-alpha] - 2026-09-02
 
