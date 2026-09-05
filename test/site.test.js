@@ -276,6 +276,10 @@ function sameePageAnchors(source) {
 // That is the gap three releases left open. The fix could be undone with all
 // 28 checks still green, because whatever the case asserted on and whatever
 // the check ran were never quite the same thing.
+//
+// Every anchor on the page below is a same-page one, so this is the
+// `path === here` half of the resolution, and `nothingOffPage` is what says
+// so. The half that reads another page is the case after it.
 test('an anchor into a sample block is not an address the page offers', () => {
     const page = '<h2 id="worked-example">Worked example</h2>\n'
         + '<p><a href="#app">the element it mounts on</a></p>\n'
@@ -291,6 +295,39 @@ test('an anchor into a sample block is not an address the page offers', () => {
 
     assert.ok(page.includes('id="app"'),
         'though the source carries that text, which is what the check used to read');
+});
+
+// The other half, held the way `a folder is a page the browser opens, and a
+// document is still a download` holds a form no page carries yet. `readPage`
+// is a seam a case can take, but until now every case answered it with a
+// failure and every anchor it was given was a same-page one, so the branch
+// that reads another page's ids ran only against the site. Two links carried
+// it - docs/controls/settings.html to `terrain.html#environments` and
+// docs/controls/instruments.html to `terrain.html#the-edge-of-the-world`, the
+// only cross-page anchors on twenty-two pages - and an edit dropping the
+// fragment from both would have left it held by nothing.
+//
+// So the seam is taken here, and which page a fragment is resolved against is
+// what the case reads: resolving against the page that links rather than the
+// page linked leaves the heading unresolved and fails this.
+test('an anchor into another page is an id that page has, not one this page has', () => {
+    const page = '<h2 id="the-way-out">The way out</h2>\n'
+        + '<p><a href="linked.html#the-edge-of-the-world">a heading the other page carries</a></p>\n'
+        + '<p><a href="linked.html#app">and an id it only prints</a></p>';
+
+    const linked = '<h2 id="the-edge-of-the-world">The edge of the world</h2>\n'
+        + '<pre><code>&lt;div id="app"&gt;&lt;/div&gt;</code></pre>';
+
+    const readPage = (path) => {
+        assert.equal(path, join(ROOT, 'docs/linked.html'),
+            'the page read should be the page the anchor points at');
+        return linked;
+    };
+
+    assert.deepEqual(unresolvedAnchors('docs/sample.html', page, readPage),
+        [{ file: 'linked.html', fragment: 'app' }],
+        'a fragment the linked page only prints resolves nowhere, while one its '
+        + 'own heading carries resolves there');
 });
 
 // An id is only an address if it names one place, and the anchor check only asks

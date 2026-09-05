@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.7-alpha] - 2026-09-05
+
+Both halves of the anchor resolution are held by a case now, so which page a
+fragment is read against is something the suite fails on rather than something
+the documentation happens to carry.
+
+### Fixed
+
+- **The case ran the anchor resolution without ever letting it read a linked
+  page.** Last release made `unresolvedAnchors()` the one home the check and the
+  case both run, so a raw read put anywhere inside it fails the case - verified,
+  27 pass and 1 fail. Which page that read is made against was another matter.
+  `unresolvedAnchors()` takes `readPage` so a case can answer it, and the case
+  answered with `nothingOffPage`, which asserts the reader is never called: every
+  anchor on its synthetic page is a same-page one, so the resolution always took
+  the `path === here` branch and no case had once run the half that reads another
+  page's ids. What ran it was the site - `docs/controls/settings.html` links
+  `../terrain.html#environments` and `docs/controls/instruments.html` links
+  `../terrain.html#the-edge-of-the-world`, the only two cross-page anchors on
+  twenty-two pages - so resolving every fragment against the page that links it
+  rather than the page it points at left the case passing and failed only the
+  check, verified at 27 pass and 1 fail, and an edit dropping the fragment from
+  both links would have left that branch held by nothing at all. `an anchor into
+  another page is an id that page has, not one this page has` takes the seam
+  instead, the way `a folder is a page the browser opens, and a document is still
+  a download` holds a form no page carries yet: it links a second page, answers
+  `readPage` with that page's source, and asserts the fragment the linked page
+  only prints inside a sample comes back unresolved while the one its own heading
+  carries does not. Resolving against the linking page now fails the case as well
+  as the check, at 27 pass and 2 fail, and skipping cross-page anchors
+  altogether - which the site cannot notice, its own two being sound - fails the
+  case alone
+
 ## [1.12.6-alpha] - 2026-09-04
 
 The anchor check and the case standing over it are one call now, so the
