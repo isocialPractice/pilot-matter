@@ -13,6 +13,7 @@ import { MINIMAP_SIZE } from '../js/minimap.js';
 import { LOADING_STEPS, LOADING_FADE_MS } from '../js/loading.js';
 import { MUTE_KEY } from '../js/audio.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
+import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 
 const indexHtml = readFileSync(
@@ -45,7 +46,7 @@ const scripts = collectScripts(scriptDir);
 // Every menu drawn into the page: the two cards, the panels they open, and the
 // three lists one panel is split across.
 const MENU_LISTS = [
-    'start-menu', 'pause-menu', 'game-modes-menu',
+    'start-menu', 'pause-menu', 'game-modes-menu', 'element-editor-menu',
     'settings-menu', 'settings-start', 'settings-options'
 ];
 
@@ -129,8 +130,9 @@ test('the warning overlays start hidden and wait for the flight to trip them', (
 // screen. Starting hidden means a page whose scripts never arrive shows an
 // honest nothing rather than a HUD reading zero over an empty world.
 test('the overlays the simulator places start hidden and wait to be placed', () => {
-    for (const id of ['title-screen', 'paused', 'settings', 'game-modes', 'game-mode',
-        'hud', 'attitude', 'minimap', 'audio-muted', 'controls-help', 'controls-help-hint']) {
+    for (const id of ['title-screen', 'paused', 'settings', 'game-modes', 'element-editor',
+        'game-mode', 'hud', 'attitude', 'minimap', 'audio-muted', 'controls-help',
+        'controls-help-hint']) {
         const rule = styleRule(indexHtml, id);
         assert.ok(rule, `index.html should style #${id}`);
         assert.ok(/display:\s*none/.test(rule), `#${id} should start hidden`);
@@ -227,6 +229,9 @@ test('the control list names the keys the flight is worked with', () => {
     assert.ok(list[1].includes(`${MUTE_KEY.replace('Key', '')} -`), 'including the one that mutes the sound');
     for (const code of SETTINGS_OPEN_KEYS) {
         assert.ok(list[1].includes(`${code.replace('Key', '')} -`), 'and the one that opens the settings');
+    }
+    for (const code of EDITOR_OPEN_KEYS) {
+        assert.ok(list[1].includes(`${code.replace('Key', '')} -`), 'and the one that opens the element editor');
     }
     assert.ok(list[1].includes(`${PHOTO_KEY} -`), 'and the one that takes a picture');
 });
@@ -380,4 +385,79 @@ test('the attitude indicator is clipped to the face its marks are drawn on', () 
     const clip = indexHtml.match(/<clipPath id="attitude-face">\s*<circle[^>]*r="(\d+)"/);
     assert.ok(clip, 'index.html should clip the instrument to a round face');
     assert.equal(Number(clip[1]), FACE_RADIUS, 'the drawn face and the face in js/attitude.js should be one size');
+});
+
+// --- The element editor's panel -------------------------------------------
+
+test('the element editor is titled and says what it is listing', () => {
+    assert.ok(indexHtml.includes(EDITOR_TITLE), 'the panel should carry its title');
+    assert.ok(indexHtml.includes(EDITOR_HEADING), 'and say what the list under it is');
+});
+
+test('the panel says how it is worked, including the keys that step a range', () => {
+    const panel = indexHtml.slice(indexHtml.indexOf('id="element-editor"'));
+    const hint = panel.slice(0, panel.indexOf('</div>'));
+
+    assert.ok(/A\/D/.test(hint), 'the keys that step a range should be named');
+    assert.ok(/ESC/.test(hint), 'and the way out of the panel');
+});
+
+// A range sits under the element it belongs to, or the list reads as one run
+// of rows rather than as elements with their ranges.
+test('a range row is drawn in under the element it belongs to', () => {
+    assert.ok(styled(indexHtml, '#element-editor-menu li[data-kind="range"]', /padding-left/),
+        'a range should be indented under its element');
+});
+
+// --- The card the objective is written onto -------------------------------
+
+test('the objective card carries the clock and the pointer the run writes to', () => {
+    for (const id of ['game-mode-clock', 'game-mode-pointer']) {
+        assert.ok(indexHtml.includes(`id="${id}"`), `index.html is missing id="${id}"`);
+    }
+});
+
+// A gate the pilot can see is not pointed at, so the line has to be able to be
+// off - which means starting off, before the run has said anything.
+test('the gate pointer starts off and waits for a gate to point at', () => {
+    assert.ok(/display:\s*none/.test(styleRule(indexHtml, 'game-mode-pointer') ?? ''),
+        '#game-mode-pointer should start hidden');
+});
+
+// --- The course on the chart ----------------------------------------------
+
+test('the chart carries the course the minimap draws into', () => {
+    for (const id of ['minimap-course', 'minimap-course-line']) {
+        assert.ok(indexHtml.includes(`id="${id}"`), `index.html is missing id="${id}"`);
+    }
+});
+
+// The aircraft is what the chart is for, so a gate is never drawn over it.
+test('the course is drawn under the marker rather than over it', () => {
+    assert.ok(indexHtml.indexOf('id="minimap-course"') < indexHtml.indexOf('id="minimap-aircraft"'),
+        'the course group should come before the marker in the chart');
+});
+
+/**
+ * The chart and the world both draw the gate the course is waiting on, and a
+ * pilot reading one against the other should not find them disagreeing. The
+ * hoops are meshes and their module imports Three.js, so the colours it draws
+ * them in are read off its source rather than by loading it.
+ */
+test('a gate on the chart is the colour the hoop it stands for is', () => {
+    const rings = readFileSync(fileURLToPath(new URL('../js/rings.js', import.meta.url)), 'utf8');
+    const hex = (name) => rings.match(new RegExp(`${name}\\s*=\\s*0x([0-9a-fA-F]{6})`))?.[1];
+
+    const readings = [
+        ['.minimap-gate',       'RING_COLOR'],
+        ['.minimap-gate.next',  'RING_NEXT_COLOR'],
+        ['.minimap-gate.flown', 'RING_DONE_COLOR']
+    ];
+
+    for (const [selector, name] of readings) {
+        const color = hex(name);
+        assert.ok(color, `js/rings.js should name ${name}`);
+        assert.ok(styled(indexHtml, selector, new RegExp(`fill:\\s*#${color}`, 'i')),
+            `${selector} should be drawn in ${name}`);
+    }
 });

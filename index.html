@@ -199,6 +199,26 @@
             letter-spacing: 1px;
         }
 
+        /* The course being flown, laid on the chart the moment the stage is, so
+           the whole of it is on screen before the first gate is flown at. The
+           three readings are the hoops' own: amber still to fly, green for the
+           one the course is waiting on, and dim green for one already behind. */
+        #minimap-course-line {
+            fill: none;
+            stroke: rgba(255, 176, 0, 0.55);
+            stroke-width: 0.9;
+            stroke-dasharray: 3 2;
+        }
+
+        .minimap-gate       { fill: #ffb000; stroke: #000; stroke-width: 0.4; }
+        .minimap-gate.next  { fill: #00ff44; }
+        .minimap-gate.flown { fill: #2c5c3a; }
+
+        /* A gate past the edge of the square the chart covers is held at that
+           edge, the way the aircraft marker is, and hollowed out so it is not
+           read as a gate standing on the ground shown. */
+        .minimap-gate.off-map { fill: none; stroke: #ffb000; stroke-width: 0.9; }
+
         /* Off the map, the marker is held at the edge it left through, and says
            so rather than reading as a position inside the world. */
         #minimap.off-map .minimap-marker { fill: #ff3b30; }
@@ -285,15 +305,28 @@
             letter-spacing: 2px;
         }
 
-        #game-mode-status {
+        #game-mode-status,
+        #game-mode-clock {
             margin-top: 3px;
             color: #f0f2f3;
             font-size: 11px;
             letter-spacing: 2px;
         }
 
+        /* Which way the gate the course is waiting on lies, when it is not on
+           the screen to be looked at. Amber, like the objective above it,
+           because it is the same instruction read at a different range. */
+        #game-mode-pointer {
+            display: none;
+            margin-top: 4px;
+            color: #ffb000;
+            font-size: 13px;
+            letter-spacing: 2px;
+        }
+
         #settings,
-        #game-modes {
+        #game-modes,
+        #element-editor {
             display: none;
             position: fixed;
             top: 50%;
@@ -316,7 +349,8 @@
         }
 
         #settings h2,
-        #game-modes h2 {
+        #game-modes h2,
+        #element-editor h2 {
             font-size: 26px;
             letter-spacing: 6px;
             padding-left: 6px;
@@ -325,7 +359,8 @@
         /* The headings the panel is divided by. Set large and underlined
            against the rows beneath them, so a panel long enough to scroll is
            read as three sections rather than as one run of entries. */
-        #settings h3 {
+        #settings h3,
+        #element-editor h3 {
             margin-top: 14px;
             color: #f0f2f3;
             font-size: 24pt;
@@ -338,6 +373,7 @@
 
         #settings small,
         #game-modes small,
+        #element-editor small,
         #paused small {
             display: block;
             color: #f0f2f3;
@@ -372,6 +408,7 @@
         #pause-menu,
         #start-menu,
         #game-modes-menu,
+        #element-editor-menu,
         #settings-menu,
         #settings-start,
         #settings-options {
@@ -382,6 +419,7 @@
         #pause-menu li,
         #start-menu li,
         #game-modes-menu li,
+        #element-editor-menu li,
         #settings-menu li,
         #settings-start li,
         #settings-options li {
@@ -404,6 +442,7 @@
         #pause-menu li.selected,
         #start-menu li.selected,
         #game-modes-menu li.selected,
+        #element-editor-menu li.selected,
         #settings-menu li.selected,
         #settings-start li.selected,
         #settings-options li.selected {
@@ -424,17 +463,29 @@
         }
 
         /* Three lists under three headings sit closer together than one list on
-           its own would, so the panel stays as near one screenful as it can. */
+           its own would, so the panel stays as near one screenful as it can.
+           The editor's one list is set the same way for the same reason: it
+           lists every element the world places and the ranges of whichever of
+           them are open. */
         #settings-menu,
         #settings-start,
-        #settings-options {
+        #settings-options,
+        #element-editor-menu {
             margin: 10px 0 8px;
         }
 
         #settings-menu li,
         #settings-start li,
-        #settings-options li {
+        #settings-options li,
+        #element-editor-menu li {
             margin: 2px 0;
+        }
+
+        /* A range sits under the element it belongs to, so the list reads as
+           elements with their ranges rather than as one run of rows. */
+        #element-editor-menu li[data-kind="range"] {
+            padding-left: 32px;
+            font-size: 14px;
         }
 
         /* What is in force, which is not the same thing as what is under the
@@ -442,12 +493,14 @@
            the mode being played are all marked the same way. */
         #settings-menu li.current,
         #settings-start li.current,
+        #element-editor-menu li.current,
         #game-modes-menu li.current {
             border-color: rgba(0, 255, 0, 0.55);
         }
 
         #settings-menu li.current::before,
         #settings-start li.current::before,
+        #element-editor-menu li.current::before,
         #game-modes-menu li.current::before {
             content: '\203A\00a0';
         }
@@ -461,6 +514,7 @@
         #settings-menu li[data-note]::after,
         #settings-start li[data-note]::after,
         #settings-options li[data-note]::after,
+        #element-editor-menu li[data-note]::after,
         #game-modes-menu li[data-note]::after {
             content: attr(data-note);
             display: block;
@@ -601,6 +655,13 @@
         <small>W/S, ↑/↓ OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
+    <div id="element-editor">
+        <h2>ELEMENT EDITOR</h2>
+        <h3>PLACED ELEMENTS</h3>
+        <ul id="element-editor-menu"></ul>
+        <small>W/S OR ↑/↓ TO SELECT &middot; A/D OR ←/→ TO ADJUST &middot; ENTER OR CLICK TO OPEN &middot; ESC TO CLOSE</small>
+    </div>
+
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>
 
     <div id="crashed">CRASHED<small>RESETTING FLIGHT</small></div>
@@ -611,6 +672,8 @@
         <h3 id="game-mode-name"></h3>
         <div id="game-mode-objective"></div>
         <div id="game-mode-status"></div>
+        <div id="game-mode-clock"></div>
+        <div id="game-mode-pointer"></div>
     </div>
 
     <div id="hud">
@@ -628,6 +691,9 @@
             <line class="minimap-grid" x1="-50" y1="0" x2="50" y2="0"></line>
             <line class="minimap-grid" x1="0" y1="-50" x2="0" y2="50"></line>
             <text class="minimap-label" x="0" y="-52" text-anchor="middle">N</text>
+            <g id="minimap-course">
+                <polyline id="minimap-course-line" points=""></polyline>
+            </g>
             <g id="minimap-aircraft" transform="translate(0 0) rotate(0)">
                 <polygon class="minimap-marker" points="0,-5 3.5,4 0,2 -3.5,4"></polygon>
             </g>
@@ -673,6 +739,7 @@
             H - Hide Controls<br>
             M - Mute Audio<br>
             O - Settings<br>
+            L - Element Editor<br>
             P - Pause<br>
             R - Reset Position<br>
             F2 - Photo

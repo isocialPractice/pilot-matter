@@ -106,6 +106,16 @@
 </table>
 </div>
 
+<h2 id="the-clock">The clock</h2>
+
+<p>Every stage is timed, and the card carries both the clock and the best that stage of that mode has ever been flown in:</p>
+
+<pre><code>TIME 0:42.1  &middot;  BEST 0:38.4</code></pre>
+
+<p>The clock runs from the moment a stage is laid out to the moment its objective is met, so neither the beat a finished stage is held on screen for nor a pause halfway down the course is part of the time. A stage started again - by a crash, by <kbd>R</kbd>, or from the pause menu - is timed from nothing, so what is recorded is the attempt that finished rather than everything done on the way there. A stage nobody has flown out reads <code>-:--.-</code> as its best.</p>
+
+<p>When a stage is flown out, the card gives its objective line up for a beat and reports what the attempt came to - <code>NEW BEST</code> when it took the board, <code>STAGE TIME</code> when it did not. Best times are kept per stage per mode in <code>localStorage</code>, so a course already flown is something to beat rather than something to repeat. A browser that refuses storage costs the board its memory and nothing else: the flight goes on and the clock still runs.</p>
+
 <h2 id="runway-landing">Runway Landing</h2>
 
 <p><code>RUNWAY LANDING</code> opens in the air over open country with one strip cut into it. The first stage puts the strip under the nose over flat ground; each one after it opens further out, further off the line back to it, over a shorter strip, in higher country - until the last opens with the runway behind your shoulder in ground you have to read to reach it. A landing counts when it is soft enough and square enough to be one, which is the same rule the rest of the game uses.</p>
@@ -113,6 +123,26 @@
 <h2 id="flying-through-loops">Flying through Loops</h2>
 
 <p><code>FLYING THROUGH LOOPS</code> opens lined up on the first gate of a course laid across a shallow valley. The gate the course is waiting on is lit green, the ones still to come are amber, and the ones behind you are dim. Only the gate the course is up to counts: the objective is the course in order, so flying back through one already behind you, or skipping ahead to one further on, is not progress. Each stage lays more gates, tighter, closer together, on a course that bends more.</p>
+
+<h3 id="seeing-the-course">Seeing the whole course</h3>
+
+<p>The whole course is drawn on the <a href="../controls/instruments.html#the-minimap">minimap</a> the moment the stage is laid out, in the same three colours the hoops are drawn in. It is on screen before you have flown anything, so the first gate is not the only one you have ever seen and which way the course runs is something to read rather than to remember. A gate past the edge of the square the chart covers is held hollow at that edge.</p>
+
+<h3 id="finding-the-next-gate">Finding the next gate</h3>
+
+<p>While the gate the course is waiting on is more than 35 degrees off the nose - far enough off to be nowhere on the screen whatever shape the window is - the card points at it:</p>
+
+<pre><code>&uarr; LOOP 3  &middot;  045&deg;  &middot;  4200 ft</code></pre>
+
+<p>An arrow for which way to turn, the compass bearing to fly, and how far there is to go, on whichever scale the <a href="../controls/settings.html">altimeter</a> is set to. It goes away the moment the gate is in front of you, because a gate on the screen is already pointing at itself.</p>
+
+<h3 id="a-gate-gone-past">A gate gone past</h3>
+
+<p>Cross a gate's plane outside the hoop, going the way the course runs, and the card says so for a few seconds:</p>
+
+<pre><code>LOOP 3 MISSED  &middot;  COME ROUND AGAIN</code></pre>
+
+<p>Nothing about the run moves: the course is still waiting on that gate, which is what lets it be flown again. What the miss buys is being told, rather than circling a course that has quietly stopped counting. Turning round and coming back through the plane on the way to lining the gate up again is the turn rather than a second miss - only the direction the course runs counts. Flying a loop backwards, on the other hand, is still flying it: a loop is a loop from both sides.</p>
 
             <nav class="page-nav" aria-label="Nearby pages">
                 <a href="../controls/settings.html" rel="prev">&#8592; Settings</a>
