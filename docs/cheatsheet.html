@@ -107,6 +107,7 @@
         <tr><td><kbd>C</kbd></td><td>Cycle camera: chase, cockpit, orbit</td></tr>
         <tr><td><kbd>P</kbd></td><td>Pause, and the pause menu</td></tr>
         <tr><td><kbd>O</kbd></td><td>Settings panel, and close it</td></tr>
+        <tr><td><kbd>L</kbd></td><td>Element editor, and close it</td></tr>
         <tr><td><kbd>M</kbd></td><td>Mute the engine and wind</td></tr>
         <tr><td><kbd>H</kbd></td><td>Collapse the control list</td></tr>
         <tr><td><kbd>Tab</kbd></td><td>Show or hide the instruments</td></tr>
@@ -216,6 +217,23 @@
 
 <p>Pipeline order: landforms, ground cover, water, cuts and built things, snow, runway last.</p>
 
+<h2 id="element-editor-cheat">Element editor</h2>
+
+<p><kbd>L</kbd> opens the world being flown as the elements it was assembled from. <kbd>Enter</kbd> opens an element onto its ranges; <kbd>A</kbd>/<kbd>D</kbd> step the range under the cursor.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Reads</th></tr></thead>
+    <tbody>
+        <tr><td>Span</td><td>Two rows, <code>MIN</code> and <code>MAX</code>, neither able to cross the other</td></tr>
+        <tr><td>Scalar</td><td>One row, one number</td></tr>
+        <tr><td>Gradient</td><td>Two rows, <code>LIGHT</code> and <code>DARK</code>, as a percentage of the preset's colour</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>One press moves a fiftieth of what the range allows, rounded to 1, 2, or 5 times a power of ten. <code>RESTORE THE PRESET</code> puts every range back. Edits belong to the world they were made on and are not stored between sessions. Not available while a game mode is being played: a mode brings its own ground.</p>
+
 <h2 id="game-modes-cheat">Game modes</h2>
 
 <div class="table-wrap">
@@ -229,6 +247,21 @@
 </div>
 
 <p>Gate colours: green is the one the course is waiting on, amber is still to come, dim is behind you. A crash restarts the stage.</p>
+
+<p>The whole course is drawn on the minimap the moment the stage is laid out, in the same three colours. A gate past the edge of the square the chart covers is held hollow at that edge.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Reading</th><th>Where</th><th>Says</th></tr></thead>
+    <tbody>
+        <tr><td><code>TIME</code> / <code>BEST</code></td><td>Objective card</td><td>The stage clock, and your best for this stage of this mode</td></tr>
+        <tr><td><code>&uarr; LOOP 3 &middot; 045&deg; &middot; 4200 ft</code></td><td>Objective card</td><td>The gate the course is waiting on, while it is more than 35 degrees off the nose</td></tr>
+        <tr><td><code>LOOP 3 MISSED &middot; COME ROUND AGAIN</code></td><td>Objective card</td><td>You crossed the gate's plane outside the hoop, going the way the course runs</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Best times are kept per stage per mode in <code>localStorage</code>. The clock runs from the moment a stage is laid out to the moment its objective is met, and a stage restarted is timed from nothing.</p>
 
 <h2 id="api-cheat">API</h2>
 

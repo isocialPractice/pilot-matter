@@ -18,6 +18,7 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `C` | Cycle camera: chase, cockpit, orbit |
 | `P` | Pause, and the pause menu |
 | `O` | Settings panel, and close it |
+| `L` | Element editor, and close it |
 | `M` | Mute the engine and wind |
 | `H` | Collapse the control list |
 | `Tab` | Show or hide the instruments |
@@ -103,6 +104,22 @@ Two more are built for the modes and kept out of the panel: `OPEN COUNTRY` and
 Pipeline order: landforms, ground cover, water, cuts and built things, snow,
 runway last.
 
+## Element editor
+
+`L` opens the world being flown as the elements it was assembled from. Enter
+opens an element onto its ranges; `A`/`D` step the range under the cursor.
+
+| Row | Reads |
+|-----|-------|
+| Span | Two rows, `MIN` and `MAX`, neither able to cross the other |
+| Scalar | One row, one number |
+| Gradient | Two rows, `LIGHT` and `DARK`, as a percentage of the preset's colour |
+
+One press moves a fiftieth of what the range allows, rounded to 1, 2, or 5
+times a power of ten. `RESTORE THE PRESET` puts every range back. Edits belong
+to the world they were made on and are not stored between sessions. Not
+available while a game mode is being played: a mode brings its own ground.
+
 ## Game modes
 
 | Mode | Stages | Objective |
@@ -112,6 +129,20 @@ runway last.
 
 Gate colours: green is the one the course is waiting on, amber is still to
 come, dim is behind you. A crash restarts the stage.
+
+The whole course is drawn on the minimap the moment the stage is laid out, in
+the same three colours. A gate past the edge of the square the chart covers is
+held hollow at that edge.
+
+| Reading | Where | Says |
+|---------|-------|------|
+| `TIME` / `BEST` | Objective card | The stage clock, and your best for this stage of this mode |
+| `↑ LOOP 3 · 045° · 4200 ft` | Objective card | The gate the course is waiting on, while it is more than 35 degrees off the nose |
+| `LOOP 3 MISSED · COME ROUND AGAIN` | Objective card | You crossed the gate's plane outside the hoop, going the way the course runs |
+
+Best times are kept per stage per mode in `localStorage`. The clock runs from
+the moment a stage is laid out to the moment its objective is met, and a stage
+restarted is timed from nothing.
 
 ## API
 

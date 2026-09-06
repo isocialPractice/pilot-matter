@@ -7,7 +7,10 @@ import {
     normalizePosition,
     minimapPoint,
     isOffMap,
-    minimapHeading
+    minimapHeading,
+    coursePoints,
+    courseLine,
+    gateClass
 } from '../js/minimap.js';
 import { headingToYaw } from '../js/units.js';
 
@@ -112,4 +115,159 @@ test('the map is refitted to whatever world is being flown', () => {
     map.update({ x: 100, y: 0, z: 0 }, 0);
     assert.equal(face.classes.has('off-map'), false, 'the edge of the new world is inside it');
     assert.deepEqual(map.setBounds(null), DEFAULT_BOUNDS, 'and no world at all falls back rather than throwing');
+});
+
+// --- The course on the chart ----------------------------------------------
+
+const COURSE = [
+    { index: 0, x: 0,     z: 0 },
+    { index: 1, x: 4000,  z: 4000 },
+    { index: 2, x: -4000, z: -4000 }
+];
+
+test('a course is drawn where the chart puts each of its gates', () => {
+    const points = coursePoints(BOUNDS, COURSE);
+
+    assert.equal(points.length, COURSE.length);
+    assert.deepEqual(points.map(point => point.index), [0, 1, 2]);
+    assert.deepEqual(points[0], { x: 0, y: 0, index: 0, offMap: false });
+    assert.ok(points[1].x > 0 && points[1].y < 0, 'north east is up and to the right');
+    assert.ok(points[2].x < 0 && points[2].y > 0, 'south west is down and to the left');
+});
+
+// A gate off the square is held at the edge it lies beyond, the way the
+// aircraft marker is: dropping it would leave the course vanishing exactly
+// when the pilot most wants to know which way it ran.
+test('a gate past the edge of the chart is held at that edge and says so', () => {
+    const point = coursePoints(BOUNDS, [{ index: 0, x: 40000, z: 0 }])[0];
+
+    assert.equal(point.x, MINIMAP_SIZE / 2, 'held at the edge it lies beyond');
+    assert.equal(point.offMap, true);
+    assert.equal(coursePoints(BOUNDS, COURSE).every(gate => !gate.offMap), true);
+});
+
+test('a gate that never carried its number is numbered by where it sits', () => {
+    const points = coursePoints(BOUNDS, [{ x: 0, z: 0 }, { x: 100, z: 100 }]);
+    assert.deepEqual(points.map(point => point.index), [0, 1]);
+});
+
+test('a course is one line through its gates, in the order they are flown', () => {
+    assert.equal(courseLine(coursePoints(BOUNDS, COURSE)), '0.00,0.00 25.00,-25.00 -25.00,25.00');
+    assert.equal(courseLine([]), '', 'and a course with no gates draws nothing');
+});
+
+// The chart and the world should not disagree about which gate is next. The
+// three readings here are the three the hoops themselves are coloured in;
+// js/rings.js imports Three.js, so that the two agree about the colours is
+// checked against its source in test/page.test.js rather than here.
+test('a gate is drawn from how far the course has got, in three readings', () => {
+    assert.deepEqual([0, 1, 2].map(at => gateClass(at, 1)), ['flown', 'next', 'ahead']);
+    assert.deepEqual([0, 1, 2].map(at => gateClass(at, -1)), ['flown', 'flown', 'flown'],
+        'a course with nothing left to fly is drawn entirely as flown');
+    assert.equal(gateClass(0, 0), 'next');
+});
+
+// --- The chart the course is drawn onto ------------------------------------
+
+// Enough of a document for the chart to draw into, with no browser to draw it
+// in. The gates are SVG circles, which have to be made in the SVG namespace to
+// be circles at all rather than well-formed tags rendering as nothing.
+function fakeChart() {
+    const element = (id = '') => ({
+        id,
+        namespace: null,
+        children: [],
+        attributes: {},
+        classes: new Set(),
+        parent: null,
+        setAttribute(name, value) { this.attributes[name] = String(value); },
+        getAttribute(name) { return this.attributes[name] ?? null; },
+        appendChild(child) { child.parent = this; this.children.push(child); return child; },
+        remove() {
+            const at = this.parent?.children.indexOf(this) ?? -1;
+            if (at >= 0) this.parent.children.splice(at, 1);
+            this.parent = null;
+        },
+        classList: {
+            toggle(name, on) { on ? this.owner.classes.add(name) : this.owner.classes.delete(name); }
+        }
+    });
+
+    const own = (made) => { made.classList.owner = made; return made; };
+    const parts = new Map(
+        ['minimap-aircraft', 'minimap-course', 'minimap-course-line']
+            .map(id => [`#${id}`, own(element(id))])
+    );
+
+    globalThis.document = {
+        createElementNS: (namespace) => {
+            const made = own(element());
+            made.namespace = namespace;
+            return made;
+        }
+    };
+
+    const root = own(element('minimap'));
+    root.querySelector = (selector) => parts.get(selector) ?? null;
+    root.parts = parts;
+
+    return root;
+}
+
+test('a course is laid on the chart as a gate for every loop of it', () => {
+    const root = fakeChart();
+    const map = new Minimap(root, BOUNDS);
+
+    assert.equal(map.setCourse(COURSE), 3);
+
+    const course = root.parts.get('#minimap-course');
+    assert.equal(course.children.length, 3);
+    assert.ok(course.children.every(gate => gate.namespace === 'http://www.w3.org/2000/svg'),
+        'a gate made outside the SVG namespace is a tag that draws nothing');
+    assert.deepEqual(course.children.map(gate => gate.getAttribute('cx')), ['0.00', '25.00', '-25.00']);
+    assert.equal(root.parts.get('#minimap-course-line').getAttribute('points'),
+        courseLine(coursePoints(BOUNDS, COURSE)));
+});
+
+// A stage is a different course, not the same one somewhere else, so the gates
+// are built again rather than moved - and the last stage's are taken down.
+test('a second course replaces the first rather than joining it', () => {
+    const root = fakeChart();
+    const map = new Minimap(root, BOUNDS);
+
+    map.setCourse(COURSE);
+    map.setCourse([{ index: 0, x: 0, z: 0 }]);
+
+    assert.equal(root.parts.get('#minimap-course').children.length, 1);
+    assert.equal(map.setCourse([]), 0, 'and a free flight leaves the chart clear');
+    assert.equal(root.parts.get('#minimap-course').children.length, 0);
+});
+
+test('the gate the course is waiting on is marked, on the chart as in the world', () => {
+    const root = fakeChart();
+    const map = new Minimap(root, BOUNDS);
+
+    map.setCourse(COURSE);
+    map.setNext(1);
+
+    const gates = root.parts.get('#minimap-course').children;
+    assert.deepEqual(gates.map(gate => [...gate.classes].filter(name => name !== 'minimap-gate')),
+        [['flown'], ['next'], ['ahead']]);
+});
+
+// The chart is fitted to the tile being flown over, so crossing onto the next
+// one puts every gate somewhere else on the face.
+test('a chart fitted to new ground draws the course against that ground', () => {
+    const root = fakeChart();
+    const map = new Minimap(root, BOUNDS);
+
+    map.setCourse(COURSE);
+    map.setNext(1);
+    map.setBounds({ minX: 8000, maxX: 24000, minZ: 8000, maxZ: 24000 });
+
+    const gates = root.parts.get('#minimap-course').children;
+    assert.ok(gates.every(gate => gate.classes.has('off-map')),
+        'the whole course is behind the aircraft now');
+    assert.ok(gates.some(gate => gate.classes.has('next')),
+        'and the gate being waited on is still marked as the one being waited on');
 });

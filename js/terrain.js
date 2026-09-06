@@ -58,10 +58,16 @@ export class Terrain {
      * stack them up behind each other.
      *
      * A world is more than the preset it is drawn from: the same description
-     * seeded differently, or with a strip in it rather than without one, is a
-     * different world and is rebuilt as one. What is not rebuilt is asking for
-     * the world already on screen, which is what keeps the panel from
-     * regenerating the ground every time a setting near it is touched.
+     * seeded differently, with a strip in it rather than without one, or with
+     * an element's range moved, is a different world and is rebuilt as one.
+     * What is not rebuilt is asking for the world already on screen, which is
+     * what keeps the panel from regenerating the ground every time a setting
+     * near it is touched.
+     *
+     * `elements` is the placements to draw instead of the ones the preset
+     * describes, which is what the element editor hands over: an edited world
+     * is a description like any other, so it goes through the same generator
+     * the preset's does rather than down a path of its own.
      *
      * Returns true when the world actually changed.
      */
@@ -71,7 +77,8 @@ export class Terrain {
             id: environment.id,
             seed: world.seed ?? environment.seed,
             runway: world.runway ?? false,
-            base: world.base ?? null
+            base: world.base ?? null,
+            elements: world.elements ?? null
         };
 
         if (this.tiles.size > 0 && sameWorld(this.built, asked)) return false;
@@ -152,13 +159,15 @@ export class Terrain {
         const key = tileKey(index);
         if (this.tiles.has(key)) return this.tiles.get(key);
 
+        const home   = isHomeTile(index);
         const middle = tileCenter(index, this.size);
         const field  = buildEnvironment(this.environment, {
             size: this.size,
             segments: this.segments,
             seed: tileSeed(this.built.seed, index.x, index.z),
             base: this.built.base,
-            runway: isHomeTile(index) ? this.built.runway : false,
+            elements: tileElements(this.built.elements, home),
+            runway: home ? this.built.runway : false,
             originX: middle.x,
             originZ: middle.z
         });
@@ -286,11 +295,27 @@ function buildMesh(field) {
     return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
 }
 
+/**
+ * The placements one tile is drawn from, for a world described by placements
+ * rather than by a preset. The strip comes off every tile but the middle one,
+ * for the reason it was only ever laid on that one: a runway is a place in the
+ * world rather than a feature of the ground that repeats across it, and a
+ * description handed whole to every tile would cut a strip into all nine.
+ *
+ * Nothing at all for a world drawn from its preset, which is the case the
+ * generator already answers from the environment itself.
+ */
+function tileElements(elements, home) {
+    if (!elements) return undefined;
+    return home ? elements : elements.filter(placement => placement.type !== 'runway');
+}
+
 /** Whether two asks would generate the same ground, down to the strip on it. */
 function sameWorld(built, asked) {
     return built != null
         && built.id === asked.id
         && built.seed === asked.seed
         && JSON.stringify(built.runway) === JSON.stringify(asked.runway)
-        && JSON.stringify(built.base) === JSON.stringify(asked.base);
+        && JSON.stringify(built.base) === JSON.stringify(asked.base)
+        && JSON.stringify(built.elements) === JSON.stringify(asked.elements);
 }

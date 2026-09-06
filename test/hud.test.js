@@ -16,8 +16,13 @@ import {
     compassPoint,
     verticalSpeedToFeetPerMinute,
     formatVerticalSpeed,
-    isLowAltitude
+    isLowAltitude,
+    DISTANCE_STEP,
+    formatGateDistance,
+    formatGatePointer,
+    formatStageClock
 } from '../js/hud.js';
+import { NO_TIME } from '../js/best-times.js';
 import { GROUND_CLEARANCE } from '../js/crash.js';
 import { createFlightState } from '../js/flight-state.js';
 
@@ -193,4 +198,49 @@ test('the new instruments are wired to the aircraft and not to guesses', () => {
     for (const method of ['getHeading', 'getVerticalSpeed', 'getHeightAboveTerrain', 'isCrashed']) {
         assert.ok(asked.has(method), `the HUD should read ${method}() off the aircraft`);
     }
+});
+
+// --- What the objective card is told --------------------------------------
+
+test('a distance is read on whichever scale the altimeter is set to', () => {
+    assert.equal(formatGateDistance(1000, 'feet'), `${Math.round(1000 * FEET_PER_UNIT / 10) * 10}`);
+    assert.notEqual(formatGateDistance(1000, 'meters'), formatGateDistance(1000, 'feet'));
+});
+
+// A distance that ran every frame would be a number nobody could read off a
+// moving aircraft, so it settles the way the climb rate does.
+test('a distance settles on a step rather than running every frame', () => {
+    for (const distance of [1000, 1000.4, 1001]) {
+        assert.equal(Number(formatGateDistance(distance)) % DISTANCE_STEP, 0);
+    }
+});
+
+test('a gate off the screen is pointed at with the turn, the bearing, and the range', () => {
+    const line = formatGatePointer(
+        { index: 2, bearing: 7, relative: -120, arrow: '←', distance: 4000 },
+        'feet'
+    );
+
+    assert.ok(line.includes('LOOP 3'), 'the loop it is, counted the way a loop is spoken about');
+    assert.ok(line.includes('←'), 'which way to turn');
+    assert.ok(line.includes('007'), 'the bearing, padded the way the compass card is');
+    assert.ok(line.includes(formatGateDistance(4000, 'feet')), 'and how far there is to go');
+    assert.ok(line.includes('ft'), 'on a scale the pilot can read');
+});
+
+test('a gate the pilot can see is not written about at all', () => {
+    assert.equal(formatGatePointer(null), '');
+});
+
+test('the clock carries the time flown and the time to beat', () => {
+    const line = formatStageClock(42.13, 38.4);
+    assert.ok(line.includes('0:42.1'));
+    assert.ok(line.includes('0:38.4'));
+});
+
+// A stage nobody has flown out leaves the shape of a time rather than a number
+// that means nothing, so the line does not change width on the first flight.
+test('a stage with no time to beat says so in the shape of a time', () => {
+    assert.ok(formatStageClock(42.1, null).includes(NO_TIME));
+    assert.equal(formatStageClock(42.1, null).length, formatStageClock(42.1, 38.4).length);
 });

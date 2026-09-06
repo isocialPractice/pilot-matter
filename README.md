@@ -34,9 +34,10 @@ two pages as Markdown, for reading without a browser.
 
 - **Arcade flight model** - pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases, airspeed-driven lift, and a wing that stalls when the speed decays
 - **The world as data** - eleven environment elements, each declaring the ranges it can be configured through and the algorithm that draws it, assembled into five worlds and regenerated on the spot
+- **An element editor** - open the world being flown, move any range an element declares, and watch the ground drawn again from the algorithm
 - **A world with no edge** - the square an environment describes is one tile of an endless grid of them, drawn out further than the camera can see, so there is always more ground ahead
 - **A day to fly through** - the sun walks across the sky and the light, the fog, and the water's sheen warm and cool with it
-- **Two game modes** - Runway Landing and Flying through Loops, four stages each, and each getting harder at exactly the thing it is about
+- **Two game modes** - Runway Landing and Flying through Loops, four stages each, and each getting harder at exactly the thing it is about, with every stage timed against your own best
 - **Instruments** - a HUD, a north-up minimap, an artificial horizon reading the aircraft's own nose and wings, and a photo mode that clears all of it for the one frame it captures
 - **A simulator API** - fly the aircraft over a host's own world, or a host's own aircraft over this one
 - **Zero build step** - runs directly in the browser via ES modules and an import map
@@ -92,6 +93,7 @@ Then open `http://localhost:8080` in your browser.
 | `C` | Cycle camera (chase, cockpit, orbit) |
 | `P` | Pause / resume, and open the pause menu |
 | `O` | Open the settings panel, and close it again |
+| `L` | Open the element editor, and close it again |
 | `M` | Mute or unmute the engine and wind |
 | `H` | Collapse the control list to a hint line, and open it again |
 | `Tab` | Show or hide the instruments |
@@ -100,8 +102,8 @@ Then open `http://localhost:8080` in your browser.
 
 In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space`
 chooses one. The mouse works the menus too: the pointer moves the cursor and a
-click chooses. In the settings panel, `A`/`D` or `←`/`→` step the option under
-the cursor through its settings. `Esc` backs out.
+click chooses. In the settings panel and the element editor, `A`/`D` or `←`/`→`
+step the value under the cursor through its settings. `Esc` backs out.
 
 **Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft
 with the throttle set at 20%. That airspeed is the stall speed itself, so the

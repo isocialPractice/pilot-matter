@@ -5,6 +5,102 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0-alpha] - 2026-09-06
+
+A world whose ranges can be moved while it is being flown over, and a course of
+loops a pilot can find their way round rather than have to remember.
+
+### Added
+
+- **An element editor**, on `L`. An environment has been a description rather
+  than a mesh since the registry landed, which means there has never been
+  anything to re-author when a range moves - only a number, and the ground drawn
+  again from the algorithm. The panel lists the elements the world being flown
+  was assembled from, in the order the pipeline applies them, and choosing one
+  opens the ranges it declared underneath it. A span is two rows, `MIN` and
+  `MAX`, and neither end may be stepped past the other, because a range whose
+  ends have swapped is a range the generator has to guess about. A single value
+  is one row. A gradient is two rows, `LIGHT` and `DARK`, each stepped as a
+  percentage of the colour the preset laid it down in: the arrow keys lighten and
+  darken an end and do nothing else, because the gradient rule exists precisely
+  so no element shifts colour dramatically across the ground it covers, and an
+  editor that let two presses undo it would be undoing the thing it is editing.
+  One press moves a fiftieth of what the range allows, put on the nearest of 1,
+  2, or 5 times a power of ten, so a peak height in the hundreds moves by fifties
+  and a ratio between nothing and one moves by hundredths - and that step is read
+  off the declared bounds rather than configured beside them, so it stays right
+  when the bounds move. Every reading the panel hands out has already been
+  clamped into the range the registry declared, so no edit can ask for a world an
+  element says it cannot draw. Edits belong to the world they were made on:
+  choosing another environment, or turning the strip on, is a different set of
+  elements, and the panel is filled again from that preset rather than carrying a
+  mountain's height range onto ground that never had that mountain.
+  `RESTORE THE PRESET` puts everything back without changing world. The preset
+  itself is never written to - what the panel holds is a copy, and what it hands
+  out is the same list of placements the Matter API takes
+- **Every stage timed**, against the best that stage of that mode has ever been
+  flown in. The clock runs from the moment a stage is laid out to the moment its
+  objective is met, so neither the beat a finished stage is held on screen for
+  nor a pause halfway down the course is part of it, and a stage started again is
+  timed from nothing - what is recorded is the attempt that finished rather than
+  everything done on the way there. A finished stage gives the objective line up
+  for its beat and reports what the attempt came to, `NEW BEST` or `STAGE TIME`.
+  The board is kept per stage per mode in `localStorage`, and a browser that
+  refuses storage costs it its memory and nothing else
+- **The whole course on the chart**, laid the moment its stage is rather than as
+  it is flown, in the same three colours the hoops are drawn in. The first gate
+  is no longer the only one the pilot has ever seen, and which way the course
+  runs is something to read rather than to remember. A gate past the edge of the
+  square the chart covers is held hollow at that edge, which is the convention
+  the chart already reads by - the aircraft marker is held the same way, and
+  dropping the gate instead would leave the course vanishing exactly when a pilot
+  most wants to know which way it ran
+- **A pointer to the gate the course is waiting on**, while it is more than 35
+  degrees off the nose: an arrow for which way to turn, the compass bearing to
+  fly, and how far there is to go on whichever scale the altimeter is set to.
+  Thirty-five degrees is half the camera's vertical field of view, which is the
+  narrow way across the frame, so a gate inside it is on the screen whatever
+  shape the window has been dragged into - and a gate on the screen is already
+  pointing at itself, so the line goes away rather than sitting there being
+  ignored
+- `js/element-editor.js` and `js/best-times.js`, both pure and both testable in
+  Node with no renderer and no browser storage: the panel's rows, its steps, and
+  the placements it hands out, and the board, its reading and writing, and the
+  stopwatch format the readouts are written in
+- `setMenuEntries` and `MenuList.rebuild`, for the first menu here whose rows
+  come and go. A list built once was enough for every menu that was a fixed set
+  of rows; a menu that opens and shuts its sections has to have its rows built
+  again to be walked at all, because a row carries its place in the whole menu
+  and a place that has moved is a row pointing at somebody else's entry
+
+### Changed
+
+- **A missed gate is reported rather than silently waited on.** Crossing a
+  gate's plane outside the hoop left the course exactly as it was, which is
+  correct - the gate is still the one being waited on, and that is what lets it
+  be flown again - but the pilot was told nothing, so a course that had stopped
+  counting looked exactly like a course that had not. The card now says so for a
+  few seconds, and says the half that matters: not that a gate was missed, but
+  that the course is still waiting on it. Only the direction the course runs
+  counts, unlike a pass, which counts from both sides. Flying a loop backwards is
+  still flying it; being told you missed one is about having left it behind you,
+  and a pilot who has turned round to come at a gate again crosses its plane on
+  the way back - which is the turn, not a second miss
+- `gatePassed` is now read off `gateCrossing`, which works out where a step
+  crossed a gate's plane once and answers everything either half of the course
+  rules asks about it: how far off the middle of the hoop the crossing landed,
+  whether that was inside it, and which way the step was going. The gate test
+  itself is unchanged, and the same cases still hold it
+- `Terrain.setEnvironment` takes an `elements` override, which is how an edited
+  world reaches the generator: as a description like any other rather than down a
+  path of its own. The strip comes off every tile but the middle one, for the
+  reason it was only ever laid on that one - a runway is a place in the world
+  rather than a feature of the ground that repeats across it, and a description
+  handed whole to every tile would cut a strip into all nine
+- `relativeBearing` folds two bearings in degrees rather than through radians and
+  back. Two bearings a whole number of degrees apart are a whole number of
+  degrees apart, and the round trip handed that number back with a tail on it
+
 ## [1.12.7-alpha] - 2026-09-05
 
 Both halves of the anchor resolution are held by a case now, so which page a

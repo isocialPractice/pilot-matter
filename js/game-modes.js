@@ -164,7 +164,10 @@ export function getGameMode(id) {
  * mode is being played at all.
  */
 export function createRunState(modeId = null) {
-    const state = { modeId: null, stageIndex: 0, gate: 0, landed: false, complete: false };
+    const state = {
+        modeId: null, stageIndex: 0, gate: 0, missed: 0,
+        elapsed: 0, landed: false, complete: false
+    };
     if (isGameModeId(modeId)) startRun(state, modeId);
     return state;
 }
@@ -209,9 +212,15 @@ export function stageNumber(state) {
     return isRunning(state) ? state.stageIndex + 1 : 0;
 }
 
-/** Puts the stage back to its beginning, for a crash or a fresh attempt. */
+/**
+ * Puts the stage back to its beginning, for a crash or a fresh attempt. The
+ * clock goes back with it: a stage flown twice is timed as the attempt that
+ * finished it rather than as everything the pilot did on the way there.
+ */
 export function restartStage(state) {
     state.gate = 0;
+    state.missed = 0;
+    state.elapsed = 0;
     state.landed = false;
     return state;
 }
@@ -282,10 +291,47 @@ export function recordGate(state, index) {
     return isStageComplete(state);
 }
 
+/**
+ * Reports a loop gone past rather than flown through. Only the gate the course
+ * is waiting on can be missed, for the same reason only it can be flown: a
+ * course is an order, and a gate further down it is not the pilot's business
+ * yet.
+ *
+ * Nothing about the run moves. The gate stays the one the course is waiting
+ * on, which is what lets it be flown again; what the miss buys is that the
+ * pilot is told, rather than left circling a course that has quietly stopped
+ * counting.
+ *
+ * Returns true when the miss was the outstanding gate's.
+ */
+export function recordMiss(state, index) {
+    const mode = runningMode(state);
+    if (!mode || mode.objective !== LOOP_OBJECTIVE || state.complete) return false;
+    if (index !== state.gate) return false;
+
+    state.missed += 1;
+    return true;
+}
+
 /** The gate the course is waiting on, or -1 once the stage is flown out. */
 export function nextGate(state) {
     const { done, total } = stageProgress(state);
     return runningMode(state)?.objective === LOOP_OBJECTIVE && done < total ? done : -1;
+}
+
+/**
+ * Runs the stage clock on by a frame. A stage is timed from the moment it is
+ * laid out to the moment it is finished, so the beat a completed stage is held
+ * on screen for is not part of the time it took, and neither is a finished run
+ * left sitting on its last stage.
+ *
+ * Returns the time on the clock.
+ */
+export function tickRun(state, dt = 0) {
+    if (!isRunning(state) || state.complete || isStageComplete(state)) return state.elapsed;
+
+    state.elapsed += Math.max(0, dt);
+    return state.elapsed;
 }
 
 /** Reports a crash to the run, which puts the stage back to its beginning. */
@@ -312,6 +358,102 @@ export function runStatus(state) {
     const stage = `STAGE ${stageNumber(state)} OF ${stageCount(state)}`;
     const { done, total } = stageProgress(state);
     return total > 1 ? `${stage}  ·  LOOP ${Math.min(done + 1, total)} OF ${total}` : stage;
+}
+
+/**
+ * What a missed gate is reported as: which loop went by, and that the course
+ * is still waiting on it. The second half is the part that matters - a pilot
+ * told only that they missed has been told the course is over, which it is
+ * not.
+ */
+export function missNotice(state) {
+    const gate = nextGate(state);
+    return gate < 0 ? '' : `LOOP ${gate + 1} MISSED  ·  COME ROUND AGAIN`;
+}
+
+// --- Where the gate is -----------------------------------------------------
+
+/**
+ * The compass bearing from a place in the world to a gate, on the same card
+ * the heading readout is written on, so a bearing on the objective card and a
+ * heading on the instruments are the same number when the nose is on the gate.
+ */
+export function gateBearing(ring, position) {
+    return wrapDegrees(Math.atan2(ring.x - position.x, ring.z - position.z) / RADIANS);
+}
+
+/** How far a gate is over the ground, which is the distance there is to fly. */
+export function gateDistance(ring, position) {
+    return Math.hypot(ring.x - position.x, ring.z - position.z);
+}
+
+/**
+ * A bearing as degrees off the nose, negative to the left and positive to the
+ * right, so a pilot reads which way to turn rather than working it out from
+ * two compass numbers.
+ */
+export function relativeBearing(bearing, heading) {
+    // Folded in degrees rather than through radians and back: two bearings a
+    // whole number of degrees apart are a whole number of degrees apart, and a
+    // round trip through radians would hand back that number with a tail on it.
+    const off = wrapDegrees(bearing - heading);
+    return off > 180 ? off - 360 : off;
+}
+
+/**
+ * The arrows a relative bearing is drawn as, clockwise from the nose. The same
+ * eight points the compass readout names, pointed at rather than named,
+ * because what the pilot wants off a pointer is a direction rather than a word
+ * to convert into one.
+ */
+export const GATE_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+
+export function gateArrow(relative) {
+    const slice = 360 / GATE_ARROWS.length;
+    return GATE_ARROWS[Math.round(wrapDegrees(relative) / slice) % GATE_ARROWS.length];
+}
+
+/**
+ * How far off the nose a gate can be and still be on the screen, in degrees
+ * either side of it.
+ *
+ * Half the camera's vertical field of view, which is the narrow way across the
+ * frame: a window is wider than it is tall, so a gate inside this is in frame
+ * whatever shape the window has been dragged into. The pointer would rather
+ * come up while the gate is still just visible than stay off while it is
+ * already gone.
+ */
+export const GATE_IN_VIEW = 35;
+
+export function gateInView(relative, halfAngle = GATE_IN_VIEW) {
+    return Math.abs(relative) <= halfAngle;
+}
+
+/**
+ * Where the gate the course is waiting on lies, for a pilot who cannot see it:
+ * which loop it is, the bearing to it, how far that is off the nose, and how
+ * far away it is.
+ *
+ * Null when there is no gate outstanding, and null while the gate is in front
+ * of the aircraft - a gate on the screen is already pointing at itself, and a
+ * readout that never goes away is a readout nobody reads.
+ */
+export function gatePointer(state, course, position, heading) {
+    const index = nextGate(state);
+    const ring  = index >= 0 ? course?.[index] : null;
+    if (!ring) return null;
+
+    const bearing  = gateBearing(ring, position);
+    const relative = relativeBearing(bearing, heading);
+    if (gateInView(relative)) return null;
+
+    return {
+        index,
+        bearing,
+        relative,
+        arrow: gateArrow(relative),
+        distance: gateDistance(ring, position)
+    };
 }
 
 // --- The panel the modes are chosen from -----------------------------------
@@ -554,27 +696,53 @@ export function gateOffset(ring, point) {
 }
 
 /**
- * True when a step of the flight went through a gate.
+ * Where a step of the flight crossed a gate's plane, or null for a step that
+ * did not cross it at all.
  *
  * The step is a segment rather than a point, because a gate is thinner than the
  * distance an aircraft covers in a frame and a point test would fly straight
  * through one without noticing. Where the segment crosses the gate's plane is
- * worked out first, and the gate is passed when that crossing lands inside the
- * hoop. Either direction counts: a loop is a loop from both sides.
+ * worked out first, and everything either half of the course rules cares about
+ * is read off that one crossing: how far off the middle of the hoop it landed,
+ * whether that was inside it, and whether the step went the way the course
+ * runs through it.
  */
-export function gatePassed(ring, from, to) {
-    if (!ring) return false;
+export function gateCrossing(ring, from, to) {
+    if (!ring) return null;
 
     const before = gateOffset(ring, from);
     const after  = gateOffset(ring, to);
-    if ((before > 0) === (after > 0)) return false;
+    if ((before > 0) === (after > 0)) return null;
 
     const t  = before / (before - after);
     const dx = from.x + (to.x - from.x) * t - ring.x;
     const dy = from.y + (to.y - from.y) * t - ring.y;
     const dz = from.z + (to.z - from.z) * t - ring.z;
+    const offset = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-    return Math.sqrt(dx * dx + dy * dy + dz * dz) <= ring.radius;
+    return { offset, inside: offset <= ring.radius, forward: after > before };
+}
+
+/**
+ * True when a step of the flight went through a gate. Either direction counts:
+ * a loop is a loop from both sides.
+ */
+export function gatePassed(ring, from, to) {
+    return gateCrossing(ring, from, to)?.inside === true;
+}
+
+/**
+ * True when a step of the flight went past a gate instead of through it: it
+ * crossed the gate's plane outside the hoop, going the way the course runs.
+ *
+ * Only that direction counts, unlike a pass. Flying a loop backwards is still
+ * flying it, but being told you missed one is about having left it behind you,
+ * and a pilot who has turned round to come at a gate again crosses its plane
+ * on the way back - which is the turn, not a second miss.
+ */
+export function gateMissed(ring, from, to) {
+    const crossing = gateCrossing(ring, from, to);
+    return crossing != null && !crossing.inside && crossing.forward;
 }
 
 function clamp(value, low, high) {

@@ -12,6 +12,7 @@ import {
     selectedId,
     moveSelection,
     resetSelection,
+    setMenuEntries,
     MENU_UP_KEYS,
     MENU_DOWN_KEYS,
     isMenuKey,
@@ -243,7 +244,13 @@ function fakeList() {
         classList: {
             toggle(name, on) { on ? this.owner.classes.add(name) : this.owner.classes.delete(name); }
         },
-        appendChild(child) { this.children.push(child); return child; },
+        parent: null,
+        appendChild(child) { child.parent = this; this.children.push(child); return child; },
+        remove() {
+            const at = this.parent?.children.indexOf(this) ?? -1;
+            if (at >= 0) this.parent.children.splice(at, 1);
+            this.parent = null;
+        },
         addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
         fire(type) { for (const handler of this.listeners[type] ?? []) handler(); }
     });
@@ -436,4 +443,122 @@ test('an empty menu has nothing to select and does not fall over being asked', (
     assert.equal(selectedId(state), null);
     assert.equal(moveSelection(state, 1), null);
     assert.equal(applyMenuKey(state, 'Enter', true), null);
+});
+
+// --- A menu whose rows come and go ----------------------------------------
+
+const GROWING = [
+    { id: 'first',  kind: 'element', label: 'FIRST' },
+    { id: 'second', kind: 'element', label: 'SECOND' }
+];
+
+const GROWN = [
+    { id: 'first',      kind: 'element', label: 'FIRST' },
+    { id: 'first.a',    kind: 'range',   label: 'A', text: 'A  < 1 >' },
+    { id: 'first.b',    kind: 'range',   label: 'B', text: 'B  < 2 >' },
+    { id: 'second',     kind: 'element', label: 'SECOND' }
+];
+
+test('a menu put on new entries keeps its cursor on the list', () => {
+    const state = createMenuState(GROWN);
+    state.index = 3;
+
+    setMenuEntries(state, GROWING);
+    assert.equal(state.index, 1, 'the cursor comes back to the last row rather than off the end');
+    assert.equal(selectedId(state), 'second');
+
+    setMenuEntries(state, GROWN);
+    assert.equal(state.index, 1, 'and a longer list leaves it where it was');
+});
+
+test('a menu put on nothing has nowhere for the cursor to be but the front', () => {
+    const state = createMenuState(GROWN);
+    state.index = 3;
+
+    setMenuEntries(state, []);
+    assert.equal(state.index, 0);
+    assert.equal(selectedEntry(state), null);
+});
+
+// A row carries its place in the whole menu, so a menu that has grown under a
+// list drawn once is a list of rows pointing at somebody else's entry.
+test('a list drawn again is drawn from the entries the menu now holds', () => {
+    const list = fakeList();
+    const state = createMenuState(GROWING);
+    const menu = new MenuList(list, state);
+
+    assert.deepEqual(list.children.map(item => item.dataset.entry), ['first', 'second']);
+
+    setMenuEntries(state, GROWN);
+    menu.rebuild(state);
+
+    assert.deepEqual(list.children.map(item => item.dataset.entry),
+        ['first', 'first.a', 'first.b', 'second']);
+    assert.deepEqual(list.children.map(item => item.textContent),
+        ['FIRST', 'A  < 1 >', 'B  < 2 >', 'SECOND']);
+});
+
+test('a list drawn again keeps the filter it was built with', () => {
+    const list = fakeList();
+    const state = createMenuState(GROWN);
+    const menu = new MenuList(list, state, entry => entry.kind === 'range');
+
+    assert.deepEqual(list.children.map(item => item.dataset.entry), ['first.a', 'first.b']);
+
+    setMenuEntries(state, GROWING);
+    menu.rebuild(state);
+    assert.deepEqual(list.children.map(item => item.dataset.entry), []);
+});
+
+test('a list drawn again puts the cursor back on the row it belongs on', () => {
+    const list = fakeList();
+    const state = createMenuState(GROWING);
+    const menu = new MenuList(list, state);
+
+    setMenuEntries(state, GROWN);
+    state.index = 2;
+    menu.rebuild(state);
+    menu.render(state);
+
+    const selected = list.children.filter(item => item.classes.has('selected'));
+    assert.equal(selected.length, 1);
+    assert.equal(selected[0].dataset.entry, 'first.b');
+});
+
+// The rows the pointer was listening on have gone, so a list handed to the
+// mouse has to be handed to it again or the panel goes dead under the cursor.
+test('a list drawn again is still a list the pointer works', () => {
+    const list = fakeList();
+    const state = createMenuState(GROWING);
+    const menu = new MenuList(list, state);
+
+    const chosen = [];
+    menu.followPointer((index, choose) => chosen.push([index, choose]));
+
+    setMenuEntries(state, GROWN);
+    menu.rebuild(state);
+
+    assert.ok(menu.pointed);
+    list.children[2].fire('click');
+    assert.deepEqual(chosen, [[2, true]]);
+});
+
+test('a list that was never handed to the mouse is not handed to it by a redraw', () => {
+    const list = fakeList();
+    const state = createMenuState(GROWING);
+    const menu = new MenuList(list, state);
+
+    menu.rebuild(state);
+    assert.equal(menu.pointed, false);
+    assert.deepEqual(list.children.map(item => Object.keys(item.listeners)), [[], []]);
+});
+
+// A panel that draws one kind of row differently from another needs to know
+// which is which, and a class would collide with the three the cursor uses.
+test('a row says what kind it is, for a panel that draws kinds differently', () => {
+    const list = fakeList();
+    new MenuList(list, createMenuState(GROWN));
+
+    assert.deepEqual(list.children.map(item => item.dataset.kind),
+        ['element', 'range', 'range', 'element']);
 });

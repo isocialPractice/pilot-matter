@@ -39,6 +39,19 @@ import {
     buildCourse,
     gateOffset,
     gatePassed,
+    gateMissed,
+    gateCrossing,
+    recordMiss,
+    missNotice,
+    tickRun,
+    gateBearing,
+    gateDistance,
+    relativeBearing,
+    gateArrow,
+    gateInView,
+    gatePointer,
+    GATE_ARROWS,
+    GATE_IN_VIEW,
     bearingDirection,
     wrapDegrees,
     wrapRadians,
@@ -545,4 +558,256 @@ test('a step that only clips the rim is flown past rather than through', () => {
     // Crossing the plane 201 units above the middle: past the hoop by a metre.
     assert.equal(gatePassed(gate, { x: 0, y: 701, z: -50 }, { x: 0, y: 701, z: 50 }), false);
     assert.equal(gatePassed(gate, { x: 0, y: 699, z: -50 }, { x: 0, y: 699, z: 50 }), true);
+});
+
+// --- A gate gone past ------------------------------------------------------
+
+// A course that stops counting without saying so is a course the pilot goes on
+// flying at a gate that is already behind them.
+test('crossing the plane of a gate outside the hoop is a miss rather than nothing', () => {
+    const gate = { x: 0, y: 500, z: 0, radius: 200, dirX: 0, dirZ: 1 };
+
+    assert.equal(gateMissed(gate, { x: 300, y: 500, z: -50 }, { x: 300, y: 500, z: 50 }), true);
+    assert.equal(gateMissed(gate, { x: 0, y: 900, z: -50 }, { x: 0, y: 900, z: 50 }), true,
+        'over the top of it is past it');
+    assert.equal(gateMissed(gate, { x: 0, y: 500, z: -50 }, { x: 0, y: 500, z: 50 }), false,
+        'through the hoop is not past it');
+    assert.equal(gateMissed(gate, { x: 300, y: 500, z: -100 }, { x: 300, y: 500, z: -10 }), false,
+        'and stopping short of the plane is neither');
+    assert.equal(gateMissed(null, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }), false);
+});
+
+// A pilot who has overshot turns round and comes back through the plane on
+// their way to line the gate up again. Reporting that as a second miss would
+// be reporting the turn.
+test('coming back at a gate is the turn rather than a second miss', () => {
+    const gate = { x: 0, y: 500, z: 0, radius: 200, dirX: 0, dirZ: 1 };
+
+    assert.equal(gateMissed(gate, { x: 300, y: 500, z: 50 }, { x: 300, y: 500, z: -50 }), false,
+        'crossing back the way the course does not run is repositioning');
+    assert.equal(gatePassed(gate, { x: 0, y: 500, z: 50 }, { x: 0, y: 500, z: -50 }), true,
+        'though flying the loop backwards is still flying it');
+});
+
+test('a step reports where it crossed and which way it was going', () => {
+    const gate = { x: 0, y: 500, z: 0, radius: 200, dirX: 0, dirZ: 1 };
+
+    const through = gateCrossing(gate, { x: 0, y: 500, z: -50 }, { x: 0, y: 500, z: 50 });
+    assert.equal(through.inside, true);
+    assert.equal(through.forward, true);
+    assert.equal(through.offset, 0);
+
+    const past = gateCrossing(gate, { x: 300, y: 500, z: -50 }, { x: 300, y: 500, z: 50 });
+    assert.equal(past.inside, false);
+    assert.equal(past.offset, 300);
+
+    assert.equal(gateCrossing(gate, { x: 0, y: 500, z: -100 }, { x: 0, y: 500, z: -10 }), null);
+    assert.equal(gateCrossing(null, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }), null);
+});
+
+test('a missed gate is counted, and the course still waits on it', () => {
+    const state = createRunState(LOOP_COURSE);
+
+    assert.equal(recordMiss(state, 0), true);
+    assert.equal(state.gate, 0, 'the gate the course waits on has not moved');
+    assert.equal(state.missed, 1);
+    assert.equal(nextGate(state), 0, 'so it is still there to be flown');
+
+    assert.equal(recordGate(state, 0), false, 'and flying it still counts');
+    assert.equal(state.gate, 1);
+});
+
+test('only the gate the course is waiting on can be missed', () => {
+    const state = createRunState(LOOP_COURSE);
+
+    assert.equal(recordMiss(state, 2), false);
+    assert.equal(state.missed, 0);
+});
+
+test('a landing has no gates to miss, and neither has a free flight', () => {
+    assert.equal(recordMiss(createRunState(RUNWAY_LANDING), 0), false);
+    assert.equal(recordMiss(createRunState(), 0), false);
+});
+
+test('a stage started again has nothing missed against it', () => {
+    const state = createRunState(LOOP_COURSE);
+    recordMiss(state, 0);
+    restartStage(state);
+    assert.equal(state.missed, 0);
+});
+
+// Being told only that a gate went by reads as the course having ended, which
+// is the one thing that has not happened.
+test('a miss is reported as the gate to come round to, not as a failure', () => {
+    const state = createRunState(LOOP_COURSE);
+    assert.equal(missNotice(state), 'LOOP 1 MISSED  ·  COME ROUND AGAIN');
+
+    recordGate(state, 0);
+    assert.equal(missNotice(state), 'LOOP 2 MISSED  ·  COME ROUND AGAIN');
+});
+
+test('a course with nothing left to fly has no gate to report', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    assert.equal(missNotice(state), '');
+});
+
+// --- The stage clock -------------------------------------------------------
+
+test('a stage is timed from the moment it is laid out', () => {
+    const state = createRunState(LOOP_COURSE);
+    assert.equal(state.elapsed, 0);
+
+    tickRun(state, 1.5);
+    tickRun(state, 0.5);
+    assert.equal(state.elapsed, 2);
+});
+
+test('a free flight has no stage to time', () => {
+    const state = createRunState();
+    tickRun(state, 5);
+    assert.equal(state.elapsed, 0);
+});
+
+// The clock stops when the objective is met rather than when the next stage is
+// laid out, so the beat a finished stage is held for is not part of its time.
+test('the clock stops the moment the stage is flown out', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    tickRun(state, 10);
+    recordLanding(state);
+    tickRun(state, 5);
+
+    assert.equal(state.elapsed, 10);
+});
+
+test('a course stops its clock on the last gate rather than after it', () => {
+    const state = createRunState(LOOP_COURSE);
+    const gates = currentStage(state).rings.count;
+
+    for (let gate = 0; gate < gates; gate++) {
+        tickRun(state, 1);
+        recordGate(state, gate);
+    }
+    tickRun(state, 30);
+
+    assert.equal(state.elapsed, gates);
+});
+
+test('a finished run has no clock left to run', () => {
+    const state = createRunState(LOOP_COURSE);
+    state.complete = true;
+    tickRun(state, 5);
+    assert.equal(state.elapsed, 0);
+});
+
+// A frame handing back a negative delta is a clock that has been put back,
+// which is not time the pilot spent flying.
+test('the clock never runs backwards', () => {
+    const state = createRunState(LOOP_COURSE);
+    tickRun(state, 4);
+    tickRun(state, -10);
+    assert.equal(state.elapsed, 4);
+});
+
+test('a stage started again is timed from nothing', () => {
+    const state = createRunState(LOOP_COURSE);
+    tickRun(state, 12);
+    restartStage(state);
+    assert.equal(state.elapsed, 0);
+});
+
+test('the next stage is timed on its own rather than on the last one', () => {
+    const state = createRunState(LOOP_COURSE);
+    tickRun(state, 12);
+    advanceStage(state);
+    assert.equal(state.elapsed, 0);
+});
+
+// --- Pointing at the gate --------------------------------------------------
+
+const GATE = { index: 0, x: 0, y: 500, z: 4000, radius: 200, dirX: 0, dirZ: 1 };
+const HERE = { x: 0, y: 500, z: 0 };
+
+test('a bearing to a gate is read off the same card the heading is', () => {
+    assert.equal(gateBearing(GATE, HERE), 0, 'due north');
+    assert.equal(gateBearing({ x: 4000, z: 0 }, HERE), 90, 'due east');
+    assert.equal(gateBearing({ x: 0, z: -4000 }, HERE), 180, 'due south');
+    assert.equal(gateBearing({ x: -4000, z: 0 }, HERE), 270, 'due west');
+});
+
+test('a bearing to a gate points the way the direction it names does', () => {
+    const gate = { x: 3000, z: 3000 };
+    const direction = bearingDirection(gateBearing(gate, HERE));
+
+    assert.ok(Math.abs(direction.x - Math.SQRT1_2) < 1e-9);
+    assert.ok(Math.abs(direction.z - Math.SQRT1_2) < 1e-9);
+});
+
+test('the distance to a gate is the distance there is to fly over the ground', () => {
+    assert.equal(gateDistance(GATE, HERE), 4000);
+    assert.equal(gateDistance({ x: 3000, z: 4000 }, HERE), 5000);
+    assert.equal(gateDistance({ x: 0, y: 9000, z: 4000 }, HERE), 4000,
+        'a gate overhead is no further off over the ground for being high');
+});
+
+test('a bearing off the nose says which way to turn', () => {
+    assert.equal(relativeBearing(90, 0), 90, 'to the right');
+    assert.equal(relativeBearing(270, 0), -90, 'to the left');
+    assert.equal(relativeBearing(0, 90), -90);
+    assert.equal(relativeBearing(350, 10), -20, 'and the short way round north');
+    assert.equal(relativeBearing(10, 350), 20);
+});
+
+test('a gate is pointed at with the eight points the compass names', () => {
+    assert.equal(gateArrow(0), GATE_ARROWS[0]);
+    assert.equal(gateArrow(90), GATE_ARROWS[2]);
+    assert.equal(gateArrow(180), GATE_ARROWS[4]);
+    assert.equal(gateArrow(-90), GATE_ARROWS[6]);
+    assert.equal(gateArrow(-170), GATE_ARROWS[4], 'and wraps rather than falling off');
+    assert.equal(gateArrow(359), GATE_ARROWS[0]);
+});
+
+test('a gate in front of the aircraft is in view and one behind it is not', () => {
+    assert.equal(gateInView(0), true);
+    assert.equal(gateInView(GATE_IN_VIEW), true);
+    assert.equal(gateInView(-GATE_IN_VIEW), true);
+    assert.equal(gateInView(GATE_IN_VIEW + 1), false);
+    assert.equal(gateInView(180), false);
+});
+
+// A readout that never goes away is a readout nobody reads, so a gate on the
+// screen is not pointed at.
+test('a gate the pilot can see is not pointed at', () => {
+    const state = createRunState(LOOP_COURSE);
+    assert.equal(gatePointer(state, [GATE], HERE, 0), null);
+});
+
+test('a gate off the screen is pointed at, with the way to turn and how far', () => {
+    const state = createRunState(LOOP_COURSE);
+    const pointer = gatePointer(state, [GATE], HERE, 180);
+
+    assert.equal(pointer.index, 0);
+    assert.equal(pointer.bearing, 0);
+    assert.equal(Math.abs(pointer.relative), 180);
+    assert.equal(pointer.distance, 4000);
+    assert.equal(pointer.arrow, GATE_ARROWS[4], 'behind you');
+});
+
+test('the gate pointed at is the one the course is waiting on', () => {
+    const state = createRunState(LOOP_COURSE);
+    const course = [GATE, { index: 1, x: 4000, y: 500, z: 0, radius: 200, dirX: 1, dirZ: 0 }];
+
+    recordGate(state, 0);
+    const pointer = gatePointer(state, course, HERE, 180);
+
+    assert.equal(pointer.index, 1);
+    assert.equal(pointer.bearing, 90);
+});
+
+test('nothing is pointed at when there is no gate outstanding', () => {
+    assert.equal(gatePointer(createRunState(), [GATE], HERE, 180), null,
+        'a free flight has no course');
+    assert.equal(gatePointer(createRunState(RUNWAY_LANDING), [GATE], HERE, 180), null,
+        'and a landing has no gates');
+    assert.equal(gatePointer(createRunState(LOOP_COURSE), [], HERE, 180), null,
+        'nor has a course that has not been laid yet');
 });

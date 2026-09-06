@@ -7,6 +7,7 @@ import {
     speedTo, altitudeTo, speedUnit, altitudeUnit,
     altitudeToFeet, throttleToPercent, headingDegrees
 } from './units.js';
+import { formatStageTime } from './best-times.js';
 
 // The unit conversions live in js/units.js, which converts in both directions
 // so a start state can be configured in knots and feet. They are re-exported
@@ -78,6 +79,43 @@ export function isLowAltitude(heightAboveTerrain, thresholdFeet = LOW_ALTITUDE_F
     return altitudeToFeet(heightAboveTerrain) < thresholdFeet;
 }
 
+/**
+ * How far off a gate is, written the way a distance is read off a HUD: on
+ * whichever scale the altimeter is set to, so the pilot has one length scale
+ * to think in rather than two, and rounded so the number settles rather than
+ * running every frame.
+ */
+export const DISTANCE_STEP = 10;
+
+export function formatGateDistance(distance, unit = DEFAULT_ALTITUDE_UNIT) {
+    const scaled = altitudeTo(distance, unit);
+    return `${Math.round(scaled / DISTANCE_STEP) * DISTANCE_STEP}`;
+}
+
+/**
+ * The line the objective card points a gate out with: which way to turn, the
+ * bearing to fly, and how far there is to go. A gate the pilot can see is not
+ * pointed at, so nothing here is written for one.
+ */
+export function formatGatePointer(pointer, unit = DEFAULT_ALTITUDE_UNIT) {
+    if (!pointer) return '';
+
+    const distance = formatGateDistance(pointer.distance, unit);
+    return `${pointer.arrow} LOOP ${pointer.index + 1}  ·  `
+        + `${formatHeading(Math.round(pointer.bearing))}°  ·  `
+        + `${distance} ${altitudeUnit(unit).label}`;
+}
+
+/**
+ * The clock line: how long the stage under way has taken, and the time there
+ * is to beat. A stage nobody has finished yet has no time to beat and says so
+ * with the empty shape of one, so the line does not change width the first
+ * time a course is flown out.
+ */
+export function formatStageClock(elapsed, best) {
+    return `TIME ${formatStageTime(elapsed)}  ·  BEST ${formatStageTime(best)}`;
+}
+
 export class HUD {
     constructor() {
         this.speedElement         = document.getElementById('hud-speed');
@@ -98,6 +136,8 @@ export class HUD {
         this.modeNameElement      = document.getElementById('game-mode-name');
         this.modeObjectiveElement = document.getElementById('game-mode-objective');
         this.modeStatusElement    = document.getElementById('game-mode-status');
+        this.modeClockElement     = document.getElementById('game-mode-clock');
+        this.modePointerElement   = document.getElementById('game-mode-pointer');
 
         // The units the readouts are written beside, which the settings panel
         // can switch without the flight model ever hearing about it.
@@ -139,6 +179,41 @@ export class HUD {
         this.modeNameElement.textContent      = name;
         this.modeObjectiveElement.textContent = objective;
         this.modeStatusElement.textContent    = status;
+    }
+
+    /**
+     * Puts a course on the chart in the corner, so the whole of it is on screen
+     * before the first gate is flown at. Called when a stage is laid out rather
+     * than as it is flown.
+     */
+    setCourse(rings) {
+        return this.minimap.setCourse(rings);
+    }
+
+    /** Marks the gate the course is waiting on, on the chart and in the world. */
+    setNextGate(index) {
+        return this.minimap.setNext(index);
+    }
+
+    /**
+     * Writes the stage clock: the time on it, and the time to beat. Written
+     * every frame, because a clock is the one thing on the card that does
+     * move.
+     */
+    setClock(elapsed, best) {
+        this.modeClockElement.textContent = formatStageClock(elapsed, best);
+    }
+
+    /**
+     * Points out the gate the course is waiting on while it is off the screen,
+     * and writes nothing at all while it is in front of the aircraft: a pilot
+     * looking at the gate does not need telling where it is, and a line that
+     * never goes away is a line nobody reads.
+     */
+    setGatePointer(pointer) {
+        const text = formatGatePointer(pointer, this.altitudeUnit);
+        this.modePointerElement.textContent = text;
+        this.modePointerElement.style.display = text ? 'block' : 'none';
     }
 
     /**

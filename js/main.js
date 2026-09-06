@@ -9,7 +9,7 @@ import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from '
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
     createMenuState, resetSelection, applyMenuKey, applyMenuPointer, isMenuKey, selectedId,
-    isMenuAdjustKey, isMenuControlKey, menuAdjustStep,
+    isMenuAdjustKey, isMenuControlKey, menuAdjustStep, setMenuEntries,
     MenuList, followPointers, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
 import { createHelpState, applyHelpKey, expandHelp, toggleHelp } from './controls-help.js';
@@ -24,13 +24,23 @@ import {
     SENSITIVITY_OPTION, FOG_OPTION, SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
 import { runwayWanted } from './config.js';
+import { headingDegrees } from './units.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
-    restartStage, recordLanding, recordGate, nextGate, runObjective, runStatus,
-    stageWorld, stageStart, buildCourse, gatePassed,
+    restartStage, recordLanding, recordGate, recordMiss, nextGate, runObjective, runStatus,
+    stageWorld, stageStart, buildCourse, gatePassed, gateMissed, gatePointer,
+    tickRun, missNotice,
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey,
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE
 } from './game-modes.js';
+import {
+    createBestTimesState, bestTime, recordStageTime, formatStageTime
+} from './best-times.js';
+import {
+    createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
+    editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
+    isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
+} from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { TILE_REACH } from './world-tiles.js';
 import {
@@ -52,6 +62,11 @@ const SWALLOWED_KEYS = ['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'Ar
 // it. Roughly the crash countdown, because both are the same beat: the flight
 // has ended, and the next one has not begun yet.
 const STAGE_HOLD = 2.5;
+
+// How long a missed gate is reported for, in seconds, before the card goes
+// back to the objective. Long enough to be read on the way past, and short
+// enough to be gone by the time the pilot has turned round to try again.
+const MISS_HOLD = 3;
 
 // Whether two starts are the same condition, so that changing a setting which
 // is not part of the start does not put the aircraft back into one.
@@ -93,14 +108,31 @@ class FlightSimulator {
 
         this.settings = createSettingsState(defaultStorage());
 
+        // The world the settings panel is holding, as the elements it was
+        // assembled from, so a range can be moved and the ground drawn again
+        // from the algorithm rather than from another preset.
+        this.editor = createEditorState(
+            currentEnvironment(this.settings),
+            runwayWanted(startSettings(this.settings))
+        );
+
         // Free flight is the run every session opens in, so the first world is
         // the settings panel's rather than a mode's.
         this.run    = createRunState();
         this.course = [];
 
+        // The board a finished stage is measured against, which outlives the
+        // session it was flown in.
+        this.bestTimes = createBestTimesState(defaultStorage());
+
         this.sky     = new Sky(this.scene);
+        // The first world is built from the editor's elements as well, though
+        // nobody has moved one yet: the ground is compared against what it was
+        // asked for, and asking for the same world a second way would throw the
+        // whole of it away and draw it again a tile at a time.
         this.terrain = new Terrain(this.scene, currentEnvironment(this.settings), {
-            runway: runwayWanted(startSettings(this.settings))
+            runway: runwayWanted(startSettings(this.settings)),
+            elements: editorPlacements(this.editor)
         });
         this.loops   = new LoopCourse(this.scene);
         // The square the world covers, held rather than asked for every frame:
@@ -126,6 +158,7 @@ class FlightSimulator {
         this.startMenuState = createMenuState(START_MENU_ENTRIES);
         this.pauseMenuState = createMenuState(PAUSE_MENU_ENTRIES);
         this.settingsState  = createMenuState(this.settings.entries);
+        this.editorState    = createMenuState(this.editor.entries);
         this.modesState     = createMenuState(gameModeEntries());
         this.helpState      = createHelpState();
         this.hudVisibility  = createHudVisibilityState(defaultStorage());
@@ -141,15 +174,22 @@ class FlightSimulator {
         // the same way the settings panel is.
         this.modesOpen = false;
 
-        // What is left of the beat a finished stage is held for, and where the
-        // aircraft was last frame, which is what a gate is tested against.
+        // What is left of the beat a finished stage is held for, what is left of
+        // the beat a missed gate is reported for, and where the aircraft was
+        // last frame, which is what a gate is tested against.
         this.stageHold = 0;
+        this.missHold = 0;
         this.lastPosition = null;
+
+        // What the stage just flown out came to, for as long as it is held on
+        // the screen: the time it took, and whether it beat the board.
+        this.stageResult = null;
 
         this.overlays = {
             title:     document.getElementById('title-screen'),
             paused:    document.getElementById('paused'),
             settings:  document.getElementById('settings'),
+            editor:    document.getElementById('element-editor'),
             gameModes: document.getElementById('game-modes'),
             objective: document.getElementById('game-mode'),
             hud:       document.getElementById('hud'),
@@ -164,6 +204,7 @@ class FlightSimulator {
         this.startMenu    = new MenuList(document.getElementById('start-menu'), this.startMenuState);
         this.pauseMenu    = new MenuList(document.getElementById('pause-menu'), this.pauseMenuState);
         this.modesMenu    = new MenuList(document.getElementById('game-modes-menu'), this.modesState);
+        this.editorMenu   = new MenuList(document.getElementById('element-editor-menu'), this.editorState);
 
         // Every menu on screen is worked with the mouse as well as the keys: the
         // cursor follows the pointer across the entries, and a click chooses the
@@ -173,6 +214,7 @@ class FlightSimulator {
         this.startMenu.followPointer((index, choose) => this.onStartPointer(index, choose));
         this.pauseMenu.followPointer((index, choose) => this.onPausePointer(index, choose));
         this.modesMenu.followPointer((index, choose) => this.onGameModesPointer(index, choose));
+        this.editorMenu.followPointer((index, choose) => this.onEditorPointer(index, choose));
 
         // One cursor, three lists: the worlds under one heading of the panel,
         // the start state under the next, and the options that hold whichever
@@ -230,6 +272,7 @@ class FlightSimulator {
      * whenever one of them is changed.
      */
     applySettings() {
+        this.syncEditor();
         this.aircraft.setSensitivity(currentOption(this.settings, SENSITIVITY_OPTION));
         this.sky.setFogDensity(currentOption(this.settings, FOG_OPTION));
         this.hud.setUnits({
@@ -275,7 +318,11 @@ class FlightSimulator {
         const mode  = runningMode(this.run);
         const world = mode ? stageWorld(this.run) : {
             environment: currentEnvironment(this.settings),
-            runway: runwayWanted(startSettings(this.settings))
+            runway: runwayWanted(startSettings(this.settings)),
+            // A free flight is drawn from the elements the editor is holding
+            // rather than from the preset directly, because those elements are
+            // the preset until the pilot moves one of them.
+            elements: editorPlacements(this.editor)
         };
 
         const rebuilt = this.terrain.setEnvironment(world.environment, world);
@@ -299,6 +346,11 @@ class FlightSimulator {
             : [];
         this.loops.setRings(this.course);
 
+        // The whole course is on the chart the moment it is laid, rather than
+        // as it is flown: the first gate should not be the only one the pilot
+        // has ever seen.
+        this.hud.setCourse(this.course);
+
         return rebuilt;
     }
 
@@ -320,21 +372,33 @@ class FlightSimulator {
      * being asked for is not something that changes inside a stage.
      */
     syncObjective() {
-        this.loops.setNext(nextGate(this.run));
+        const gate = nextGate(this.run);
+        this.loops.setNext(gate);
+        this.hud.setNextGate(gate);
 
         const mode  = runningMode(this.run);
         const stage = currentStage(this.run);
 
+        // The objective line is given up for two things, both of them shorter
+        // lived than it and both of them more urgent while they last: a gate
+        // gone by, and the time a stage just flown out came to. The objective
+        // is written back the moment their beat runs out.
+        const missed = this.missHold > 0 ? missNotice(this.run) : '';
+        const report = this.stageHold > 0 ? this.stageReport() : '';
+
         this.hud.setObjective(mode ? {
             name: mode.label,
-            objective: this.run.complete ? 'MODE COMPLETE' : runObjective(this.run),
+            objective: missed || report || (this.run.complete ? 'MODE COMPLETE' : runObjective(this.run)),
             status: this.run.complete ? runStatus(this.run) : `${stage.label}  ·  ${runStatus(this.run)}`
         } : {});
     }
 
     /** True while something the pilot works with the menu keys is on screen. */
     menuShowing() {
-        return this.modesOpen || settingsShowing(this.settings) || this.pauseState.paused;
+        return this.modesOpen
+            || settingsShowing(this.settings)
+            || editorShowing(this.editor)
+            || this.pauseState.paused;
     }
 
     setupKeys() {
@@ -382,8 +446,23 @@ class FlightSimulator {
             return;
         }
 
+        if (editorShowing(this.editor)) {
+            this.onEditorKey(e);
+            return;
+        }
+
         if (isSettingsOpenKey(e.code) && !e.repeat) {
             this.openSettingsPanel();
+            this.syncOverlays();
+            return;
+        }
+
+        // The world can be edited before the flight it will be flown over has
+        // begun, which is the natural time to do it - unless a mode has been
+        // chosen, which brings its own ground and leaves the editor nothing to
+        // edit.
+        if (isEditorOpenKey(e.code) && !e.repeat && !isRunning(this.run)) {
+            this.openEditorPanel();
             this.syncOverlays();
             return;
         }
@@ -456,10 +535,20 @@ class FlightSimulator {
             return;
         }
 
+        if (editorShowing(this.editor)) {
+            this.onEditorKey(e);
+            return;
+        }
+
         let changed = false;
 
         if (isSettingsOpenKey(e.code) && !e.repeat) {
             this.openSettingsPanel();
+            changed = true;
+        } else if (isEditorOpenKey(e.code) && !e.repeat && !isRunning(this.run)) {
+            // A mode brings its own ground with it, so there is nothing here
+            // for the editor to be editing while one is being played.
+            this.openEditorPanel();
             changed = true;
         } else if (applyMuteKey(this.audioState, e.code, true, e.repeat)) {
             changed = true;
@@ -537,6 +626,7 @@ class FlightSimulator {
 
     openSettingsPanel() {
         this.modesOpen = false;
+        closeEditor(this.editor);
         openSettings(this.settings);
         resetSelection(this.settingsState);
     }
@@ -591,10 +681,105 @@ class FlightSimulator {
         this.applySettings();
     }
 
+    // --- The element editor ----------------------------------------------
+
+    /**
+     * Puts the editor on the world the settings panel is holding, and draws its
+     * rows again when that is a different world.
+     *
+     * Called wherever the settings are applied rather than only where the
+     * environment is chosen, because the strip is part of what a world places
+     * and the start state is what turns it on.
+     */
+    syncEditor() {
+        const rebuilt = setEditorWorld(
+            this.editor,
+            currentEnvironment(this.settings),
+            runwayWanted(startSettings(this.settings))
+        );
+        if (rebuilt) this.redrawEditor();
+        return rebuilt;
+    }
+
+    /**
+     * Draws the panel again from the rows it now has. The list is built rather
+     * than redrawn because the editor is the one menu whose rows come and go:
+     * opening an element adds its ranges to the panel under it.
+     */
+    redrawEditor() {
+        setMenuEntries(this.editorState, this.editor.entries);
+        this.editorMenu.rebuild(this.editorState);
+    }
+
+    openEditorPanel() {
+        closeSettings(this.settings);
+        this.modesOpen = false;
+        openEditor(this.editor);
+        this.redrawEditor();
+        resetSelection(this.editorState);
+    }
+
+    onEditorKey(e) {
+        // The key that opens the panel closes it again, the way O does the
+        // settings panel.
+        if (isEditorCloseKey(e.code) || (isEditorOpenKey(e.code) && !e.repeat)) {
+            closeEditor(this.editor);
+            this.syncOverlays();
+            return;
+        }
+
+        // A range is stepped where an element is opened, so the roll keys move
+        // a number along its own bounds rather than the cursor down the panel.
+        if (isMenuAdjustKey(e.code)) {
+            e.preventDefault();
+            const moved = adjustEditorRange(this.editor, selectedId(this.editorState), menuAdjustStep(e.code));
+            if (moved) this.applyEditor();
+            this.syncOverlays();
+            return;
+        }
+
+        if (!isMenuKey(e.code)) return;
+        e.preventDefault();
+
+        const chosen = applyMenuKey(this.editorState, e.code, true, e.repeat);
+        if (chosen) this.chooseEditorRow(chosen);
+        this.syncOverlays();
+    }
+
+    /**
+     * The editor under the mouse. Every choice the panel offers goes through
+     * the same place a chosen row does, so a click on an element opens it and a
+     * click on a range steps it on - the same answers the keys get.
+     */
+    onEditorPointer(index, choose) {
+        const chosen = applyMenuPointer(this.editorState, index, choose);
+        if (chosen) this.chooseEditorRow(chosen);
+        this.syncOverlays();
+    }
+
+    chooseEditorRow(id) {
+        const applied = chooseEditorEntry(this.editor, id);
+        this.redrawEditor();
+
+        if (applied && applied !== EDITOR_BACK_ID) this.refreshWorld();
+    }
+
+    /**
+     * Draws the ground again from the elements the panel is now describing.
+     * The world goes back through the same place every other world does, so an
+     * edited environment is generated by the algorithm rather than patched into
+     * the one already on screen.
+     */
+    applyEditor() {
+        this.redrawEditor();
+        this.refreshWorld();
+    }
+
     // --- The modes -------------------------------------------------------
 
     openGameModesPanel() {
         closeSettings(this.settings);
+        closeEditor(this.editor);
         this.modesOpen = true;
         resetSelection(this.modesState);
     }
@@ -651,6 +836,8 @@ class FlightSimulator {
     onFlightReset() {
         this.camera2?.setMode(this.start?.cameraMode ?? INITIAL_CAMERA_MODE);
         this.lastPosition = null;
+        this.missHold = 0;
+        this.stageResult = null;
 
         if (!isRunning(this.run) || this.run.complete) return;
         restartStage(this.run);
@@ -659,13 +846,42 @@ class FlightSimulator {
 
     /** A landing reported by the flight model, which a landing stage is asking for. */
     onLanding() {
-        if (recordLanding(this.run)) this.holdStage();
+        if (recordLanding(this.run)) this.finishStage();
         this.syncObjective();
+    }
+
+    /**
+     * A stage flown out: the clock stops, the time goes on the board, and the
+     * stage is held on screen for a beat before the next one is laid out.
+     *
+     * The time recorded is what the clock read when the objective was met, so
+     * neither the beat the stage is held for nor the pause menu opened halfway
+     * down the course is part of it.
+     */
+    finishStage() {
+        this.stageResult = recordStageTime(
+            this.bestTimes, this.run.modeId, this.run.stageIndex, this.run.elapsed
+        );
+        this.holdStage();
+    }
+
+    /**
+     * What a finished stage is reported as while it is held on the screen: the
+     * time it took, and whether that beat the board. Nothing at all for a stage
+     * whose clock never ran, which is a stage nothing was flown in.
+     */
+    stageReport() {
+        const result = this.stageResult;
+        if (!result?.time) return '';
+
+        const time = formatStageTime(result.time);
+        return result.best ? `NEW BEST  ·  ${time}` : `STAGE TIME  ·  ${time}`;
     }
 
     /** Holds a finished stage on screen for a beat before laying out the next. */
     holdStage() {
         this.stageHold = STAGE_HOLD;
+        this.missHold = 0;
     }
 
     /**
@@ -695,13 +911,50 @@ class FlightSimulator {
             return;
         }
 
-        if (gatePassed(this.course[gate], this.lastPosition, position)) {
-            const finished = recordGate(this.run, gate);
+        const ring = this.course[gate];
+
+        if (gatePassed(ring, this.lastPosition, position)) {
+            // The stage is finished before the card is written, so a card
+            // written on the last gate of a stage carries the time it took.
+            if (recordGate(this.run, gate)) this.finishStage();
             this.syncObjective();
-            if (finished) this.holdStage();
+        } else if (gateMissed(ring, this.lastPosition, position) && recordMiss(this.run, gate)) {
+            // The course is still waiting on the same gate, so nothing about
+            // the run has moved. What the pilot gets is the one thing they were
+            // not getting before: told.
+            this.missHold = MISS_HOLD;
+            this.syncObjective();
         }
 
         this.lastPosition = position;
+    }
+
+    /**
+     * Runs the stage clock and the beat a missed gate is reported for, and
+     * writes both onto the objective card.
+     *
+     * The clock is the one thing on that card that moves, so it is written
+     * every frame while the rest of the card is written when the run does.
+     */
+    trackStage(dt) {
+        tickRun(this.run, dt);
+
+        if (this.missHold > 0) {
+            this.missHold = Math.max(0, this.missHold - dt);
+            if (this.missHold === 0) this.syncObjective();
+        }
+
+        this.hud.setClock(
+            this.run.elapsed,
+            isRunning(this.run) ? bestTime(this.bestTimes, this.run.modeId, this.run.stageIndex) : null
+        );
+
+        this.hud.setGatePointer(gatePointer(
+            this.run,
+            this.course,
+            this.aircraft.getPosition(),
+            headingDegrees(this.aircraft.getHeading())
+        ));
     }
 
     /** Counts down the beat a finished stage is held for, then lays out the next. */
@@ -711,6 +964,7 @@ class FlightSimulator {
         this.stageHold = Math.max(0, this.stageHold - dt);
         if (this.stageHold > 0) return;
 
+        this.stageResult = null;
         if (advanceStage(this.run)) this.refreshWorld();
         else this.syncObjective();
     }
@@ -725,7 +979,8 @@ class FlightSimulator {
         const onTitle  = !photo && titleShowing(this.titleState);
         const modes    = !photo && this.modesOpen;
         const settings = !photo && !modes && settingsShowing(this.settings);
-        const panel    = modes || settings;
+        const editor   = !photo && !modes && !settings && editorShowing(this.editor);
+        const panel    = modes || settings || editor;
         const paused   = !photo && !onTitle && this.pauseState.paused;
         const chrome   = !photo && !onTitle && !panel && this.hudVisibility.visible;
         // A panel is opened to look at the world behind it, so it is the one
@@ -734,6 +989,7 @@ class FlightSimulator {
 
         this.overlays.title.style.display     = onTitle && !panel ? 'flex' : 'none';
         this.overlays.settings.style.display  = settings ? 'block' : 'none';
+        this.overlays.editor.style.display    = editor ? 'block' : 'none';
         this.overlays.gameModes.style.display = modes ? 'block' : 'none';
         this.overlays.paused.style.display    = paused && !panel ? 'block' : 'none';
         this.overlays.hud.style.display       = chrome ? 'block' : 'none';
@@ -760,6 +1016,7 @@ class FlightSimulator {
         this.settingsMenu.render(this.settingsState);
         this.settingsStart.render(this.settingsState);
         this.settingsOptions.render(this.settingsState);
+        this.editorMenu.render(this.editorState);
     }
 
     animate() {
@@ -772,6 +1029,7 @@ class FlightSimulator {
         const frozen  = titleShowing(this.titleState)
             || this.pauseState.paused
             || settingsShowing(this.settings)
+            || editorShowing(this.editor)
             || this.modesOpen;
 
         const dt = frozen ? 0 : preFlightDelta(this.titleState, simulationDelta(this.pauseState, elapsed));
@@ -793,6 +1051,7 @@ class FlightSimulator {
         this.flyOver(this.aircraft.getPosition());
 
         this.trackCourse();
+        this.trackStage(dt);
         this.advanceRun(dt);
 
         this.camera2.update(dt);

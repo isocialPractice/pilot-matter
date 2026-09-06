@@ -64,6 +64,20 @@ export function resetSelection(state) {
     return selectedEntry(state);
 }
 
+/**
+ * Puts a menu on a different set of entries, keeping the cursor on the list
+ * rather than off the end of it.
+ *
+ * A menu whose rows open and shut is shorter one moment than the next, and a
+ * cursor left where it was would be pointing past the last row - which walks
+ * as though the list were still the length it used to be.
+ */
+export function setMenuEntries(state, entries = []) {
+    state.entries = entries;
+    state.index = Math.min(Math.max(state.index, 0), Math.max(0, entries.length - 1));
+    return state;
+}
+
 /** True for any key the menu acts on, so the caller knows to keep it. */
 export function isMenuKey(code) {
     return MENU_UP_KEYS.includes(code)
@@ -169,8 +183,9 @@ export function followPointers(lists = [], handler) {
  */
 export class MenuList {
     constructor(listElement, state, include = () => true) {
-        this.list  = listElement;
-        this.items = [];
+        this.list    = listElement;
+        this.include = include;
+        this.items   = [];
         // Where the cursor was when the list was last drawn, so a redraw can
         // tell a cursor that moved from a list that was simply redrawn.
         this.cursor = null;
@@ -178,17 +193,51 @@ export class MenuList {
         // to it, which is a list worked with the keys alone.
         this.handler = null;
 
+        this.build(state);
+    }
+
+    /** Draws a row for every entry this list keeps, in the order they come. */
+    build(state) {
         state.entries.forEach((entry, index) => {
-            if (!include(entry, index)) return;
+            if (!this.include(entry, index)) return;
 
             const item = document.createElement('li');
             item.textContent = entry.text ?? entry.label;
             item.dataset.entry = entry.id;
+            // What kind of row this is, for a panel that draws one kind
+            // differently from another. Written as data rather than as a class
+            // so it cannot collide with the three the cursor already uses.
+            if (entry.kind) item.dataset.kind = entry.kind;
             if (entry.note) item.dataset.note = entry.note;
 
             this.list.appendChild(item);
             this.items.push({ index, item });
         });
+        return this.items.length;
+    }
+
+    /**
+     * Draws the list again, from a menu whose entries are no longer the ones it
+     * was built with.
+     *
+     * A list built once is enough for a menu that is a fixed set of rows, which
+     * every menu here was until one of them started opening and shutting its
+     * sections. A menu that grows and shrinks has to have its rows built again
+     * to be walked at all: the rows carry their place in the menu, and a place
+     * that has moved is a row pointing at somebody else's entry.
+     *
+     * The list goes back to the mouse afterwards where it was ever handed to
+     * it, because the rows the pointer was listening on have gone.
+     */
+    rebuild(state) {
+        for (const { item } of this.items) item.remove();
+        this.items.length = 0;
+        this.cursor = null;
+
+        this.build(state);
+        if (this.handler) this.followPointer(this.handler);
+
+        return this;
     }
 
     /**
