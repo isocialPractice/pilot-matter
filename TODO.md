@@ -11,24 +11,67 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
+- [ ] Bank the gates off the horizontal, so a loop has to be flown through at
+  the angle it was laid at rather than upright every time
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
+
+### UI/UX Override - the ground the element editor never redraws
+
+#### Resolve Issues
+
 - [ ] Add an element editor overlay that lists the placed elements, edits
   their ranges live, and regenerates the terrain from the algorithm
+  - **Issue**: The panel edits, but the terrain is never regenerated. Driven in
+    a browser on the start screen and in a free flight, `HEIGHT MAX` under
+    `MOUNTAIN` walked from `500` to `900` and the ground either side of the
+    panel came back pixel for pixel identical both times. The cause is an
+    aliased record: `editorPlacements` hands out the editor's live `config`
+    object, `terrain.setEnvironment` keeps it as `this.built`, and
+    `adjustEditorRange` then mutates it in place, so `sameWorld` compares the
+    changed object against itself, reports the world unchanged, and no tile is
+    ever drawn again. The generator is willing - built from the same placements
+    directly, eight steps of `HEIGHT MAX` move the highest point from `578.2`
+    to `904.9`
+  - **Goal**: Resolve to [element-editor-terrain-redraw.prompt.md](.claude/prompts/element-editor-terrain-redraw.prompt.md)
   - From: Environment Design
-- [ ] Report a gate that was missed rather than leaving the course silently
-  stalled on it: once the aircraft is past a gate's plane outside the hoop,
-  say so and let it be re-flown
-  - From: Game Modes
-- [ ] Point at the gate the course is waiting on while it is off screen, as a
-  bearing and a distance on the HUD, so a course can be flown without the
-  pilot having to remember which way it ran
-  - From: Game Modes
-- [ ] Time each stage and keep the best time per stage in `localStorage`, so
-  a course already flown is something to beat rather than something to repeat
-  - From: Game Modes
-- [ ] Show the whole course before the stage begins - as an overlay on the
-  minimap, or as a pass down the line of it - so the first gate is not the
-  only one the pilot has ever seen
-  - From: Game Modes
+
+#### Found Issues
+
+- [ ] A stage of a course cannot be flown out under test, so everything that
+  only happens at the end of one is unverified
+  - **Issue**: The card's report on a finished stage (`NEW BEST  ·  <time>`
+    against `STAGE TIME  ·  <time>`), the next stage opening at `0:00.0`, a
+    `BEST` surviving a reload, and the green mark moving on to the next gate
+    all need a gate actually flown through. A 240 unit hoop reached 2600 units
+    down its own axis cannot be hit by tapping the flight keys from a test:
+    the aircraft opens lined up but climbs away at full throttle, and there is
+    no seam - no exposed run state, no way to place the aircraft - for a test
+    to fly the course any other way. The geometry underneath is covered by the
+    suite (`test/game-modes.test.js` for the crossing rules,
+    `test/best-times.test.js` for the board), but nothing checks that flying a
+    gate writes the report onto the card
+  - **Goal**: Give the loop course a seam a test can take - an exposed hook
+    that reports a gate flown, or a way to open a stage with the aircraft on
+    the gate's plane - and cover the finished-stage card with it, so the one
+    line a pilot reads at the end of a stage is not the only part of the mode
+    nothing checks
+  - From: UI/UX Override - the ground the element editor never redraws
+- [ ] Score a landing rather than only counting it: touchdown point down the
+  strip, sink rate at the moment of contact, distance off the centreline, and
+  heading off the strip, shown as a breakdown once the aircraft has stopped
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Runway Landing
+- [ ] Add approach guidance that is withdrawn as the stages go on - an
+  extended centreline and a threshold marker on the first stage, the marker
+  alone on the second, and nothing at all by the last
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Runway Landing
+- [ ] Add on-screen touch controls so the simulator is playable on a phone
+  or tablet without a keyboard
+  - From: Game UI/UX
+- [ ] Fly by tilting the device: read the orientation sensors for pitch and
+  roll, and make tilt the control the simulator opens in - but only on a
+  phone or tablet with no keyboard, so a machine that has keys is still
+  flown with them
+  - From: Game UI/UX
 
 ## Game UI/UX
 
@@ -80,19 +123,8 @@ minor version update.
 
 #### Flying through Loops
 
-- [ ] Time each stage and keep the best time per stage in `localStorage`, so
-  a course already flown is something to beat rather than something to repeat
-- [ ] Point at the gate the course is waiting on while it is off screen, as a
-  bearing and a distance on the HUD, so a course can be flown without the
-  pilot having to remember which way it ran
-- [ ] Report a gate that was missed rather than leaving the course silently
-  stalled on it: once the aircraft is past a gate's plane outside the hoop,
-  say so and let it be re-flown
 - [ ] Bank the gates off the horizontal, so a loop has to be flown through at
   the angle it was laid at rather than upright every time
-- [ ] Show the whole course before the stage begins - as an overlay on the
-  minimap, or as a pass down the line of it - so the first gate is not the
-  only one the pilot has ever seen
 
 ## World & Environment
 
@@ -124,8 +156,6 @@ items in this section applies a minor version update.
 - [ ] Add an element registry (`js/environment/elements.js`) where each
   element declares its configurable ranges and its generator function, so
   new elements are data rather than a bespoke terrain pass
-- [ ] Add an element editor overlay that lists the placed elements, edits
-  their ranges live, and regenerates the terrain from the algorithm
 - [ ] **Mountain** height range: peaks render between a `min` and a `max`
   height
 - [ ] **Mountain** bulk range: an apply-to-all mode that randomizes length,
@@ -725,3 +755,21 @@ how the simulator got here rather than as a list still to be worked.
     and resolving a fragment against the wrong source fails the case rather than
     only the check
   - From: Code Review Override - the linked page the anchor resolution never reads
+- [x] Add an element editor overlay that lists the placed elements, edits
+  their ranges live, and regenerates the terrain from the algorithm
+  - From: Environment Design
+- [x] Report a gate that was missed rather than leaving the course silently
+  stalled on it: once the aircraft is past a gate's plane outside the hoop,
+  say so and let it be re-flown
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
+- [x] Point at the gate the course is waiting on while it is off screen, as a
+  bearing and a distance on the HUD, so a course can be flown without the
+  pilot having to remember which way it ran
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
+- [x] Time each stage and keep the best time per stage in `localStorage`, so
+  a course already flown is something to beat rather than something to repeat
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
+- [x] Show the whole course before the stage begins - as an overlay on the
+  minimap, or as a pass down the line of it - so the first gate is not the
+  only one the pilot has ever seen
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
