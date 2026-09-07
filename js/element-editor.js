@@ -467,7 +467,15 @@ export function chooseEditorEntry(state, id) {
  * generated from it by the same algorithm that generates a preset's, because
  * an edited world is a description like any other rather than a special case
  * downstream of one.
+ *
+ * Every configuration is copied on the way out. What a caller is handed is a
+ * description of the world as it stands rather than a handle on the panel: the
+ * ranges go on being stepped under the arrow keys, and a caller that kept the
+ * live object would find the world it recorded changing underneath it.
  */
 export function editorPlacements(state) {
-    return state.elements.map(element => ({ type: element.type, config: element.config }));
+    return state.elements.map(element => ({
+        type: element.type,
+        config: structuredCloneConfig(element.config)
+    }));
 }

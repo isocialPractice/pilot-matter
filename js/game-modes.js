@@ -313,6 +313,38 @@ export function recordMiss(state, index) {
     return true;
 }
 
+/**
+ * The step the aircraft just flew, put to the gate the course is waiting on.
+ *
+ * A step rather than a position, because a gate is thinner than the distance an
+ * aircraft covers in a frame. Everything a step can do to a run is decided
+ * here rather than half here and half in the caller, which is what lets a stage
+ * be flown out with no flight model anywhere near it: hand this the two ends of
+ * a line through a gate and the course moves on exactly as it does under a
+ * pilot.
+ *
+ * Returns what became of the step: the gate it was put to, whether it went
+ * through that gate or past it, and whether going through it was the last gate
+ * the stage was waiting on.
+ */
+export function flyStep(state, course, from, to) {
+    const gate = nextGate(state);
+    const nothing = { gate, passed: false, missed: false, finished: false };
+    if (gate < 0 || !from || !to) return nothing;
+
+    const ring = course?.[gate];
+
+    if (gatePassed(ring, from, to)) {
+        return { gate, passed: true, missed: false, finished: recordGate(state, gate) };
+    }
+
+    if (gateMissed(ring, from, to)) {
+        return { gate, passed: false, missed: recordMiss(state, gate), finished: false };
+    }
+
+    return nothing;
+}
+
 /** The gate the course is waiting on, or -1 once the stage is flown out. */
 export function nextGate(state) {
     const { done, total } = stageProgress(state);

@@ -689,14 +689,17 @@ or read them as a worked example of a game built on the two APIs.
 | `stageWorld(state)` | The world the stage is flown over |
 | `stageStart(state, world)` | Where in it the flight opens |
 | `buildCourse(stage, options)` | The loops a course stage is flown through |
-| `gatePassed(ring, from, to)`, `gateOffset(ring, point)` | Whether a step went through one |
+| `gatePassed(ring, from, to)`, `gateMissed(ring, from, to)`, `gateOffset(ring, point)` | Whether a step went through one, or past it |
+| `flyStep(state, course, from, to)` | Both of those put to the gate the course is waiting on |
 
 A gate is tested against the step the aircraft flew rather than against where it
 ended up, because a hoop is thinner than the distance covered in a frame and a
-point test would fly straight through one without noticing:
+point test would fly straight through one without noticing. `flyStep` is that
+test and the recording it leads to in one call, so a host drives a course with
+the two ends of a step and reads back what became of it:
 
 ```javascript
-import { createRunState, LOOP_COURSE, buildCourse, currentStage, nextGate, recordGate } from 'pilot-matter';
+import { createRunState, LOOP_COURSE, buildCourse, currentStage, flyStep } from 'pilot-matter';
 
 const run = createRunState(LOOP_COURSE);
 const rings = buildCourse(currentStage(run), { seed: 1, sampleHeight: world.sampleHeight });
@@ -705,11 +708,20 @@ let last = pilot.pose().position;
 function frame(dt) {
     pilot.update(dt);
     const now = pilot.pose().position;
-    const gate = nextGate(run);
-    if (gate >= 0 && gatePassed(rings[gate], last, now)) recordGate(run, gate);
+
+    const step = flyStep(run, rings, last, now);
+    if (step.finished) endOfStage(run);
+    else if (step.missed) say('come round again');
+
     last = now;
 }
 ```
+
+`flyStep` returns the gate the step was put to, whether it went `passed` that
+gate or `missed` it, and whether passing it `finished` the stage. Nothing but
+the gate a course is waiting on can be flown or missed - a course is an order,
+and a hoop further down it is not the pilot's business yet - so a host that
+holds no course state of its own still gets the whole of what a step did.
 
 ## Worlds and elements
 

@@ -717,14 +717,15 @@ const pilot = createPilot({
         <tr><td><code>stageWorld(state)</code></td><td>The world the stage is flown over</td></tr>
         <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
         <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
-        <tr><td><code>gatePassed(ring, from, to)</code>, <code>gateOffset(ring, point)</code></td><td>Whether a step went through one</td></tr>
+        <tr><td><code>gatePassed(ring, from, to)</code>, <code>gateMissed(ring, from, to)</code>, <code>gateOffset(ring, point)</code></td><td>Whether a step went through one, or past it</td></tr>
+        <tr><td><code>flyStep(state, course, from, to)</code></td><td>Both of those put to the gate the course is waiting on</td></tr>
     </tbody>
 </table>
 </div>
 
-<p>A gate is tested against the step the aircraft flew rather than against where it ended up, because a hoop is thinner than the distance covered in a frame and a point test would fly straight through one without noticing:</p>
+<p>A gate is tested against the step the aircraft flew rather than against where it ended up, because a hoop is thinner than the distance covered in a frame and a point test would fly straight through one without noticing. <code>flyStep</code> is that test and the recording it leads to in one call, so a host drives a course with the two ends of a step and reads back what became of it:</p>
 
-<pre><code>import { createRunState, LOOP_COURSE, buildCourse, currentStage, nextGate, recordGate } from 'pilot-matter';
+<pre><code>import { createRunState, LOOP_COURSE, buildCourse, currentStage, flyStep } from 'pilot-matter';
 
 const run = createRunState(LOOP_COURSE);
 const rings = buildCourse(currentStage(run), { seed: 1, sampleHeight: world.sampleHeight });
@@ -733,10 +734,15 @@ let last = pilot.pose().position;
 function frame(dt) {
     pilot.update(dt);
     const now = pilot.pose().position;
-    const gate = nextGate(run);
-    if (gate &gt;= 0 &amp;&amp; gatePassed(rings[gate], last, now)) recordGate(run, gate);
+
+    const step = flyStep(run, rings, last, now);
+    if (step.finished) endOfStage(run);
+    else if (step.missed) say('come round again');
+
     last = now;
 }</code></pre>
+
+<p><code>flyStep</code> returns the gate the step was put to, whether it went <code>passed</code> that gate or <code>missed</code> it, and whether passing it <code>finished</code> the stage. Nothing but the gate a course is waiting on can be flown or missed - a course is an order, and a hoop further down it is not the pilot's business yet - so a host that holds no course state of its own still gets the whole of what a step did.</p>
 
 <h2 id="worlds-and-elements">Worlds and elements</h2>
 

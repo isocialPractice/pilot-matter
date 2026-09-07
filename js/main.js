@@ -27,14 +27,14 @@ import { runwayWanted } from './config.js';
 import { headingDegrees } from './units.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
-    restartStage, recordLanding, recordGate, recordMiss, nextGate, runObjective, runStatus,
-    stageWorld, stageStart, buildCourse, gatePassed, gateMissed, gatePointer,
+    restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
+    stageWorld, stageStart, buildCourse, gatePointer,
     tickRun, missNotice,
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey,
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE
 } from './game-modes.js';
 import {
-    createBestTimesState, bestTime, recordStageTime, formatStageTime
+    createBestTimesState, bestTime, recordStageTime, stageReport
 } from './best-times.js';
 import {
     createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
@@ -384,7 +384,7 @@ class FlightSimulator {
         // gone by, and the time a stage just flown out came to. The objective
         // is written back the moment their beat runs out.
         const missed = this.missHold > 0 ? missNotice(this.run) : '';
-        const report = this.stageHold > 0 ? this.stageReport() : '';
+        const report = this.stageHold > 0 ? stageReport(this.stageResult) : '';
 
         this.hud.setObjective(mode ? {
             name: mode.label,
@@ -865,19 +865,6 @@ class FlightSimulator {
         this.holdStage();
     }
 
-    /**
-     * What a finished stage is reported as while it is held on the screen: the
-     * time it took, and whether that beat the board. Nothing at all for a stage
-     * whose clock never ran, which is a stage nothing was flown in.
-     */
-    stageReport() {
-        const result = this.stageResult;
-        if (!result?.time) return '';
-
-        const time = formatStageTime(result.time);
-        return result.best ? `NEW BEST  ·  ${time}` : `STAGE TIME  ·  ${time}`;
-    }
-
     /** Holds a finished stage on screen for a beat before laying out the next. */
     holdStage() {
         this.stageHold = STAGE_HOLD;
@@ -898,35 +885,31 @@ class FlightSimulator {
     }
 
     /**
-     * Watches the step the aircraft just flew for the gate the course is
-     * waiting on. A step rather than a position, because a gate is thinner than
-     * the distance covered in a frame.
+     * Puts the step the aircraft just flew to the course. What that step did to
+     * the run is decided in `js/game-modes.js`, which holds the course rules;
+     * what is here is the screen's answer to it.
      */
     trackCourse() {
         const position = this.aircraft.getPosition();
-        const gate = nextGate(this.run);
 
-        if (gate < 0 || !this.lastPosition) {
+        if (nextGate(this.run) < 0 || !this.lastPosition) {
             this.lastPosition = position;
             return;
         }
 
-        const ring = this.course[gate];
-
-        if (gatePassed(ring, this.lastPosition, position)) {
-            // The stage is finished before the card is written, so a card
-            // written on the last gate of a stage carries the time it took.
-            if (recordGate(this.run, gate)) this.finishStage();
-            this.syncObjective();
-        } else if (gateMissed(ring, this.lastPosition, position) && recordMiss(this.run, gate)) {
-            // The course is still waiting on the same gate, so nothing about
-            // the run has moved. What the pilot gets is the one thing they were
-            // not getting before: told.
-            this.missHold = MISS_HOLD;
-            this.syncObjective();
-        }
-
+        const step = flyStep(this.run, this.course, this.lastPosition, position);
         this.lastPosition = position;
+
+        // The stage is finished before the card is written, so a card written
+        // on the last gate of a stage carries the time it took.
+        if (step.finished) this.finishStage();
+
+        // A miss leaves the course waiting on the same gate, so nothing about
+        // the run has moved. What the pilot gets is the one thing they were not
+        // getting before: told.
+        if (step.missed) this.missHold = MISS_HOLD;
+
+        if (step.passed || step.missed) this.syncObjective();
     }
 
     /**

@@ -432,3 +432,37 @@ test('every reading the panel holds is inside the range it was declared with', (
         state.elements.map(element => element.config)
     );
 });
+
+// The panel used to hand out its own live configuration objects, so a world
+// recorded from a set of placements went on changing as the ranges were
+// stepped. Whatever held that record - the terrain's, which is what decides
+// whether the ground has to be laid again - then compared the edited world
+// against itself, found nothing different, and left the ground exactly as it
+// was however far a range was walked.
+test('placements already handed out are not moved by the next edit', () => {
+    const { state, element } = openedOn('highlands', 'mountain');
+
+    const recorded = editorPlacements(state);
+    const before = JSON.stringify(recorded);
+
+    for (let i = 0; i < 8; i++) adjustEditorRange(state, rowId(element.id, 'height', 'max'), 1);
+
+    assert.equal(JSON.stringify(recorded), before,
+        'placements handed out before the edit describe the world before the edit');
+    assert.notEqual(JSON.stringify(editorPlacements(state)), before,
+        'and the next ask describes a world the ground has to be laid again for');
+});
+
+// A colour is held as an object inside the configuration rather than as a
+// number beside it, so it is the case a copy is easiest to get half right.
+test('a colour handed out is the colour it was handed out as', () => {
+    const { state, element } = openedOn('river-basin', 'grass');
+
+    const recorded = editorPlacements(state);
+    const before = JSON.stringify(recorded);
+
+    adjustEditorRange(state, rowId(element.id, 'color', 'light'), -6);
+
+    assert.equal(JSON.stringify(recorded), before);
+    assert.notEqual(JSON.stringify(editorPlacements(state)), before);
+});

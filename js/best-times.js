@@ -129,3 +129,19 @@ export function formatStageTime(seconds) {
 
     return `${minutes}:${String(whole).padStart(2, '0')}.${rest % TIME_PRECISION}`;
 }
+
+/**
+ * What a finished stage is reported as, in the one line the pilot reads at the
+ * end of one: the time it took, and whether that beat the board. Written from
+ * the record `recordStageTime` returns rather than from the clock, so the line
+ * and the board can never disagree about what was flown.
+ *
+ * Nothing at all for a stage whose clock never ran, which is a stage nothing
+ * was flown in.
+ */
+export function stageReport(result) {
+    if (!result?.time) return '';
+
+    const time = formatStageTime(result.time);
+    return result.best ? `NEW BEST  ·  ${time}` : `STAGE TIME  ·  ${time}`;
+}

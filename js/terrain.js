@@ -83,7 +83,13 @@ export class Terrain {
 
         if (this.tiles.size > 0 && sameWorld(this.built, asked)) return false;
 
-        this.built       = asked;
+        // The world is recorded as a copy of the ask rather than as the ask
+        // itself. A caller that goes on editing the description it handed over -
+        // which is exactly what the element editor does - would otherwise be
+        // editing this record too, and `sameWorld` would be comparing the
+        // changed placements against themselves: a world that is never seen to
+        // change, and ground that is never drawn again.
+        this.built       = { ...asked, elements: asked.elements ? structuredClone(asked.elements) : null };
         this.environment = environment;
         this.maxHeight   = asked.base?.maxHeight ?? environment.base?.maxHeight ?? 480;
 
