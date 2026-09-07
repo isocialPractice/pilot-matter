@@ -14,48 +14,6 @@ its context survives being archived.
 - [ ] Bank the gates off the horizontal, so a loop has to be flown through at
   the angle it was laid at rather than upright every time
   - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
-
-### UI/UX Override - the ground the element editor never redraws
-
-#### Resolve Issues
-
-- [ ] Add an element editor overlay that lists the placed elements, edits
-  their ranges live, and regenerates the terrain from the algorithm
-  - **Issue**: The panel edits, but the terrain is never regenerated. Driven in
-    a browser on the start screen and in a free flight, `HEIGHT MAX` under
-    `MOUNTAIN` walked from `500` to `900` and the ground either side of the
-    panel came back pixel for pixel identical both times. The cause is an
-    aliased record: `editorPlacements` hands out the editor's live `config`
-    object, `terrain.setEnvironment` keeps it as `this.built`, and
-    `adjustEditorRange` then mutates it in place, so `sameWorld` compares the
-    changed object against itself, reports the world unchanged, and no tile is
-    ever drawn again. The generator is willing - built from the same placements
-    directly, eight steps of `HEIGHT MAX` move the highest point from `578.2`
-    to `904.9`
-  - **Goal**: Resolve to [element-editor-terrain-redraw.prompt.md](.claude/prompts/element-editor-terrain-redraw.prompt.md)
-  - From: Environment Design
-
-#### Found Issues
-
-- [ ] A stage of a course cannot be flown out under test, so everything that
-  only happens at the end of one is unverified
-  - **Issue**: The card's report on a finished stage (`NEW BEST  ·  <time>`
-    against `STAGE TIME  ·  <time>`), the next stage opening at `0:00.0`, a
-    `BEST` surviving a reload, and the green mark moving on to the next gate
-    all need a gate actually flown through. A 240 unit hoop reached 2600 units
-    down its own axis cannot be hit by tapping the flight keys from a test:
-    the aircraft opens lined up but climbs away at full throttle, and there is
-    no seam - no exposed run state, no way to place the aircraft - for a test
-    to fly the course any other way. The geometry underneath is covered by the
-    suite (`test/game-modes.test.js` for the crossing rules,
-    `test/best-times.test.js` for the board), but nothing checks that flying a
-    gate writes the report onto the card
-  - **Goal**: Give the loop course a seam a test can take - an exposed hook
-    that reports a gate flown, or a way to open a stage with the aircraft on
-    the gate's plane - and cover the finished-stage card with it, so the one
-    line a pilot reads at the end of a stage is not the only part of the mode
-    nothing checks
-  - From: UI/UX Override - the ground the element editor never redraws
 - [ ] Score a landing rather than only counting it: touchdown point down the
   strip, sink rate at the moment of contact, distance off the centreline, and
   heading off the strip, shown as a breakdown once the aircraft has stopped
@@ -72,6 +30,32 @@ its context survives being archived.
   phone or tablet with no keyboard, so a machine that has keys is still
   flown with them
   - From: Game UI/UX
+
+### UI/UX Override - the terrain's own copy of the world it built
+
+#### Found Issues
+
+- [ ] Cover the terrain's copy of the world it built, which nothing in the
+  suite reaches
+  - **Issue**: `terrain.setEnvironment` records a copy of the world it was
+    asked for rather than the ask itself, which is the half of the redraw fix
+    that lives outside the element editor. Backing that copy out of
+    `js/terrain.js` - `this.built = asked` - and running `npm test` gives 807
+    tests, 807 pass, 0 fail: the ground stops being drawn again and the suite
+    says nothing. The editor's half is covered, by the two tests added to
+    `test/element-editor.test.js`; this half is not. It cannot be reached the
+    way the rest of `test/` works, because `js/terrain.js` imports `three` and
+    the project carries no dependencies to import it from.
+  - **Goal**: Give the record-and-compare its own seam outside the mesh, so it
+    can be tested the way everything else here is: lift `sameWorld` and the
+    copy taken beside it into a module that imports no Three.js - the shape of
+    `js/world-tiles.js` next to `js/terrain.js` - and have `setEnvironment`
+    call it. A test would then assert that a description handed over and then
+    edited by its caller still reads to the recorder as a changed world: hand
+    it a set of placements, keep the reference, step a range on it, and expect
+    the next comparison to report a different world rather than the same one.
+    Verified in the browser this run, but only in the browser.
+  - From: UI/UX Override - the terrain's own copy of the world it built
 
 ## Game UI/UX
 
@@ -773,3 +757,37 @@ how the simulator got here rather than as a list still to be worked.
   minimap, or as a pass down the line of it - so the first gate is not the
   only one the pilot has ever seen
   - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
+- [x] Add an element editor overlay that lists the placed elements, edits
+  their ranges live, and regenerates the terrain from the algorithm
+  - **Issue**: The panel edits, but the terrain is never regenerated. Driven in
+    a browser on the start screen and in a free flight, `HEIGHT MAX` under
+    `MOUNTAIN` walked from `500` to `900` and the ground either side of the
+    panel came back pixel for pixel identical both times. The cause is an
+    aliased record: `editorPlacements` hands out the editor's live `config`
+    object, `terrain.setEnvironment` keeps it as `this.built`, and
+    `adjustEditorRange` then mutates it in place, so `sameWorld` compares the
+    changed object against itself, reports the world unchanged, and no tile is
+    ever drawn again. The generator is willing - built from the same placements
+    directly, eight steps of `HEIGHT MAX` move the highest point from `578.2`
+    to `904.9`
+  - **Goal**: Resolve to [element-editor-terrain-redraw.prompt.md](.claude/prompts/element-editor-terrain-redraw.prompt.md)
+  - From: Environment Design
+- [x] A stage of a course cannot be flown out under test, so everything that
+  only happens at the end of one is unverified
+  - **Issue**: The card's report on a finished stage (`NEW BEST  ·  <time>`
+    against `STAGE TIME  ·  <time>`), the next stage opening at `0:00.0`, a
+    `BEST` surviving a reload, and the green mark moving on to the next gate
+    all need a gate actually flown through. A 240 unit hoop reached 2600 units
+    down its own axis cannot be hit by tapping the flight keys from a test:
+    the aircraft opens lined up but climbs away at full throttle, and there is
+    no seam - no exposed run state, no way to place the aircraft - for a test
+    to fly the course any other way. The geometry underneath is covered by the
+    suite (`test/game-modes.test.js` for the crossing rules,
+    `test/best-times.test.js` for the board), but nothing checks that flying a
+    gate writes the report onto the card
+  - **Goal**: Give the loop course a seam a test can take - an exposed hook
+    that reports a gate flown, or a way to open a stage with the aircraft on
+    the gate's plane - and cover the finished-stage card with it, so the one
+    line a pilot reads at the end of a stage is not the only part of the mode
+    nothing checks
+  - From: UI/UX Override - the ground the element editor never redraws
