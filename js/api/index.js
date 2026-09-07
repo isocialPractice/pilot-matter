@@ -63,7 +63,8 @@ export {
 } from '../crash.js';
 
 // The modes the bundled game is played in, and the pure rules behind them: the
-// stages, the run state, the course geometry, and the gate test.
+// stages, the run state, the course geometry, the gate tests, and the step a
+// course is flown a frame at a time with.
 export {
     GAME_MODES, GAME_MODE_IDS, RUNWAY_LANDING, LOOP_COURSE,
     LAND_OBJECTIVE, LOOP_OBJECTIVE,
@@ -71,7 +72,8 @@ export {
     createRunState, startRun, endRun, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, recordGate, recordCrash, nextGate,
     stageProgress, isStageComplete, runObjective, runStatus,
-    stageWorld, stageStart, buildCourse, gateOffset, gatePassed
+    stageWorld, stageStart, buildCourse,
+    gateOffset, gatePassed, gateMissed, flyStep
 } from '../game-modes.js';
 
 // The rule the bundled simulator uses at the end of the ground, published so a

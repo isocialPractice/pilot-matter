@@ -5,6 +5,69 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1-alpha] - 2026-09-07
+
+The element editor draws the ground it was already editing, and a stage of a
+course can be flown out from a case, so the one line a pilot reads at the end of
+a stage is held by the suite rather than by nobody.
+
+### Added
+
+- **`flyStep(state, course, from, to)`**, which is the whole of what a step of
+  flight does to a course, in one call. `js/main.js` used to hold half that rule
+  and `js/game-modes.js` the other: the frame asked `gatePassed` and
+  `gateMissed` itself, chose between `recordGate` and `recordMiss` on the
+  answer, and read whether the stage was out of the return value. That put the
+  mode's only end-of-stage path inside the one module the suite cannot import -
+  `js/main.js` reaches for Three.js and for the document - and a 240 unit hoop
+  2600 units down its own axis is not something a case can reach by tapping the
+  flight keys: the aircraft opens lined up and climbs away at full throttle, and
+  there was no other way in. The seam takes the two ends of a step and reports
+  the gate it was put to, whether the step went through that gate or past it,
+  and whether going through it was the last gate the stage was waiting on;
+  `trackCourse` is the screen's answer to that record and nothing more
+- **`stageReport(result)`** in `js/best-times.js` - the line a finished stage
+  is reported on, `NEW BEST  ·  0:12.0` against `STAGE TIME  ·  0:12.0`,
+  written from the record `recordStageTime` hands back rather than from the
+  clock, so the card and the board cannot disagree about what was flown. It was
+  a method on the class in `js/main.js`, which is to say it was the one thing a
+  pilot is told at the end of a stage and the one thing nothing checked
+- **`test/stage-flight.test.js`**, ten cases that fly a stage out gate by gate
+  through the seam and hold everything that only happens at the end of one: the
+  card on a first flight and on a slower second and on a faster third, a stage
+  whose clock never ran reported as nothing at all, the next stage opening on
+  its own clock at `TIME -:--.-  ·  BEST -:--.-`, a best flown in one session
+  reading back as `BEST 0:12.0` in the next, the mark walking the course one
+  gate at a time and going out when the stage does, a gate gone past leaving the
+  course waiting on that same gate, a step that crosses nothing leaving the run
+  alone, and a crash costing the thirty seconds before it rather than the stage
+- **`flyStep` and `gateMissed` are published from `js/api/index.js`**, which is
+  what the `pilot-matter` specifier resolves to. A name the document tells a
+  host to import and the entry point does not re-export is not a name they have
+  to go looking for, it is an import that fails on their page
+- The **Game modes** table in `docs/api.md` names `flyStep` and `gateMissed`,
+  and the worked example drives a course through the seam rather than through
+  the four calls it replaces
+
+### Fixed
+
+- **The element editor moved every reading and never the ground.** `HEIGHT MAX`
+  under `MOUNTAIN` walked from `500` to `900` on the start screen and again in
+  a free flight, and the terrain either side of the panel came back pixel for
+  pixel identical both times. The generator was willing - built from the same
+  placements directly, eight steps of that range take the highest point from
+  `578.2` to `904.9` - it was never asked to run. `editorPlacements` handed out
+  the panel's own live `config` objects, `setEnvironment` kept the ask it was
+  given as `this.built`, and stepping a range then edited that record in place,
+  so `sameWorld` stringified the changed placements against themselves, reported
+  a world that had not changed, and released no tile. Both halves are closed
+  rather than the reachable one: the panel copies each configuration on the way
+  out, so what a caller is handed is a description of the world rather than a
+  handle on the editor, and the terrain records a copy of the ask rather than
+  the ask itself, so a caller that goes on editing what it handed over is not
+  editing the record of it. Two cases hold the copy, a span stepped eight times
+  and a colour stepped once, and both fail against the aliased placements
+
 ## [1.13.0-alpha] - 2026-09-06
 
 A world whose ranges can be moved while it is being flown over, and a course of
