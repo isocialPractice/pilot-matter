@@ -57,6 +57,49 @@ its context survives being archived.
     Verified in the browser this run, but only in the browser.
   - From: UI/UX Override - the terrain's own copy of the world it built
 
+### Code Review Override - the published surface and the copy beside it
+
+#### Found Issues
+
+- [ ] Check the document's imports against the published surface, and not only
+  the surface against the document
+  - **Issue**: `test/docs.test.js` asserts every name `js/api/index.js`
+    publishes is named somewhere in `docs/api.md`, and nothing asserts the
+    other direction. A name the document presents as an export of
+    `pilot-matter` that the entry point does not re-export passes the whole
+    suite. This run put `flyStep` and `gateMissed` in the **Game modes** export
+    table and `flyStep` in the worked example's `from 'pilot-matter'` import
+    while `js/api/index.js` published neither, and 807 tests passed on it. A
+    host copying that line got `SyntaxError: The requested module does not
+    provide an export named 'flyStep'`. Both names are published now; the gap
+    that let them ship unpublished is still open.
+  - **Goal**: Add the reverse check to `test/docs.test.js`. Read the names out
+    of the export tables' leading code spans and out of the
+    `import { ... } from 'pilot-matter'` lines in `docs/api.md`, and assert
+    each one appears in `publishedNames(apiIndex)` - the helper is already
+    there, and it reads the surface off the source without loading the
+    renderer half of it. Expect the first run to name any other claim the
+    document makes that the entry point does not keep.
+  - From: Code Review Override - the published surface and the copy beside it
+- [ ] Copy the whole ask in `setEnvironment`, or say that the placements are
+  all that is copied
+  - **Issue**: `js/terrain.js` records `{ ...asked, elements: <clone> }` and
+    the comment above it says the world is recorded as a copy of the ask
+    rather than as the ask itself. Only `elements` is copied. `base` and
+    `runway` stay references into the caller's object, and `sameWorld`
+    compares both of them with `JSON.stringify`, so a caller that went on
+    editing its own `base` would hit the same self-comparison the elements
+    copy was added to close: a world never seen to change, and ground never
+    drawn again. Nothing reaches it today, because every `base` that gets to
+    `setEnvironment` is a static stage or preset object that nothing mutates,
+    so this is the comment claiming cover the code does not have rather than a
+    defect a pilot can fly into.
+  - **Goal**: Either take the copy the comment describes, which is
+    `structuredClone` over the whole of `asked` since every field of it is
+    JSON-shaped data, or narrow the comment to say the placements are what is
+    copied and why the other fields do not need it.
+  - From: Code Review Override - the published surface and the copy beside it
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
