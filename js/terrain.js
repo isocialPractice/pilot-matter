@@ -8,6 +8,7 @@ import {
     TILE_REACH, tileIndexAt, tileKey, tileBounds, tileCenter, tilesInReach,
     tileWorthKeeping, sameTile, isHomeTile
 } from './world-tiles.js';
+import { recordWorld, sameWorld } from './world-record.js';
 
 /**
  * The ground, as the mesh side of an assembled environment. Everything about
@@ -84,12 +85,11 @@ export class Terrain {
         if (this.tiles.size > 0 && sameWorld(this.built, asked)) return false;
 
         // The world is recorded as a copy of the ask rather than as the ask
-        // itself. A caller that goes on editing the description it handed over -
-        // which is exactly what the element editor does - would otherwise be
-        // editing this record too, and `sameWorld` would be comparing the
-        // changed placements against themselves: a world that is never seen to
-        // change, and ground that is never drawn again.
-        this.built       = { ...asked, elements: asked.elements ? structuredClone(asked.elements) : null };
+        // itself, so a caller that goes on editing the description it handed
+        // over is not editing this record too. `js/world-record.js` is that
+        // copy and the comparison above; both are kept out of here so they can
+        // be tested without a renderer.
+        this.built       = recordWorld(asked);
         this.environment = environment;
         this.maxHeight   = asked.base?.maxHeight ?? environment.base?.maxHeight ?? 480;
 
@@ -316,12 +316,3 @@ function tileElements(elements, home) {
     return home ? elements : elements.filter(placement => placement.type !== 'runway');
 }
 
-/** Whether two asks would generate the same ground, down to the strip on it. */
-function sameWorld(built, asked) {
-    return built != null
-        && built.id === asked.id
-        && built.seed === asked.seed
-        && JSON.stringify(built.runway) === JSON.stringify(asked.runway)
-        && JSON.stringify(built.base) === JSON.stringify(asked.base)
-        && JSON.stringify(built.elements) === JSON.stringify(asked.elements);
-}

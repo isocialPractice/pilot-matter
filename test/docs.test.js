@@ -25,6 +25,28 @@ function publishedNames(source) {
         .filter(Boolean);
 }
 
+/**
+ * Every name `docs/api.md` presents as an export of the package: the leading
+ * code spans of each export table's rows, and the names the worked examples
+ * take off the bare specifier. A row's first cell can carry several at once
+ * (`` `FLYING`, `LANDED`, `CRASHED` ``), and a function is written with the
+ * arguments it takes, which are not part of the name.
+ */
+function documentedNames(doc) {
+    const rows = [...doc.matchAll(/^\| Export \| Is \|\n\|[-| ]+\|\n((?:\|.*\n)+)/gm)]
+        .flatMap(table => table[1].trim().split('\n'));
+
+    const listed = rows
+        .flatMap(row => [...(row.split('|')[1] ?? '').matchAll(/`([^`]+)`/g)])
+        .map(match => match[1]);
+
+    const imported = [...doc.matchAll(/import\s*\{([^}]*)\}\s*from\s*'pilot-matter'/g)]
+        .flatMap(match => match[1].split(','));
+
+    return [...new Set([...listed, ...imported].map(name => name.trim().replace(/\(.*$/, '').trim()))]
+        .filter(Boolean);
+}
+
 const published = publishedNames(apiIndex);
 
 test('the entry point publishes something to document', () => {
@@ -39,6 +61,24 @@ test('the entry point publishes something to document', () => {
 test('every name the API publishes is named in the document', () => {
     for (const name of published) {
         assert.ok(apiDoc.includes(name), `docs/api.md does not mention ${name}`);
+    }
+});
+
+// And the other way round, which is the direction a host actually reads the
+// document in. A name the document presents as an export of `pilot-matter`
+// that the entry point does not publish is a line a host copies onto its page
+// and gets `SyntaxError: The requested module does not provide an export
+// named ...` from - and everything above this passes on it, because every
+// check above asks only whether the document kept up with the surface.
+test('every name the document presents as an export is one the API publishes', () => {
+    const documented = documentedNames(apiDoc);
+
+    assert.ok(documented.length > 20, 'the document should present the whole of both halves');
+    assert.ok(documented.includes('createPilot'));
+
+    for (const name of documented) {
+        assert.ok(published.includes(name),
+            `docs/api.md presents ${name} as an export, which js/api/index.js does not publish`);
     }
 });
 

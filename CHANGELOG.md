@@ -5,6 +5,57 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.2-alpha] - 2026-09-08
+
+The record a terrain keeps of the world it built is a module of its own, and the
+document is read against the entry point in both directions rather than one.
+
+### Added
+
+- **`js/world-record.js`**, the record a terrain keeps of the world it built:
+  the copy taken of an ask, and the comparison that decides whether the ground
+  already on screen is the ground being asked for. Both used to sit inside
+  `js/terrain.js`, which reaches for Three.js and so cannot be imported by the
+  suite - and the project carries no dependencies to import it from, so nothing
+  reached them at all. Backing the copy out of the class gave 807 tests, 807
+  pass, and ground that was never drawn again: the half of the redraw fix that
+  lives outside the element editor had no cover of any kind. The module is pure
+  in the shape `js/world-tiles.js` is, and `setEnvironment` calls it
+- **`test/world-record.test.js`**, fifteen cases over that seam. What counts as
+  the same world - the preset, the seed, the strip and the configuration it was
+  laid to, an element moved - and then the copy itself, which is the case the
+  redraw fix turns on: a set of placements handed over, kept a reference to, and
+  edited by its caller reads back as a changed world rather than as the same
+  one. Five of the fifteen fail against a record that holds the ask instead of a
+  copy of it. The last two read `js/terrain.js` rather than import it, the way
+  `test/world-tiles.test.js` reads the camera out of `js/main.js`, because a
+  module the terrain stopped calling would pass every case above them
+- **The document's own claims are checked against the published surface.**
+  `test/docs.test.js` asserted every name `js/api/index.js` publishes is named
+  in `docs/api.md` and nothing asserted the other way, so a name the document
+  presented as an export of `pilot-matter` that the entry point did not
+  re-export passed the whole suite - which is exactly what `flyStep` and
+  `gateMissed` did last version, in an export table and in an import line a
+  host would copy, for `SyntaxError: The requested module does not provide an
+  export named 'flyStep'`. The reverse check reads the names out of the export
+  tables' leading code spans and out of the `from 'pilot-matter'` imports and
+  holds each one to the entry point. It names nothing today, which is the point:
+  the gap is closed rather than the symptom
+
+### Fixed
+
+- **`setEnvironment` copied the placements and called it the ask.** The record
+  was `{ ...asked, elements: <clone> }` while the comment above it said the
+  world was recorded as a copy of the ask rather than as the ask itself. `base`
+  and `runway` stayed references into the caller's object, and both are
+  compared, so a caller that went on editing its own `base` would have hit the
+  same self-comparison the elements copy was added to close: a world never seen
+  to change, and ground never drawn again. Nothing reached it, because every
+  `base` that gets to `setEnvironment` today is a static stage or preset that
+  nothing mutates - it was the comment claiming cover the code did not have.
+  `recordWorld` clones the whole of an ask, every field of which is JSON-shaped
+  data, so no field is left as a reference for a later one to be caught out by
+
 ## [1.13.1-alpha] - 2026-09-07
 
 The element editor draws the ground it was already editing, and a stage of a
