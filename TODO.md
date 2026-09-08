@@ -31,74 +31,26 @@ its context survives being archived.
   flown with them
   - From: Game UI/UX
 
-### UI/UX Override - the terrain's own copy of the world it built
+### Code Review Override - the guard on the document's reverse check
 
-#### Found Issues
-
-- [ ] Cover the terrain's copy of the world it built, which nothing in the
-  suite reaches
-  - **Issue**: `terrain.setEnvironment` records a copy of the world it was
-    asked for rather than the ask itself, which is the half of the redraw fix
-    that lives outside the element editor. Backing that copy out of
-    `js/terrain.js` - `this.built = asked` - and running `npm test` gives 807
-    tests, 807 pass, 0 fail: the ground stops being drawn again and the suite
-    says nothing. The editor's half is covered, by the two tests added to
-    `test/element-editor.test.js`; this half is not. It cannot be reached the
-    way the rest of `test/` works, because `js/terrain.js` imports `three` and
-    the project carries no dependencies to import it from.
-  - **Goal**: Give the record-and-compare its own seam outside the mesh, so it
-    can be tested the way everything else here is: lift `sameWorld` and the
-    copy taken beside it into a module that imports no Three.js - the shape of
-    `js/world-tiles.js` next to `js/terrain.js` - and have `setEnvironment`
-    call it. A test would then assert that a description handed over and then
-    edited by its caller still reads to the recorder as a changed world: hand
-    it a set of placements, keep the reference, step a range on it, and expect
-    the next comparison to report a different world rather than the same one.
-    Verified in the browser this run, but only in the browser.
-  - From: UI/UX Override - the terrain's own copy of the world it built
-
-### Code Review Override - the published surface and the copy beside it
-
-#### Found Issues
-
-- [ ] Check the document's imports against the published surface, and not only
-  the surface against the document
-  - **Issue**: `test/docs.test.js` asserts every name `js/api/index.js`
-    publishes is named somewhere in `docs/api.md`, and nothing asserts the
-    other direction. A name the document presents as an export of
-    `pilot-matter` that the entry point does not re-export passes the whole
-    suite. This run put `flyStep` and `gateMissed` in the **Game modes** export
-    table and `flyStep` in the worked example's `from 'pilot-matter'` import
-    while `js/api/index.js` published neither, and 807 tests passed on it. A
-    host copying that line got `SyntaxError: The requested module does not
-    provide an export named 'flyStep'`. Both names are published now; the gap
-    that let them ship unpublished is still open.
-  - **Goal**: Add the reverse check to `test/docs.test.js`. Read the names out
-    of the export tables' leading code spans and out of the
-    `import { ... } from 'pilot-matter'` lines in `docs/api.md`, and assert
-    each one appears in `publishedNames(apiIndex)` - the helper is already
-    there, and it reads the surface off the source without loading the
-    renderer half of it. Expect the first run to name any other claim the
-    document makes that the entry point does not keep.
-  - From: Code Review Override - the published surface and the copy beside it
-- [ ] Copy the whole ask in `setEnvironment`, or say that the placements are
-  all that is copied
-  - **Issue**: `js/terrain.js` records `{ ...asked, elements: <clone> }` and
-    the comment above it says the world is recorded as a copy of the ask
-    rather than as the ask itself. Only `elements` is copied. `base` and
-    `runway` stay references into the caller's object, and `sameWorld`
-    compares both of them with `JSON.stringify`, so a caller that went on
-    editing its own `base` would hit the same self-comparison the elements
-    copy was added to close: a world never seen to change, and ground never
-    drawn again. Nothing reaches it today, because every `base` that gets to
-    `setEnvironment` is a static stage or preset object that nothing mutates,
-    so this is the comment claiming cover the code does not have rather than a
-    defect a pilot can fly into.
-  - **Goal**: Either take the copy the comment describes, which is
-    `structuredClone` over the whole of `asked` since every field of it is
-    JSON-shaped data, or narrow the comment to say the placements are what is
-    copied and why the other fields do not need it.
-  - From: Code Review Override - the published surface and the copy beside it
+- [ ] Hold the document's reverse check to the export tables it says it reads
+  - **Issue**: the reverse check added to `test/docs.test.js` this run guards
+    itself with `assert.ok(documented.length > 20)`, and the fifteen
+    `import { ... } from 'pilot-matter'` lines in `docs/api.md` carry 25 unique
+    names between them, so the guard is met by the imports alone. The table
+    half of `documentedNames` matches on a header row of exactly
+    `| Export | Is |` followed by a separator row, so a table reformatted, a
+    column renamed, or the file saved with CRLF line endings drops every one of
+    the nine export tables out of the scrape - and `documented` is still 25
+    names, still over 20, and the suite is still green while nothing checks a
+    table at all. That is the same silent pass the check was written to close,
+    one level up from it.
+  - **Goal**: Guard the read rather than the count. Count the
+    `| Export | Is |` header rows in `docs/api.md` and assert the table pattern
+    matched that many, so a table the scrape can no longer read fails the suite
+    instead of quietly leaving it. The name assertions underneath are right as
+    they stand and need no change.
+  - From: Code Review Override - the guard on the document's reverse check
 
 ## Game UI/UX
 
@@ -834,3 +786,62 @@ how the simulator got here rather than as a list still to be worked.
     line a pilot reads at the end of a stage is not the only part of the mode
     nothing checks
   - From: UI/UX Override - the ground the element editor never redraws
+- [x] Cover the terrain's copy of the world it built, which nothing in the
+  suite reaches
+  - **Issue**: `terrain.setEnvironment` records a copy of the world it was
+    asked for rather than the ask itself, which is the half of the redraw fix
+    that lives outside the element editor. Backing that copy out of
+    `js/terrain.js` - `this.built = asked` - and running `npm test` gives 807
+    tests, 807 pass, 0 fail: the ground stops being drawn again and the suite
+    says nothing. The editor's half is covered, by the two tests added to
+    `test/element-editor.test.js`; this half is not. It cannot be reached the
+    way the rest of `test/` works, because `js/terrain.js` imports `three` and
+    the project carries no dependencies to import it from.
+  - **Goal**: Give the record-and-compare its own seam outside the mesh, so it
+    can be tested the way everything else here is: lift `sameWorld` and the
+    copy taken beside it into a module that imports no Three.js - the shape of
+    `js/world-tiles.js` next to `js/terrain.js` - and have `setEnvironment`
+    call it. A test would then assert that a description handed over and then
+    edited by its caller still reads to the recorder as a changed world: hand
+    it a set of placements, keep the reference, step a range on it, and expect
+    the next comparison to report a different world rather than the same one.
+    Verified in the browser this run, but only in the browser.
+  - From: UI/UX Override - the terrain's own copy of the world it built
+- [x] Check the document's imports against the published surface, and not only
+  the surface against the document
+  - **Issue**: `test/docs.test.js` asserts every name `js/api/index.js`
+    publishes is named somewhere in `docs/api.md`, and nothing asserts the
+    other direction. A name the document presents as an export of
+    `pilot-matter` that the entry point does not re-export passes the whole
+    suite. This run put `flyStep` and `gateMissed` in the **Game modes** export
+    table and `flyStep` in the worked example's `from 'pilot-matter'` import
+    while `js/api/index.js` published neither, and 807 tests passed on it. A
+    host copying that line got `SyntaxError: The requested module does not
+    provide an export named 'flyStep'`. Both names are published now; the gap
+    that let them ship unpublished is still open.
+  - **Goal**: Add the reverse check to `test/docs.test.js`. Read the names out
+    of the export tables' leading code spans and out of the
+    `import { ... } from 'pilot-matter'` lines in `docs/api.md`, and assert
+    each one appears in `publishedNames(apiIndex)` - the helper is already
+    there, and it reads the surface off the source without loading the
+    renderer half of it. Expect the first run to name any other claim the
+    document makes that the entry point does not keep.
+  - From: Code Review Override - the published surface and the copy beside it
+- [x] Copy the whole ask in `setEnvironment`, or say that the placements are
+  all that is copied
+  - **Issue**: `js/terrain.js` records `{ ...asked, elements: <clone> }` and
+    the comment above it says the world is recorded as a copy of the ask
+    rather than as the ask itself. Only `elements` is copied. `base` and
+    `runway` stay references into the caller's object, and `sameWorld`
+    compares both of them with `JSON.stringify`, so a caller that went on
+    editing its own `base` would hit the same self-comparison the elements
+    copy was added to close: a world never seen to change, and ground never
+    drawn again. Nothing reaches it today, because every `base` that gets to
+    `setEnvironment` is a static stage or preset object that nothing mutates,
+    so this is the comment claiming cover the code does not have rather than a
+    defect a pilot can fly into.
+  - **Goal**: Either take the copy the comment describes, which is
+    `structuredClone` over the whole of `asked` since every field of it is
+    JSON-shaped data, or narrow the comment to say the placements are what is
+    copied and why the other fields do not need it.
+  - From: Code Review Override - the published surface and the copy beside it
