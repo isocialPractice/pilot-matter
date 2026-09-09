@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.3-alpha] - 2026-09-09
+
+The reverse check on the document is held to the tables it says it reads.
+
+### Fixed
+
+- **The reverse check guarded its count rather than its read.**
+  `documentedNames` in `test/docs.test.js` scrapes `docs/api.md` two ways - the
+  leading code spans of every export table's rows, and the names taken off
+  `from 'pilot-matter'` - and the check then guarded itself with
+  `assert.ok(documented.length > 20)`. The fifteen import lines carry 25 unique
+  names between them, so that guard was met on the imports alone. The table
+  half matched a header row of exactly `| Export | Is |` followed by a
+  separator row, so a second column renamed, a separator rewritten, or the file
+  saved with CRLF endings dropped all nine export tables out of the scrape
+  while `documented` stayed at 25, still over 20, and the suite stayed green
+  with nothing checking a table at all - the same silent pass the check was
+  written to close, one level up from it. The tables are now read by
+  `exportTables` and their count held against `exportTableCount`, which
+  recognizes a header row by its leading `Export` cell and nothing else, so the
+  loose count keeps standing where the strict pattern gives way. Each of those
+  three ways of breaking the scrape now fails the suite by name instead of
+  leaving it, and the name assertions underneath are unchanged
+
 ## [1.13.2-alpha] - 2026-09-08
 
 The record a terrain keeps of the world it built is a module of its own, and the

@@ -26,6 +26,30 @@ function publishedNames(source) {
 }
 
 /**
+ * Every export table in `docs/api.md`, as its rows. Read on its own so the
+ * number of tables this pattern found can be held against the number the
+ * document carries: a table it can no longer read - one reformatted, a column
+ * renamed, the file saved with CRLF endings - leaves the scrape without
+ * leaving a mark, and every name that table held stops being checked.
+ */
+function exportTables(doc) {
+    return [...doc.matchAll(/^\| Export \| Is \|\n\|[-| ]+\|\n((?:\|.*\n)+)/gm)]
+        .map(table => table[1].trim().split('\n'));
+}
+
+/**
+ * The number of export tables the document is written with, counted off the
+ * leading `Export` cell of each header row and nothing else. Deliberately the
+ * loosest read in this file: it is what the strict pattern above is measured
+ * against, so it has to hold where that one gives way rather than give way
+ * beside it - a second column renamed or a separator row rewritten takes a
+ * table out of the scrape while leaving it counted here.
+ */
+function exportTableCount(doc) {
+    return [...doc.matchAll(/^\|[ \t]*Export[ \t]*\|/gm)].length;
+}
+
+/**
  * Every name `docs/api.md` presents as an export of the package: the leading
  * code spans of each export table's rows, and the names the worked examples
  * take off the bare specifier. A row's first cell can carry several at once
@@ -33,10 +57,7 @@ function publishedNames(source) {
  * arguments it takes, which are not part of the name.
  */
 function documentedNames(doc) {
-    const rows = [...doc.matchAll(/^\| Export \| Is \|\n\|[-| ]+\|\n((?:\|.*\n)+)/gm)]
-        .flatMap(table => table[1].trim().split('\n'));
-
-    const listed = rows
+    const listed = exportTables(doc).flat()
         .flatMap(row => [...(row.split('|')[1] ?? '').matchAll(/`([^`]+)`/g)])
         .map(match => match[1]);
 
@@ -72,6 +93,18 @@ test('every name the API publishes is named in the document', () => {
 // check above asks only whether the document kept up with the surface.
 test('every name the document presents as an export is one the API publishes', () => {
     const documented = documentedNames(apiDoc);
+    const headers = exportTableCount(apiDoc);
+
+    // Guard the read rather than the count. The fifteen `from 'pilot-matter'`
+    // import lines carry 25 names between them, so `documented` clears 20 on
+    // those alone: a scrape that read no export table at all would still pass
+    // the line below, and every name the tables hold would then be checked
+    // against nothing. Held against the header rows - the loosest thing a
+    // table can be recognized by - a table that has gone out of the pattern's
+    // reach fails here rather than leaving quietly.
+    assert.ok(headers > 0, 'the document should present its exports in tables');
+    assert.equal(exportTables(apiDoc).length, headers,
+        'docs/api.md carries an export table this file can no longer read');
 
     assert.ok(documented.length > 20, 'the document should present the whole of both halves');
     assert.ok(documented.includes('createPilot'));

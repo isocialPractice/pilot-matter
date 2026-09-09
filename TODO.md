@@ -31,27 +31,6 @@ its context survives being archived.
   flown with them
   - From: Game UI/UX
 
-### Code Review Override - the guard on the document's reverse check
-
-- [ ] Hold the document's reverse check to the export tables it says it reads
-  - **Issue**: the reverse check added to `test/docs.test.js` this run guards
-    itself with `assert.ok(documented.length > 20)`, and the fifteen
-    `import { ... } from 'pilot-matter'` lines in `docs/api.md` carry 25 unique
-    names between them, so the guard is met by the imports alone. The table
-    half of `documentedNames` matches on a header row of exactly
-    `| Export | Is |` followed by a separator row, so a table reformatted, a
-    column renamed, or the file saved with CRLF line endings drops every one of
-    the nine export tables out of the scrape - and `documented` is still 25
-    names, still over 20, and the suite is still green while nothing checks a
-    table at all. That is the same silent pass the check was written to close,
-    one level up from it.
-  - **Goal**: Guard the read rather than the count. Count the
-    `| Export | Is |` header rows in `docs/api.md` and assert the table pattern
-    matched that many, so a table the scrape can no longer read fails the suite
-    instead of quietly leaving it. The name assertions underneath are right as
-    they stand and need no change.
-  - From: Code Review Override - the guard on the document's reverse check
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -845,3 +824,21 @@ how the simulator got here rather than as a list still to be worked.
     JSON-shaped data, or narrow the comment to say the placements are what is
     copied and why the other fields do not need it.
   - From: Code Review Override - the published surface and the copy beside it
+- [x] Hold the document's reverse check to the export tables it says it reads
+  - **Issue**: the reverse check added to `test/docs.test.js` this run guards
+    itself with `assert.ok(documented.length > 20)`, and the fifteen
+    `import { ... } from 'pilot-matter'` lines in `docs/api.md` carry 25 unique
+    names between them, so the guard is met by the imports alone. The table
+    half of `documentedNames` matches on a header row of exactly
+    `| Export | Is |` followed by a separator row, so a table reformatted, a
+    column renamed, or the file saved with CRLF line endings drops every one of
+    the nine export tables out of the scrape - and `documented` is still 25
+    names, still over 20, and the suite is still green while nothing checks a
+    table at all. That is the same silent pass the check was written to close,
+    one level up from it.
+  - **Goal**: Guard the read rather than the count. Count the
+    `| Export | Is |` header rows in `docs/api.md` and assert the table pattern
+    matched that many, so a table the scrape can no longer read fails the suite
+    instead of quietly leaving it. The name assertions underneath are right as
+    they stand and need no change.
+  - From: Code Review Override - the guard on the document's reverse check
