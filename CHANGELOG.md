@@ -5,6 +5,107 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0-alpha] - 2026-09-10
+
+A gate is an attitude to match rather than a place to be, a landing is four
+measurements rather than a count, and a machine with no keys has controls of its
+own.
+
+### Added
+
+- **Gates are laid over, and closed up one way across as they are.** A course
+  used to be round hoops, upright, and the whole of flying one was getting to
+  it: a circle is the same circle at every angle, so there was never anything to
+  line up on. Every stage past the first now lays its gates off the horizontal
+  by an amount of its own, either way, and narrows them along their own vertical
+  as it does - which is what makes the bank something to fly rather than
+  something to look at. `gateAxes` reads the span and the rise a crossing is
+  measured on off the gate's bearing and its bank, `gateCrossing` puts the
+  crossing to the opening those two describe rather than to a radius, and
+  `js/rings.js` draws the hoop about the same two axes, so the opening on the
+  screen and the opening the rules test are one opening. A gate that names no
+  shape is the round one a course was always flown through, which is what leaves
+  the first stage exactly as it was and every gate written by hand in the suite
+  reading as it always did
+- **A landing is scored rather than counted.** `js/landing-score.js` takes the
+  reading the touchdown was judged from and says what the approach came to: how
+  far down the strip from the threshold it touched, how far off the centreline,
+  the rate it came down at, and how far off the strip the nose was. Each is
+  marked against its own limit - the aim is a fifth of the strip past the
+  threshold and a third of its length either side of that is worth nothing, the
+  centreline against the half width, the sink against the landing limit, the
+  heading against the 25 degrees a landing is allowed - and the four averaged out
+  of a hundred are the score. A touchdown short of the threshold reads negative,
+  which is an undershoot and reads as one. The threshold it is all measured from
+  is whichever end the aircraft came over, so a strip flown in either direction
+  is scored the same way
+- **The breakdown is held until the aircraft has stopped.** The stage's clock
+  still stops at the touchdown - the time is the one the approach was flown in -
+  but the card waits out the rollout before saying anything, so what the pilot
+  reads it against is the strip they are sitting on rather than the one going
+  past the window. A pilot who lands and leaves the throttle open is waited on
+  for ten seconds and then told anyway, because a stage that waited forever
+  would be a stage with no end. `#game-mode-report` is where it goes: five lines
+  ruled off under the rest of the card, on whichever scale the altimeter is set
+  to
+- **Approach guidance, withdrawn as the stages go on.** The first landing stage
+  is given a bar across the threshold and an extended centreline running 3200
+  units back down the approach in eight marks; the second keeps the bar and
+  loses the line; by the last there is neither and the strip is where the pilot
+  works out it is. Which of the two a stage gets is declared on the stage rather
+  than worked out from its number. `approachGuidance` is the pure geometry and
+  `js/guidance.js` draws it, the same division `js/rings.js` keeps with the
+  course, and each mark stands clear of the ground under it rather than at the
+  runway's own elevation - the lead-in leaves the graded strip after a mark or
+  two, and one laid at the strip's height would bury itself in the first rise
+- **`approachThreshold`**, which is what stops those two pointing at opposite
+  ends of the same runway. A strip has two thresholds and is landed on in either
+  direction, so which one is "the" threshold is a decision rather than a
+  reading; the approach is opened off it and the guidance is drawn from it, and
+  it is now made once for both
+- **On-screen controls, for a machine with no keys to fly with.**
+  `js/touch-controls.js` is the layout of two crosses of pads - attitude under
+  the left thumb, power under the right - and the rule for whether a machine
+  wants them. There is no way to ask a browser whether a keyboard is attached,
+  so what is asked is whether the machine takes touches and has no pointer that
+  can hover: a laptop with a touchscreen has a trackpad, and a trackpad means
+  there are keys beside it. The pads write the same input state the keyboard
+  does, which is what lets the flight model stay ignorant of where a control
+  came from. The pointer is captured on the way down, so a thumb that slides off
+  a pad still lets the control go when it lifts. Only pads actually coming off
+  the glass let go of what they were holding: the overlays are synced on every
+  photo, every resize, and every press of the HUD and control-list keys, and a
+  set of pads that was never drawn letting go each time would take the control
+  off a key still being held with it
+- **Flying by tilting the device.** `js/tilt-controls.js` turns the orientation
+  sensors into the same controls again, and it is what those machines open in -
+  a machine with keys is flown with them and is never offered it. Whatever angle
+  the device is being held at when a flight starts is level for that flight, and
+  a reset levels it again; seven degrees either side of that is a hand rather
+  than a control input. The screen's own angle turns the device's frame into the
+  pilot's, because a flight simulator on a phone is held sideways every time.
+  The four pads tilt takes over come off the glass rather than fighting it, and
+  they stay on it until a reading actually arrives - a browser can refuse the
+  sensor outright, and a device with no gyroscope answers the ask and then never
+  says anything, and pads taken off for a tilt that never came would be an
+  aircraft with no controls at all
+
+### Changed
+
+- **`onLanding` is handed the arrival as well as the strip.** It has always been
+  called with the runway landed on, and it still is; the contact reading the
+  touchdown rules were applied to now follows it. `contactAt` carries the place
+  and the bearing along with the manner, on the one reading rather than on a
+  second, because a landing is scored on where down the strip it happened as
+  much as on how, and the place and the manner are the same moment. A host
+  reading only the first argument sees no change
+- **The pads take the bottom corners, so two overlays move out of them.** The
+  attitude indicator goes to the top of the screen while they are out rather
+  than coming off it - it is the instrument a pilot flying on a small screen
+  most wants - and the muted notice goes with it. The on-screen control list
+  comes off entirely, naming as it does keys the device does not have, though
+  the start screen's `CONTROLS` entry still shows it: there are no pads out yet
+
 ## [1.13.3-alpha] - 2026-09-09
 
 The reverse check on the document is held to the tables it says it reads.
