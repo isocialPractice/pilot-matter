@@ -11,38 +11,98 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] Bank the gates off the horizontal, so a loop has to be flown through at
-  the angle it was laid at rather than upright every time
-  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
-- [ ] Score a landing rather than only counting it: touchdown point down the
-  strip, sink rate at the moment of contact, distance off the centreline, and
-  heading off the strip, shown as a breakdown once the aircraft has stopped
+- [ ] **Dead Stick**: the engine quits at altitude and the throttle is dead
+  for the rest of the flight, with the runway far enough off that reaching it
+  is a glide to be planned rather than a descent to be flown
+  - From: Game Modes UI/UX `->` New Game Modes
+- [ ] **Cargo Run**: land at one strip, then at the next, against a budget
+  that only spends while the engine is open, so the route flown matters as
+  much as the landings made
+  - From: Game Modes UI/UX `->` New Game Modes
+- [ ] **Search and Rescue**: find a marker placed somewhere in the world given
+  only a bearing and a distance from the start, then get down beside it
+  - From: Game Modes UI/UX `->` New Game Modes
+
+### UI/UX Override - the landing the card is never told about
+
+#### Resolve Issues
+
+- [ ] **Landing Breakdown 1**: the card is never handed the strip a landing was
+  made on, so the breakdown is never written
+  - **Issue**: A landing flown onto `FINAL`'s strip in the browser touches down
+    370.8 units down it, dead on the centreline, is judged `LANDED`, and rolls
+    to a stop at 2.55s - and `#game-mode-report` stays `display:none` with no
+    children throughout. `__sim.landing` is null on the touchdown frame and
+    still null when the rollout ends. `js/aircraft.js:303` now hands the
+    callback two arguments, `this.options.onLanding?.(this.runwayUnder(),
+    contact)`, but `js/main.js:159` still registers
+    `onLanding: () => this.onLanding()`. The arrow takes no parameters, so the
+    strip and the contact are dropped; `onLanding(runway, contact)` runs with
+    `undefined, undefined`; `scoreLanding` returns null for want of a strip;
+    and `setLandingReport(null)` writes nothing and hides the block. Served with
+    the one line rewritten to forward its arguments, every other part of the
+    item is right - the five rows, the amber score line, the hold through the
+    rollout, the stopped clock, the plausible figures, the ten second limit, the
+    block coming off at the next stage and at a fresh attempt, and metres. The
+    feature is whole; one line of wiring is not.
+  - **Goal**: Forward the arguments at `js/main.js:159` -
+    `onLanding: (runway, contact) => this.onLanding(runway, contact)` - and pin
+    the seam so it cannot come apart again. `test/world-tiles.test.js` and
+    `test/world-record.test.js` already read `js/main.js` as source text to
+    cover call sites the suite cannot import; add a test in that shape
+    asserting the `onLanding` handed to `new Aircraft` names the parameters it
+    passes on, rather than being a zero-argument arrow. The 893 tests pass today
+    with the breakdown never once reaching the screen, because every one of them
+    exercises `scoreLanding` and `formatLandingReport` in isolation.
   - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Runway Landing
-- [ ] Add approach guidance that is withdrawn as the stages go on - an
-  extended centreline and a threshold marker on the first stage, the marker
-  alone on the second, and nothing at all by the last
-  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Runway Landing
-- [ ] Add on-screen touch controls so the simulator is playable on a phone
-  or tablet without a keyboard
-  - From: Game UI/UX
-- [ ] Fly by tilting the device: read the orientation sensors for pitch and
-  roll, and make tilt the control the simulator opens in - but only on a
-  phone or tablet with no keyboard, so a machine that has keys is still
-  flown with them
-  - From: Game UI/UX
+
+#### Found Issues
+
+- [ ] A sensor that reports nothing is read as a device held level, and takes
+  the pitch and roll pads off a machine that has no keys
+  - **Issue**: A browser with no gyroscope fires one `deviceorientation` event
+    with `alpha`, `beta` and `gamma` all null, which is the specification's way
+    of saying it has nothing to report. `TiltSensor.onReading` in
+    `js/tilt-controls.js` passes `event.beta ?? 0, event.gamma ?? 0`, so that
+    null becomes a reading of `{pitch: 0, roll: 0}`; `tiltFlying` goes true, and
+    `touchPads(true)` takes `PITCH +`, `PITCH -`, `ROLL L` and `ROLL R` off the
+    glass. Measured on an emulated phone with nothing driving the sensors: the
+    one event captured is `{alpha: null, beta: null, gamma: null}`, the left
+    cluster then holds 0 pads against the right's 4, and `tiltToInput` writes
+    all four attitude controls false every frame. The aircraft cannot be
+    pitched or rolled at all, on the one kind of machine that has no keys to
+    fall back on. `js/tilt-controls.js` names this exact hazard in its own
+    comment - "a set of pads taken off the glass for a tilt that never arrived
+    would be an aircraft with no controls at all" - and a null reading is that
+    arrival.
+  - **Goal**: Treat a reading with no numbers in it as no reading. Have the
+    listener ignore an event whose `beta` and `gamma` are both null rather than
+    coercing them to zero, so `state.reading` stays null and the pads stay on
+    the glass until a real orientation arrives. `applyTiltReading` should be
+    the place it is decided, so the rule is testable in Node beside the rest of
+    the module.
+  - From: UI/UX Override - the landing the card is never told about
+- [ ] The floated attitude indicator is drawn over the readouts it is floated
+  above
+  - **Issue**: With the pads out, `#attitude.floated` is placed at the top
+    centre. On a 393 pixel wide phone it occupies x 141.5 to 251.5 while the
+    `#hud` block runs out to x 208.8 - 67 pixels of overlap - and the attitude
+    element paints later at the same `z-index: 100`. It covers the right-hand
+    end of four readouts at once: on screen they read "AIRSPEED: 80 kno",
+    "ALTITUDE: 139", "V/S: +1260 ft/" and the heading behind the ladder's rim.
+    The ladder was moved there because the corner it used to sit in is now under
+    a thumb, and on a narrow screen the top centre is already taken.
+  - **Goal**: Give the two of them the screen between them rather than the same
+    part of it - either drop `#hud` below the floated ladder while the pads are
+    out, or narrow the ladder and pin it clear of the readout block - so that
+    nothing a pilot flies on is obscured at the widths a phone actually has.
+  - From: UI/UX Override - the landing the card is never told about
 
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
 raw instrument readout. Completing items in this section applies a minor
 version update.
-
-- [ ] Add on-screen touch controls so the simulator is playable on a phone
-  or tablet without a keyboard
-- [ ] Fly by tilting the device: read the orientation sensors for pitch and
-  roll, and make tilt the control the simulator opens in - but only on a
-  phone or tablet with no keyboard, so a machine that has keys is still
-  flown with them
 
 ## Game Modes UI/UX
 
@@ -72,17 +132,7 @@ minor version update.
 
 #### Runway Landing
 
-- [ ] Score a landing rather than only counting it: touchdown point down the
-  strip, sink rate at the moment of contact, distance off the centreline, and
-  heading off the strip, shown as a breakdown once the aircraft has stopped
-- [ ] Add approach guidance that is withdrawn as the stages go on - an
-  extended centreline and a threshold marker on the first stage, the marker
-  alone on the second, and nothing at all by the last
-
 #### Flying through Loops
-
-- [ ] Bank the gates off the horizontal, so a loop has to be flown through at
-  the angle it was laid at rather than upright every time
 
 ## World & Environment
 
@@ -842,3 +892,23 @@ how the simulator got here rather than as a list still to be worked.
     instead of quietly leaving it. The name assertions underneath are right as
     they stand and need no change.
   - From: Code Review Override - the guard on the document's reverse check
+- [x] Bank the gates off the horizontal, so a loop has to be flown through at
+  the angle it was laid at rather than upright every time
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Flying through Loops
+- [x] **Landing Breakdown**: Score a landing rather than only counting it:
+  touchdown point down the strip, sink rate at the moment of contact, distance
+  off the centreline, and heading off the strip, shown as a breakdown once the
+  aircraft has stopped
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Runway Landing
+- [x] Add approach guidance that is withdrawn as the stages go on - an
+  extended centreline and a threshold marker on the first stage, the marker
+  alone on the second, and nothing at all by the last
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Runway Landing
+- [x] Add on-screen touch controls so the simulator is playable on a phone
+  or tablet without a keyboard
+  - From: Game UI/UX
+- [x] Fly by tilting the device: read the orientation sensors for pitch and
+  roll, and make tilt the control the simulator opens in - but only on a
+  phone or tablet with no keyboard, so a machine that has keys is still
+  flown with them
+  - From: Game UI/UX
