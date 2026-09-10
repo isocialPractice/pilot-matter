@@ -289,13 +289,18 @@ export class Aircraft {
 
             if (this.airborne) {
                 this.airborne = false;
-                const outcome = touchdownOutcome(this.contactAt(impactRate), {
+                const contact = this.contactAt(impactRate);
+                const outcome = touchdownOutcome(contact, {
                     impactSpeed: this.impactSpeed,
                     runwayImpact: this.runwayImpactSpeed
                 });
 
+                // The strip first, which is what a landing has always been
+                // reported as, and the arrival itself after it: where on the
+                // strip it happened and how, which is everything a landing can
+                // be scored from and nothing a caller has to take.
                 if (recordTouchdown(this.crash, outcome) && outcome === LANDED) {
-                    this.options.onLanding?.(this.runwayUnder());
+                    this.options.onLanding?.(this.runwayUnder(), contact);
                 }
 
                 if (outcome === CRASHED) {
@@ -344,6 +349,11 @@ export class Aircraft {
      * How the aircraft is meeting the ground, as the reading the touchdown rules
      * are written against: the descent it arrived at, whether there is a strip
      * under it, and how it is being held.
+     *
+     * Where it is meeting the ground rides along with it, on the same reading
+     * rather than on a second one. The rules ignore it, but a landing is scored
+     * on where down the strip it happened as much as on how, and the place and
+     * the manner are the one moment.
      */
     contactAt(verticalSpeed) {
         const strip = this.runwayUnder();
@@ -352,6 +362,11 @@ export class Aircraft {
         return {
             verticalSpeed,
             onRunway: strip != null,
+            x: this.position.x,
+            z: this.position.z,
+            // The compass bearing the nose is on, in radians, which is the yaw
+            // read the way the card counts rather than the way the model turns.
+            heading: -this.rotation.y,
             bank: this.rotation.z,
             // The nose's own elevation rather than the pitch that was asked for,
             // so the aircraft is read the way it is actually being held.

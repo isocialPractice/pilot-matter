@@ -313,6 +313,28 @@
             letter-spacing: 2px;
         }
 
+        /* What a landing came to, read off once the aircraft has stopped on the
+           strip it was flown onto. Ruled off from the lines above it because it
+           is a reading of something finished rather than another instruction. */
+        #game-mode-report {
+            display: none;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(0, 255, 0, 0.25);
+            color: #f0f2f3;
+            font-size: 11px;
+            letter-spacing: 2px;
+        }
+
+        #game-mode-report .landing-score {
+            color: #ffb000;
+            font-size: 13px;
+        }
+
+        #game-mode-report div + div {
+            margin-top: 2px;
+        }
+
         /* Which way the gate the course is waiting on lies, when it is not on
            the screen to be looked at. Amber, like the objective above it,
            because it is the same instruction read at a different range. */
@@ -322,6 +344,86 @@
             color: #ffb000;
             font-size: 13px;
             letter-spacing: 2px;
+        }
+
+        /* The controls for a machine with no keys to fly with: two crosses of
+           pads under the thumbs, attitude on the left and power on the right,
+           the way an aircraft is flown with a stick in one hand and a lever in
+           the other. Drawn from js/touch-controls.js rather than written here,
+           because which pads there are depends on whether the device is being
+           tilted to fly it. */
+        #touch-controls {
+            display: none;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            justify-content: space-between;
+            padding: 0 16px 16px;
+            /* The card lets the flight behind it take the pointer; the pads on
+               it are the one thing that has to catch it. */
+            pointer-events: none;
+            z-index: 130;
+        }
+
+        .touch-cluster {
+            display: grid;
+            grid-template-columns: repeat(3, 48px);
+            grid-template-rows: repeat(3, 48px);
+            gap: 6px;
+        }
+
+        .touch-pad {
+            grid-area: 2 / 2;
+            pointer-events: auto;
+            /* The browser's own gestures - scrolling the page, zooming it,
+               selecting the label - are every one of them something other than
+               flying, and all of them happen under a thumb that is holding a
+               control down. */
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(0, 255, 0, 0.35);
+            border-radius: 8px;
+        }
+
+        .touch-pad:active {
+            color: #000;
+            background: rgba(0, 255, 0, 0.65);
+        }
+
+        .touch-up    { grid-area: 1 / 2; }
+        .touch-left  { grid-area: 2 / 1; }
+        .touch-right { grid-area: 2 / 3; }
+        .touch-down  { grid-area: 3 / 2; }
+
+        /* The pads take the bottom corners, which is where the attitude
+           indicator and the muted notice were. Both move to the top of the
+           screen rather than coming off it: the ladder is the one instrument a
+           pilot flying on a small screen most wants, and the corner it used to
+           sit in is now under a thumb. */
+        #attitude.floated {
+            top: 20px;
+            bottom: auto;
+            right: auto;
+            left: 50%;
+            width: 110px;
+            height: 110px;
+            transform: translateX(-50%);
+        }
+
+        #audio-muted.floated {
+            top: 140px;
+            bottom: auto;
+            right: auto;
+            left: 50%;
+            transform: translateX(-50%);
         }
 
         #settings,
@@ -673,7 +775,13 @@
         <div id="game-mode-objective"></div>
         <div id="game-mode-status"></div>
         <div id="game-mode-clock"></div>
+        <div id="game-mode-report"></div>
         <div id="game-mode-pointer"></div>
+    </div>
+
+    <div id="touch-controls">
+        <div id="touch-cluster-left" class="touch-cluster"></div>
+        <div id="touch-cluster-right" class="touch-cluster"></div>
     </div>
 
     <div id="hud">

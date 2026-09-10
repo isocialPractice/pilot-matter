@@ -62,6 +62,27 @@ export {
     touchdownOutcome, withinLandingAttitude, headingOffsetTo
 } from '../crash.js';
 
+// And what one was, rather than only that it was one: where down the strip it
+// touched, how far off the middle, how hard, and how square.
+export {
+    LANDING_PARTS, PERFECT_SCORE, TOUCHDOWN_ZONE, TOUCHDOWN_REACH,
+    landedForward, touchdownPoint, scoreLanding
+} from '../landing-score.js';
+
+// Writing the input state from something other than a keyboard: the pads a
+// machine with no keys is flown from, and the device's own attitude. Both write
+// the same controls the keymap binds, which is what lets the flight model stay
+// ignorant of where a control came from.
+export {
+    TOUCH_PADS, TOUCH_LEFT, TOUCH_RIGHT,
+    touchPads, applyTouchToInput, releaseTouchInput, isTouchOnly
+} from '../touch-controls.js';
+
+export {
+    TILT_DEADZONE, TILT_CONTROLS,
+    tiltAxes, createTiltState, tiltFlying, applyTiltReading, levelTilt, tiltToInput
+} from '../tilt-controls.js';
+
 // The modes the bundled game is played in, and the pure rules behind them: the
 // stages, the run state, the course geometry, the gate tests, and the step a
 // course is flown a frame at a time with.
@@ -73,7 +94,8 @@ export {
     restartStage, recordLanding, recordGate, recordCrash, nextGate,
     stageProgress, isStageComplete, runObjective, runStatus,
     stageWorld, stageStart, buildCourse,
-    gateOffset, gatePassed, gateMissed, flyStep
+    gateOffset, gateAspect, gateAxes, gateCrossing, gatePassed, gateMissed, flyStep,
+    approachThreshold, approachGuidance, CENTRELINE_REACH, CENTRELINE_MARKS
 } from '../game-modes.js';
 
 // The rule the bundled simulator uses at the end of the ground, published so a

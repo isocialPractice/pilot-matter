@@ -20,9 +20,12 @@ import {
     DISTANCE_STEP,
     formatGateDistance,
     formatGatePointer,
-    formatStageClock
+    formatStageClock,
+    formatLandingReport,
+    LANDING_PART_LABELS
 } from '../js/hud.js';
 import { NO_TIME } from '../js/best-times.js';
+import { LANDING_PARTS, PERFECT_SCORE } from '../js/landing-score.js';
 import { GROUND_CLEARANCE } from '../js/crash.js';
 import { createFlightState } from '../js/flight-state.js';
 
@@ -243,4 +246,55 @@ test('the clock carries the time flown and the time to beat', () => {
 test('a stage with no time to beat says so in the shape of a time', () => {
     assert.ok(formatStageClock(42.1, null).includes(NO_TIME));
     assert.equal(formatStageClock(42.1, null).length, formatStageClock(42.1, 38.4).length);
+});
+
+// --- What a landing is read off as -----------------------------------------
+
+// A landing is four measurements, and four measurements on one line is a line
+// nobody finishes reading.
+const LANDING = {
+    down: 610, across: 18, sink: 4.2, heading: 0.07,
+    marks: { touchdown: 0.9, centreline: 0.88, sink: 0.77, heading: 0.84 },
+    score: 85
+};
+
+test('a landing is read off line by line, the score first', () => {
+    const lines = formatLandingReport(LANDING, 'feet');
+
+    assert.equal(lines.length, LANDING_PARTS.length + 1, 'the score, then each part behind it');
+    assert.ok(lines[0].text.includes('85'), 'the headline is what it came to');
+    assert.ok(lines[0].className, 'and is marked out from the readings under it');
+});
+
+test('every part of a landing is named and given its reading', () => {
+    const lines = formatLandingReport(LANDING, 'feet').map(line => line.text);
+
+    for (const part of LANDING_PARTS) {
+        assert.ok(lines.some(line => line.startsWith(LANDING_PART_LABELS[part])),
+            `the breakdown should account for ${part}`);
+    }
+
+    const report = lines.join('\n');
+    assert.ok(report.includes(`${altitudeToFeet(610)} ft`), 'how far down the strip');
+    assert.ok(report.includes(`${altitudeToFeet(18)} ft`), 'how far off the middle');
+    assert.ok(report.includes('ft/min'), 'the rate it came down at');
+    assert.ok(report.includes('4°'), 'and how far off the strip the nose was');
+});
+
+test('the breakdown is read on whichever scale the altimeter is set to', () => {
+    const metric = formatLandingReport(LANDING, 'meters').map(line => line.text).join('\n');
+
+    assert.ok(metric.includes(' m'), 'the lengths follow the altimeter');
+    assert.ok(metric.includes('m/min'), 'and so does the rate');
+    assert.ok(!metric.includes(' ft'), 'rather than leaving the pilot two scales to think in');
+});
+
+test('a perfect landing is written as the whole hundred', () => {
+    const perfect = { ...LANDING, score: PERFECT_SCORE };
+    assert.ok(formatLandingReport(perfect, 'feet')[0].text.includes(String(PERFECT_SCORE)));
+});
+
+test('a landing there is nothing to say about writes nothing', () => {
+    assert.deepEqual(formatLandingReport(null), [], 'which is what leaves the card as it was');
+    assert.deepEqual(formatLandingReport(undefined), []);
 });

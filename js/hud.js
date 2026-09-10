@@ -2,7 +2,7 @@ import { AttitudeIndicator, pitchFromForward, bankFromWing } from './attitude.js
 import { Minimap } from './minimap.js';
 import { LANDED } from './crash.js';
 import {
-    FEET_PER_UNIT, SECONDS_PER_MINUTE,
+    FEET_PER_UNIT, SECONDS_PER_MINUTE, DEGREES_PER_RADIAN,
     DEFAULT_SPEED_UNIT, DEFAULT_ALTITUDE_UNIT,
     speedTo, altitudeTo, speedUnit, altitudeUnit,
     altitudeToFeet, throttleToPercent, headingDegrees
@@ -116,6 +116,42 @@ export function formatStageClock(elapsed, best) {
     return `TIME ${formatStageTime(elapsed)}  ·  BEST ${formatStageTime(best)}`;
 }
 
+/**
+ * What each part of a landing is called on the card. The four are named the way
+ * a pilot would say them rather than the way `js/landing-score.js` files them,
+ * so the breakdown reads as an account of the approach.
+ */
+export const LANDING_PART_LABELS = Object.freeze({
+    touchdown:  'DOWN THE STRIP',
+    centreline: 'OFF THE CENTRELINE',
+    sink:       'SINK RATE',
+    heading:    'OFF THE STRIP'
+});
+
+/**
+ * A landing read off line by line: the score it came to, and then the four
+ * measurements behind it, each on whichever scale the altimeter is set to so
+ * the pilot has one length to think in rather than two.
+ *
+ * A list rather than a line, because a breakdown that had to be read sideways
+ * would be a breakdown nobody finishes. Empty for a landing there is nothing
+ * to say about, which is what leaves the card as it was.
+ */
+export function formatLandingReport(landing, unit = DEFAULT_ALTITUDE_UNIT) {
+    if (!landing) return [];
+
+    const scale = altitudeUnit(unit);
+    const length = (value) => `${altitudeTo(value, unit)} ${scale.label}`;
+
+    return [
+        { text: `LANDING  ·  ${landing.score}`, className: 'landing-score' },
+        { text: `${LANDING_PART_LABELS.touchdown}  ${length(landing.down)}` },
+        { text: `${LANDING_PART_LABELS.centreline}  ${length(landing.across)}` },
+        { text: `${LANDING_PART_LABELS.sink}  ${verticalSpeedToRate(landing.sink, unit)} ${scale.rateLabel}` },
+        { text: `${LANDING_PART_LABELS.heading}  ${Math.round(landing.heading * DEGREES_PER_RADIAN)}°` }
+    ];
+}
+
 export class HUD {
     constructor() {
         this.speedElement         = document.getElementById('hud-speed');
@@ -137,6 +173,7 @@ export class HUD {
         this.modeObjectiveElement = document.getElementById('game-mode-objective');
         this.modeStatusElement    = document.getElementById('game-mode-status');
         this.modeClockElement     = document.getElementById('game-mode-clock');
+        this.modeReportElement    = document.getElementById('game-mode-report');
         this.modePointerElement   = document.getElementById('game-mode-pointer');
 
         // The units the readouts are written beside, which the settings panel
@@ -202,6 +239,25 @@ export class HUD {
      */
     setClock(elapsed, best) {
         this.modeClockElement.textContent = formatStageClock(elapsed, best);
+    }
+
+    /**
+     * Writes what a landing came to under the rest of the card, and takes the
+     * whole block off again for anything else. Written when a landing is
+     * finished rather than every frame: it is a reading of one moment, and the
+     * moment has passed by the time it is on the screen.
+     */
+    setLandingReport(landing) {
+        const lines = formatLandingReport(landing, this.altitudeUnit);
+
+        this.modeReportElement.replaceChildren(...lines.map(line => {
+            const row = document.createElement('div');
+            row.textContent = line.text;
+            if (line.className) row.className = line.className;
+            return row;
+        }));
+
+        this.modeReportElement.style.display = lines.length ? 'block' : 'none';
     }
 
     /**

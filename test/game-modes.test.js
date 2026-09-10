@@ -41,6 +41,12 @@ import {
     gatePassed,
     gateMissed,
     gateCrossing,
+    gateAspect,
+    gateAxes,
+    approachThreshold,
+    approachGuidance,
+    CENTRELINE_REACH,
+    CENTRELINE_MARKS,
     recordMiss,
     missNotice,
     tickRun,
@@ -810,4 +816,199 @@ test('nothing is pointed at when there is no gate outstanding', () => {
         'and a landing has no gates');
     assert.equal(gatePointer(createRunState(LOOP_COURSE), [], HERE, 180), null,
         'nor has a course that has not been laid yet');
+});
+
+// --- A gate laid over ------------------------------------------------------
+
+/**
+ * A step across a gate's plane, `span` units along the gate's own width and
+ * `rise` units up its own vertical.
+ *
+ * Written in the gate's frame rather than the world's because that is the whole
+ * of what banking changes: a gate laid over at half a right angle has an opening
+ * whose wide way climbs, and a step that would have gone through it upright goes
+ * past it now. Anything measuring the crossing in world height would be
+ * measuring the wrong thing and agreeing with itself about it.
+ */
+function crossAt(ring, span, rise) {
+    const axes = gateAxes(ring);
+    const run  = ring.radius * 3;
+    const at = (side) => ({
+        x: ring.x + axes.span.x * span + axes.rise.x * rise + ring.dirX * run * side,
+        y: ring.y + axes.span.y * span + axes.rise.y * rise,
+        z: ring.z + axes.span.z * span + axes.rise.z * rise + ring.dirZ * run * side
+    });
+
+    return { from: at(-1), to: at(1) };
+}
+
+test('a gate that names no shape is the round one a course was always flown through', () => {
+    assert.equal(gateAspect({ radius: 200 }), 1, 'nothing named');
+    assert.equal(gateAspect({ radius: 200, aspect: 0 }), 1, 'nor a shape with no height to it');
+    assert.equal(gateAspect({ radius: 200, aspect: -1 }), 1, 'nor one turned inside out');
+    assert.equal(gateAspect(null), 1);
+    assert.equal(gateAspect({ radius: 200, aspect: 0.5 }), 0.5, 'and a shape named is the shape');
+});
+
+test('a level gate opens across the way the course runs and straight up', () => {
+    const { span, rise } = gateAxes({ dirX: 0, dirZ: 1 });
+
+    assert.ok(Math.abs(span.x - 1) < 1e-9, 'the width lies across the course');
+    assert.ok(Math.abs(span.y) < 1e-9, 'and does not climb');
+    assert.ok(Math.abs(rise.y - 1) < 1e-9, 'the height is the world vertical');
+});
+
+test('banking a gate turns its opening about the way the course runs', () => {
+    const { span, rise } = gateAxes({ dirX: 0, dirZ: 1, bank: Math.PI / 2 });
+
+    // A quarter turn puts the gate's width where its height was.
+    assert.ok(Math.abs(span.y - 1) < 1e-9, 'the width now climbs');
+    assert.ok(Math.abs(rise.x + 1) < 1e-9, 'and the height lies across the course');
+
+    for (const axis of [span, rise]) {
+        assert.ok(Math.abs(Math.hypot(axis.x, axis.y, axis.z) - 1) < 1e-9,
+            'a turn is a turn: neither axis changes length');
+    }
+});
+
+test('a gate narrower one way is flown through at the angle it was laid at', () => {
+    const level  = { x: 0, y: 500, z: 0, radius: 200, aspect: 0.5, dirX: 0, dirZ: 1 };
+    const banked = { ...level, bank: Math.PI / 2 };
+
+    // 150 units along the wide way is inside; the same 150 up the narrow way,
+    // which only reaches 100, is outside. That is true of both gates - what the
+    // bank changes is which way through the world those two directions point.
+    for (const gate of [level, banked]) {
+        const wide   = crossAt(gate, 150, 0);
+        const narrow = crossAt(gate, 0, 150);
+
+        assert.equal(gatePassed(gate, wide.from, wide.to), true,
+            'the wide way across is the way through');
+        assert.equal(gatePassed(gate, narrow.from, narrow.to), false,
+            'and the narrow way is not');
+    }
+
+    // The same step in the world, put to each gate: the one that is level takes
+    // it and the one laid on its side does not.
+    const across = { from: { x: -150, y: 500, z: -50 }, to: { x: -150, y: 500, z: 50 } };
+    assert.equal(gatePassed(level, across.from, across.to), true);
+    assert.equal(gatePassed(banked, across.from, across.to), false,
+        'a gate on its side is 100 units wide where it was 200');
+});
+
+test('a gate laid over is missed on the same rule it is flown on', () => {
+    const banked = { x: 0, y: 500, z: 0, radius: 200, aspect: 0.5, bank: Math.PI / 2, dirX: 0, dirZ: 1 };
+    const narrow = crossAt(banked, 0, 150);
+
+    assert.equal(gateMissed(banked, narrow.from, narrow.to), true,
+        'outside the opening, going the way the course runs');
+    assert.equal(gateMissed(banked, narrow.to, narrow.from), false,
+        'and coming back at it is still the turn');
+});
+
+test('a crossing still reports how far off the middle of the hoop it landed', () => {
+    const banked = { x: 0, y: 500, z: 0, radius: 200, aspect: 0.5, bank: 0.6, dirX: 0, dirZ: 1 };
+    const { from, to } = crossAt(banked, 120, 0);
+    const crossing = gateCrossing(banked, from, to);
+
+    assert.ok(Math.abs(crossing.offset - 120) < 1e-6,
+        'the offset is a distance in the world, whatever angle the gate is at');
+    assert.equal(crossing.inside, true);
+    assert.equal(crossing.forward, true);
+});
+
+test('a course is laid at the banks its stage asks for', () => {
+    const state = createRunState(LOOP_COURSE);
+
+    do {
+        const stage = currentStage(state);
+        const { rings } = worldFor(state);
+
+        for (const ring of rings) {
+            assert.equal(ring.aspect, stage.rings.aspect,
+                'every gate of a stage is the shape the stage was written as');
+            assert.ok(Math.abs(ring.bank) <= stage.rings.bank + 1e-9,
+                'and is laid no further over than the stage allows');
+        }
+
+        if (stage.rings.bank > 0) {
+            assert.ok(rings.some(ring => ring.bank < 0) && rings.some(ring => ring.bank > 0),
+                'a course banked one way only would be flown with one wing down');
+        }
+    } while (advanceStage(state));
+});
+
+test('the first stage is the round upright course it always was, and the rest lean', () => {
+    const [first, ...rest] = getGameMode(LOOP_COURSE).stages;
+
+    assert.equal(first.rings.aspect, 1, 'nothing to line up on but the gate itself');
+    assert.equal(first.rings.bank, 0);
+
+    let aspect = first.rings.aspect;
+    let bank   = first.rings.bank;
+    for (const stage of rest) {
+        assert.ok(stage.rings.aspect < aspect, `${stage.label} should close up on the one before it`);
+        assert.ok(stage.rings.bank > bank, `${stage.label} should lie further over`);
+        aspect = stage.rings.aspect;
+        bank   = stage.rings.bank;
+    }
+});
+
+// --- The help a landing stage is given -------------------------------------
+
+test('the approach and its guidance are measured off one end of the strip', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    const { runway } = worldFor(state);
+
+    assert.deepEqual(approachThreshold(runway), runwayThresholds(runway)[0],
+        'a strip has two ends, and which one is the threshold is decided once');
+    assert.equal(approachThreshold(null), null);
+});
+
+test('the first stage is given the whole of the help, and the last none of it', () => {
+    const state = createRunState(RUNWAY_LANDING);
+
+    const first = approachGuidance(state, worldFor(state).runway);
+    assert.equal(first.marks.length, CENTRELINE_MARKS, 'a lead-in back down the approach');
+    assert.ok(first.threshold, 'and a bar across the threshold');
+
+    advanceStage(state);
+    const second = approachGuidance(state, worldFor(state).runway);
+    assert.equal(second.marks.length, 0, 'the lead-in is the first thing withdrawn');
+    assert.ok(second.threshold, 'and the marker outlives it');
+
+    while (advanceStage(state)) { /* on to the last stage */ }
+    assert.equal(approachGuidance(state, worldFor(state).runway), null,
+        'by the last stage the strip is where the pilot works out it is');
+});
+
+test('the lead-in runs back down the approach rather than out the far end', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    const { runway } = worldFor(state);
+
+    const { marks, threshold, heading, width, elevation } = approachGuidance(state, runway);
+    const back = bearingDirection(wrapDegrees(approachThreshold(runway).heading + 180));
+
+    assert.equal(heading, approachThreshold(runway).heading, 'laid across the strip it belongs to');
+    assert.equal(width, runway.width);
+    assert.equal(elevation, runway.elevation);
+
+    marks.forEach((mark, index) => {
+        const step = CENTRELINE_REACH / CENTRELINE_MARKS * (index + 1);
+        assert.ok(Math.abs(mark.x - (threshold.x + back.x * step)) < 1e-6, 'on the extended centreline');
+        assert.ok(Math.abs(mark.z - (threshold.z + back.z * step)) < 1e-6);
+    });
+
+    const last = marks[marks.length - 1];
+    assert.ok(Math.hypot(last.x - runway.x, last.z - runway.z) > runway.length / 2,
+        'and reaching out past the strip rather than lying along it');
+});
+
+test('there is nothing to draw where there is nothing to find', () => {
+    const strip = { x: 0, z: 0, heading: 0, length: 3000, width: 300, alongX: 0, alongZ: 1 };
+
+    assert.equal(approachGuidance(createRunState(RUNWAY_LANDING), null), null,
+        'a world with no strip in it');
+    assert.equal(approachGuidance(createRunState(LOOP_COURSE), strip), null, 'a course stage');
+    assert.equal(approachGuidance(createRunState(), strip), null, 'and a free flight');
 });

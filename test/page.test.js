@@ -15,6 +15,7 @@ import { MUTE_KEY } from '../js/audio.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
+import { TOUCH_PADS, TOUCH_CELLS, TOUCH_LEFT, TOUCH_RIGHT } from '../js/touch-controls.js';
 
 const indexHtml = readFileSync(
     fileURLToPath(new URL('../index.html', import.meta.url)),
@@ -131,8 +132,8 @@ test('the warning overlays start hidden and wait for the flight to trip them', (
 // honest nothing rather than a HUD reading zero over an empty world.
 test('the overlays the simulator places start hidden and wait to be placed', () => {
     for (const id of ['title-screen', 'paused', 'settings', 'game-modes', 'element-editor',
-        'game-mode', 'hud', 'attitude', 'minimap', 'audio-muted', 'controls-help',
-        'controls-help-hint']) {
+        'game-mode', 'game-mode-report', 'hud', 'attitude', 'minimap', 'audio-muted',
+        'controls-help', 'controls-help-hint', 'touch-controls']) {
         const rule = styleRule(indexHtml, id);
         assert.ok(rule, `index.html should style #${id}`);
         assert.ok(/display:\s*none/.test(rule), `#${id} should start hidden`);
@@ -459,5 +460,42 @@ test('a gate on the chart is the colour the hoop it stands for is', () => {
         assert.ok(color, `js/rings.js should name ${name}`);
         assert.ok(styled(indexHtml, selector, new RegExp(`fill:\\s*#${color}`, 'i')),
             `${selector} should be drawn in ${name}`);
+    }
+});
+
+// --- The controls for a machine with no keys -------------------------------
+
+test('each cluster of pads has an empty box to be drawn into', () => {
+    for (const side of [TOUCH_LEFT, TOUCH_RIGHT]) {
+        const id = `touch-cluster-${side}`;
+        assert.ok(new RegExp(`<div id="${id}"[^>]*class="touch-cluster"[^>]*></div>`).test(indexHtml),
+            `the pads are drawn from js/touch-controls.js, so the page should leave #${id} empty`);
+    }
+});
+
+test('every cell a pad can sit in has somewhere in the cross to sit', () => {
+    for (const cell of TOUCH_CELLS) {
+        assert.ok(styled(indexHtml, `.touch-${cell}`, /grid-area/),
+            `a pad in the ${cell} cell would otherwise stack on the one before it`);
+    }
+    assert.ok(TOUCH_PADS.every(pad => TOUCH_CELLS.includes(pad.cell)));
+});
+
+// A thumb holding a control down is a thumb dragging the page under it, unless
+// the pad says otherwise. The browser's own gestures are every one of them
+// something other than flying.
+test('a pad takes the pointer and none of the browser gestures under it', () => {
+    assert.ok(styled(indexHtml, '.touch-pad', /pointer-events:\s*auto/),
+        'the card lets the flight take the pointer, so the pads have to catch it');
+    assert.ok(styled(indexHtml, '.touch-pad', /touch-action:\s*none/),
+        'or a control held down scrolls the page instead of flying the aircraft');
+    assert.ok(styled(indexHtml, '.touch-pad', /user-select:\s*none/),
+        'and a long press selects the label rather than working the control');
+});
+
+test('the two overlays the pads take the corner from have somewhere else to be', () => {
+    for (const id of ['attitude', 'audio-muted']) {
+        assert.ok(styleRules(indexHtml).some(rule => rule.selectors.includes(`#${id}.floated`)),
+            `js/main.js lifts #${id} clear of the pads, so the page should say where to`);
     }
 });

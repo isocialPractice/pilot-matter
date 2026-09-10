@@ -104,6 +104,9 @@
     <li><a href="#matter-api">Matter API</a></li>
     <li><a href="#contracts">Contracts</a></li>
     <li><a href="#configuration">Configuration</a></li>
+    <li><a href="#controls-without-a-keyboard">Controls without a keyboard</a></li>
+    <li><a href="#runways-and-landings">Runways and landings</a></li>
+    <li><a href="#game-modes">Game modes</a></li>
     <li><a href="#worlds-and-elements">Worlds and elements</a></li>
     <li><a href="#the-day">The day</a></li>
     <li><a href="#the-water">The water</a></li>
@@ -634,6 +637,62 @@ for (const field of START_FIELDS) {
 
 <p><code>isStartValue</code> refuses a reading between two steps rather than snapping it, because a value the configuration never offered is a value from somewhere else. <code>snapStartValue</code> is for the other case - a reading worked out rather than chosen, which wants the nearest setting the field actually has.</p>
 
+<h2 id="controls-without-a-keyboard">Controls without a keyboard</h2>
+
+<p>The flight model reads an input state of named controls that are either held or not, and the keyboard is only one thing that writes it. Two others are published, for a host whose page is opened on a phone or a tablet: a set of on-screen pads, and the device's own attitude.</p>
+
+<p><code>isTouchOnly</code> is the question put the way a browser can answer it. There is no way to ask whether a keyboard is attached, so what is asked instead is whether the machine takes touches and has no pointer that can hover over anything. A device with a mouse or a trackpad has keys beside it in every case that matters, and getting it wrong in the cautious direction leaves a machine flown with the keys it already had.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>isTouchOnly(env)</code></td><td>Whether this machine has to be flown from the glass</td></tr>
+        <tr><td><code>TOUCH_PADS</code></td><td>Every pad there is, with the control each one holds down</td></tr>
+        <tr><td><code>TOUCH_LEFT</code>, <code>TOUCH_RIGHT</code></td><td>The two clusters a pad can belong to</td></tr>
+        <tr><td><code>touchPads(tilting, pads)</code></td><td>The pads a flight wants, given whether tilt has pitch and roll</td></tr>
+        <tr><td><code>applyTouchToInput(input, control, down)</code></td><td>Holding one down, or letting it up</td></tr>
+        <tr><td><code>releaseTouchInput(input, pads)</code></td><td>Letting go of everything, for controls being taken away</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A pad is <code>{id, control, label, side, cell, tilted}</code>. <code>control</code> is one of <code>CONTROL_NAMES</code>, <code>side</code> is which cluster it belongs to, <code>cell</code> is where in that cluster's cross it sits, and <code>tilted</code> marks the four that tilt takes over.</p>
+
+<p>Tilt is the same input state written from the orientation sensors. It is a default rather than a replacement: a machine that has keys is flown with them, which is why it is offered on what <code>isTouchOnly</code> answers yes to and nowhere else.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>createTiltState(enabled)</code></td><td>The state, wanted or not, with no reading yet</td></tr>
+        <tr><td><code>applyTiltReading(state, beta, gamma, screenAngle)</code></td><td>A reading from the sensor</td></tr>
+        <tr><td><code>tiltAxes(beta, gamma, screenAngle)</code></td><td>A device reading as the aircraft's two axes</td></tr>
+        <tr><td><code>tiltFlying(state)</code></td><td>Whether tilt is both wanted and actually reporting</td></tr>
+        <tr><td><code>levelTilt(state)</code></td><td>However the device is being held now is level</td></tr>
+        <tr><td><code>tiltToInput(input, state, deadzone)</code></td><td>The tilt written onto the controls</td></tr>
+        <tr><td><code>TILT_DEADZONE</code>, <code>TILT_CONTROLS</code></td><td>How far off level is nothing, and what tilt writes</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>beta</code> and <code>gamma</code> are reported against the device rather than against the screen, so a phone turned on its side reports the pilot's pitch as roll. <code>screenAngle</code> is what turns one frame into the other, and a flight simulator on a phone is held sideways every time.</p>
+
+<pre><code>import { isTouchOnly, createTiltState, applyTiltReading, tiltToInput } from 'pilot-matter';
+
+const tilt = createTiltState(isTouchOnly());
+
+addEventListener('deviceorientation', (e) =&gt; {
+    applyTiltReading(tilt, e.beta, e.gamma, screen.orientation?.angle ?? 0);
+});
+
+function frame(dt) {
+    tiltToInput(pilot.input, tilt);
+    pilot.update(dt);
+}</code></pre>
+
+<p><code>tiltFlying</code> is what tells a sensor that was asked for from one that is actually reporting: a browser can refuse it outright, and a device with no gyroscope answers the ask and then never says anything. A tilt that is not flying writes nothing at all rather than four released controls, so the keys and the pads keep whatever they were holding.</p>
+
 <h2 id="runways-and-landings">Runways and landings</h2>
 
 <p>A runway is an element of the world like a river or a forest: generated by algorithm rather than placed as an asset, cut into whichever ground the site search found flattest, and levelled with an apron that eases back into the country around it. A world is built without one unless one is asked for.</p>
@@ -695,7 +754,35 @@ const pilot = createPilot({
 </table>
 </div>
 
-<p><code>contact</code> is <code>{verticalSpeed, onRunway, bank, pitch, headingOffset}</code>, in world units and radians. The telemetry's <code>landed</code> is the same reading for a host that would rather not work it out.</p>
+<p><code>contact</code> is <code>{verticalSpeed, onRunway, x, z, heading, bank, pitch, headingOffset}</code>, in world units and radians. The rules read the first and the last four of those; the place and the bearing ride along on the same reading because a landing is scored on where down the strip it happened as much as on how. <code>onLanding</code> is handed the strip and that contact, in that order. The telemetry's <code>landed</code> is the same yes or no for a host that would rather not work it out.</p>
+
+<p>A landing is a yes or a no, and then it is four measurements. <code>scoreLanding</code> takes the reading <code>onLanding</code> was handed and says what the approach came to:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>scoreLanding(runway, touchdown)</code></td><td>The whole reading of a landing, or null off a strip</td></tr>
+        <tr><td><code>touchdownPoint(runway, touchdown)</code></td><td>How far down the strip it touched, from the threshold flown over</td></tr>
+        <tr><td><code>landedForward(runway, heading)</code></td><td>Which of the two thresholds that was</td></tr>
+        <tr><td><code>LANDING_PARTS</code></td><td>The four parts a landing is marked on</td></tr>
+        <tr><td><code>TOUCHDOWN_ZONE</code>, <code>TOUCHDOWN_REACH</code></td><td>Where down the strip to aim, and how far off is nothing</td></tr>
+        <tr><td><code>PERFECT_SCORE</code></td><td>What the four marks come to when every one of them is flown</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>What comes back is <code>{down, across, sink, heading, marks, score}</code>: how far down the strip from the threshold, how far off the centreline, the rate it came down at, how far off the strip the nose was, the mark each of those four came to from 0 to 1, and the score the four make together. <code>down</code> is negative for a touchdown short of the threshold, which is an undershoot and reads as one.</p>
+
+<pre><code>import { createPilot, scoreLanding, PERFECT_SCORE } from 'pilot-matter';
+
+const pilot = createPilot({
+    scene, terrain: world, camera,
+    onLanding: (runway, contact) =&gt; {
+        const landing = scoreLanding(runway, contact);
+        say(`${landing.score} out of ${PERFECT_SCORE}`);
+    }
+});</code></pre>
 
 <h2 id="game-modes">Game modes</h2>
 
@@ -718,7 +805,12 @@ const pilot = createPilot({
         <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
         <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
         <tr><td><code>gatePassed(ring, from, to)</code>, <code>gateMissed(ring, from, to)</code>, <code>gateOffset(ring, point)</code></td><td>Whether a step went through one, or past it</td></tr>
+        <tr><td><code>gateCrossing(ring, from, to)</code></td><td>The one crossing both of those are read off</td></tr>
+        <tr><td><code>gateAspect(ring)</code>, <code>gateAxes(ring)</code></td><td>The shape of a gate's opening, and the two directions across it</td></tr>
         <tr><td><code>flyStep(state, course, from, to)</code></td><td>Both of those put to the gate the course is waiting on</td></tr>
+        <tr><td><code>approachThreshold(runway)</code></td><td>The end of a strip a landing stage is flown onto</td></tr>
+        <tr><td><code>approachGuidance(state, runway)</code></td><td>What is drawn on the ground to help the pilot find it</td></tr>
+        <tr><td><code>CENTRELINE_REACH</code>, <code>CENTRELINE_MARKS</code></td><td>How far the lead-in runs back, and in how many marks</td></tr>
     </tbody>
 </table>
 </div>
@@ -743,6 +835,10 @@ function frame(dt) {
 }</code></pre>
 
 <p><code>flyStep</code> returns the gate the step was put to, whether it went <code>passed</code> that gate or <code>missed</code> it, and whether passing it <code>finished</code> the stage. Nothing but the gate a course is waiting on can be flown or missed - a course is an order, and a hoop further down it is not the pilot's business yet - so a host that holds no course state of its own still gets the whole of what a step did.</p>
+
+<p>A gate is <code>{index, x, y, z, radius, aspect, bank, dirX, dirZ}</code>. <code>dirX</code> and <code>dirZ</code> are the way the course runs through it; <code>radius</code> is its half width; <code>aspect</code> is how tall it is against that width; and <code>bank</code> is how far over it was laid, as a turn about the way the course runs. Those last two are what make a gate an attitude to match rather than a place to be: a circle turned about its own axis is the same circle, so a gate that has to be flown at the angle it was laid at has to be narrower one way across than the other. <code>gateAxes</code> gives the span and the rise a crossing is measured on, which is what a host draws the hoop about so that the opening it draws and the opening <code>gateCrossing</code> tests are one opening.</p>
+
+<p>A landing stage may be given help finding its strip, and <code>approachGuidance</code> is what to draw: an extended centreline running back down the approach as a list of <code>marks</code>, and a bar across the <code>threshold</code>, with the <code>heading</code>, <code>width</code> and <code>elevation</code> of the strip they belong to. Which of the two a stage is given is declared on the stage, and by the last of them there is neither. It answers null where there is nothing to draw, which is what leaves the ground clear.</p>
 
 <h2 id="worlds-and-elements">Worlds and elements</h2>
 

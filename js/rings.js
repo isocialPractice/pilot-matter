@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import { gateAspect } from './game-modes.js';
 
 /**
  * The loops a course is flown through, as the meshes the geometry in
- * `js/game-modes.js` describes. Nothing here decides where a gate is or whether
- * one was flown through: this is the drawing of a course that has already been
- * laid, which is what lets the course itself be worked out and tested without a
- * renderer anywhere near it.
+ * `js/game-modes.js` describes. Nothing here decides where a gate is, what
+ * shape it was laid as, or whether one was flown through: this is the drawing
+ * of a course that has already been laid, which is what lets the course itself
+ * be worked out and tested without a renderer anywhere near it.
  */
 
 // The hoop's thickness, as a fraction of its own radius, so a small gate looks
@@ -92,10 +93,21 @@ function buildHoop(ring) {
 
     mesh.position.set(ring.x, ring.y, ring.z);
 
-    // A torus is built in its own XY plane, which puts its opening along +Z.
-    // The gate faces the way the course runs through it, so the hoop is turned
-    // about the vertical until its opening is on that bearing.
-    mesh.rotation.y = Math.atan2(ring.dirX, ring.dirZ);
+    // A torus is built round in its own XY plane. A gate is only as tall as it
+    // was laid, so the hoop is taken in along that plane's vertical before it is
+    // turned - which is the whole of what makes a bank something to fly rather
+    // than something to look at, a circle being the same circle at every angle.
+    mesh.scale.set(1, gateAspect(ring), 1);
+
+    // Then the two turns, innermost first, the way a rotation in the default
+    // order is applied: the roll is about the torus's own axis, which lays the
+    // opening over at the bank the gate carries, and the yaw about the vertical
+    // puts that axis on the bearing the course runs through it.
+    //
+    // Done in this order the hoop's own X and Y come out along the span and the
+    // rise `gateAxes` reads the crossing on, so the opening drawn here and the
+    // opening tested there are one opening.
+    mesh.rotation.set(0, Math.atan2(ring.dirX, ring.dirZ), ring.bank ?? 0);
 
     return mesh;
 }

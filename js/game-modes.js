@@ -8,8 +8,9 @@
  *
  * Pure module with no DOM or Three.js dependency. The course a loop stage is
  * flown through is geometry rather than meshes, the gate test is a segment
- * against a disc, and the run state is a plain object, so every rule here can
- * be unit tested in Node and drawn by whatever renderer is in front of it.
+ * against the opening it was laid as, and the run state is a plain object, so
+ * every rule here can be unit tested in Node and drawn by whatever renderer is
+ * in front of it.
  */
 
 import { createRandom, runwayThresholds, DEFAULT_SIZE } from './environment/elements.js';
@@ -61,6 +62,10 @@ export function blendBearing(from, to, amount) {
  * finding the runway, and reading the ground around it well enough to get down
  * on it. The first stage puts the strip under the nose over flat country. The
  * last puts it behind the aircraft, small, in high ground.
+ *
+ * The help goes as the ground gets harder. A lead-in out along the approach and
+ * a bar across the threshold on the first stage, the bar alone on the second,
+ * and by the last nothing at all: the strip is where the pilot works out it is.
  */
 const runwayLanding = {
     id: RUNWAY_LANDING,
@@ -76,14 +81,16 @@ const runwayLanding = {
             note: 'the strip ahead of you over flat country',
             base: { maxHeight: 180, scale: 1.9 },
             runway: { length: [3000, 3400], width: [300, 340] },
-            approach: { distance: 2400, bearing: 8, heading: 0, altitudeFeet: 1000 }
+            approach: { distance: 2400, bearing: 8, heading: 0, altitudeFeet: 1000 },
+            guidance: { centreline: true, threshold: true }
         },
         {
             label: 'DOWNWIND',
             note: 'the strip off your wing, and the ground beginning to rise',
             base: { maxHeight: 300, scale: 2.4 },
             runway: { length: [2600, 3000], width: [260, 300] },
-            approach: { distance: 5200, bearing: 75, heading: 55, altitudeFeet: 2000 }
+            approach: { distance: 5200, bearing: 75, heading: 55, altitudeFeet: 2000 },
+            guidance: { centreline: false, threshold: true }
         },
         {
             label: 'CROSS COUNTRY',
@@ -104,9 +111,9 @@ const runwayLanding = {
 
 /**
  * A course of loops flown in the order they were laid. The gates get smaller,
- * closer together, and further off the level as the stages go on, so what is
- * being asked for moves from flying at a target to flying a line through
- * several of them.
+ * closer together, further off the level, and further off the horizontal as the
+ * stages go on, so what is being asked for moves from flying at a target to
+ * flying a line through several of them in the attitude each one was laid at.
  */
 const loopCourse = {
     id: LOOP_COURSE,
@@ -120,22 +127,26 @@ const loopCourse = {
         {
             label: 'THREE GATES',
             note: 'wide loops in a line, with room to line each one up',
-            rings: { count: 3, radius: 240, spacing: 2600, altitude: 900, spread: 0.10, turn: 0.20 }
+            rings: { count: 3, radius: 240, spacing: 2600, altitude: 900, spread: 0.10, turn: 0.20,
+                     aspect: 1, bank: 0 }
         },
         {
             label: 'FIVE GATES',
-            note: 'the course starts to bend, and the loops start to close',
-            rings: { count: 5, radius: 200, spacing: 2300, altitude: 950, spread: 0.20, turn: 0.35 }
+            note: 'the course starts to bend, and the loops lean off the level',
+            rings: { count: 5, radius: 200, spacing: 2300, altitude: 950, spread: 0.20, turn: 0.35,
+                     aspect: 0.80, bank: 0.40 }
         },
         {
             label: 'SEVEN GATES',
             note: 'tighter loops, less run between them, and a course that turns',
-            rings: { count: 7, radius: 165, spacing: 2000, altitude: 1000, spread: 0.30, turn: 0.50 }
+            rings: { count: 7, radius: 165, spacing: 2000, altitude: 1000, spread: 0.30, turn: 0.50,
+                     aspect: 0.66, bank: 0.70 }
         },
         {
             label: 'NINE GATES',
             note: 'a course flown as one line rather than nine approaches',
-            rings: { count: 9, radius: 135, spacing: 1750, altitude: 1050, spread: 0.42, turn: 0.65 }
+            rings: { count: 9, radius: 135, spacing: 1750, altitude: 1050, spread: 0.42, turn: 0.65,
+                     aspect: 0.55, bank: 1.00 }
         }
     ]
 };
@@ -607,6 +618,65 @@ const OPENING_KNOTS    = 105;
 const OPENING_THROTTLE = 55;
 
 /**
+ * The end of the strip a landing stage is flown onto. A runway has two of them
+ * and is landed on in either direction, so which one is "the" threshold is a
+ * decision rather than a reading - and it is made once, here, because the
+ * approach is opened off it and the guidance is drawn from it, and the two
+ * pointing at opposite ends of the same strip would be worse than no guidance.
+ */
+export function approachThreshold(runway) {
+    return runway ? runwayThresholds(runway)[0] : null;
+}
+
+// --- What the pilot is shown of the approach -------------------------------
+
+/** How far the lead-in runs back from the threshold, in world units. */
+export const CENTRELINE_REACH = 3200;
+
+/** How many marks that reach is drawn with, evenly spaced along it. */
+export const CENTRELINE_MARKS = 8;
+
+/**
+ * What is drawn on the ground to help the pilot find the strip and line up on
+ * it: an extended centreline running back down the approach, and a bar across
+ * the threshold. Which of the two a stage gets is declared on the stage rather
+ * than worked out from its number, so what the pilot is given is read off the
+ * mode in one place.
+ *
+ * Null where there is nothing to draw - a course stage, a stage past the help,
+ * or a world with no strip in it - which is what leaves the ground clear.
+ */
+export function approachGuidance(state, runway) {
+    const mode  = runningMode(state);
+    const stage = currentStage(state);
+    const shown = stage?.guidance;
+
+    if (!runway || mode?.objective !== LAND_OBJECTIVE || !shown) return null;
+    if (!shown.centreline && !shown.threshold) return null;
+
+    const threshold = approachThreshold(runway);
+    // Back down the approach, which is the reciprocal of the way a landing
+    // rolls out: the marks lie between the aircraft and the strip.
+    const out = bearingDirection(wrapDegrees(threshold.heading + 180));
+
+    const marks = [];
+    if (shown.centreline) {
+        const step = CENTRELINE_REACH / CENTRELINE_MARKS;
+        for (let at = 1; at <= CENTRELINE_MARKS; at++) {
+            marks.push({ x: threshold.x + out.x * step * at, z: threshold.z + out.z * step * at });
+        }
+    }
+
+    return {
+        heading: threshold.heading,
+        width: runway.width,
+        elevation: runway.elevation ?? 0,
+        threshold: shown.threshold ? { x: threshold.x, z: threshold.z } : null,
+        marks
+    };
+}
+
+/**
  * Where a landing stage opens: out on a bearing from the strip, at a height,
  * pointing however far off the line back to it the stage asks for. Stage one
  * puts it on the nose; the last puts it behind the shoulder.
@@ -621,7 +691,7 @@ function approachOpening(stage, runway) {
     // Landing runs down the strip's own bearing, so the approach lies out on
     // the reciprocal of it, turned by however far off the extended centreline
     // the stage puts the aircraft.
-    const [threshold] = runwayThresholds(runway);
+    const threshold = approachThreshold(runway);
     const from = wrapDegrees(threshold.heading + 180 + bearing);
     const out  = bearingDirection(from);
 
@@ -679,6 +749,9 @@ const COURSE_REACH = 0.82;
  *
  * Every gate faces the way the course runs through it, and sits at least its own
  * radius and a half over the ground beneath, so there is always a line through.
+ * Each is laid at a bank of its own, up to the stage's, so a course that has
+ * left the first stage behind is flown wings-with-the-gate rather than upright
+ * all the way down.
  */
 export function buildCourse(stage, options = {}) {
     const plan = stage?.rings;
@@ -705,6 +778,11 @@ export function buildCourse(stage, options = {}) {
             z,
             y: Math.max(ground + plan.radius * RING_CLEARANCE, plan.altitude + drift),
             radius: plan.radius,
+            aspect: gateAspect(plan),
+            // Either way off the horizontal: a course that only ever banked one
+            // way would be a course flown with one wing down the whole length
+            // of it.
+            bank: (random() * 2 - 1) * (plan.bank ?? 0),
             dirX: Math.sin(heading),
             dirZ: Math.cos(heading)
         });
@@ -728,6 +806,51 @@ export function gateOffset(ring, point) {
 }
 
 /**
+ * How tall a gate is against how wide, which is what makes its bank something
+ * to fly rather than something to look at: a circle turned about its own axis
+ * is the same circle, so a gate that reads as laid over has to be narrower one
+ * way across than the other.
+ *
+ * A gate that names no shape is the round one the course was always flown
+ * through, which is what leaves the first stage exactly as it was.
+ *
+ * Read off a gate or off the plan a course is laid from, both of which carry
+ * the shape under the same name, so the default lives here rather than once at
+ * each end of the course being built.
+ */
+export function gateAspect(ring) {
+    const aspect = ring?.aspect;
+    return Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+}
+
+/**
+ * The two directions across a gate's opening: along its span, and up its own
+ * vertical. Both are read off the way the course runs through the gate and the
+ * bank it was laid at, so a gate lying over at half a right angle has a span
+ * that climbs and a vertical that leans with it.
+ *
+ * These are the axes a crossing is measured on, and they are the axes the hoop
+ * is drawn about in `js/rings.js`, so what the pilot is flying at and what the
+ * course is testing are the same opening.
+ */
+export function gateAxes(ring) {
+    const bank = ring?.bank ?? 0;
+    const dirX = ring?.dirX ?? 0;
+    const dirZ = ring?.dirZ ?? 1;
+
+    const cos = Math.cos(bank);
+    const sin = Math.sin(bank);
+
+    // Level, the span lies to the right of the way the course runs and the
+    // vertical is the world's. Banking turns the pair about the way the course
+    // runs, which is the axis the aircraft's own roll turns about.
+    return {
+        span: { x:  dirZ * cos, y: sin, z: -dirX * cos },
+        rise: { x: -dirZ * sin, y: cos, z:  dirX * sin }
+    };
+}
+
+/**
  * Where a step of the flight crossed a gate's plane, or null for a step that
  * did not cross it at all.
  *
@@ -738,6 +861,13 @@ export function gateOffset(ring, point) {
  * is read off that one crossing: how far off the middle of the hoop it landed,
  * whether that was inside it, and whether the step went the way the course
  * runs through it.
+ *
+ * Inside is asked of the opening rather than of a radius, because an opening
+ * laid over is not the same shape whichever way you come at it: the crossing is
+ * measured along the gate's own span and up its own vertical, and it is in when
+ * those two together fall inside the ellipse the gate was laid as. A round gate
+ * is the case where the two semi-axes are the same length, so the reading it
+ * gives is the one it always gave.
  */
 export function gateCrossing(ring, from, to) {
     if (!ring) return null;
@@ -752,7 +882,15 @@ export function gateCrossing(ring, from, to) {
     const dz = from.z + (to.z - from.z) * t - ring.z;
     const offset = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-    return { offset, inside: offset <= ring.radius, forward: after > before };
+    const { span, rise } = gateAxes(ring);
+    const along  = (dx * span.x + dy * span.y + dz * span.z) / ring.radius;
+    const across = (dx * rise.x + dy * rise.y + dz * rise.z) / (ring.radius * gateAspect(ring));
+
+    return {
+        offset,
+        inside: along * along + across * across <= 1,
+        forward: after > before
+    };
 }
 
 /**

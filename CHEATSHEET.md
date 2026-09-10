@@ -27,6 +27,26 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `Esc` `Backspace` | Back out of a panel |
 | `Enter` `Space` | Choose the menu entry under the cursor |
 
+## Without a keyboard
+
+Drawn on a machine that takes touches and has no pointer that can hover: a
+phone or a tablet, never a laptop with a touchscreen. Menus were always worked
+by pointer, so only the flight controls are added.
+
+| Pad | Works | Cluster |
+|-----|-------|---------|
+| `PITCH +` / `PITCH -` | Nose up / down | Left |
+| `ROLL L` / `ROLL R` | Wing down either way | Left |
+| `THR +` / `THR -` | The throttle lever | Right |
+| `YAW L` / `YAW R` | Nose left / right | Right |
+
+Tilt is what those machines open in, and it takes the four attitude pads off
+the glass. Whatever angle the device is held at when a flight starts is level
+for it, and a reset levels it again. Seven degrees either side of level is
+nothing. Refused, or on a device with no gyroscope, the pads stay and the
+flight is flown from them. The pads take the bottom corners, so the attitude
+indicator moves to the top of the screen and the control list comes off.
+
 ## Flight numbers
 
 | Quantity | Value |
@@ -39,6 +59,9 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | Terrain crash | Faster than 30 units/s down |
 | Runway crash | Faster than 48 units/s down |
 | Runway landing | Under 18 units/s, wings 11 deg, nose 15 deg, heading 25 deg |
+| Landing aim | A fifth of the strip's length past the threshold |
+| Landing reach | A third of its length either side of that is worth nothing |
+| Landing rollout | Ends at 1 unit/s, or after 10 seconds |
 | Ground clearance | 5 units |
 | Crash countdown | 2.5 seconds, then reset |
 | Low altitude warning | Within 200 ft of the ground below |
@@ -124,11 +147,27 @@ available while a game mode is being played: a mode brings its own ground.
 
 | Mode | Stages | Objective |
 |------|--------|-----------|
-| `RUNWAY LANDING` | 4 | Land on the strip. Harder: further out, off the line, shorter strip, higher country |
-| `FLYING THROUGH LOOPS` | 4 | Fly the gates in order. Harder: more gates, tighter, closer, bending more |
+| `RUNWAY LANDING` | 4 | Land on the strip. Harder: further out, off the line, shorter strip, higher country, less help |
+| `FLYING THROUGH LOOPS` | 4 | Fly the gates in order. Harder: more gates, tighter, closer, bending more, laid further over |
 
 Gate colours: green is the one the course is waiting on, amber is still to
 come, dim is behind you. A crash restarts the stage.
+
+Gates are laid over from the second stage on, and closed up one way across as
+they are - a round hoop is the same hoop at every angle, so a gate that has to
+be flown at the angle it was laid at is wider along its span than it is tall.
+
+| Stage | Gate height against its width | Laid over up to |
+|-------|-------------------------------|-----------------|
+| `THREE GATES` | Round | Upright |
+| `FIVE GATES` | 0.80 | 0.40 rad |
+| `SEVEN GATES` | 0.66 | 0.70 rad |
+| `NINE GATES` | 0.55 | 1.00 rad |
+
+Approach guidance is withdrawn the same way: an extended centreline of eight
+marks running 3200 units back down the approach and a bar across the threshold
+on stage one, the bar alone on stage two, and nothing from stage three on. Both
+are laid off the threshold the stage opens you out from.
 
 The whole course is drawn on the minimap the moment the stage is laid out, in
 the same three colours. A gate past the edge of the square the chart covers is
@@ -139,6 +178,8 @@ held hollow at that edge.
 | `TIME` / `BEST` | Objective card | The stage clock, and your best for this stage of this mode |
 | `↑ LOOP 3 · 045° · 4200 ft` | Objective card | The gate the course is waiting on, while it is more than 35 degrees off the nose |
 | `LOOP 3 MISSED · COME ROUND AGAIN` | Objective card | You crossed the gate's plane outside the hoop, going the way the course runs |
+| `LANDING · 85` | Objective card | What a landing came to, shown once the aircraft has stopped |
+| `DOWN THE STRIP` `OFF THE CENTRELINE` `SINK RATE` `OFF THE STRIP` | Objective card | The four readings behind that score, each marked against its own limit |
 
 Best times are kept per stage per mode in `localStorage`. The clock runs from
 the moment a stage is laid out to the moment its objective is met, and a stage

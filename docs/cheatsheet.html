@@ -119,6 +119,24 @@
 </table>
 </div>
 
+<h2 id="without-a-keyboard-cheat">Without a keyboard</h2>
+
+<p>Drawn on a machine that takes touches and has no pointer that can hover: a phone or a tablet, never a laptop with a touchscreen. Menus were always worked by pointer, so only the flight controls are added.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Pad</th><th>Works</th><th>Cluster</th></tr></thead>
+    <tbody>
+        <tr><td><code>PITCH +</code> / <code>PITCH -</code></td><td>Nose up / down</td><td>Left</td></tr>
+        <tr><td><code>ROLL L</code> / <code>ROLL R</code></td><td>Wing down either way</td><td>Left</td></tr>
+        <tr><td><code>THR +</code> / <code>THR -</code></td><td>The throttle lever</td><td>Right</td></tr>
+        <tr><td><code>YAW L</code> / <code>YAW R</code></td><td>Nose left / right</td><td>Right</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Tilt is what those machines open in, and it takes the four attitude pads off the glass. Whatever angle the device is held at when a flight starts is level for it, and a reset levels it again. Seven degrees either side of level is nothing. Refused, or on a device with no gyroscope, the pads stay and the flight is flown from them. The pads take the bottom corners, so the attitude indicator moves to the top of the screen and the control list comes off.</p>
+
 <h2 id="flight-numbers">Flight numbers</h2>
 
 <div class="table-wrap">
@@ -133,6 +151,9 @@
         <tr><td>Terrain crash</td><td>Faster than 30 units/s down</td></tr>
         <tr><td>Runway crash</td><td>Faster than 48 units/s down</td></tr>
         <tr><td>Runway landing</td><td>Under 18 units/s, wings 11 deg, nose 15 deg, heading 25 deg</td></tr>
+        <tr><td>Landing aim</td><td>A fifth of the strip's length past the threshold</td></tr>
+        <tr><td>Landing reach</td><td>A third of its length either side of that is worth nothing</td></tr>
+        <tr><td>Landing rollout</td><td>Ends at 1 unit/s, or after 10 seconds</td></tr>
         <tr><td>Ground clearance</td><td>5 units</td></tr>
         <tr><td>Crash countdown</td><td>2.5 seconds, then reset</td></tr>
         <tr><td>Low altitude warning</td><td>Within 200 ft of the ground below</td></tr>
@@ -240,13 +261,29 @@
 <table>
     <thead><tr><th>Mode</th><th>Stages</th><th>Objective</th></tr></thead>
     <tbody>
-        <tr><td><code>RUNWAY LANDING</code></td><td>4</td><td>Land on the strip. Harder: further out, off the line, shorter strip, higher country</td></tr>
-        <tr><td><code>FLYING THROUGH LOOPS</code></td><td>4</td><td>Fly the gates in order. Harder: more gates, tighter, closer, bending more</td></tr>
+        <tr><td><code>RUNWAY LANDING</code></td><td>4</td><td>Land on the strip. Harder: further out, off the line, shorter strip, higher country, less help</td></tr>
+        <tr><td><code>FLYING THROUGH LOOPS</code></td><td>4</td><td>Fly the gates in order. Harder: more gates, tighter, closer, bending more, laid further over</td></tr>
     </tbody>
 </table>
 </div>
 
 <p>Gate colours: green is the one the course is waiting on, amber is still to come, dim is behind you. A crash restarts the stage.</p>
+
+<p>Gates are laid over from the second stage on, and closed up one way across as they are - a round hoop is the same hoop at every angle, so a gate that has to be flown at the angle it was laid at is wider along its span than it is tall.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Stage</th><th>Gate height against its width</th><th>Laid over up to</th></tr></thead>
+    <tbody>
+        <tr><td><code>THREE GATES</code></td><td>Round</td><td>Upright</td></tr>
+        <tr><td><code>FIVE GATES</code></td><td>0.80</td><td>0.40 rad</td></tr>
+        <tr><td><code>SEVEN GATES</code></td><td>0.66</td><td>0.70 rad</td></tr>
+        <tr><td><code>NINE GATES</code></td><td>0.55</td><td>1.00 rad</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Approach guidance is withdrawn the same way: an extended centreline of eight marks running 3200 units back down the approach and a bar across the threshold on stage one, the bar alone on stage two, and nothing from stage three on. Both are laid off the threshold the stage opens you out from.</p>
 
 <p>The whole course is drawn on the minimap the moment the stage is laid out, in the same three colours. A gate past the edge of the square the chart covers is held hollow at that edge.</p>
 
@@ -257,6 +294,8 @@
         <tr><td><code>TIME</code> / <code>BEST</code></td><td>Objective card</td><td>The stage clock, and your best for this stage of this mode</td></tr>
         <tr><td><code>&uarr; LOOP 3 &middot; 045&deg; &middot; 4200 ft</code></td><td>Objective card</td><td>The gate the course is waiting on, while it is more than 35 degrees off the nose</td></tr>
         <tr><td><code>LOOP 3 MISSED &middot; COME ROUND AGAIN</code></td><td>Objective card</td><td>You crossed the gate's plane outside the hoop, going the way the course runs</td></tr>
+        <tr><td><code>LANDING &middot; 85</code></td><td>Objective card</td><td>What a landing came to, shown once the aircraft has stopped</td></tr>
+        <tr><td><code>DOWN THE STRIP</code> <code>OFF THE CENTRELINE</code> <code>SINK RATE</code> <code>OFF THE STRIP</code></td><td>Objective card</td><td>The four readings behind that score, each marked against its own limit</td></tr>
     </tbody>
 </table>
 </div>

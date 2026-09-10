@@ -28,11 +28,14 @@ import { headingDegrees } from './units.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
-    stageWorld, stageStart, buildCourse, gatePointer,
+    stageWorld, stageStart, buildCourse, gatePointer, approachGuidance,
     tickRun, missNotice,
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey,
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE
 } from './game-modes.js';
+import {
+    scoreLanding, createRolloutState, beginRollout, clearRollout, updateRollout
+} from './landing-score.js';
 import {
     createBestTimesState, bestTime, recordStageTime, stageReport
 } from './best-times.js';
@@ -42,11 +45,18 @@ import {
     isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
+import { ApproachGuidance } from './guidance.js';
 import { TILE_REACH } from './world-tiles.js';
 import {
     createLoadingState, advanceLoading, loadingComplete, LoadingScreen
 } from './loading.js';
 import { createAudioState, applyMuteKey, audioLevels, FlightAudio } from './audio.js';
+import {
+    isTouchOnly, touchPads, TouchControls, TOUCH_LEFT, TOUCH_RIGHT
+} from './touch-controls.js';
+import {
+    createTiltState, tiltFlying, tiltToInput, levelTilt, TiltSensor
+} from './tilt-controls.js';
 import {
     createPhotoState, applyPhotoKey, photoPending, completePhoto,
     photoFilename, savePhoto
@@ -135,6 +145,7 @@ class FlightSimulator {
             elements: editorPlacements(this.editor)
         });
         this.loops   = new LoopCourse(this.scene);
+        this.guidance = new ApproachGuidance(this.scene);
         // The square the world covers, held rather than asked for every frame:
         // it only changes when the world does.
         this.bounds  = this.terrain.getBounds();
@@ -166,6 +177,17 @@ class FlightSimulator {
         this.audio          = new FlightAudio(this.audioState);
         this.photoState     = createPhotoState();
 
+        // Whether this machine has to be flown from the glass, and so whether
+        // the pads are drawn and the device's own attitude is read. Asked once:
+        // a phone does not grow a keyboard halfway through a flight.
+        this.touchOnly  = isTouchOnly();
+        this.tilt       = createTiltState(this.touchOnly);
+        this.tiltSensor = new TiltSensor(this.tilt);
+
+        // Which controls the pads are currently drawn for, so the set is rebuilt
+        // when the sensor comes to life rather than every frame it stays alive.
+        this.padsTilted = null;
+
         // The start screen's Controls entry puts the control list on screen
         // over the title, where nothing else would have shown it yet.
         this.titleHelp = false;
@@ -185,6 +207,12 @@ class FlightSimulator {
         // the screen: the time it took, and whether it beat the board.
         this.stageResult = null;
 
+        // A landing is not finished at the touchdown. What it came to is worked
+        // out on the frame the wheels arrive and held until the aircraft has
+        // stopped, which is when the pilot has somewhere to read it from.
+        this.rollout = createRolloutState();
+        this.landing = null;
+
         this.overlays = {
             title:     document.getElementById('title-screen'),
             paused:    document.getElementById('paused'),
@@ -198,8 +226,16 @@ class FlightSimulator {
             muted:     document.getElementById('audio-muted'),
             help:      document.getElementById('controls-help'),
             helpList:  document.getElementById('controls-help-list'),
-            helpHint:  document.getElementById('controls-help-hint')
+            helpHint:  document.getElementById('controls-help-hint'),
+            touch:     document.getElementById('touch-controls')
         };
+
+        // The pads write the same input state the keys do, which is what lets
+        // the flight model stay ignorant of where a control came from.
+        this.touch = new TouchControls(this.overlays.touch, this.aircraft.input, {
+            [TOUCH_LEFT]:  document.getElementById('touch-cluster-left'),
+            [TOUCH_RIGHT]: document.getElementById('touch-cluster-right')
+        });
 
         this.startMenu    = new MenuList(document.getElementById('start-menu'), this.startMenuState);
         this.pauseMenu    = new MenuList(document.getElementById('pause-menu'), this.pauseMenuState);
@@ -351,6 +387,14 @@ class FlightSimulator {
         // has ever seen.
         this.hud.setCourse(this.course);
 
+        // And the help a landing stage is given, drawn out over the ground it
+        // is laid on rather than at the strip's own height, because the lead-in
+        // leaves the graded strip behind after the first mark or two.
+        this.guidance.setGuidance(
+            approachGuidance(this.run, this.terrain.getRunway()),
+            (x, z) => this.terrain.getTerrainHeightAt(x, z)
+        );
+
         return rebuilt;
     }
 
@@ -485,8 +529,13 @@ class FlightSimulator {
                 this.titleHelp = false;
                 startFlight(this.titleState);
                 // The key that started the flight is also the gesture a
-                // browser wants before it will let the page make a sound.
+                // browser wants before it will let the page make a sound, and
+                // the one Safari wants before it will report the device's
+                // orientation. Neither ask is waited on: a refused sound is a
+                // quiet flight, and a refused sensor is a flight flown from the
+                // pads, which are on the glass until tilt reports otherwise.
                 this.audio.start();
+                this.tiltSensor.start().then(() => this.syncOverlays());
                 break;
             case 'modes':
                 this.openGameModesPanel();
@@ -838,16 +887,50 @@ class FlightSimulator {
         this.lastPosition = null;
         this.missHold = 0;
         this.stageResult = null;
+        this.clearLanding();
+
+        // However the pilot has drifted into holding the device, that is level
+        // for the flight that starts now.
+        levelTilt(this.tilt);
 
         if (!isRunning(this.run) || this.run.complete) return;
         restartStage(this.run);
         this.syncObjective();
     }
 
-    /** A landing reported by the flight model, which a landing stage is asking for. */
-    onLanding() {
-        if (recordLanding(this.run)) this.finishStage();
+    /**
+     * A landing reported by the flight model, which a landing stage is asking
+     * for. The objective is met on the touchdown - the clock stops there, and
+     * the time is the one the approach was flown in - but the stage is not laid
+     * away yet: what the landing came to is measured now and held until the
+     * aircraft has rolled to a stop.
+     */
+    onLanding(runway, contact) {
+        if (recordLanding(this.run)) {
+            this.landing = scoreLanding(runway, contact);
+            beginRollout(this.rollout);
+        }
         this.syncObjective();
+    }
+
+    /**
+     * Counts out the rollout, then reads the landing off. The wait ends when
+     * the aircraft stops or when it is plain it is not going to, and either way
+     * the breakdown goes up and the stage is finished from there.
+     */
+    trackLanding(dt) {
+        if (!updateRollout(this.rollout, dt, this.aircraft.getSpeed())) return;
+
+        this.hud.setLandingReport(this.landing);
+        this.finishStage();
+        this.syncObjective();
+    }
+
+    /** Takes a landing's breakdown back off the card, for the next attempt. */
+    clearLanding() {
+        clearRollout(this.rollout);
+        this.landing = null;
+        this.hud?.setLandingReport(null);
     }
 
     /**
@@ -948,6 +1031,7 @@ class FlightSimulator {
         if (this.stageHold > 0) return;
 
         this.stageResult = null;
+        this.clearLanding();
         if (advanceStage(this.run)) this.refreshWorld();
         else this.syncObjective();
     }
@@ -966,9 +1050,17 @@ class FlightSimulator {
         const panel    = modes || settings || editor;
         const paused   = !photo && !onTitle && this.pauseState.paused;
         const chrome   = !photo && !onTitle && !panel && this.hudVisibility.visible;
+        // The pads belong to a flight being flown, the same as the instruments,
+        // and to a machine with no keys to fly it with. Taking them off lets go
+        // of whatever they were holding, which is why a pause takes them off
+        // rather than leaving a control held under a menu.
+        const pads     = chrome && !paused && this.touchOnly;
         // A panel is opened to look at the world behind it, so it is the one
-        // overlay that clears the screen it was opened from.
-        const help     = !panel && (chrome || (onTitle && this.titleHelp));
+        // overlay that clears the screen it was opened from. The pads clear it
+        // too, for the corner they take and because the list names keys a
+        // machine being flown from the glass does not have - though the entry
+        // on the start screen still shows it, there being no pads out yet.
+        const help     = !panel && !pads && (chrome || (onTitle && this.titleHelp));
 
         this.overlays.title.style.display     = onTitle && !panel ? 'flex' : 'none';
         this.overlays.settings.style.display  = settings ? 'block' : 'none';
@@ -991,6 +1083,12 @@ class FlightSimulator {
         // start screen it has to be lifted over the title to be read at all.
         this.overlays.help.classList.toggle('over-title', onTitle);
 
+        // The pads take the bottom corners, so the two overlays that were in
+        // them move to the top of the screen for as long as the pads are out.
+        this.syncTouchPads(pads);
+        this.overlays.attitude.classList.toggle('floated', pads);
+        this.overlays.muted.classList.toggle('floated', pads);
+
         syncGameModeEntries(this.modesState.entries, this.run);
 
         this.startMenu.render(this.startMenuState);
@@ -1000,6 +1098,38 @@ class FlightSimulator {
         this.settingsStart.render(this.settingsState);
         this.settingsOptions.render(this.settingsState);
         this.editorMenu.render(this.editorState);
+    }
+
+    /**
+     * Draws the pads the flight wants and puts them on screen or takes them off.
+     *
+     * The set is rebuilt only when tilt changes hands, because the sensor coming
+     * to life is what decides whether pitch and roll are flown off the glass or
+     * off the device itself - and that happens once, some frames after the
+     * flight has begun, rather than on any frame anything else changes.
+     */
+    syncTouchPads(visible) {
+        const tilted = tiltFlying(this.tilt);
+
+        if (tilted !== this.padsTilted) {
+            this.padsTilted = tilted;
+            this.touch.setPads(touchPads(tilted));
+        }
+
+        this.touch.setVisible(visible);
+    }
+
+    /**
+     * Hands the device's own attitude to the aircraft. Nothing at all where the
+     * sensor is not reporting, which is every machine that has keys and every
+     * one that refused the sensor: the input state belongs to whatever is
+     * writing it, and tilt does not take it away from the keys by turning up.
+     */
+    trackTilt(frozen) {
+        // The pads that tilt replaces come off the moment it starts reporting,
+        // which is a frame nothing else has any reason to notice.
+        if (tiltFlying(this.tilt) !== this.padsTilted) this.syncOverlays();
+        if (!frozen) tiltToInput(this.aircraft.input, this.tilt);
     }
 
     animate() {
@@ -1024,6 +1154,10 @@ class FlightSimulator {
         const aircraftPos = this.aircraft.getPosition();
         const groundH     = this.terrain.getTerrainHeightAt(aircraftPos.x, aircraftPos.z);
 
+        // Read before the frame is flown, so the attitude the device is being
+        // held at is the attitude this frame is flown in.
+        this.trackTilt(frozen);
+
         this.aircraft.update(dt, groundH);
 
         // The world has no end to it: the ground is laid on ahead of the
@@ -1035,6 +1169,7 @@ class FlightSimulator {
 
         this.trackCourse();
         this.trackStage(dt);
+        this.trackLanding(dt);
         this.advanceRun(dt);
 
         this.camera2.update(dt);

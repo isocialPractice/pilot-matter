@@ -126,6 +126,34 @@
     <p>Flight begins in the air and already climbing, at 80 knots and 1390 ft with the throttle set at 20%, which is exactly the setting that holds 80 knots. That airspeed is the stall speed itself, so the wing is carrying with nothing in hand: opening the throttle is still the first thing to do. <kbd>Shift</kbd> and <kbd>Ctrl</kbd> move a lever rather than the speed itself, so the HUD throttle reads the setting you asked for while airspeed catches up to it over the next second or two. Once the needle reaches cruise speed the wing carries the aircraft and level flight holds altitude; climb with the nose, and watch the airspeed while you do, because pulling up too hard bleeds the speed the lift depends on. Keep an eye on the terrain too: a gentle arrival is a landing, but flying into a hillside wrecks the aircraft. The rules behind all of it are written out in <a href="../flight-model.html">How the flight model works</a>.</p>
 </div>
 
+<h2 id="without-a-keyboard">Flying without a keyboard</h2>
+
+<p>Opened on a phone or a tablet, the simulator draws its own controls: two crosses of pads along the bottom of the screen, attitude under the left thumb and power under the right, the way an aircraft is flown with a stick in one hand and a lever in the other. They write the same controls the keys do, so nothing about the flight model changes - only where the input came from.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Pad</th><th>Works</th></tr></thead>
+    <tbody>
+        <tr><td><code>PITCH +</code> / <code>PITCH -</code></td><td>Nose up and nose down, on the left</td></tr>
+        <tr><td><code>ROLL L</code> / <code>ROLL R</code></td><td>Wing down either way, on the left</td></tr>
+        <tr><td><code>THR +</code> / <code>THR -</code></td><td>The throttle lever, on the right</td></tr>
+        <tr><td><code>YAW L</code> / <code>YAW R</code></td><td>Nose left and right, on the right</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The pads take the two bottom corners, so the <a href="../controls/instruments.html">attitude indicator</a> moves to the top of the screen while they are out, and the control list - which names keys the device does not have - comes off. Menus need nothing added: they have always followed the pointer, and a tap is a click.</p>
+
+<p>There is no way to ask a browser whether a keyboard is attached, so the question is put the way it can be answered: the pads are drawn on a machine that takes touches and has no pointer that can hover over anything. A laptop with a touchscreen has a trackpad, and a trackpad means there are keys beside it, so it is flown with the keys it already had.</p>
+
+<h3 id="flying-by-tilt">Flying by tilt</h3>
+
+<p>On the same machines, the device itself is the stick. Pitching it back pitches the nose up, dropping a side drops that wing, and the four pads tilt takes over come off the glass rather than fighting it - the throttle and the yaw stay where they are. Tilt is what the simulator opens in there, because a phone has nothing better; a machine with keys is flown with them and is never offered it.</p>
+
+<p>Whatever angle you are holding the device at when a flight starts is level for that flight, so there is no right way to hold it. A reset levels it again, which is the way back if you have drifted into holding it somewhere new. Seven degrees either side of that is a hand rather than a control input, so a device held still flies straight.</p>
+
+<p>Safari asks before it will report the device's orientation, and it only takes the ask from something you did - so it is asked on the tap that starts the flight. Refuse it, or fly a device with no gyroscope in it, and nothing is lost: the pads that tilt would have taken over stay on the glass and the flight is flown from them.</p>
+
 <h2 id="the-rest-of-the-interface">The rest of the interface</h2>
 
 <ul class="card-grid">
