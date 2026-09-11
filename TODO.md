@@ -46,6 +46,55 @@ its context survives being archived.
   - **Goal**: Resolve to [stage-opening-heading.prompt.md](.claude/prompts/stage-opening-heading.prompt.md)
   - From: UI/UX Override - the stage that opens pointed away from the strip
 
+### Code Review Override - the phone layout the two fixes left behind
+
+#### Resolve Issues
+
+- [ ] Floated Readouts 1: the readouts dropped below the ladder land in the
+  pads instead
+  - **Issue**: `#hud.floated` starts at `top: 180px` and is six 16 pixel rows,
+    `204.75` pixels of them, so it ends `384.8` pixels down. The pads take the
+    bottom `172`, and `#touch-controls` is `z-index: 130` against `#hud`'s
+    `100`, so they paint over the readouts. The two are clear of each other
+    only above `557` pixels of viewport height. A phone held sideways - which
+    `js/tilt-controls.js` calls the ordinary way this is flown - gives `393` at
+    most and about `330` in a browser with a toolbar: at `330` the whole block
+    is inside the pad band and `THROTTLE` and `CAMERA` are off the bottom edge
+    entirely. On a 320 pixel phone in portrait, the width the
+    `#audio-muted.floated` comment says the layout was measured at, Safari
+    leaves `460` and the right-hand cluster at x `148`..`304` covers the
+    right-hand end of `HEADING`, `THROTTLE` and `CAMERA`. The left-hand cluster
+    empties only when tilt is flying, so a device with no gyroscope - the state
+    the same turn's other fix exists to preserve - keeps `PITCH +`, `PITCH -`,
+    `ROLL L` and `ROLL R` at x `16`..`172`, directly under them. Read off the
+    stylesheet rather than measured in a browser; the same model reproduces the
+    completed item's own browser measurement of `#hud` at x `208.8` exactly.
+  - **Goal**: Resolve to [floated-readouts-height.prompt.md](.claude/prompts/floated-readouts-height.prompt.md)
+  - From: UI/UX Override - the landing the card is never told about
+
+#### Found Issues
+
+- [ ] The landing breakdown is read off from under the pads
+  - **Issue**: `#game-mode-report` is the bottom of a card pinned at
+    `bottom: 20px`, `min-width: 260px` wide with `20px` of side padding and
+    centred, so the report sits `28` to `114` pixels up from the bottom edge.
+    Both pad clusters occupy the bottom `16` to `172` pixels, at x `16`..`172`
+    and x `W-172`..`W-16`, and `#touch-controls` is `z-index: 130` against the
+    card's `120`. On a 393 pixel phone the five rows are centred across x
+    `89`..`304`, so every one of them runs `44` to `83` pixels into a cluster
+    at each end - `OFF THE CENTRELINE  12 ft` is the widest and loses `83` off
+    both, behind `ROLL R` on one side and `YAW L` on the other. The card's
+    place is older than this turn. The breakdown is what this turn made appear,
+    and until now there was nothing in that part of the card to be covered.
+  - **Goal**: Give the breakdown somewhere on a touch screen that the pads are
+    not. Lifting the card clear of the pad band while `#touch-controls` is
+    shown is the smallest version, and the same `floated` idea `#hud` and
+    `#attitude` already use, but the card is centred and the band is `172`
+    pixels deep, so check what it meets on the way up before settling on it.
+    Whatever it comes to, pin it in `test/page.test.js` the way the floated
+    overlays are.
+  - From: Code Review Override - the phone layout the two fixes left behind
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -912,8 +961,8 @@ how the simulator got here rather than as a list still to be worked.
     the place it is decided, so the rule is testable in Node beside the rest of
     the module.
   - From: UI/UX Override - the landing the card is never told about
-- [x] The floated attitude indicator is drawn over the readouts it is floated
-  above
+- [x] **Floated Readouts**: The floated attitude indicator is drawn over the
+  readouts it is floated above
   - **Issue**: With the pads out, `#attitude.floated` is placed at the top
     centre. On a 393 pixel wide phone it occupies x 141.5 to 251.5 while the
     `#hud` block runs out to x 208.8 - 67 pixels of overlap - and the attitude
