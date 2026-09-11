@@ -407,23 +407,43 @@
            indicator and the muted notice were. Both move to the top of the
            screen rather than coming off it: the ladder is the one instrument a
            pilot flying on a small screen most wants, and the corner it used to
-           sit in is now under a thumb. */
+           sit in is now under a thumb.
+
+           The top of the screen is already spoken for, though - the readouts
+           down the left of it and the chart in the right corner - so the four
+           of them are given the screen between them rather than the same part
+           of it. The ladder takes the left corner, the chart keeps the right
+           one it already had, and the readouts and the notice go under them.
+           Pinning the two instruments to opposite edges is what keeps them
+           apart at a width nobody chose: they meet only on a screen narrower
+           than 290 pixels, which is narrower than a phone comes. */
         #attitude.floated {
             top: 20px;
             bottom: auto;
             right: auto;
-            left: 50%;
+            left: 20px;
             width: 110px;
             height: 110px;
-            transform: translateX(-50%);
         }
 
+        /* Below both instruments rather than behind one. Floated, the ladder
+           was drawn over the right-hand end of four readouts at once - the
+           airspeed, the altitude, the vertical speed and the heading - which
+           are the four things a pilot is flying on. 180px clears the chart,
+           which is the taller of the two at 140px from a 20px top. */
+        #hud.floated {
+            top: 180px;
+        }
+
+        /* Into the band the readouts left between themselves and the ladder,
+           on the same left edge as both, so the notice has the width of the
+           screen the chart is not using. Centred, it ran over the readouts on a
+           320 pixel screen. */
         #audio-muted.floated {
             top: 140px;
             bottom: auto;
             right: auto;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 20px;
         }
 
         #settings,

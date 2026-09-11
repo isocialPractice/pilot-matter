@@ -156,7 +156,10 @@ class FlightSimulator {
         // puts whatever stage was under way back to its beginning.
         this.aircraft = new Aircraft(this.scene, {
             onReset:   () => this.onFlightReset(),
-            onLanding: () => this.onLanding()
+            // The strip and the arrival are handed on rather than dropped: they
+            // are everything the landing is scored from, and a handler that
+            // took neither scored nothing and wrote no breakdown.
+            onLanding: (runway, contact) => this.onLanding(runway, contact)
         });
         this.camera2  = new CameraController(this.camera, this.aircraft, INITIAL_CAMERA_MODE);
         this.loaded('aircraft');
@@ -1084,10 +1087,13 @@ class FlightSimulator {
         this.overlays.help.classList.toggle('over-title', onTitle);
 
         // The pads take the bottom corners, so the two overlays that were in
-        // them move to the top of the screen for as long as the pads are out.
+        // them move to the top of the screen for as long as the pads are out -
+        // and the readouts drop below the two instruments now sharing that top,
+        // rather than being drawn over by the ladder that moved into them.
         this.syncTouchPads(pads);
         this.overlays.attitude.classList.toggle('floated', pads);
         this.overlays.muted.classList.toggle('floated', pads);
+        this.overlays.hud.classList.toggle('floated', pads);
 
         syncGameModeEntries(this.modesState.entries, this.run);
 

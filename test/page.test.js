@@ -44,6 +44,10 @@ function collectScripts(directory, prefix = '') {
 const scriptDir = fileURLToPath(new URL('../js', import.meta.url));
 const scripts = collectScripts(scriptDir);
 
+// The narrowest a phone in portrait actually gets, which is the width the
+// overlays have to share rather than a comfortable one they were laid out at.
+const NARROWEST_PHONE = 320;
+
 // Every menu drawn into the page: the two cards, the panels they open, and the
 // three lists one panel is split across.
 const MENU_LISTS = [
@@ -498,4 +502,80 @@ test('the two overlays the pads take the corner from have somewhere else to be',
         assert.ok(styleRules(indexHtml).some(rule => rule.selectors.includes(`#${id}.floated`)),
             `js/main.js lifts #${id} clear of the pads, so the page should say where to`);
     }
+});
+
+/** The declarations of a rule written for a selector, property by property. */
+function declarations(css, selector) {
+    const rule = styleRules(css).find(entry => entry.selectors.includes(selector));
+    return new Map((rule?.body ?? '').split(';')
+        .map(part => part.split(':').map(piece => piece.trim()))
+        .filter(pair => pair.length === 2 && pair[0] && pair[1]));
+}
+
+/** A pixel length declared for a selector, as a number. */
+function pixels(css, selector, property) {
+    const value = declarations(css, selector).get(property);
+    return value?.endsWith('px') ? Number(value.slice(0, -2)) : null;
+}
+
+/**
+ * The top of a phone holds three things at once when the pads are out: the
+ * ladder the corner sent up there, the chart that was already in the other
+ * corner, and the readouts down the left. Floated over the readouts, the ladder
+ * covered the right-hand end of the airspeed, the altitude, the vertical speed
+ * and the heading - four of the things a pilot is flying on - so the three of
+ * them are given the screen between them rather than the same part of it.
+ */
+test('the floated ladder is clear of the readouts and the chart it shares a screen with', () => {
+    const ladder = {
+        top:    pixels(indexHtml, '#attitude.floated', 'top'),
+        left:   pixels(indexHtml, '#attitude.floated', 'left'),
+        height: pixels(indexHtml, '#attitude.floated', 'height'),
+        width:  pixels(indexHtml, '#attitude.floated', 'width')
+    };
+    const chart = {
+        top:    pixels(indexHtml, '#minimap', 'top'),
+        right:  pixels(indexHtml, '#minimap', 'right'),
+        height: pixels(indexHtml, '#minimap', 'height'),
+        width:  pixels(indexHtml, '#minimap', 'width')
+    };
+    const readouts = pixels(indexHtml, '#hud.floated', 'top');
+
+    assert.ok(Object.values(ladder).every(Number.isFinite), 'the floated ladder should be placed in pixels');
+    assert.ok(Object.values(chart).every(Number.isFinite), 'and so should the chart it joins up there');
+    assert.ok(Number.isFinite(readouts),
+        'the readouts need somewhere to go, or the ladder is drawn over them');
+
+    // Pinned to opposite edges, the two instruments meet only on a screen
+    // narrower than they are together - which is narrower than a phone comes.
+    const together = ladder.left + ladder.width + chart.width + chart.right;
+    assert.ok(together < NARROWEST_PHONE,
+        `the ladder and the chart want ${together}px and a phone gives ${NARROWEST_PHONE}px`);
+    assert.ok(pixels(indexHtml, '#attitude.floated', 'right') === null
+        && !styled(indexHtml, '#attitude.floated', /transform/),
+        'the ladder is pinned to its edge rather than centred over whatever is behind it');
+
+    // And the readouts start below the lower edge of both, rather than beside
+    // one of them at a width nobody chose.
+    for (const [name, box] of [['ladder', ladder], ['chart', chart]]) {
+        assert.ok(readouts >= box.top + box.height,
+            `the readouts start at ${readouts}px and the ${name} ends at ${box.top + box.height}px`);
+    }
+});
+
+// The notice goes in the band the readouts left between themselves and the
+// ladder, on the same left edge as both. Centred, it ran over the readouts on a
+// 320 pixel screen, which is the width they were dropped down the page for.
+test('the muted notice is floated into the band the two left it', () => {
+    const notice   = pixels(indexHtml, '#audio-muted.floated', 'top');
+    const readouts = pixels(indexHtml, '#hud.floated', 'top');
+    const ladder   = pixels(indexHtml, '#attitude.floated', 'top')
+                   + pixels(indexHtml, '#attitude.floated', 'height');
+
+    assert.ok(Number.isFinite(notice), 'the notice should be placed in pixels');
+    assert.ok(notice >= ladder, `the notice starts at ${notice}px and the ladder ends at ${ladder}px`);
+    assert.ok(notice < readouts, `and the readouts start at ${readouts}px, below it`);
+    assert.equal(pixels(indexHtml, '#audio-muted.floated', 'left'),
+        pixels(indexHtml, '#attitude.floated', 'left'),
+        'on the left edge the ladder and the readouts share, clear of the chart on the right');
 });

@@ -644,7 +644,7 @@ which is why it is offered on what `isTouchOnly` answers yes to and nowhere else
 | Export | Is |
 |--------|-----|
 | `createTiltState(enabled)` | The state, wanted or not, with no reading yet |
-| `applyTiltReading(state, beta, gamma, screenAngle)` | A reading from the sensor |
+| `applyTiltReading(state, beta, gamma, screenAngle)` | A reading from the sensor, or `null` for one with no angles in it |
 | `tiltAxes(beta, gamma, screenAngle)` | A device reading as the aircraft's two axes |
 | `tiltFlying(state)` | Whether tilt is both wanted and actually reporting |
 | `levelTilt(state)` | However the device is being held now is level |
@@ -673,9 +673,17 @@ function frame(dt) {
 
 `tiltFlying` is what tells a sensor that was asked for from one that is actually
 reporting: a browser can refuse it outright, and a device with no gyroscope
-answers the ask and then never says anything. A tilt that is not flying writes
-nothing at all rather than four released controls, so the keys and the pads keep
-whatever they were holding.
+answers the ask and then never says anything worth reading. A tilt that is not
+flying writes nothing at all rather than four released controls, so the keys and
+the pads keep whatever they were holding.
+
+What a device with no sensor actually sends is one event with `beta` and `gamma`
+both `null`, which is the specification's way of saying it has nothing to
+report. `applyTiltReading` refuses it and returns `null`, leaving `state.reading`
+as it was, because a null read as a zero is a device held perfectly level - the
+one reading that would take the pitch and roll pads off the glass of a machine
+that has no keys to fall back on. One axis reported and the other not is still a
+reading, and the silent axis is taken as the neutral.
 
 ## Runways and landings
 

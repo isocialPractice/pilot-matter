@@ -68,6 +68,45 @@ test('a machine that never wanted tilt does not start flying by it', () => {
     assert.equal(tiltFlying(state), false);
 });
 
+// A browser with no gyroscope still fires one event, with every angle null.
+// Read as zero that is a device held perfectly level, and the pads for pitch and
+// roll come off the glass for a sensor that never arrived - on the one kind of
+// machine that has no keys to fall back on.
+test('a sensor reporting nothing is not a device held level', () => {
+    const state = createTiltState(true);
+
+    assert.equal(applyTiltReading(state, null, null), null, 'no numbers in it is no reading');
+    assert.equal(state.reading, null);
+    assert.equal(tiltFlying(state), false, 'so the pads stay on the glass');
+
+    applyTiltReading(state, undefined, undefined);
+    assert.equal(tiltFlying(state), false, 'an event with no angles on it at all reads the same');
+
+    applyTiltReading(state, NaN, NaN);
+    assert.equal(tiltFlying(state), false, 'and so does one that answered with nothing numeric');
+
+    applyTiltReading(state, 0, 0);
+    assert.equal(tiltFlying(state), true, 'a device genuinely held level is a reading, and zero');
+});
+
+test('the four attitude controls are left to whoever is holding them', () => {
+    const state = createTiltState(true);
+    const input = createInputState();
+    input.pitchUp = true;
+
+    applyTiltReading(state, null, null);
+    tiltToInput(input, state);
+    assert.equal(input.pitchUp, true, 'a sensor with nothing to say lets go of nothing');
+});
+
+test('one axis reported and the other silent is still a device saying something', () => {
+    const state = createTiltState(true);
+
+    assert.deepEqual(applyTiltReading(state, null, 20), { pitch: 0, roll: 20 },
+        'a sensor that only knows roll can still fly the wings');
+    assert.equal(tiltFlying(state), true);
+});
+
 test('the first reading is what level means, so a phone is held however it suits', () => {
     const state = held(40, -15);
 
@@ -206,6 +245,18 @@ test('the sensor listens, reports, and stops', async () => {
     assert.equal(sensor.stop(), true);
     assert.equal(env.listening, false);
     assert.equal(tiltFlying(state), false, 'a sensor stopped is a sensor no longer flying');
+});
+
+test('the sensor hands the angles over exactly as the event reported them', async () => {
+    const state = createTiltState(true);
+    const env = fakeWindow();
+    await new TiltSensor(state, env).start();
+
+    env.send({ alpha: null, beta: null, gamma: null });
+    assert.equal(state.reading, null, 'the emulated phone with nothing driving its sensors');
+
+    env.send({ alpha: 0, beta: 12, gamma: -4 });
+    assert.deepEqual(state.reading, { pitch: 12, roll: -4 }, 'and a real orientation, arriving after');
 });
 
 test('a machine that does not want tilt never reaches for the sensor', async () => {

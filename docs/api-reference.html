@@ -666,7 +666,7 @@ for (const field of START_FIELDS) {
     <thead><tr><th>Export</th><th>Is</th></tr></thead>
     <tbody>
         <tr><td><code>createTiltState(enabled)</code></td><td>The state, wanted or not, with no reading yet</td></tr>
-        <tr><td><code>applyTiltReading(state, beta, gamma, screenAngle)</code></td><td>A reading from the sensor</td></tr>
+        <tr><td><code>applyTiltReading(state, beta, gamma, screenAngle)</code></td><td>A reading from the sensor, or <code>null</code> for one with no angles in it</td></tr>
         <tr><td><code>tiltAxes(beta, gamma, screenAngle)</code></td><td>A device reading as the aircraft's two axes</td></tr>
         <tr><td><code>tiltFlying(state)</code></td><td>Whether tilt is both wanted and actually reporting</td></tr>
         <tr><td><code>levelTilt(state)</code></td><td>However the device is being held now is level</td></tr>
@@ -691,7 +691,9 @@ function frame(dt) {
     pilot.update(dt);
 }</code></pre>
 
-<p><code>tiltFlying</code> is what tells a sensor that was asked for from one that is actually reporting: a browser can refuse it outright, and a device with no gyroscope answers the ask and then never says anything. A tilt that is not flying writes nothing at all rather than four released controls, so the keys and the pads keep whatever they were holding.</p>
+<p><code>tiltFlying</code> is what tells a sensor that was asked for from one that is actually reporting: a browser can refuse it outright, and a device with no gyroscope answers the ask and then never says anything worth reading. A tilt that is not flying writes nothing at all rather than four released controls, so the keys and the pads keep whatever they were holding.</p>
+
+<p>What a device with no sensor actually sends is one event with <code>beta</code> and <code>gamma</code> both <code>null</code>, which is the specification's way of saying it has nothing to report. <code>applyTiltReading</code> refuses it and returns <code>null</code>, leaving <code>state.reading</code> as it was, because a null read as a zero is a device held perfectly level - the one reading that would take the pitch and roll pads off the glass of a machine that has no keys to fall back on. One axis reported and the other not is still a reading, and the silent axis is taken as the neutral.</p>
 
 <h2 id="runways-and-landings">Runways and landings</h2>
 

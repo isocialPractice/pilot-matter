@@ -71,11 +71,26 @@ export function tiltFlying(state) {
  * Takes a reading. The first one after a levelling is what the device's neutral
  * is set from, so a pilot holding a phone at whatever angle suits them is
  * holding it level rather than permanently pitching.
+ *
+ * A reading with no numbers in it is no reading. A browser with no gyroscope
+ * still fires the event, with every angle null, which is the specification's
+ * way of saying it has nothing to report - and a null read as zero is a device
+ * being held perfectly level, which is the one answer that takes the pitch and
+ * roll pads off the glass. Refusing it here is what keeps `state.reading` null,
+ * and a tilt that is not flying is what leaves the pads where they are.
  */
 export function applyTiltReading(state, beta, gamma, screenAngle = 0) {
     if (!state.enabled) return null;
+    if (!Number.isFinite(beta) && !Number.isFinite(gamma)) return null;
 
-    const axes = tiltAxes(beta, gamma, screenAngle);
+    // One axis reported and the other not is still a device saying something,
+    // so the silent axis is the neutral rather than the whole reading thrown
+    // away: a sensor that only knows roll can still fly the wings.
+    const axes = tiltAxes(
+        Number.isFinite(beta)  ? beta  : 0,
+        Number.isFinite(gamma) ? gamma : 0,
+        screenAngle
+    );
     if (state.reading == null) state.zero = { ...axes };
 
     state.reading = axes;
@@ -173,16 +188,19 @@ export class TiltSensor {
         this.state = state;
         this.env = env;
         this.listening = false;
+        // The angles are handed over exactly as the event reported them,
+        // nulls and all, because whether a reading is a reading is decided in
+        // `applyTiltReading` - where it can be tested without a device.
         this.onReading = (event) => {
-            applyTiltReading(this.state, event.beta ?? 0, event.gamma ?? 0, screenAngle(this.env));
+            applyTiltReading(this.state, event.beta, event.gamma, screenAngle(this.env));
         };
     }
 
     /**
      * Starts listening, asking first where the browser wants asking. Returns
      * whether the sensor is being listened to, which is not yet whether it is
-     * reporting - a device with no gyroscope answers yes here and never sends a
-     * reading, and `tiltFlying` is what tells those two apart.
+     * reporting - a device with no gyroscope answers yes here and then sends
+     * nothing worth reading, and `tiltFlying` is what tells those two apart.
      */
     async start() {
         if (this.listening || !this.state.enabled) return this.listening;

@@ -44,8 +44,10 @@ Tilt is what those machines open in, and it takes the four attitude pads off
 the glass. Whatever angle the device is held at when a flight starts is level
 for it, and a reset levels it again. Seven degrees either side of level is
 nothing. Refused, or on a device with no gyroscope, the pads stay and the
-flight is flown from them. The pads take the bottom corners, so the attitude
-indicator moves to the top of the screen and the control list comes off.
+flight is flown from them: a sensor that reports no angles at all is no reading
+rather than a device held level. The pads take the bottom corners, so the
+attitude indicator moves to the top left of the screen, the readouts drop below
+it and the chart it now shares that top with, and the control list comes off.
 
 ## Flight numbers
 

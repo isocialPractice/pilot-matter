@@ -5,6 +5,62 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0-alpha] - 2026-09-11
+
+The landing the card was never told about, a sensor that says nothing read as a
+device held level, and three instruments given the top of a phone between them.
+
+### Fixed
+
+- **The card is handed the strip a landing was made on.** `js/aircraft.js`
+  reports a touchdown with the strip it happened on and the arrival itself -
+  where on the strip, how hard, how square - which is everything a landing can
+  be scored from. `js/main.js` registered a zero-argument arrow for it, so both
+  were dropped on the way in: `onLanding` ran with `undefined` twice,
+  `scoreLanding` returned null for want of a strip, and `setLandingReport(null)`
+  wrote nothing and left `#game-mode-report` hidden. A landing flown onto the
+  first stage's strip in a browser touched down on the centreline, was judged
+  `LANDED`, rolled to a stop, and the breakdown it was all measured for never
+  appeared. The handler now names the two it is given and hands them on. Every
+  other part of the feature was already right, which is why nothing showed:
+  the five rows, the score line, the hold through the rollout and the ten
+  second limit had all been exercised in isolation, and the suite passed with
+  the breakdown never once reaching the screen
+- **A seam the suite could not import is read from the source instead.** Both
+  files load `three`, so no test could hold the two ends of that call together,
+  and a callback that quietly took nothing was worth 893 green tests.
+  `test/landing-score.test.js` now reads `js/aircraft.js` and `js/main.js` as
+  text the way `test/world-tiles.test.js` reads the camera out of `js/main.js`,
+  and checks the three joints in turn: that the flight model still reports two
+  things, that the handler registered takes two and hands on the two it took,
+  and that the breakdown is written from those rather than from nothing
+- **A sensor that reports nothing is no longer read as a device held level.** A
+  browser with no gyroscope still fires one `deviceorientation` event, with
+  `alpha`, `beta` and `gamma` all null - the specification's way of saying it
+  has nothing to report. `TiltSensor.onReading` coerced that to
+  `{pitch: 0, roll: 0}`, which is a device being held perfectly level: tilt went
+  to flying, and `PITCH +`, `PITCH -`, `ROLL L` and `ROLL R` came off the glass
+  of a machine that has no keys to fall back on, leaving an aircraft that could
+  not be pitched or rolled at all. `applyTiltReading` now refuses a reading with
+  no numbers in it and returns null, so `state.reading` stays null, `tiltFlying`
+  stays false, and the pads stay where they are until a real orientation
+  arrives. One axis reported and the other not is still a reading, with the
+  silent axis taken as the neutral - a sensor that only knows roll can still fly
+  the wings. The decision is made in the pure module rather than in the
+  listener, so it is tested in Node beside the rest of it
+- **The floated instruments are given the top of the screen between them.** With
+  the pads out, the attitude indicator was floated to the top centre, where the
+  readouts already ran: on a 393 pixel phone it covered the right-hand end of
+  the airspeed, the altitude, the vertical speed and the heading at once, and
+  clipped the chart in the other corner besides. Three instruments do not fit
+  across the top of a phone, so they are stacked instead: the ladder takes the
+  left corner, the chart keeps the right one it already had, and the readouts
+  drop below both. Pinning the two instruments to opposite edges is what keeps
+  them apart at a width nobody chose - they meet only on a screen narrower than
+  290 pixels - and the muted notice goes into the band the readouts left behind,
+  on the same left edge. Measured clear at 320, 360, 393 and 412 pixels, with
+  the notice showing
+
 ## [1.14.0-alpha] - 2026-09-10
 
 A gate is an attitude to match rather than a place to be, a landing is four

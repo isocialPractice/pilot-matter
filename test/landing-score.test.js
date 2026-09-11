@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     TOUCHDOWN_ZONE,
     TOUCHDOWN_REACH,
@@ -199,4 +200,57 @@ test('a rollout can be called off, for a stage that has been started again', () 
     assert.equal(rollingOut(state), false);
     assert.equal(state.elapsed, 0);
     assert.equal(updateRollout(state, 1, 0), false, 'and it does not go off later');
+});
+
+// --- The flight reaches for it ---------------------------------------------
+//
+// Everything above proves a landing is scored and read off correctly, and every
+// one of those tests exercises `scoreLanding` and `formatLandingReport` in
+// isolation. What none of them can prove is that a landing flown in a browser
+// ever reaches them: `js/aircraft.js` reports the strip and the arrival to a
+// callback `js/main.js` registers, and for a while that callback was a
+// zero-argument arrow. It dropped both, `scoreLanding` was handed `undefined`
+// twice, the breakdown was never written, and all 893 tests passed. Both files
+// import `three`, so nothing here can load them - the seam is read from the
+// source the way `test/world-tiles.test.js` reads the camera out of
+// `js/main.js`.
+
+const aircraftSource = readFileSync(new URL('../js/aircraft.js', import.meta.url), 'utf8');
+const mainSource     = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+
+/** The arguments of a call, read off the line it is written on. */
+function callArguments(source, pattern) {
+    const call = source.match(pattern);
+    if (!call) return null;
+    return call[1].split(',').map(argument => argument.trim()).filter(Boolean);
+}
+
+test('the flight model reports the strip a landing was made on, and the arrival', () => {
+    const reported = callArguments(aircraftSource, /this\.options\.onLanding\?\.\((.*)\)/);
+    assert.ok(reported, 'js/aircraft.js should still be reporting landings');
+    assert.equal(reported.length, 2,
+        `onLanding is called with (${reported.join(', ')}), which is not a strip and an arrival`);
+});
+
+test('the handler registered for a landing takes what the flight model reports', () => {
+    const taken = callArguments(mainSource, /onLanding:\s*\(([^)]*)\)\s*=>/);
+    assert.ok(taken, 'js/main.js should still register an onLanding handler');
+    assert.equal(taken.length, 2,
+        `the handler takes (${taken.join(', ')}), so the landing is dropped on the way in`);
+
+    // Named is not yet passed on: an arrow that takes both and then calls
+    // `this.onLanding()` drops them just as quietly, and just as silently.
+    const passed = callArguments(mainSource, /onLanding:\s*\([^)]*\)\s*=>\s*this\.onLanding\(([^)]*)\)/);
+    assert.ok(passed, 'the handler should hand the landing on to this.onLanding');
+    assert.deepEqual(passed, taken, 'and hand on the two it was given rather than calling with nothing');
+});
+
+test('the landing is scored from the two the handler was given', () => {
+    const handler = mainSource.match(/^ {4}onLanding\((.*?)\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(handler, 'js/main.js should still define onLanding');
+
+    const [strip, contact] = handler[1].split(',').map(name => name.trim());
+    assert.ok(strip && contact, `onLanding(${handler[1]}) should take a strip and an arrival`);
+    assert.ok(handler[2].includes(`scoreLanding(${strip}, ${contact})`),
+        'the breakdown is written from the landing that was reported, not from nothing');
 });
