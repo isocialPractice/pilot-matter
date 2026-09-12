@@ -59,18 +59,31 @@ import {
     GATE_ARROWS,
     GATE_IN_VIEW,
     bearingDirection,
+    directionToBearing,
     wrapDegrees,
     wrapRadians,
     blendBearing
 } from '../js/game-modes.js';
-import { isStartValue, START_FIELD_IDS, START_FLYING } from '../js/config.js';
+import { isStartValue, START_FIELD_IDS, START_FLYING, startField } from '../js/config.js';
 import {
     buildEnvironment, getEnvironment, MODE_ENVIRONMENTS, isEnvironmentId
 } from '../js/environment/presets.js';
-import { sampleHeight, runwayThresholds } from '../js/environment/elements.js';
-import { FEET_PER_UNIT } from '../js/units.js';
+import {
+    sampleHeight, runwayThresholds, runwayDirection, runwayOffsets
+} from '../js/environment/elements.js';
+import { FEET_PER_UNIT, headingToYaw } from '../js/units.js';
 
 const WORLD_SIZE = 16000;
+
+/**
+ * How far an opening's heading can sit off the bearing it was worked out from
+ * and still be right. A stage opens on a card heading a pilot could dial in,
+ * so `stageStart` snaps it to the step the start field is configured in, and
+ * half a step is the most that snap can move it. Anything past this is the
+ * geometry being wrong rather than the dial being coarse - the frame mismatch
+ * these tests were written for was four times it.
+ */
+const HEADING_SNAP = startField('headingDegrees').step / 2;
 
 /** The world a stage is flown over, built the way the simulator builds it. */
 function worldFor(state, segments = 100) {
@@ -325,10 +338,40 @@ test('the keys that close the panel are the ones that back out of anything', () 
 
 test('a bearing points the way the compass card says it does', () => {
     assert.ok(Math.abs(bearingDirection(0).z - 1) < 1e-9, 'north is +Z');
-    assert.ok(Math.abs(bearingDirection(90).x - 1) < 1e-9, 'east is +X');
+    assert.ok(Math.abs(bearingDirection(90).x + 1) < 1e-9, 'east is -X');
     assert.equal(wrapDegrees(-90), 270);
     assert.equal(wrapDegrees(450), 90);
     assert.ok(Math.abs(wrapRadians(Math.PI * 1.5) + Math.PI * 0.5) < 1e-9);
+});
+
+/**
+ * The one thing a compass bearing has to be, and the thing that was wrong:
+ * the direction a bearing names is the direction an aircraft on that bearing
+ * travels. Anything else and a stage can place the aircraft correctly, point
+ * it with the reciprocal of the same bearing, and still aim it off the strip.
+ *
+ * The aircraft's direction is taken from `headingToYaw` and the rotation the
+ * renderer applies it through: a model built nose-first along +Z, turned about
+ * +Y by the yaw, travels `(sin yaw, cos yaw)`.
+ */
+test('a bearing is the direction an aircraft on that bearing actually flies', () => {
+    // Bearings that are not multiples of a right angle, so a frame mirrored in
+    // x cannot pass by symmetry the way it does on 000 and 180.
+    for (const degrees of [5, 37, 128, 183, 274, 359]) {
+        const yaw   = headingToYaw(degrees);
+        const flown = { x: Math.sin(yaw), z: Math.cos(yaw) };
+        const named = bearingDirection(degrees);
+
+        assert.ok(Math.abs(named.x - flown.x) < 1e-9 && Math.abs(named.z - flown.z) < 1e-9,
+            `${degrees} names (${named.x.toFixed(4)}, ${named.z.toFixed(4)}) `
+          + `but is flown as (${flown.x.toFixed(4)}, ${flown.z.toFixed(4)})`);
+
+        // And the reverse reading gets the bearing back off the direction.
+        assert.ok(Math.abs(directionToBearing(flown.x, flown.z) - degrees) < 1e-9,
+            `${degrees} does not read back off the direction it is flown in`);
+    }
+
+    assert.equal(directionToBearing(0, 0), 0, 'nowhere at all reads as north');
 });
 
 test('a bearing turns toward another by the short way round', () => {
@@ -401,10 +444,15 @@ function offsetToRunway(position, runway) {
     return { x: position.x - runway.x, z: position.z - runway.z };
 }
 
-/** The bearing from the strip out to a place, in degrees clockwise from north. */
+/**
+ * The bearing from the strip out to a place, in degrees clockwise from north,
+ * read on the card the aircraft flies by rather than on one written out here.
+ * The two are mirror images in x, and a test that writes out its own is a test
+ * that agrees with a placement and a heading that disagree with each other.
+ */
 function bearingFromRunway(position, runway) {
     const out = offsetToRunway(position, runway);
-    return wrapDegrees(Math.atan2(out.x, out.z) * 180 / Math.PI);
+    return directionToBearing(out.x, out.z);
 }
 
 test('a landing stage opens where it said it would, pointing where it said', () => {
@@ -419,9 +467,133 @@ test('a landing stage opens where it said it would, pointing where it said', () 
 
     // The first stage points at the strip: the bearing from the aircraft to the
     // runway and the heading it opens on should be the same bearing.
-    const toStrip = wrapDegrees(Math.atan2(-out.x, -out.z) * 180 / Math.PI);
+    const toStrip = directionToBearing(-out.x, -out.z);
     const off = Math.abs(wrapRadians((toStrip - start.headingDegrees) * Math.PI / 180));
     assert.ok(off < 0.1, `the first stage opens ${(off * 180 / Math.PI).toFixed(0)} degrees off the strip`);
+});
+
+/**
+ * The check the two tests above could not make between them. Both read the
+ * opening's bearing off a card written in the test, so a placement and a
+ * heading that were mirror images of each other agreed with a test that was
+ * mirrored the same way, and `FINAL` opened ten degrees off the strip for as
+ * long as the three of them were wrong together.
+ *
+ * This one never names a bearing. It asks where the nose points in the world,
+ * through `headingToYaw` and the rotation the renderer applies it with, and
+ * compares that against where the strip lies from the opening. A frame is
+ * either right or it is not, and no card is consulted about it.
+ */
+test('a landing stage opens pointed at the strip it is about', () => {
+    const state = createRunState(RUNWAY_LANDING);
+
+    // A strip laid on a bearing that is not a multiple of a right angle, so a
+    // frame mirrored in x cannot pass by symmetry. Placed well away from the
+    // origin for the same reason.
+    const runway = {
+        x: 1200, z: -3400, heading: 37, length: 3000, width: 300, elevation: 0,
+        ...runwayDirection(37)
+    };
+
+    const { start, position } = stageStart(state, { runway, size: WORLD_SIZE });
+
+    // Where the nose points in the world, for the heading the stage opened on.
+    const yaw  = headingToYaw(start.headingDegrees);
+    const nose = { x: Math.sin(yaw), z: Math.cos(yaw) };
+
+    // And where the strip is from there.
+    const away    = Math.hypot(runway.x - position.x, runway.z - position.z);
+    const toStrip = { x: (runway.x - position.x) / away, z: (runway.z - position.z) / away };
+
+    // FINAL sets approach.heading 0, which is the stage saying "aimed at it".
+    assert.equal(currentStage(state).approach.heading, 0,
+        'this test is about the stage that opens aimed at the strip');
+
+    const off = Math.acos(Math.min(1, Math.max(-1, nose.x * toStrip.x + nose.z * toStrip.z)))
+              * 180 / Math.PI;
+    assert.ok(off <= HEADING_SNAP,
+        `the stage opens ${off.toFixed(2)} degrees off the strip it is about`);
+});
+
+/**
+ * What that angle comes to over the distance there is to fly, which is the
+ * part a pilot meets. The test above reads the opening's aim as an angle, and
+ * an angle is right or wrong at any range; this one holds the heading the
+ * stage opened on across the ground between the aircraft and the strip and
+ * asks whether the track that draws crosses the strip or the country beside
+ * it. Nothing is flown - no model, no time - only the straight line a heading
+ * held without a control touched leaves over the ground.
+ *
+ * Marched in steps rather than solved, because what is wanted is the closest
+ * the track comes to the middle while it is over the strip's own length, and a
+ * line that never gets there at all has no answer to give rather than a wrong
+ * one.
+ */
+test('the opening heading, held, carries the aircraft onto the strip', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    const { runway } = worldFor(state);
+    const { start, position } = stageStart(state, { runway, size: WORLD_SIZE });
+
+    // Where the nose points in the world, taken the way the renderer takes it
+    // rather than off a bearing, for the same reason the test above does.
+    const yaw  = headingToYaw(start.headingDegrees);
+    const nose = { x: Math.sin(yaw), z: Math.cos(yaw) };
+
+    let closest = null;
+    for (let flown = 0; flown <= WORLD_SIZE; flown += 10) {
+        const { along, across } = runwayOffsets(runway,
+            position.x + nose.x * flown, position.z + nose.z * flown);
+        if (Math.abs(along) > runway.length / 2) continue;
+        if (!closest || Math.abs(across) < Math.abs(closest.across)) closest = { along, across };
+    }
+
+    assert.ok(closest, 'the opening heading never carries the aircraft over the strip at all');
+    assert.ok(Math.abs(closest.across) <= runway.width / 2,
+        `the track passes ${Math.abs(closest.across).toFixed(0)} units off the middle of a strip `
+      + `${runway.width.toFixed(0)} wide, which is beside it rather than onto it`);
+});
+
+/**
+ * The same reading for the stages that open deliberately turned off the line.
+ * A stage asking to open 30 degrees off the strip should be 30 degrees off it,
+ * not 30 mirrored into something else.
+ *
+ * Measured in the world the same way as the test above, never through a
+ * bearing: a test that reads the opening's bearing back with the same helper
+ * the opening was placed with agrees with any frame at all, mirrored or not,
+ * because the two mirror together.
+ */
+test('a landing stage opens exactly as far off the strip as it asked to', () => {
+    const state = createRunState(RUNWAY_LANDING);
+    const runway = {
+        x: -900, z: 2100, heading: 214, length: 3000, width: 300, elevation: 0,
+        ...runwayDirection(214)
+    };
+
+    do {
+        const stage = currentStage(state);
+        const { start, position } = stageStart(state, { runway, size: WORLD_SIZE });
+
+        const yaw  = headingToYaw(start.headingDegrees);
+        const nose = { x: Math.sin(yaw), z: Math.cos(yaw) };
+
+        const away    = Math.hypot(runway.x - position.x, runway.z - position.z);
+        const toStrip = { x: (runway.x - position.x) / away, z: (runway.z - position.z) / away };
+
+        // Signed the way the card counts, so a stage that opens turned right
+        // of the strip reads as the positive `approach.heading` it asked for.
+        const turned = Math.atan2(nose.z * toStrip.x - nose.x * toStrip.z,
+                                  nose.x * toStrip.x + nose.z * toStrip.z) * 180 / Math.PI;
+
+        // Folded back into the half turn either side of zero, because the last
+        // stage opens with the strip dead behind and 180 either way is the
+        // same place: an unfolded difference there reads as 359 degrees out.
+        const miss = relativeBearing(turned, stage.approach.heading);
+
+        assert.ok(Math.abs(miss) <= HEADING_SNAP,
+            `${stage.label} asked to open ${stage.approach.heading} degrees off the strip `
+          + `and opened ${turned.toFixed(2)}`);
+    } while (advanceStage(state));
 });
 
 test('a landing stage opens on the approach side, so the strip is ahead not behind', () => {
@@ -733,17 +905,21 @@ test('the next stage is timed on its own rather than on the last one', () => {
 const GATE = { index: 0, x: 0, y: 500, z: 4000, radius: 200, dirX: 0, dirZ: 1 };
 const HERE = { x: 0, y: 500, z: 0 };
 
+// East is the world's -X, because the card counts the way the nose turns and
+// the nose is turned by `headingToYaw`. So a gate out along +X is to the west.
 test('a bearing to a gate is read off the same card the heading is', () => {
     assert.equal(gateBearing(GATE, HERE), 0, 'due north');
-    assert.equal(gateBearing({ x: 4000, z: 0 }, HERE), 90, 'due east');
+    assert.equal(gateBearing({ x: -4000, z: 0 }, HERE), 90, 'due east');
     assert.equal(gateBearing({ x: 0, z: -4000 }, HERE), 180, 'due south');
-    assert.equal(gateBearing({ x: -4000, z: 0 }, HERE), 270, 'due west');
+    assert.equal(gateBearing({ x: 4000, z: 0 }, HERE), 270, 'due west');
 });
 
 test('a bearing to a gate points the way the direction it names does', () => {
     const gate = { x: 3000, z: 3000 };
     const direction = bearingDirection(gateBearing(gate, HERE));
 
+    // Whatever the bearing reads, the direction it names has to be the way the
+    // gate actually lies - which is the round trip the two functions make.
     assert.ok(Math.abs(direction.x - Math.SQRT1_2) < 1e-9);
     assert.ok(Math.abs(direction.z - Math.SQRT1_2) < 1e-9);
 });
@@ -806,7 +982,7 @@ test('the gate pointed at is the one the course is waiting on', () => {
     const pointer = gatePointer(state, course, HERE, 180);
 
     assert.equal(pointer.index, 1);
-    assert.equal(pointer.bearing, 90);
+    assert.equal(pointer.bearing, 270, 'the second gate is out along +X, which is west');
 });
 
 test('nothing is pointed at when there is no gate outstanding', () => {
