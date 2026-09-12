@@ -105,6 +105,52 @@ its context survives being archived.
     Changing the documentation and the pad labels instead is the other way, and
     is a decision rather than a repair.
   - From: UI/UX Override - the card lifted onto the notice
+- [ ] The one compass frame is still written down two ways
+  - **Issue**: This release makes east the world's `-X` and says so in
+    `js/units.js`, `js/minimap.js` and `docs/controls/instruments.html`. The
+    tiled-world example in `docs/api.md` was not taken with them: lines 416 and
+    417 still name the tile at `x: -0.5` `west` and the one at `x: 0.5` `east`,
+    which is the mirror of the frame the release just settled, so the two pages
+    of the same site now contradict each other on which way the x axis runs.
+    `docs/api-reference.html` carries the same two lines at 473 and 474 because
+    it is generated from that markdown, and `test/environment-tiles.test.js`
+    names `tile(0, 0)` west and `tile(1, 0)` east at lines 90, 165 and 196.
+    Nothing fails and the suite passes - a join is a join whichever name the
+    variable carries - but a host building an assembly from the example ends up
+    with every compass name in it reversed, and the example is the one place
+    the API says anything about the axis at all.
+  - **Goal**: Swap the two names in `docs/api.md` so the tile at the lower x is
+    the east one, regenerate the page with `npm run docs:api`, and rename the
+    three pairs in `test/environment-tiles.test.js` to match. `test/site.test.js`
+    renders the reference again and fails if what is committed is not what the
+    markdown comes to, so the regeneration is checked rather than trusted.
+  - From: UI/UX Override - the card lifted onto the notice
+- [ ] The module that owns the compass frame misdescribes its own reverse
+  - **Issue**: `directionToBearing` in `js/units.js` is documented as coming
+    back "in whole degrees from 0 to 359", which is the phrasing of
+    `headingDegrees` thirty lines above it, but only `headingDegrees` rounds -
+    this one returns whatever `Math.atan2` gave it. Every caller happens to
+    cover for it, so nothing reads wrong today: `js/hud.js:105` rounds the gate
+    bearing before drawing it, and `courseOpening` hands its result to
+    `snapStartValue`. A caller added later that takes the sentence at its word
+    draws `HEADING: 037.48312`. The same docstring also says `Math.atan2` of
+    two zeros gives a NaN. It gives `0`, so the sentence credits a guard that
+    neither exists nor is needed - what actually makes `directionToBearing(0, 0)`
+    read as north is the wrap on the line below.
+  - **Goal**: Make both sentences true. Either round the return and keep the
+    claim, or drop "whole" and say it comes back fractional; and delete the NaN
+    claim rather than rewording it. This module is the one place the release
+    designates as the authority for the frame, so its description of itself is
+    what the next caller builds on.
+  - From: UI/UX Override - the card lifted onto the notice
+- [ ] A test helper left behind by the rewrite it was rewritten out of
+  - **Issue**: `colorAt` at `test/runway.test.js:327` has no callers. Its only
+    one was `the strip is painted so it can be picked out from the air`, which
+    this run rewrote to read every vertex through `paintBands` and `colorOf`
+    instead of sampling three places. The helper was left where it was.
+  - **Goal**: Delete `colorAt`, or call it from the sampling the rewrite kept
+    if one is still wanted.
+  - From: UI/UX Override - the card lifted onto the notice
 
 ## Game UI/UX
 
