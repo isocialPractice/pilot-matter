@@ -15,6 +15,7 @@
 
 import { fbm, hash, shapeHeight, smoothstep, mountainBump } from '../terrain-math.js';
 import { mountainCount } from '../mountains.js';
+import { bearingToDirection } from '../units.js';
 
 // The field the bundled simulator builds: a 16000-unit square sampled on a
 // 200-segment grid, which is one vertex every 80 units.
@@ -777,11 +778,16 @@ const runway = {
 /**
  * The unit vector a strip runs along, from the bearing it was laid on. North is
  * the world's +Z axis, which is the same north the compass card counts from, so
- * a strip on 000 runs the way a flight starting on 000 is already pointing.
+ * a strip on 000 runs the way a flight starting on 000 is already pointing -
+ * and a strip on any other bearing runs the way a flight on that bearing is
+ * pointing, which is what `bearingToDirection` is for. The frame lives in
+ * `js/units.js` beside `headingToYaw` rather than being written out again here,
+ * because the two have to agree for a landing to line up on the strip it is
+ * scored against.
  */
 export function runwayDirection(heading) {
-    const radians = heading * Math.PI / 180;
-    return { alongX: Math.sin(radians), alongZ: Math.cos(radians) };
+    const { x, z } = bearingToDirection(heading);
+    return { alongX: x, alongZ: z };
 }
 
 /** A place on a strip, given as how far along it and how far across it lies. */

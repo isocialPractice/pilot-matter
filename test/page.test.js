@@ -48,6 +48,17 @@ const scripts = collectScripts(scriptDir);
 // overlays have to share rather than a comfortable one they were laid out at.
 const NARROWEST_PHONE = 320;
 
+// And the shortest it gets, which is the same phone with a browser's own bars
+// taking their share of it: 320 x 568 under Safari leaves 460. Height is the
+// scarcer of the two once the pads are out, because they take a fixed band off
+// the bottom of whatever is left.
+const SHORTEST_PHONE = 460;
+
+// The shortest screen the stacked floated readouts still hold on. Below this
+// the stack and the pad band are the same band, which is the height the
+// stylesheet's own media query takes over at.
+const SHORTEST_STACKED = 557;
+
 // Every menu drawn into the page: the two cards, the panels they open, and the
 // three lists one panel is split across.
 const MENU_LISTS = [
@@ -467,6 +478,158 @@ test('a gate on the chart is the colour the hoop it stands for is', () => {
     }
 });
 
+/**
+ * The approach marks are boxes turned about the vertical until they lie across
+ * the strip, and which way to turn them is a compass question: the renderer
+ * turns a model by `headingToYaw`, and a bearing in plain radians is the mirror
+ * of that. Written out by hand it puts the threshold bar and the whole lead-in
+ * on the wrong diagonal of every strip that is not laid north to south.
+ *
+ * The module imports Three.js, so this is read off its source the way the ring
+ * colours above are.
+ */
+test('the approach marks are turned the way the aircraft is turned', () => {
+    const guidance = readFileSync(fileURLToPath(new URL('../js/guidance.js', import.meta.url)), 'utf8');
+
+    assert.match(guidance, /import\s*\{[^}]*headingToYaw[^}]*\}\s*from\s*'\.\/units\.js'/,
+        'js/guidance.js should take the conversion from js/units.js');
+    assert.match(guidance, /const\s+facing\s*=\s*headingToYaw\(/,
+        'and turn its marks by it rather than by the bearing in radians');
+    assert.ok(!/plan\.heading\s*\*\s*Math\.PI\s*\/\s*180/.test(guidance),
+        'a bearing converted by hand here is the compass frame written out a second time');
+});
+
+/**
+ * The pads take a fixed band off the bottom of the screen and paint over
+ * everything in it at z-index 130. The floated readouts were dropped to 180
+ * to clear the two instruments above them and nothing said where they had to
+ * stop, so on every screen a phone gives held sideways they ran into that
+ * band and the last of them ran off the bottom edge entirely.
+ *
+ * The height is declared now, which is what lets it be checked at all: the
+ * content's own height is nowhere in the stylesheet.
+ */
+test('the floated readouts stop before the band the pads take', () => {
+    const band = padBandDepth(indexHtml);
+    assert.ok(Number.isFinite(band), 'the depth of the pad band should be readable off the page');
+
+    const top   = pixels(indexHtml, '#hud.floated', 'top');
+    const bound = pixels(indexHtml, '#hud.floated', 'max-height');
+    const clips = declarations(indexHtml, '#hud.floated').get('overflow');
+
+    assert.ok(Number.isFinite(bound),
+        'the floated readouts need a declared height, or nothing can say where they end');
+    assert.equal(clips, 'hidden', 'and it has to bind, or it is a number rather than a bound');
+
+    assert.ok(top + bound <= SHORTEST_STACKED - band,
+        `the stacked readouts run to ${top + bound}px and the pads start at `
+      + `${SHORTEST_STACKED - band}px on the shortest screen they are drawn at`);
+});
+
+/**
+ * Below that height the stack cannot fit however it is written, so the page
+ * takes over with a media query. The breakpoint and the bound above have to
+ * be the same number seen from either side: a gap between them is a run of
+ * screen heights where neither arrangement holds.
+ */
+test('the short-screen readouts take over exactly where the stacked ones stop', () => {
+    const short = media(indexHtml, '(max-height: 556px)');
+    assert.ok(short, 'index.html should carry the short-screen rules for the readouts');
+
+    const breakpoint = Number(indexHtml.match(/@media \(max-height: (\d+)px\)/)?.[1]);
+    assert.equal(breakpoint, SHORTEST_STACKED - 1,
+        'the query should start one pixel below the shortest screen the stack holds on');
+
+    // Compact, and clear of the pads on the shortest screen a phone gives -
+    // which is the one the stacked block cannot be made to fit.
+    const band  = padBandDepth(indexHtml);
+    const top   = pixels(indexHtml, '#hud.floated', 'top');
+    const bound = pixels(short, '#hud.floated', 'max-height');
+
+    assert.ok(Number.isFinite(bound), 'the compact readouts need a declared height too');
+    assert.ok(bound < pixels(indexHtml, '#hud.floated', 'max-height'),
+        'and a smaller one, or the query has changed nothing');
+    assert.ok(top + bound <= SHORTEST_PHONE - band,
+        `the compact readouts run to ${top + bound}px and the pads start at `
+      + `${SHORTEST_PHONE - band}px on the shortest phone`);
+
+    assert.equal(declarations(short, '#hud.floated .hud-secondary').get('display'), 'none',
+        'the two readouts that are not flown on are what the compact block drops');
+});
+
+/**
+ * Shorter again and the readouts leave the left column for the band between
+ * the two pad clusters, which is the one part of a short screen nothing else
+ * has claimed. Both ends of that band belong to a cluster, so the block has
+ * to start past one and stop before the other.
+ */
+test('the readouts moved to the bottom band stay between the two pad clusters', () => {
+    const sideways = media(indexHtml, '(max-height: 556px) and (min-width: 500px)');
+    assert.ok(sideways, 'index.html should say where the readouts go on a phone held sideways');
+
+    const reach = clusterReach(indexHtml);
+    assert.ok(Number.isFinite(reach), 'how far a cluster reaches in should be readable off the page');
+
+    for (const edge of ['left', 'right']) {
+        const inset = pixels(sideways, '#hud.floated', edge);
+        assert.ok(Number.isFinite(inset), `the block should declare its ${edge} edge`);
+        assert.ok(inset >= reach,
+            `the readouts start ${inset}px from the ${edge} and that cluster reaches ${reach}px in`);
+    }
+
+    assert.equal(declarations(sideways, '#hud.floated').get('top'), 'auto',
+        'and come off the top edge they were hung from, or they are in two places at once');
+});
+
+/**
+ * The objective card is centred and the pads are not, so it cleared them for
+ * as long as it only carried an instruction: its rows are narrow enough to
+ * pass between the clusters. The landing breakdown is wider and lower, and
+ * the pads paint over it, so the reading of a landing was read off from
+ * behind a thumb at each end.
+ */
+test('the floated card is lifted clear of the band the pads take', () => {
+    const narrow = media(indexHtml, '(max-width: 640px)');
+    assert.ok(narrow, 'index.html should say where the card goes on a screen the pads cross');
+
+    const band = padBandDepth(indexHtml);
+    const lift = pixels(narrow, '#game-mode.floated', 'bottom');
+
+    assert.ok(Number.isFinite(lift), 'the lifted card should be placed in pixels');
+    assert.ok(lift >= band, `the card sits ${lift}px up and the pads reach ${band}px up`);
+
+    // Lifted that far it needs the height above the band rather than the
+    // corner it used to have, and the shortest screen does not have it. The
+    // bound is what keeps the top line on the screen.
+    const bound = declarations(narrow, '#game-mode.floated').get('max-height');
+    assert.equal(bound, `calc(100vh - ${lift + 20}px)`,
+        'the card should be bounded to the room above the band, so it clips rather than overflows');
+    assert.equal(declarations(narrow, '#game-mode.floated').get('overflow'), 'hidden');
+
+    // And it lands over the readouts wherever it lands, so it has to be read
+    // as one card rather than as two overlays through each other.
+    const alpha = (rule) => Number(declarations(indexHtml, rule).get('background')
+        ?.match(/rgba\([^)]*,\s*([\d.]+)\)/)?.[1]);
+
+    assert.ok(alpha('#game-mode.floated') > alpha('#game-mode'),
+        `the floated card reads at ${alpha('#game-mode.floated')} over the readouts `
+      + `and the placed one at ${alpha('#game-mode')}`);
+});
+
+// The card is lifted by the same flag that floats the overlays the pads took
+// the corner from, because it is the same condition: the pads are out.
+test('the card is floated by the run that floats the rest of them', () => {
+    const main = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
+    const floated = [...main.matchAll(/overlays\.(\w+)\.classList\.toggle\('floated', pads\)/g)]
+        .map(match => match[1]);
+
+    assert.ok(floated.includes('objective'),
+        'js/main.js should float the objective card with the pads, as it does the others');
+    for (const overlay of ['attitude', 'muted', 'hud']) {
+        assert.ok(floated.includes(overlay), `and go on floating ${overlay}`);
+    }
+});
+
 // --- The controls for a machine with no keys -------------------------------
 
 test('each cluster of pads has an empty box to be drawn into', () => {
@@ -516,6 +679,69 @@ function declarations(css, selector) {
 function pixels(css, selector, property) {
     const value = declarations(css, selector).get(property);
     return value?.endsWith('px') ? Number(value.slice(0, -2)) : null;
+}
+
+/**
+ * The body of an `@media` block, as its own stylesheet, so the rules written
+ * for one screen can be read apart from the rules written for every screen.
+ * Both are `#hud.floated`, and reading them together would answer a question
+ * about a short phone with the declaration meant for a tall one.
+ *
+ * Matched on the condition text with the spacing normalized, and read by
+ * counting braces rather than by a pattern, because the block holds rules and
+ * a rule holds braces.
+ */
+function media(css, condition) {
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const want = condition.replace(/\s+/g, ' ').trim();
+
+    for (const match of stripped.matchAll(/@media([^{]*)\{/g)) {
+        if (match[1].replace(/\s+/g, ' ').trim() !== want) continue;
+
+        let depth = 1;
+        let at = match.index + match[0].length;
+        const from = at;
+        while (at < stripped.length && depth > 0) {
+            if (stripped[at] === '{') depth++;
+            if (stripped[at] === '}') depth--;
+            at++;
+        }
+        return stripped.slice(from, at - 1);
+    }
+
+    return null;
+}
+
+/**
+ * How deep a band the pads take off the bottom of the screen, read off the
+ * page rather than written down here: three rows of cells, the gaps between
+ * them, and the inset the whole cross is held off the edge by. Every overlay
+ * that has to clear the pads is measured against this, so a pad grown a row
+ * taller moves all of them at once instead of leaving them behind.
+ */
+function padBandDepth(css) {
+    const rows = declarations(css, '.touch-cluster').get('grid-template-rows');
+    const gap  = pixels(css, '.touch-cluster', 'gap');
+    const inset = declarations(css, '#touch-controls').get('padding')?.split(/\s+/).pop();
+
+    const cells = rows?.match(/repeat\((\d+),\s*(\d+)px\)/);
+    if (!cells || gap === null || !inset?.endsWith('px')) return null;
+
+    const count = Number(cells[1]);
+    return count * Number(cells[2]) + (count - 1) * gap + Number(inset.slice(0, -2));
+}
+
+/** How far in from each edge a cluster of pads reaches. */
+function clusterReach(css) {
+    const columns = declarations(css, '.touch-cluster').get('grid-template-columns');
+    const gap     = pixels(css, '.touch-cluster', 'gap');
+    const inset   = declarations(css, '#touch-controls').get('padding')?.split(/\s+/)[1];
+
+    const cells = columns?.match(/repeat\((\d+),\s*(\d+)px\)/);
+    if (!cells || gap === null || !inset?.endsWith('px')) return null;
+
+    const count = Number(cells[1]);
+    return count * Number(cells[2]) + (count - 1) * gap + Number(inset.slice(0, -2));
 }
 
 /**

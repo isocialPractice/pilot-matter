@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { headingToYaw } from './units.js';
 
 /**
  * The approach guidance, as the meshes the geometry in `js/game-modes.js`
@@ -57,7 +58,11 @@ export class ApproachGuidance {
         this.clear();
         if (!plan) return 0;
 
-        const facing = plan.heading * Math.PI / 180;
+        // The strip's bearing as the rotation that lays a box along it. A mesh
+        // is turned the way the aircraft is turned - `headingToYaw` - rather
+        // than by the bearing in radians, which is its mirror and would put the
+        // bar across the wrong diagonal on every strip but a north-south one.
+        const facing = headingToYaw(plan.heading);
 
         if (plan.threshold) {
             this.add(buildMark(plan.threshold, facing, plan.width,

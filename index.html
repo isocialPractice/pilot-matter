@@ -430,9 +430,20 @@
            was drawn over the right-hand end of four readouts at once - the
            airspeed, the altitude, the vertical speed and the heading - which
            are the four things a pilot is flying on. 180px clears the chart,
-           which is the taller of the two at 140px from a 20px top. */
+           which is the taller of the two at 140px from a 20px top.
+
+           The height is declared rather than left to the six rows, because
+           the band below is not free either: the pads take the bottom 172
+           pixels and paint over the readouts at z-index 130 against their
+           100. Six rows come to 204.75, so the stack fits from 180 down only
+           while the screen is at least 557 pixels tall - which is the height
+           the media query below takes over at, and 205 is the bound that
+           makes the two agree. A seventh row added here without moving that
+           number is a row drawn under a thumb, so it is clipped instead. */
         #hud.floated {
             top: 180px;
+            max-height: 205px;
+            overflow: hidden;
         }
 
         /* Into the band the readouts left between themselves and the ladder,
@@ -444,6 +455,49 @@
             bottom: auto;
             right: auto;
             left: 20px;
+        }
+
+        /* The card is centred and the pads are not, so for as long as it only
+           carried an instruction it cleared them by being short: its own rows
+           are narrow enough to pass between the two clusters, and the band it
+           overlapped held nothing but the empty corners of them. The landing
+           breakdown is wider and lower, and the pads paint over it at z-index
+           130 against the card's 120, so the reading of a landing ended up
+           behind a thumb at each end.
+
+           Lifted the depth of the pad band and a gap. The pads are the one
+           thing on the screen that must never be covered and the one thing
+           that cannot move, so the card is what gives way - and where it now
+           lands it lands over the readouts, which it already paints over.
+           Opaque with it, so that reads as a card over a flight rather than
+           as two overlays read through each other.
+
+           The card is over something whenever the pads are out - the
+           readouts on a tall screen, and the band they move into on a short
+           one - so the opaque reading is the floated one rather than the
+           lifted one. */
+        #game-mode.floated {
+            background: rgba(0, 0, 0, 0.85);
+        }
+
+        /* The lift itself only where the two actually meet. The clusters take
+           172 pixels in from each edge and the card is about 300 across, so a
+           screen wider than the three of them together was never covering it,
+           and lifting the card there would cost the height a short wide
+           screen has least of, for nothing. */
+        @media (max-width: 640px) {
+            #game-mode.floated {
+                bottom: 188px;
+                /* Lifted that far, the card needs the height above the band
+                   rather than the corner it used to sit in, and the shortest
+                   screen does not have it. Bounded to what is there, so a
+                   phone held sideways loses the last line of the breakdown
+                   from the bottom rather than the name of the stage off the
+                   top. The score is the first line written, so what goes is
+                   always the least of it. */
+                max-height: calc(100vh - 208px);
+                overflow: hidden;
+            }
         }
 
         #settings,
@@ -737,6 +791,69 @@
             #low-altitude { animation: none; }
             #loading, #loading-bar { transition: none; }
         }
+
+        /* A screen too short for the floated readouts to fit between the
+           instruments above them and the pads below.
+
+           The stack runs from 180 to 384.75 and the pads take the bottom 172,
+           so the two are clear of each other only from 557 pixels of height
+           up. Every phone gives less than that held sideways - 393 at most,
+           and about 330 in a browser with a toolbar - and js/tilt-controls.js
+           says sideways is how a flight simulator on a phone is held every
+           time. So this is the ordinary case rather than the corner one.
+
+           180 cannot come up: the ladder ends at 130 and the chart at 160,
+           and those two were placed correctly. What gives instead is the
+           rows. THROTTLE and CAMERA go, because they are the two a pilot is
+           not flying on and the two that fell off the bottom, and the four
+           that are left are drawn tighter. Four compact rows come to 91, so
+           the block ends at 271 and clears the pads on a 460 pixel screen -
+           which is what a 320 pixel phone in portrait gives under Safari, the
+           shortest screen this arrangement still has to hold on. */
+        @media (max-height: 556px) {
+            #hud.floated {
+                font-size: 13px;
+                max-height: 100px;
+            }
+
+            #hud.floated div {
+                margin-bottom: 4px;
+                padding: 2px 6px;
+            }
+
+            /* Read on the ground rather than flown on, and the first two to
+               go when there is not room for six. */
+            #hud.floated .hud-secondary {
+                display: none;
+            }
+        }
+
+        /* Shorter still, and wide with it, which is a phone held sideways.
+           Even the compact stack does not fit: at 330 pixels of height the
+           pads start at 158 and the readouts have not begun at 180.
+
+           A screen that short is never a narrow one - the shortest is 568
+           across - so the readouts take the width they could not get in
+           height, and go in the band between the two pad clusters. That band
+           is 156 pixels deep and everything but its two ends is empty, which
+           is the one piece of a short screen nothing else has claimed. */
+        @media (max-height: 556px) and (min-width: 500px) {
+            #hud.floated {
+                top: auto;
+                bottom: 16px;
+                /* Clear of both clusters, which run 172 in from each edge. */
+                left: 188px;
+                right: 188px;
+                max-height: 140px;
+                text-align: center;
+            }
+
+            #hud.floated div {
+                display: inline-block;
+                vertical-align: top;
+                text-align: left;
+            }
+        }
     </style>
 </head>
 <body>
@@ -809,8 +926,8 @@
         <div>ALTITUDE: <span id="hud-altitude">1390</span> <span id="hud-altitude-unit">ft</span></div>
         <div>V/S: <span id="hud-vertical-speed">+1260</span> <span id="hud-vertical-speed-unit">ft/min</span></div>
         <div>HEADING: <span id="hud-heading">000</span>&deg; <span id="hud-compass">N</span></div>
-        <div>THROTTLE: <span id="hud-throttle">20</span>%</div>
-        <div>CAMERA: <span id="hud-camera">CHASE</span></div>
+        <div class="hud-secondary">THROTTLE: <span id="hud-throttle">20</span>%</div>
+        <div class="hud-secondary">CAMERA: <span id="hud-camera">CHASE</span></div>
     </div>
 
     <div id="minimap">

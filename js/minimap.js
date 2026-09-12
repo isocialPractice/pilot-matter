@@ -5,9 +5,16 @@
  * it can be unit tested in Node; the class at the bottom is the SVG face the
  * marker is drawn onto.
  *
- * The map is drawn north-up, the way a chart is read: the world's +Z axis is
- * north and runs up the face, +X is east and runs across it, and the marker
- * turns under a fixed card rather than the card turning under the marker.
+ * The map is drawn north-up, the way a chart is read: north runs up the face
+ * and east across it, and the marker turns under a fixed card rather than the
+ * card turning under the marker.
+ *
+ * North is the world's +Z axis and east is its -X, which is the frame
+ * `bearingToDirection` in `js/units.js` holds and the one the aircraft
+ * actually flies in. So the face runs the world's x axis right to left. That
+ * looks like a mirror written down and is the opposite: a marker turned by the
+ * compass heading has to point along the track it is leaving, and it only does
+ * that if east is the side of the face the aircraft moves toward on 090.
  */
 
 import { headingDegrees } from './units.js';
@@ -25,7 +32,8 @@ function clamp(value, low, high) {
 
 /**
  * A point in the world as a fraction of the way across the map, from 0 at the
- * west and south edges to 1 at the east and north ones.
+ * low x and z edges to 1 at the high ones. Which compass edge each of those is
+ * belongs to `minimapPoint`, which is where the face's own axes are decided.
  *
  * A position outside the world clamps to the edge it left through, so an
  * aircraft that has flown off the map is still shown at the edge it went out
@@ -42,11 +50,13 @@ export function normalizePosition(bounds, x, z) {
 /**
  * Where a world position sits on the face, in the face's own units, measured
  * from its centre. North is up, so a position further north sits higher up the
- * face, which is a smaller y in the coordinates an SVG is drawn in.
+ * face, which is a smaller y in the coordinates an SVG is drawn in. East is
+ * right, and east is -X, so a position further along the world's x axis sits
+ * further left.
  */
 export function minimapPoint(bounds, x, z, size = MINIMAP_SIZE) {
     const { u, v } = normalizePosition(bounds, x, z);
-    return { x: (u - 0.5) * size, y: (0.5 - v) * size };
+    return { x: (0.5 - u) * size, y: (0.5 - v) * size };
 }
 
 /** True when the position is outside the world the map covers. */

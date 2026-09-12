@@ -5,6 +5,76 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0-alpha] - 2026-09-12
+
+One compass for the whole simulator, and the two overlays a phone was reading
+from behind a thumb.
+
+### Fixed
+
+- **A bearing now points the way an aircraft on it flies.** There were two
+  compass frames in the world and they were mirror images in x. An aircraft on
+  heading `H` carries `yaw = headingToYaw(H)` and travels `(-sin H, cos H)`,
+  because a model built nose-first along `+Z` in a right-handed world with `+Y`
+  up carries its right wing on `-X` - so east is `-X`. `bearingDirection` in
+  `js/game-modes.js` and `runwayDirection` in `js/environment/elements.js` both
+  returned `(+sin H, cos H)` instead, and `approachOpening` used the first to
+  place the aircraft and the second's frame to point it. `RUNWAY LANDING`'s
+  `FINAL` stage sets `approach.heading: 0`, which is the stage saying it opens
+  aimed at the strip, and it opened ten degrees off it: held, the card's
+  `HEADING: 005` carried the aircraft past the side of the runway onto open
+  country. The frame now lives once, in `js/units.js` beside `headingToYaw`, as
+  `bearingToDirection` and its reverse `directionToBearing`; both modules take
+  it from there rather than writing the sign out again
+- **A landing is scored against the strip it was flown down.** The same
+  mismatch reached the mark for how square a touchdown was. `scoreLanding`
+  compares the aircraft's heading against a runway's own `heading` field, and
+  that field was in the mirrored frame, so a landing that physically crossed
+  the strip at `9.9` degrees was reported as `4`. The card was self-consistent
+  and wrong: the number matched the game's own arithmetic, and the two numbers
+  were not the same angle
+- **The gate pointer, the approach marks and the chart follow the same
+  compass.** `gateBearing` and the opening of a loop course each wrote the
+  mirrored frame out for themselves and now read it off `directionToBearing`.
+  The threshold bar and the extended centreline are turned by `headingToYaw`
+  rather than by the bearing in radians, which is its mirror and put them on
+  the wrong diagonal of every strip not laid north to south. The chart runs the
+  world's x axis right to left, so that a marker turned by the compass heading
+  points along the track it is leaving - it pointed at the mirror of it before
+- **The landing breakdown is read off the screen rather than from behind a
+  thumb.** The objective card is centred at the bottom and the pads are not, so
+  it cleared them for as long as it only carried an instruction: its rows are
+  narrow enough to pass between the two clusters. The breakdown is wider and
+  lower, and `#touch-controls` paints over the card at z-index 130 against its
+  120, so on a 393 pixel phone every one of the five rows ran 44 to 83 pixels
+  into a cluster at each end. The card is lifted the depth of the pad band and
+  a gap where the two meet, bounded to the room above that band so a short
+  screen clips the last line of the breakdown rather than drawing the name of
+  the stage off the top, and drawn opaque because lifted it lands over the
+  readouts it already paints over
+- **The floated readouts stop before the pads start.** Dropped to 180 pixels to
+  clear the ladder and the chart, the six rows ran to 384.75 and the pads take
+  the bottom 172, so the two are clear of each other only from 557 pixels of
+  height up. A phone held sideways - which `js/tilt-controls.js` calls the
+  ordinary way this is flown - gives 393 at most and about 330 with a browser
+  toolbar, and at 330 the whole block sat inside the pad band with `THROTTLE`
+  and `CAMERA` off the bottom edge. Below 557 the block is compact and drops
+  those two, which are the readouts a pilot is not flying on; below that and
+  wide with it, which is a phone held sideways, it moves into the band between
+  the two pad clusters, the one part of a short screen nothing else claims. The
+  height is declared rather than left to the rows, so a test can say where it
+  ends - the content's own height was nowhere in the stylesheet
+
+### Changed
+
+- **A seed lays a different runway than it did.** Turning `runwayDirection`
+  into the aircraft's frame mirrors the bearing a strip is laid on, so the site
+  search scores different candidates and settles on a different one. A strip is
+  symmetric about its own axis, so this is a different strip in the same world
+  rather than a broken one, but `RUNWAY LANDING` is flown over new ground:
+  its first stage now opens on a strip at `-3844, 2202` on `170.58` where it
+  was on `5165, -7469` before
+
 ## [1.15.0-alpha] - 2026-09-11
 
 The landing the card was never told about, a sensor that says nothing read as a

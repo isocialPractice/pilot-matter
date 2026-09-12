@@ -21,6 +21,7 @@ import {
 import {
     ENVIRONMENTS, MODE_ENVIRONMENTS, buildEnvironment, environmentElements
 } from '../js/environment/presets.js';
+import { headingToYaw } from '../js/units.js';
 
 const runway = getElement('runway');
 
@@ -42,11 +43,29 @@ function place(field, config = {}, seed = 7) {
 
 // --- Reading a strip -------------------------------------------------------
 
+// A strip runs the way a flight on the same bearing is already pointing, which
+// is the one thing the direction has to be: the landing is scored against this
+// field, and a strip laid on the mirror of its own bearing is scored as square
+// when it was crossed at ten degrees. East is the world's -X, the frame
+// `bearingToDirection` holds and the one the aircraft flies in.
 test('a strip runs on the bearing it was laid on, counted from north', () => {
     assert.deepEqual(round(runwayDirection(0)),   { alongX: 0,  alongZ: 1  }, 'north is +Z');
-    assert.deepEqual(round(runwayDirection(90)),  { alongX: 1,  alongZ: 0  }, 'east is +X');
+    assert.deepEqual(round(runwayDirection(90)),  { alongX: -1, alongZ: 0  }, 'east is -X');
     assert.deepEqual(round(runwayDirection(180)), { alongX: 0,  alongZ: -1 });
-    assert.deepEqual(round(runwayDirection(270)), { alongX: -1, alongZ: 0  });
+    assert.deepEqual(round(runwayDirection(270)), { alongX: 1,  alongZ: 0  });
+});
+
+// The same statement made against the aircraft rather than against an axis,
+// so it holds on bearings that are not multiples of a right angle too.
+test('a strip runs the way a flight on its own bearing is pointing', () => {
+    for (const heading of [5, 37, 128, 214, 301]) {
+        const { alongX, alongZ } = runwayDirection(heading);
+        const yaw = headingToYaw(heading);
+
+        assert.ok(Math.abs(alongX - Math.sin(yaw)) < 1e-9
+               && Math.abs(alongZ - Math.cos(yaw)) < 1e-9,
+            `a strip on ${heading} does not run the way a flight on ${heading} does`);
+    }
 });
 
 test('a place on a strip and a place in the world are the same reading twice', () => {
@@ -75,9 +94,9 @@ test('a strip has two ends, each with the bearing a takeoff from it runs on', ()
     const strip = { x: 0, z: 0, heading: 90, ...runwayDirection(90), length: 2000, width: 200 };
     const [first, second] = runwayThresholds(strip);
 
-    assert.ok(Math.abs(first.x + 1000) < 1e-9, 'the first end is a half length back down the strip');
+    assert.ok(Math.abs(first.x - 1000) < 1e-9, 'the first end is a half length back down the strip');
     assert.equal(first.heading, 90);
-    assert.ok(Math.abs(second.x - 1000) < 1e-9);
+    assert.ok(Math.abs(second.x + 1000) < 1e-9);
     assert.equal(second.heading, 270, 'and the other end is flown the opposite way');
 
     // Rolling from the first threshold on its own bearing runs onto the strip.
@@ -176,17 +195,52 @@ test('the ground either side eases back rather than ending in a cliff', () => {
     assert.ok(steepest < 1.4, `the apron rises at ${steepest.toFixed(2)}, which is a wall`);
 });
 
+/**
+ * How the vertices of a field fall on a strip: the painted band down each
+ * shoulder and across each threshold, the plain pavement inside them, and the
+ * ground well clear of it.
+ *
+ * Read off every vertex rather than by sampling three places on the strip and
+ * rounding each to the nearest one. A field vertex is 166 units apart here and
+ * the shoulder stripe is 25 units wide, so where a sample lands is decided by
+ * where the site search happened to put the strip rather than by what the
+ * paint does - and a strip laid a little differently moves all three samples
+ * onto ground that says nothing about the question.
+ */
+function paintBands(field, strip) {
+    const halfLength = strip.length / 2;
+    const halfWidth  = strip.width / 2;
+    const bands = { painted: [], pavement: [], off: [] };
+
+    for (let i = 0; i < field.count; i++) {
+        const { along, across } = runwayOffsets(strip, fieldX(field, i), fieldZ(field, i));
+        const reachAlong = Math.abs(along) / halfLength;
+        const reachCross = Math.abs(across) / halfWidth;
+
+        if (reachAlong <= 1 && reachCross <= 1) {
+            const painted = reachCross >= 0.78 || reachAlong >= 0.9;
+            bands[painted ? 'painted' : 'pavement'].push(brightness(colorOf(field, i)));
+        } else if (Math.abs(across) > strip.width * 4 && Math.abs(across) < strip.width * 8) {
+            bands.off.push(brightness(colorOf(field, i)));
+        }
+    }
+
+    return bands;
+}
+
+const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
 test('the strip is painted so it can be picked out from the air', () => {
     const field = rolling();
     const strip = place(field);
+    const { painted, pavement, off } = paintBands(field, strip);
 
-    const middle = colorAt(field, runwayPoint(strip, 0, 0));
-    const shoulder = colorAt(field, runwayPoint(strip, 0, strip.width * 0.46));
-    const off = colorAt(field, runwayPoint(strip, 0, strip.width * 6));
+    assert.ok(painted.length > 0 && pavement.length > 0 && off.length > 0,
+        'the strip should cover vertices of all three kinds to have anything to compare');
 
-    assert.ok(brightness(middle) < brightness(shoulder),
-        'the shoulder stripe should read paler than the pavement it edges');
-    assert.ok(Math.abs(brightness(middle) - brightness(off)) > 0.05,
+    assert.ok(mean(pavement) < mean(painted),
+        'the shoulder and threshold paint should read paler than the pavement it edges');
+    assert.ok(Math.abs(mean(pavement) - mean(off)) > 0.05,
         'and the pavement should not read as the ground around it');
 });
 
@@ -274,8 +328,12 @@ function colorAt(field, at) {
     const half = field.size / 2;
     const col = Math.round((at.x + half) / field.step);
     const row = Math.round((at.z + half) / field.step);
-    const index = (row * field.stride + col) * 3;
-    return [field.color[index], field.color[index + 1], field.color[index + 2]];
+    return colorOf(field, row * field.stride + col);
+}
+
+/** The colour a field vertex carries, by its index rather than by its place. */
+function colorOf(field, i) {
+    return [field.color[i * 3], field.color[i * 3 + 1], field.color[i * 3 + 2]];
 }
 
 function brightness([r, g, b]) {

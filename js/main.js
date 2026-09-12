@@ -1094,6 +1094,11 @@ class FlightSimulator {
         this.overlays.attitude.classList.toggle('floated', pads);
         this.overlays.muted.classList.toggle('floated', pads);
         this.overlays.hud.classList.toggle('floated', pads);
+        // The objective card is centred and the pads are not, so it cleared
+        // them for as long as it only carried an instruction. The landing
+        // breakdown made it tall enough to reach into the band they take, and
+        // they paint over it, so it is lifted the depth of that band too.
+        this.overlays.objective.classList.toggle('floated', pads);
 
         syncGameModeEntries(this.modesState.entries, this.run);
 

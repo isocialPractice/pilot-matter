@@ -21,22 +21,58 @@ test('the middle of the world is the middle of the map', () => {
     assert.deepEqual(minimapPoint(BOUNDS, 0, 0), { x: 0, y: 0 });
 });
 
+// East is the world's -X, the frame `bearingToDirection` holds and the one the
+// aircraft flies in, so the face runs the world's x axis right to left.
 test('east is right and north is up, the way a chart is read', () => {
-    assert.ok(minimapPoint(BOUNDS, 4000, 0).x > 0, 'east should be to the right');
-    assert.ok(minimapPoint(BOUNDS, -4000, 0).x < 0, 'west should be to the left');
+    assert.ok(minimapPoint(BOUNDS, -4000, 0).x > 0, 'east should be to the right');
+    assert.ok(minimapPoint(BOUNDS, 4000, 0).x < 0, 'west should be to the left');
     assert.ok(minimapPoint(BOUNDS, 0, 4000).y < 0, 'north should be up the face');
     assert.ok(minimapPoint(BOUNDS, 0, -4000).y > 0, 'south should be down it');
 });
 
+/**
+ * What being drawn right amounts to, and what the face was getting wrong: a
+ * marker turned by the compass heading points along the track it is leaving.
+ *
+ * The chart is the only place the page shows a world position, so a face whose
+ * marker and whose trace disagree is a face that cannot be read at all - and
+ * it is the instrument the mirrored-bearing defect was measured with.
+ */
+test('the marker points along the track it leaves', () => {
+    for (const degrees of [0, 37, 90, 152, 214, 300]) {
+        const yaw = headingToYaw(degrees);
+
+        // A step flown on that heading: a model built nose-first along +Z,
+        // turned about +Y by the yaw, travels (sin yaw, cos yaw).
+        const step = { x: Math.sin(yaw) * 100, z: Math.cos(yaw) * 100 };
+
+        const before = minimapPoint(BOUNDS, 0, 0);
+        const after  = minimapPoint(BOUNDS, step.x, step.z);
+        const moved  = { x: after.x - before.x, y: after.y - before.y };
+
+        // Where the marker points, in the face's own coordinates: it is drawn
+        // pointing up the face and rotated clockwise by the heading, and SVG
+        // counts y downward.
+        const turn    = minimapHeading(yaw) * Math.PI / 180;
+        const pointed = { x: Math.sin(turn), y: -Math.cos(turn) };
+
+        const along = Math.hypot(moved.x, moved.y);
+        const dot   = (moved.x * pointed.x + moved.y * pointed.y) / along;
+        assert.ok(dot > 0.9999,
+            `on ${degrees} the marker points ${(Math.acos(Math.min(1, dot)) * 180 / Math.PI).toFixed(1)}`
+          + ' degrees off the track it draws');
+    }
+});
+
 test('the corners of the world are the corners of the face', () => {
     const half = MINIMAP_SIZE / 2;
-    assert.deepEqual(minimapPoint(BOUNDS, BOUNDS.minX, BOUNDS.maxZ), { x: -half, y: -half });
-    assert.deepEqual(minimapPoint(BOUNDS, BOUNDS.maxX, BOUNDS.minZ), { x: half, y: half });
+    assert.deepEqual(minimapPoint(BOUNDS, BOUNDS.minX, BOUNDS.maxZ), { x: half, y: -half });
+    assert.deepEqual(minimapPoint(BOUNDS, BOUNDS.maxX, BOUNDS.minZ), { x: -half, y: half });
 });
 
 test('a position is placed in proportion to how far across the world it is', () => {
     const { u, v } = normalizePosition(BOUNDS, 4000, -4000);
-    assert.equal(u, 0.75, 'three quarters of the way east');
+    assert.equal(u, 0.75, 'three quarters of the way along the world x axis');
     assert.equal(v, 0.25, 'a quarter of the way north');
 });
 
@@ -45,7 +81,7 @@ test('a position is placed in proportion to how far across the world it is', () 
 // aircraft went out, rather than drawing it somewhere it is not.
 test('an aircraft outside the world holds the edge it left through', () => {
     const half = MINIMAP_SIZE / 2;
-    assert.deepEqual(minimapPoint(BOUNDS, 99999, 0), { x: half, y: 0 });
+    assert.deepEqual(minimapPoint(BOUNDS, 99999, 0), { x: -half, y: 0 });
     assert.deepEqual(minimapPoint(BOUNDS, 0, -99999), { x: 0, y: half });
 });
 
@@ -89,7 +125,7 @@ test('the map draws the aircraft where it is and turns it the way it points', ()
     const map  = new Minimap(face, BOUNDS);
 
     map.update({ x: 4000, y: 500, z: 4000 }, headingToYaw(90));
-    assert.equal(face.marker.attributes.transform, 'translate(25.00 -25.00) rotate(90)');
+    assert.equal(face.marker.attributes.transform, 'translate(-25.00 -25.00) rotate(90)');
     assert.equal(face.classes.has('off-map'), false);
 });
 
@@ -131,8 +167,8 @@ test('a course is drawn where the chart puts each of its gates', () => {
     assert.equal(points.length, COURSE.length);
     assert.deepEqual(points.map(point => point.index), [0, 1, 2]);
     assert.deepEqual(points[0], { x: 0, y: 0, index: 0, offMap: false });
-    assert.ok(points[1].x > 0 && points[1].y < 0, 'north east is up and to the right');
-    assert.ok(points[2].x < 0 && points[2].y > 0, 'south west is down and to the left');
+    assert.ok(points[1].x < 0 && points[1].y < 0, 'north west is up and to the left');
+    assert.ok(points[2].x > 0 && points[2].y > 0, 'south east is down and to the right');
 });
 
 // A gate off the square is held at the edge it lies beyond, the way the
@@ -141,7 +177,7 @@ test('a course is drawn where the chart puts each of its gates', () => {
 test('a gate past the edge of the chart is held at that edge and says so', () => {
     const point = coursePoints(BOUNDS, [{ index: 0, x: 40000, z: 0 }])[0];
 
-    assert.equal(point.x, MINIMAP_SIZE / 2, 'held at the edge it lies beyond');
+    assert.equal(point.x, -MINIMAP_SIZE / 2, 'held at the edge it lies beyond');
     assert.equal(point.offMap, true);
     assert.equal(coursePoints(BOUNDS, COURSE).every(gate => !gate.offMap), true);
 });
@@ -152,7 +188,7 @@ test('a gate that never carried its number is numbered by where it sits', () => 
 });
 
 test('a course is one line through its gates, in the order they are flown', () => {
-    assert.equal(courseLine(coursePoints(BOUNDS, COURSE)), '0.00,0.00 25.00,-25.00 -25.00,25.00');
+    assert.equal(courseLine(coursePoints(BOUNDS, COURSE)), '0.00,0.00 -25.00,-25.00 25.00,25.00');
     assert.equal(courseLine([]), '', 'and a course with no gates draws nothing');
 });
 
@@ -224,7 +260,7 @@ test('a course is laid on the chart as a gate for every loop of it', () => {
     assert.equal(course.children.length, 3);
     assert.ok(course.children.every(gate => gate.namespace === 'http://www.w3.org/2000/svg'),
         'a gate made outside the SVG namespace is a tag that draws nothing');
-    assert.deepEqual(course.children.map(gate => gate.getAttribute('cx')), ['0.00', '25.00', '-25.00']);
+    assert.deepEqual(course.children.map(gate => gate.getAttribute('cx')), ['0.00', '-25.00', '25.00']);
     assert.equal(root.parts.get('#minimap-course-line').getAttribute('points'),
         courseLine(coursePoints(BOUNDS, COURSE)));
 });

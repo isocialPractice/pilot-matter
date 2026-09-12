@@ -18,8 +18,9 @@ import {
     updateRollout,
     rollingOut
 } from '../js/landing-score.js';
-import { LANDING_SINK_SPEED, LANDING_HEADING_LIMIT } from '../js/crash.js';
+import { LANDING_SINK_SPEED, LANDING_HEADING_LIMIT, headingOffsetTo } from '../js/crash.js';
 import { runwayDirection, runwayPoint, runwayThresholds } from '../js/environment/elements.js';
+import { headingDegrees } from '../js/units.js';
 
 /**
  * A strip laid on a bearing, written the way the generator writes them, so
@@ -124,6 +125,44 @@ test('each part of a landing is marked on its own reading', () => {
 
     const long = scoreLanding(runway, arrival(runway, { down: aim + runway.length * TOUCHDOWN_REACH / 2 }));
     assert.equal(long.marks.touchdown, 0.5);
+});
+
+/**
+ * The second half of the mirrored-bearing defect, and the half that is quiet:
+ * every test above takes the heading it lands on from the strip's `heading`
+ * field, so a field holding the mirror of the bearing the strip is actually
+ * carved on is marked as square by all of them.
+ *
+ * This one never reads that field. It flies the strip's own geometry - the
+ * direction `runwayOffsets` measures along and `gradeRunway` paved - and asks
+ * for the full mark. A landing that physically ran down the middle of the
+ * strip was reported as four degrees off while the two disagreed.
+ */
+test('a landing flown along the strip itself is scored as square', () => {
+    for (const heading of [0, 37, 128, 214, 301]) {
+        const runway = strip(heading);
+
+        // The card heading an aircraft has to be on to run down this strip,
+        // worked out from the aircraft rather than from any compass helper: a
+        // model built nose-first along +Z and turned about +Y by its yaw
+        // travels (sin yaw, cos yaw), so the yaw that runs along the strip is
+        // the one below, and `headingDegrees` says what the card reads at it.
+        const along = headingDegrees(Math.atan2(runway.alongX, runway.alongZ));
+
+        const landing = scoreLanding(runway, {
+            ...arrival(runway, { down: runway.length * TOUCHDOWN_ZONE, heading: along }),
+            // Worked out the way the aircraft works it out, off the strip's
+            // heading field, which is where the two frames meet.
+            headingOffset: headingOffsetTo(along * RADIANS, runway.heading * RADIANS)
+        });
+
+        assert.ok(Math.abs(landing.heading) < 1e-9,
+            `a landing down the middle of a strip on ${heading} read `
+          + `${(landing.heading / RADIANS).toFixed(2)} degrees off it`);
+        assert.equal(landing.marks.heading, 1, 'and should take the whole mark for it');
+        assert.equal(landing.score, PERFECT_SCORE,
+            'a landing flown perfectly along the strip is a perfect landing');
+    }
 });
 
 test('the readings come back beside the marks, in the units they were taken in', () => {

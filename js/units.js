@@ -114,3 +114,34 @@ export function headingToYaw(degrees) {
     const yaw = -degrees / DEGREES_PER_RADIAN;
     return Object.is(yaw, -0) ? 0 : yaw;
 }
+
+/**
+ * The direction over the ground a compass bearing names, as a unit vector in
+ * world x and z.
+ *
+ * There is one compass frame in the simulator and this is it. The world's +Z
+ * axis is north and the card counts clockwise from it, which in a right-handed
+ * world with +Y up puts east on -X - the same x the nose points along at that
+ * bearing, because `headingToYaw` turns the model the way the card counts and
+ * a model built nose-first along +Z carries its right wing on -X.
+ *
+ * Anything that turns a bearing into a place, or a place into a bearing, goes
+ * through this pair. The two differ only in the sign of x, and that sign is
+ * the whole of the frame: a second copy of it written out somewhere else is
+ * how a strip ends up laid on the mirror of the bearing it was asked for.
+ */
+export function bearingToDirection(degrees) {
+    const radians = degrees / DEGREES_PER_RADIAN;
+    return { x: -Math.sin(radians), z: Math.cos(radians) };
+}
+
+/**
+ * The reverse: the bearing a direction over the ground lies on, in whole
+ * degrees from 0 to 359 the way the card reads. A direction of nothing at all
+ * reads as north rather than as a NaN, which is what `Math.atan2` of two zeros
+ * already gives.
+ */
+export function directionToBearing(x, z) {
+    const degrees = Math.atan2(-x, z) * DEGREES_PER_RADIAN;
+    return ((degrees % 360) + 360) % 360;
+}

@@ -18,7 +18,9 @@ import { OPEN_COUNTRY_ID, LOOP_VALLEY_ID } from './environment/presets.js';
 import {
     START_FLYING, startDefaults, snapStartValue, startField
 } from './config.js';
-import { FEET_PER_UNIT } from './units.js';
+import {
+    FEET_PER_UNIT, bearingToDirection as bearingDirection, directionToBearing
+} from './units.js';
 
 export const RUNWAY_LANDING = 'runway-landing';
 export const LOOP_COURSE    = 'loop-course';
@@ -29,15 +31,16 @@ export const LAND_OBJECTIVE = 'landing';
 export const LOOP_OBJECTIVE = 'loops';
 
 /**
- * The world's +Z axis is north, the same north the compass card counts from, so
- * a bearing turns into a direction the same way everywhere in the simulator.
+ * A bearing as the direction over the ground it names, and the reverse.
+ *
+ * Both are `js/units.js`, which owns the one compass frame the simulator has,
+ * the same module `headingToYaw` is in. They are re-exported here under the
+ * names the modes have always called them by rather than reimplemented: a
+ * bearing written out a second time is a bearing written out in the mirror of
+ * the frame the aircraft flies in, which is the whole of what went wrong when
+ * these two lived here.
  */
-const RADIANS = Math.PI / 180;
-
-export function bearingDirection(degrees) {
-    const radians = degrees * RADIANS;
-    return { x: Math.sin(radians), z: Math.cos(radians) };
-}
+export { bearingDirection, directionToBearing };
 
 export function wrapDegrees(degrees) {
     return ((degrees % 360) + 360) % 360;
@@ -422,7 +425,7 @@ export function missNotice(state) {
  * heading on the instruments are the same number when the nose is on the gate.
  */
 export function gateBearing(ring, position) {
-    return wrapDegrees(Math.atan2(ring.x - position.x, ring.z - position.z) / RADIANS);
+    return directionToBearing(ring.x - position.x, ring.z - position.z);
 }
 
 /** How far a gate is over the ground, which is the distance there is to fly. */
@@ -720,7 +723,10 @@ function courseOpening(stage, rings) {
     return {
         x: first.x - first.dirX * run,
         z: first.z - first.dirZ * run,
-        headingDegrees: Math.atan2(first.dirX, first.dirZ) / RADIANS,
+        // The way the course runs through the first gate, read back onto the
+        // card: the opening lies a run short of that gate, so this is the
+        // bearing that carries the nose along the line to it.
+        headingDegrees: directionToBearing(first.dirX, first.dirZ),
         // The opening height is read off the first loop rather than configured,
         // so the aircraft arrives at the height the course was laid at.
         altitudeFeet: first.y * FEET_PER_UNIT,
