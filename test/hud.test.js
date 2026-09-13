@@ -22,7 +22,9 @@ import {
     formatGatePointer,
     formatStageClock,
     formatLandingReport,
-    LANDING_PART_LABELS
+    LANDING_PART_LABELS,
+    showsLandedNotice,
+    breakdownOnScreen
 } from '../js/hud.js';
 import { NO_TIME } from '../js/best-times.js';
 import { LANDING_PARTS, PERFECT_SCORE } from '../js/landing-score.js';
@@ -297,4 +299,69 @@ test('a perfect landing is written as the whole hundred', () => {
 test('a landing there is nothing to say about writes nothing', () => {
     assert.deepEqual(formatLandingReport(null), [], 'which is what leaves the card as it was');
     assert.deepEqual(formatLandingReport(undefined), []);
+});
+
+// --- The notice and the breakdown ------------------------------------------
+
+/**
+ * The two are on screen for the same moment. `#landed` is shown for as long as
+ * the ground outcome reads LANDED, which is the whole of the time the aircraft
+ * is stopped on the strip, and the breakdown goes up when the rollout ends,
+ * which is inside that. Centred, the notice is drawn over the card - and on a
+ * 320 pixel screen held upright it took seven of the card's lines with it,
+ * `LANDING  ·  <score>` among them.
+ */
+test('the LANDED notice comes off once the breakdown is up to say it better', () => {
+    assert.equal(showsLandedNotice(true, false), true,
+        'a landing still rolling out has nothing else announcing it');
+    assert.equal(showsLandedNotice(true, true), false,
+        'and the notice steps aside once the card is reading the landing off');
+    assert.equal(showsLandedNotice(false, false), false);
+    assert.equal(showsLandedNotice(false, true), false,
+        'a breakdown left up over a flight is not a landing to announce');
+});
+
+// The notice is only safe to drop because the card says everything it said.
+test('the breakdown the notice steps aside for names the landing itself', () => {
+    const [headline] = formatLandingReport(LANDING, 'feet');
+    assert.match(headline.text, /LANDING/,
+        'the card has to carry what the notice carried, or taking it off loses it');
+    assert.ok(headline.text.includes(String(LANDING.score)),
+        'and the score with it, which is more than the notice ever said');
+});
+
+test('the run that raises the breakdown is the run that records it is up', () => {
+    assert.match(hudSource, /setLandingReport\([\s\S]*?this\.breakdownShowing\s*=/,
+        'setLandingReport is what puts the card up, so it is what says the card is up');
+    assert.match(hudSource, /landedElement\.style\.display\s*=\s*\n?\s*showsLandedNotice\(/,
+        'and the notice is drawn through the rule rather than around it');
+});
+
+/**
+ * Writing the breakdown is not the same as showing it. The card is placed by
+ * the run rather than by the HUD, and `Tab` takes it off with the instruments
+ * while the flight goes on being flown - a cleared screen is not a frozen one,
+ * and the notice is not among the things that key hides. So a landing rolled
+ * to a stop with the screen cleared had the notice stepping aside for a card
+ * that was not on it, and nothing at all said the aircraft was down.
+ */
+test('a breakdown the screen is not showing is not something to step aside for', () => {
+    assert.equal(breakdownOnScreen(true, 'block'), true,
+        'a card the run has put up is a card a landing can be read off');
+    assert.equal(breakdownOnScreen(true, 'none'), false,
+        'and a card cleared off the screen says nothing, whatever was written on it');
+    assert.equal(breakdownOnScreen(false, 'block'), false,
+        'a card with no breakdown on it is not a breakdown');
+
+    assert.equal(showsLandedNotice(true, breakdownOnScreen(true, 'none')), true,
+        'so the notice is what is left to announce a landing on a cleared screen');
+    assert.equal(showsLandedNotice(true, breakdownOnScreen(true, 'block')), false,
+        'and it steps aside again as soon as the card is back');
+});
+
+test('the notice is asked what is on the screen rather than what was written', () => {
+    assert.match(hudSource, /showsLandedNotice\(landed, breakdown\)/,
+        'the notice reads the breakdown that is up, not the one that was written');
+    assert.match(hudSource, /breakdownOnScreen\(\s*\n?\s*this\.breakdownShowing,\s*this\.modeElement\.style\.display/,
+        'and what is up is the flag and the display the run wrote onto the card');
 });

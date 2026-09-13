@@ -5,6 +5,85 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.1-alpha] - 2026-09-13
+
+The stick wired the way everything written about it says, and the controls a
+phone is flown with fitted to the screen a phone actually gives.
+
+### Fixed
+
+- **The pitch keys carry the nose the way the controls say they do.** `W`, the
+  pad labelled `PITCH +` and a device tilted back all reach the aircraft
+  through `pitchUp`, and `pitchUp` raised `rotation.x` - which `pitchForClimb`
+  in `js/flight-model.js` states in its own comment is the direction that
+  carries the nose *down*, the model being built nose-first along `+Z`. Held
+  from a steady cruise, `W` took the altimeter from 1073 to 860 ft in 1.2
+  seconds with the vertical speed reading -20950 ft/min. The attitude ladder
+  agreed with the world throughout, so what was inverted was the binding rather
+  than the instrument, and the documentation and the pad label both claimed the
+  direction the binding was not flying. The two cases in `js/aircraft.js` are
+  swapped; the tilt mapping needs nothing, because a device tilted back asks
+  for `pitchUp` and `pitchUp` now means what it is called
+- **Both clusters of pads are drawn inside the narrowest phone.**
+  `#touch-controls` is a flex row with `justify-content: space-between`, and at
+  48 pixel cells the two clusters and the padding either side of them wanted
+  344 pixels against the 320 a phone gives at its narrowest. `space-between`
+  has no space to distribute below that: it packs from the left and the
+  right-hand cluster runs off the end, so eight pixels of `YAW R` were outside
+  the viewport. A cell is 44 pixels now with a 4 pixel gap - the pair comes to
+  312 and leaves 8 between them - and 44 is a floor rather than a number to go
+  on shrinking, being the smallest a control found by a thumb should be. The
+  band the pads take is 156 deep with it rather than 172, so the stacked
+  readouts clear them from 541 pixels of height rather than 557, and the
+  objective card is lifted 172 rather than 188
+- **The muted notice is out of the pad band on a phone held sideways.**
+  `#audio-muted.floated` was placed once, 140 pixels down the left edge, and is
+  22 tall - so it ran into the band on every screen a phone gives sideways and
+  `PITCH +` painted over it at z-index 130 against its 100. The readouts leave
+  that edge for the bottom band on a screen this short, which frees the whole
+  top of it, so the notice goes up beside the attitude indicator rather than
+  staying under it
+- **The `LANDED` banner comes off as the landing breakdown goes up.** The two
+  were on screen for exactly the same moment - the banner shows while the
+  ground outcome reads `LANDED`, and the breakdown goes up when the rollout
+  ends, which is inside that - and the banner is centred at z-index 150 against
+  the card's 120, so it painted over the card. On a 320x568 screen the card
+  lifted clear of the pads landed under the banner instead and lost seven of
+  its lines, `LANDING  ·  <score>` among them. They were also saying the same
+  thing about the same event: the card's first line names the landing and reads
+  the score off it, on the strip the aircraft is stopped on, which is the
+  banner's whole content and four lines more. So the banner is what gives way,
+  rather than the two being placed around each other on a screen with room for
+  neither - and only for as long as the card is on the screen to give way to.
+  `Tab` clears the card off with the instruments while the flight goes on being
+  flown, and a cleared screen is not a frozen one, so a landing rolled to a
+  stop with the instruments off would otherwise have had the banner stepping
+  aside for a card that was not there and nothing at all saying the aircraft
+  was down
+- **The API's tiled-world example names the compass this release settled on.**
+  `docs/api.md` called the tile at `x: -0.5` west and the one at `x: 0.5` east,
+  which is the mirror of the frame `js/units.js`, `js/minimap.js` and the
+  instruments page now share - so two pages of the same site contradicted each
+  other on which way the x axis runs, and a host building an assembly from the
+  example ended up with every compass name in it reversed. The two are swapped,
+  the reference page regenerated, and a paragraph under the example says which
+  way the frame runs and where it is written down. `test/environment-tiles.test.js`
+  names its pairs the same way round
+- **`directionToBearing` describes itself accurately.** It was documented as
+  coming back "in whole degrees from 0 to 359", which is the phrasing of
+  `headingDegrees` thirty lines above it - but only that one rounds, and every
+  caller happened to cover for the difference by rounding what it drew. The
+  same sentence credited a guard against `Math.atan2` of two zeros being a NaN.
+  It is `0`, and the wrap on the line below is what leaves a direction of
+  nothing at all reading as north. A bearing between two places is a
+  measurement rather than a reading off a dial, so the return stays fractional
+  and the docstring says so
+
+### Removed
+
+- `colorAt` in `test/runway.test.js`, a sampling helper whose only caller was
+  rewritten to read every vertex through `paintBands` and `colorOf`
+
 ## [1.16.0-alpha] - 2026-09-12
 
 One compass for the whole simulator, and the two overlays a phone was reading

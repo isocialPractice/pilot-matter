@@ -152,6 +152,46 @@ export function formatLandingReport(landing, unit = DEFAULT_ALTITUDE_UNIT) {
     ];
 }
 
+/**
+ * Whether the LANDED notice still has anything to say.
+ *
+ * The notice and the landing breakdown are on screen for the same moment: the
+ * notice is shown for as long as the ground outcome reads LANDED, which is the
+ * whole of the time the aircraft is stopped on the strip, and the breakdown
+ * goes up when the rollout ends, which is inside that. Centred on the screen
+ * and drawn at z-index 150 against the card's 120, the notice paints over the
+ * card - and on a phone held upright it took `LANDING  ·  <score>`, the
+ * headline of the breakdown, with it.
+ *
+ * They are also saying the same thing about the same event. `LANDING` names
+ * the arrival and the score reads it off, on the strip the aircraft is sitting
+ * on, which is the notice's whole content and four lines more. So the notice
+ * is the one that gives way, rather than the two being placed around each
+ * other on a screen that has room for neither.
+ */
+export function showsLandedNotice(landed, breakdownShowing) {
+    return landed && !breakdownShowing;
+}
+
+/**
+ * Whether that breakdown is on the glass, which is not the same as one having
+ * been written.
+ *
+ * The card is put on screen and taken off it by the run rather than by the
+ * HUD, and a screen cleared with Tab takes the card with the instruments while
+ * the flight goes on being flown. The notice is not cleared that way - a
+ * warning is what a cleared screen keeps - so a landing rolled to a stop with
+ * the instruments off had the notice stepping aside for a card that was not
+ * there, and nothing at all said the aircraft was down.
+ *
+ * Read off the display the run wrote rather than off the layout, because it is
+ * written as an inline style and asking the element what it came to would cost
+ * a reflow on every frame of the flight.
+ */
+export function breakdownOnScreen(written, cardDisplay) {
+    return written && cardDisplay !== 'none';
+}
+
 export class HUD {
     constructor() {
         this.speedElement         = document.getElementById('hud-speed');
@@ -175,6 +215,14 @@ export class HUD {
         this.modeClockElement     = document.getElementById('game-mode-clock');
         this.modeReportElement    = document.getElementById('game-mode-report');
         this.modePointerElement   = document.getElementById('game-mode-pointer');
+
+        // The card the breakdown is written on, which the HUD does not place
+        // and does not hide - it only asks whether the run has it on screen.
+        this.modeElement          = document.getElementById('game-mode');
+
+        // Whether a landing is being read off the card, which is what decides
+        // if the LANDED notice has anything left to announce.
+        this.breakdownShowing = false;
 
         // The units the readouts are written beside, which the settings panel
         // can switch without the flight model ever hearing about it.
@@ -258,6 +306,10 @@ export class HUD {
         }));
 
         this.modeReportElement.style.display = lines.length ? 'block' : 'none';
+
+        // The card now says everything the LANDED notice says, so the run that
+        // raises the breakdown is the run that takes the notice off.
+        this.breakdownShowing = lines.length > 0;
     }
 
     /**
@@ -301,11 +353,20 @@ export class HUD {
         // replaces it for the same reason - the ground under the aircraft has
         // stopped being a thing to be warned about and started being the point.
         // All three give the middle of the screen up to the paused indicator.
+        //
+        // A landing is still a landing while the breakdown is reading it off,
+        // so the warning stays down for the whole of it; it is only the notice
+        // that steps aside once the card is saying it better - and only for as
+        // long as the card is on screen to say it.
+        const breakdown = breakdownOnScreen(
+            this.breakdownShowing, this.modeElement.style.display
+        );
         const crashed = !frozen && aircraft.isCrashed();
         const landed  = !frozen && !crashed && aircraft.getGroundOutcome?.() === LANDED;
         const low = !frozen && !crashed && !landed && isLowAltitude(aircraft.getHeightAboveTerrain());
         this.crashElement.style.display = crashed ? 'block' : 'none';
-        this.landedElement.style.display = landed ? 'block' : 'none';
+        this.landedElement.style.display =
+            showsLandedNotice(landed, breakdown) ? 'block' : 'none';
         this.lowAltitudeElement.style.display = low ? 'block' : 'none';
     }
 }
