@@ -86,12 +86,19 @@ test('a world nobody placed is the square in the middle', () => {
 
 // --- The ground under an assembly -----------------------------------------
 
-test('the ground a tile is shaped on runs on across the join', () => {
-    const west = tile(0, 0);
-    const east = tile(1, 0);
+// The pairs below are named by the compass rather than by the sign. The
+// world's +Z is north and the card counts clockwise from it, which puts east
+// on -X, so the tile at the lower x is the eastern one and the join between
+// them is its maxX edge. Nothing here reads the name - a join is a join
+// whichever way it is called - but a reader taking the names at their word is
+// the reader who lays an assembly out mirrored.
 
-    const leaving  = edge(west, 'maxX');
-    const arriving = edge(east, 'minX');
+test('the ground a tile is shaped on runs on across the join', () => {
+    const east = tile(0, 0);
+    const west = tile(1, 0);
+
+    const leaving  = edge(east, 'maxX');
+    const arriving = edge(west, 'minX');
 
     for (let line = 0; line < leaving.length; line++) {
         assert.ok(Math.abs(leaving[line].height - arriving[line].height) < 1e-3,
@@ -162,21 +169,21 @@ test('an element drawn on a tile is drawn on the tile it was given', () => {
 // --- The seams ------------------------------------------------------------
 
 test('matching settles what two tiles have at the vertices they share', () => {
-    const west = tile(0, 0);
-    const east = tile(1, 0);
+    const east = tile(0, 0);
+    const west = tile(1, 0);
 
     // Something drawn over each edge, so the two have a real disagreement to
     // settle rather than the base ground they already agree on.
-    applyElement(west, { type: 'mountain', config: { count: 8 } }, createRandom(3));
-    applyElement(east, { type: 'mountain', config: { count: 8 } }, createRandom(11));
+    applyElement(east, { type: 'mountain', config: { count: 8 } }, createRandom(3));
+    applyElement(west, { type: 'mountain', config: { count: 8 } }, createRandom(11));
 
-    const before = edge(west, 'maxX').map(vertex => vertex.height);
-    const settled = matchEdges([west, east]);
+    const before = edge(east, 'maxX').map(vertex => vertex.height);
+    const settled = matchEdges([east, west]);
 
-    assert.equal(settled, west.stride, 'every vertex down the join should be settled');
+    assert.equal(settled, east.stride, 'every vertex down the join should be settled');
 
-    const leaving  = edge(west, 'maxX');
-    const arriving = edge(east, 'minX');
+    const leaving  = edge(east, 'maxX');
+    const arriving = edge(west, 'minX');
 
     for (let line = 0; line < leaving.length; line++) {
         assert.ok(Math.abs(leaving[line].height - arriving[line].height) < 1e-3,
@@ -193,37 +200,37 @@ test('matching settles what two tiles have at the vertices they share', () => {
 });
 
 test('a join is eased back into the ground rather than left as a step', () => {
-    const west = tile(0, 0);
-    const east = tile(1, 0);
-    applyElement(west, { type: 'mountain', config: { count: 8 } }, createRandom(3));
-    applyElement(east, { type: 'mountain', config: { count: 8 } }, createRandom(11));
+    const east = tile(0, 0);
+    const west = tile(1, 0);
+    applyElement(east, { type: 'mountain', config: { count: 8 } }, createRandom(3));
+    applyElement(west, { type: 'mountain', config: { count: 8 } }, createRandom(11));
 
-    const before = Float32Array.from(west.height);
+    const before = Float32Array.from(east.height);
 
     // The row the two disagree most about, which is the row that has the most
     // to say about how the disagreement is eased away.
     const gap = (line) => Math.abs(
-        west.height[line * west.stride + west.stride - 1] - east.height[line * east.stride]
+        east.height[line * east.stride + east.stride - 1] - west.height[line * west.stride]
     );
 
     // Kept clear of the ends of the join, where a vertex is near two sides at
     // once and takes what is being eased in from both of them.
     let row = SEAM_BLEND;
-    for (let line = SEAM_BLEND; line < west.stride - SEAM_BLEND; line++) {
+    for (let line = SEAM_BLEND; line < east.stride - SEAM_BLEND; line++) {
         if (gap(line) > gap(row)) row = line;
     }
     assert.ok(gap(row) > 1, 'the two should have something to disagree about');
 
-    matchEdges([west, east]);
+    matchEdges([east, west]);
 
-    const at = (depth) => row * west.stride + (west.stride - 1 - depth);
+    const at = (depth) => row * east.stride + (east.stride - 1 - depth);
 
-    const seam = Math.abs(west.height[at(0)] - before[at(0)]);
-    const inner = Math.abs(west.height[at(1)] - before[at(1)]);
+    const seam = Math.abs(east.height[at(0)] - before[at(0)]);
+    const inner = Math.abs(east.height[at(1)] - before[at(1)]);
 
     assert.ok(seam > 0, 'the vertex on the join should move');
     assert.ok(inner < seam, 'and the one behind it should move less');
-    assert.equal(west.height[at(SEAM_BLEND)], before[at(SEAM_BLEND)],
+    assert.equal(east.height[at(SEAM_BLEND)], before[at(SEAM_BLEND)],
         'past the blend the ground is left exactly as the elements drew it');
 });
 
@@ -254,16 +261,16 @@ test('the corner four tiles meet at closes as cleanly as the edges do', () => {
 });
 
 test('settling a join that is already settled changes nothing', () => {
-    const west = tile(0, 0);
-    const east = tile(1, 0);
-    applyElement(west, { type: 'mountain', config: { count: 8 } }, createRandom(3));
+    const east = tile(0, 0);
+    const west = tile(1, 0);
+    applyElement(east, { type: 'mountain', config: { count: 8 } }, createRandom(3));
 
-    matchEdges([west, east]);
-    const settled = Float32Array.from(west.height);
+    matchEdges([east, west]);
+    const settled = Float32Array.from(east.height);
 
-    matchEdges([west, east]);
-    for (let i = 0; i < west.count; i++) {
-        assert.ok(Math.abs(west.height[i] - settled[i]) < 1e-4, 'a second pass should be a no-op');
+    matchEdges([east, west]);
+    for (let i = 0; i < east.count; i++) {
+        assert.ok(Math.abs(east.height[i] - settled[i]) < 1e-4, 'a second pass should be a no-op');
     }
 });
 
@@ -277,19 +284,19 @@ test('tiles that do not touch have nothing to settle', () => {
 });
 
 test('a colour laid over a join is settled the same way a height is', () => {
-    const west = tile(0, 0);
-    const east = tile(1, 0);
+    const east = tile(0, 0);
+    const west = tile(1, 0);
 
     const line = 3;
-    paint(west, line * west.stride + west.stride - 1, [1, 0, 0]);
-    paint(east, line * east.stride, [0, 0, 1]);
+    paint(east, line * east.stride + east.stride - 1, [1, 0, 0]);
+    paint(west, line * west.stride, [0, 0, 1]);
 
-    matchEdges([west, east]);
+    matchEdges([east, west]);
 
-    const [wr, wg, wb] = readColor(west, line * west.stride + west.stride - 1);
-    const [er, eg, eb] = readColor(east, line * east.stride);
+    const [er, eg, eb] = readColor(east, line * east.stride + east.stride - 1);
+    const [wr, wg, wb] = readColor(west, line * west.stride);
 
-    assert.ok(Math.abs(wr - er) < 1e-3 && Math.abs(wg - eg) < 1e-3 && Math.abs(wb - eb) < 1e-3);
-    assert.ok(Math.abs(wr - 0.5) < 1e-3, 'the settled colour is what the two of them had');
-    assert.ok(Math.abs(wb - 0.5) < 1e-3);
+    assert.ok(Math.abs(er - wr) < 1e-3 && Math.abs(eg - wg) < 1e-3 && Math.abs(eb - wb) < 1e-3);
+    assert.ok(Math.abs(er - 0.5) < 1e-3, 'the settled colour is what the two of them had');
+    assert.ok(Math.abs(eb - 0.5) < 1e-3);
 });

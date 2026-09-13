@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
     MIN_SPEED,
     CRUISE_SPEED,
@@ -21,7 +23,8 @@ import {
     liftFactor,
     isStalled,
     sinkRate,
-    controlRates
+    controlRates,
+    pitchForClimb
 } from '../js/flight-model.js';
 import { createFlightState, INITIAL_THROTTLE } from '../js/flight-state.js';
 import { throttleToPercent } from '../js/hud.js';
@@ -226,4 +229,39 @@ test('a sensitivity that is not a number leaves the controls where they were tun
     for (const value of [undefined, null, 'twice as much', NaN]) {
         assert.deepEqual(controlRates(value), controlRates(CONTROL_SENSITIVITY));
     }
+});
+
+// --- Which way the stick is wired -----------------------------------------
+
+// js/aircraft.js imports Three.js, so the binding it writes is read off its
+// source, the way the HUD's contract with it is.
+const aircraftSource = readFileSync(
+    fileURLToPath(new URL('../js/aircraft.js', import.meta.url)),
+    'utf8'
+);
+
+/**
+ * `pitchForClimb` is where the simulator writes down which way the X part of
+ * the aircraft's rotation runs: it negates the angle, because the model flies
+ * nose-first along +Z and a positive rotation about +X carries that nose down.
+ *
+ * The keys, the tilt and the pads all reach the aircraft through `pitchUp` and
+ * `pitchDown`, and for a while those raised the angle for `pitchUp` - so W,
+ * the pad labelled PITCH + and a device tilted back every one of them flew the
+ * nose the opposite way to what is written on the glass and in the controls.
+ */
+test('a climb is a lower pitch angle, and the control that climbs lowers it', () => {
+    assert.ok(pitchForClimb(10, CRUISE_SPEED) < 0,
+        'a climb asks for a negative rotation about +X');
+    assert.ok(pitchForClimb(-10, CRUISE_SPEED) > pitchForClimb(10, CRUISE_SPEED),
+        'and a descent for a higher one than a climb');
+
+    const binding = (control) => aircraftSource.match(
+        new RegExp(String.raw`input\.${control}\)\s*this\.rotation\.x\s*([+-])=`)
+    )?.[1];
+
+    assert.equal(binding('pitchUp'), '-',
+        'so the control that raises the nose is the one that lowers the angle');
+    assert.equal(binding('pitchDown'), '+',
+        'and the one that drops the nose is the one that raises it');
 });

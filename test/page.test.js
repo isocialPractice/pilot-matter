@@ -56,8 +56,19 @@ const SHORTEST_PHONE = 460;
 
 // The shortest screen the stacked floated readouts still hold on. Below this
 // the stack and the pad band are the same band, which is the height the
-// stylesheet's own media query takes over at.
-const SHORTEST_STACKED = 557;
+// stylesheet's own media query takes over at. It moved up when the pads were
+// narrowed to fit a 320 pixel screen: a shorter cell is a shallower band, and
+// a shallower band is sixteen more pixels of screen the stack can have.
+const SHORTEST_STACKED = 541;
+
+// And the shortest a phone gets held sideways, which is the same 568 x 320 the
+// portrait figure comes from, turned over. Nothing stands between the top of
+// the screen and the pads on one of these but the two instruments.
+const SHORTEST_SIDEWAYS = 320;
+
+// The smallest a control meant to be hit by a thumb should get. The pads were
+// narrowed to fit the narrowest phone, and this is where that stops.
+const SMALLEST_TAP = 44;
 
 // Every menu drawn into the page: the two cards, the panels they open, and the
 // three lists one panel is split across.
@@ -533,7 +544,7 @@ test('the floated readouts stop before the band the pads take', () => {
  * screen heights where neither arrangement holds.
  */
 test('the short-screen readouts take over exactly where the stacked ones stop', () => {
-    const short = media(indexHtml, '(max-height: 556px)');
+    const short = media(indexHtml, '(max-height: 540px)');
     assert.ok(short, 'index.html should carry the short-screen rules for the readouts');
 
     const breakpoint = Number(indexHtml.match(/@media \(max-height: (\d+)px\)/)?.[1]);
@@ -564,7 +575,7 @@ test('the short-screen readouts take over exactly where the stacked ones stop', 
  * to start past one and stop before the other.
  */
 test('the readouts moved to the bottom band stay between the two pad clusters', () => {
-    const sideways = media(indexHtml, '(max-height: 556px) and (min-width: 500px)');
+    const sideways = media(indexHtml, '(max-height: 540px) and (min-width: 500px)');
     assert.ok(sideways, 'index.html should say where the readouts go on a phone held sideways');
 
     const reach = clusterReach(indexHtml);
@@ -665,6 +676,113 @@ test('the two overlays the pads take the corner from have somewhere else to be',
         assert.ok(styleRules(indexHtml).some(rule => rule.selectors.includes(`#${id}.floated`)),
             `js/main.js lifts #${id} clear of the pads, so the page should say where to`);
     }
+});
+
+/**
+ * `#touch-controls` is a flex row with the two crosses pushed to opposite
+ * ends, so a screen too narrow for both has nothing left to distribute: it
+ * packs from the left instead and the right-hand cross is drawn off the end
+ * of the screen. At 48 pixel cells the pair wanted 344 and the narrowest
+ * phone gives 320, so eight pixels of YAW R were outside the viewport - on
+ * the one width the rest of this stylesheet reasons about.
+ */
+test('both clusters of pads are drawn inside the narrowest phone', () => {
+    const reach = clusterReach(indexHtml);
+    assert.ok(Number.isFinite(reach), 'how far a cluster reaches in should be readable off the page');
+
+    assert.ok(reach * 2 < NARROWEST_PHONE,
+        `the two clusters and the padding either side want ${reach * 2}px `
+      + `and the narrowest phone gives ${NARROWEST_PHONE}px`);
+});
+
+// Fitting is not the only thing a pad has to do. A cell shrunk until the
+// arithmetic comes out is a control a thumb misses, so the fit above has a
+// floor under it rather than room to go on giving.
+test('a pad is no smaller than a thumb can be asked to hit', () => {
+    const cell = (axis) => Number(declarations(indexHtml, '.touch-cluster')
+        .get(`grid-template-${axis}`)?.match(/repeat\(\d+,\s*(\d+)px\)/)?.[1]);
+
+    for (const axis of ['columns', 'rows']) {
+        assert.ok(cell(axis) >= SMALLEST_TAP,
+            `a pad is ${cell(axis)}px across its ${axis} and ${SMALLEST_TAP}px is the floor`);
+    }
+    assert.equal(cell('columns'), cell('rows'), 'and square, the way a cross of them reads');
+});
+
+/**
+ * The muted notice was placed once, 140 pixels down the left edge, and that
+ * is the band the pads take on a screen held sideways: it ran into PITCH +
+ * on an 852x330 screen and was painted over at z-index 130 against its 100.
+ *
+ * The readouts leave the left edge for the bottom band on a screen that
+ * short, which frees the whole of the top between the two instruments - so
+ * the notice goes up beside the ladder rather than staying under it.
+ */
+test('the muted notice leaves the pad band on a phone held sideways', () => {
+    const sideways = media(indexHtml, '(max-height: 540px) and (min-width: 500px)');
+    assert.ok(sideways, 'index.html should say where the notice goes on a phone held sideways');
+
+    const notice = {
+        top:  pixels(sideways, '#audio-muted.floated', 'top'),
+        left: pixels(sideways, '#audio-muted.floated', 'left')
+    };
+    assert.ok(Object.values(notice).every(Number.isFinite),
+        'the notice should be placed in pixels on the screen with least room for it');
+
+    const ladder = {
+        top:    pixels(indexHtml, '#attitude.floated', 'top'),
+        left:   pixels(indexHtml, '#attitude.floated', 'left'),
+        width:  pixels(indexHtml, '#attitude.floated', 'width'),
+        height: pixels(indexHtml, '#attitude.floated', 'height')
+    };
+    const chart = {
+        right: pixels(indexHtml, '#minimap', 'right'),
+        width: pixels(indexHtml, '#minimap', 'width')
+    };
+
+    assert.equal(notice.top, ladder.top,
+        'hung from the same edge as the ladder, the notice is as far off the pads as it is');
+    assert.ok(notice.left >= ladder.left + ladder.width,
+        `the notice starts at ${notice.left}px and the ladder ends at ${ladder.left + ladder.width}px`);
+
+    // And the ladder itself clears the pads on the shortest screen a phone
+    // gives sideways, which is what makes the line above a placement rather
+    // than the same collision moved up the screen.
+    const band = padBandDepth(indexHtml);
+    assert.ok(ladder.top + ladder.height <= SHORTEST_SIDEWAYS - band,
+        `the ladder ends at ${ladder.top + ladder.height}px and the pads start at `
+      + `${SHORTEST_SIDEWAYS - band}px on the shortest screen a phone gives sideways`);
+
+    // The far corner belongs to the chart, and a notice run under that is the
+    // same fault moved across the screen. How wide the notice draws is the
+    // browser's to decide, so what is checked is where it starts - against
+    // the narrowest screen this arrangement is written for, which the query
+    // names itself.
+    const narrowest = Number(indexHtml.match(/\(max-height: \d+px\) and \(min-width: (\d+)px\)/)?.[1]);
+    assert.ok(Number.isFinite(narrowest), 'the query should say how wide a screen it is written for');
+    assert.ok(notice.left < narrowest - chart.right - chart.width,
+        `the notice starts at ${notice.left}px and the chart at `
+      + `${narrowest - chart.right - chart.width}px on the narrowest screen both are drawn on`);
+});
+
+/**
+ * The LANDED notice and the landing breakdown are on screen for the same
+ * moment, and the notice is centred over the middle of it at a higher layer
+ * than the card. That is what makes this a rule about when the notice is
+ * shown rather than about where the card sits: lifting the card clear of the
+ * pads carried it under the notice instead, and nothing a stylesheet can say
+ * about a centred banner and a lifted card keeps the two apart at every size
+ * a phone comes in.
+ */
+test('the landing notice is drawn over the card the breakdown is written on', () => {
+    const layer = (selector) => Number(declarations(indexHtml, selector).get('z-index'));
+
+    assert.ok(layer('#landed') > layer('#game-mode'),
+        `the notice draws at ${layer('#landed')} and the card at ${layer('#game-mode')}`);
+    assert.equal(declarations(indexHtml, '#landed').get('top'), '50%',
+        'and it is centred on the screen rather than placed clear of anything');
+    assert.ok(hudSource.includes('showsLandedNotice'),
+        'so js/hud.js is what keeps them off each other, by never showing both at once');
 });
 
 /** The declarations of a rule written for a selector, property by property. */

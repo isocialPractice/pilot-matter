@@ -366,11 +366,21 @@
             z-index: 130;
         }
 
+        /* Both crosses and the padding either side of them have to fit the
+           narrowest screen a phone gives, which is 320. `space-between` has no
+           space to distribute below that: it packs from the left instead, and
+           the right-hand cross is drawn off the end. At 48 pixel cells the pair
+           wanted 344, and eight pixels of YAW R were outside the viewport.
+
+           44 is what fits - the pair comes to 312 and leaves 8 between them -
+           and it is also the smallest a control meant to be hit by a thumb
+           should get, so this is the floor rather than a number to go on
+           shrinking the next time something has to be made to fit. */
         .touch-cluster {
             display: grid;
-            grid-template-columns: repeat(3, 48px);
-            grid-template-rows: repeat(3, 48px);
-            gap: 6px;
+            grid-template-columns: repeat(3, 44px);
+            grid-template-rows: repeat(3, 44px);
+            gap: 4px;
         }
 
         .touch-pad {
@@ -433,10 +443,10 @@
            which is the taller of the two at 140px from a 20px top.
 
            The height is declared rather than left to the six rows, because
-           the band below is not free either: the pads take the bottom 172
+           the band below is not free either: the pads take the bottom 156
            pixels and paint over the readouts at z-index 130 against their
            100. Six rows come to 204.75, so the stack fits from 180 down only
-           while the screen is at least 557 pixels tall - which is the height
+           while the screen is at least 541 pixels tall - which is the height
            the media query below takes over at, and 205 is the bound that
            makes the two agree. A seventh row added here without moving that
            number is a row drawn under a thumb, so it is clipped instead. */
@@ -481,13 +491,13 @@
         }
 
         /* The lift itself only where the two actually meet. The clusters take
-           172 pixels in from each edge and the card is about 300 across, so a
+           156 pixels in from each edge and the card is about 300 across, so a
            screen wider than the three of them together was never covering it,
            and lifting the card there would cost the height a short wide
            screen has least of, for nothing. */
         @media (max-width: 640px) {
             #game-mode.floated {
-                bottom: 188px;
+                bottom: 172px;
                 /* Lifted that far, the card needs the height above the band
                    rather than the corner it used to sit in, and the shortest
                    screen does not have it. Bounded to what is there, so a
@@ -495,7 +505,7 @@
                    from the bottom rather than the name of the stage off the
                    top. The score is the first line written, so what goes is
                    always the least of it. */
-                max-height: calc(100vh - 208px);
+                max-height: calc(100vh - 192px);
                 overflow: hidden;
             }
         }
@@ -795,8 +805,8 @@
         /* A screen too short for the floated readouts to fit between the
            instruments above them and the pads below.
 
-           The stack runs from 180 to 384.75 and the pads take the bottom 172,
-           so the two are clear of each other only from 557 pixels of height
+           The stack runs from 180 to 384.75 and the pads take the bottom 156,
+           so the two are clear of each other only from 541 pixels of height
            up. Every phone gives less than that held sideways - 393 at most,
            and about 330 in a browser with a toolbar - and js/tilt-controls.js
            says sideways is how a flight simulator on a phone is held every
@@ -810,7 +820,7 @@
            the block ends at 271 and clears the pads on a 460 pixel screen -
            which is what a 320 pixel phone in portrait gives under Safari, the
            shortest screen this arrangement still has to hold on. */
-        @media (max-height: 556px) {
+        @media (max-height: 540px) {
             #hud.floated {
                 font-size: 13px;
                 max-height: 100px;
@@ -830,20 +840,20 @@
 
         /* Shorter still, and wide with it, which is a phone held sideways.
            Even the compact stack does not fit: at 330 pixels of height the
-           pads start at 158 and the readouts have not begun at 180.
+           pads start at 174 and the readouts have not begun at 180.
 
            A screen that short is never a narrow one - the shortest is 568
            across - so the readouts take the width they could not get in
            height, and go in the band between the two pad clusters. That band
-           is 156 pixels deep and everything but its two ends is empty, which
+           is 140 pixels deep and everything but its two ends is empty, which
            is the one piece of a short screen nothing else has claimed. */
-        @media (max-height: 556px) and (min-width: 500px) {
+        @media (max-height: 540px) and (min-width: 500px) {
             #hud.floated {
                 top: auto;
                 bottom: 16px;
-                /* Clear of both clusters, which run 172 in from each edge. */
-                left: 188px;
-                right: 188px;
+                /* Clear of both clusters, which run 156 in from each edge. */
+                left: 172px;
+                right: 172px;
                 max-height: 140px;
                 text-align: center;
             }
@@ -852,6 +862,23 @@
                 display: inline-block;
                 vertical-align: top;
                 text-align: left;
+            }
+
+            /* The notice goes up beside the ladder rather than staying under
+               it. Under it is where the pads are on a screen this short: the
+               band starts at 164 on the shortest phone held sideways and the
+               notice runs to 162, which is two pixels of daylight and a
+               thumb's width of doubt.
+
+               The readouts have just left the top left for the band between
+               the clusters, so the whole of the top edge between the ladder
+               and the chart is empty - and a screen short enough for this
+               query is wide enough to have plenty of it. Hung from the same
+               top edge as both instruments, the notice is as far from the
+               pads as they are. */
+            #audio-muted.floated {
+                top: 20px;
+                left: 146px;
             }
         }
     </style>

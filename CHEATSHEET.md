@@ -49,13 +49,19 @@ rather than a device held level. The pads take the bottom corners, so the
 attitude indicator moves to the top left of the screen, the readouts drop below
 it and the chart it now shares that top with, and the control list comes off.
 
+A pad is 44 pixels square, which is both the smallest a control under a thumb
+should be and what lets two clusters and the padding either side of them fit
+the 320 pixel screen a phone is narrowest at.
+
 The pads take a fixed band off the bottom whatever the screen, so a short one
-has less left between them and the instruments above. Below 557 pixels of
+has less left between them and the instruments above. Below 541 pixels of
 height - which is every phone held sideways - the readouts are drawn compact
 and drop `THROTTLE` and `CAMERA`, the two you are not flying on; shorter again
-and they move into the band between the two clusters of pads. The objective
-card, which is what carries the breakdown of a landing, is lifted clear of the
-pads on any screen narrow enough for them to cross it.
+and they move into the band between the two clusters of pads, with the
+`AUDIO MUTED` line going up beside the attitude indicator rather than staying
+under it. The objective card, which is what carries the breakdown of a
+landing, is lifted clear of the pads on any screen narrow enough for them to
+cross it.
 
 ## Flight numbers
 

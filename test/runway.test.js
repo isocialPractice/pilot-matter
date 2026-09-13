@@ -324,13 +324,6 @@ test('a strip longer than the world it is asked for is refused rather than hung 
     assert.equal(field.runways.length, 0);
 });
 
-function colorAt(field, at) {
-    const half = field.size / 2;
-    const col = Math.round((at.x + half) / field.step);
-    const row = Math.round((at.z + half) / field.step);
-    return colorOf(field, row * field.stride + col);
-}
-
 /** The colour a field vertex carries, by its index rather than by its place. */
 function colorOf(field, i) {
     return [field.color[i * 3], field.color[i * 3 + 1], field.color[i * 3 + 2]];

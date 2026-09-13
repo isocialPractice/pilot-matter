@@ -9,7 +9,7 @@ import {
     speedTo, altitudeTo, speedUnit, altitudeUnit,
     throttleToPercent, percentToThrottle,
     feetPerMinuteToVerticalSpeed,
-    headingDegrees, headingToYaw
+    headingDegrees, headingToYaw, bearingToDirection, directionToBearing
 } from '../js/units.js';
 import { verticalSpeedToFeetPerMinute, verticalSpeedToRate } from '../js/hud.js';
 
@@ -98,4 +98,36 @@ test('a scale this version has never heard of reads as the one it opens on', () 
         assert.equal(speedTo(40, id), speedToKnots(40));
         assert.equal(altitudeTo(423, id), altitudeToFeet(423));
     }
+});
+
+// --- The one compass frame -------------------------------------------------
+
+/**
+ * `directionToBearing` says what it comes back with, and for a while it said
+ * the wrong thing twice over: that it rounded, which it never has, and that a
+ * direction of nothing at all would otherwise be a NaN, which it never was.
+ * Every caller happened to cover for the first - the gate pointer rounds what
+ * it draws - so what the sentence cost was the caller written after it.
+ */
+test('a bearing between two places is measured rather than read off a dial', () => {
+    const bearing = directionToBearing(-0.6, 0.8);
+    assert.ok(!Number.isInteger(bearing),
+        `a direction off the marks should keep its fraction, and ${bearing} lost it`);
+    assert.notEqual(bearing, headingDegrees(headingToYaw(bearing)),
+        'the reading on the card is the rounded one, and this is not it');
+});
+
+test('a bearing comes back inside the circle the card reads', () => {
+    for (let degrees = 0; degrees < 360; degrees += 7.5) {
+        const { x, z } = bearingToDirection(degrees);
+        const back = directionToBearing(x, z);
+        assert.ok(back >= 0 && back < 360, `${degrees} came back as ${back}`);
+        assert.ok(Math.abs(back - degrees) < 1e-9, `${degrees} came back as ${back}`);
+    }
+});
+
+test('a direction of nothing at all reads as north rather than as nothing', () => {
+    assert.equal(directionToBearing(0, 0), 0);
+    assert.equal(Number.isNaN(Math.atan2(0, 0)), false,
+        'atan2 of two zeros is a zero, not the NaN this was once documented as guarding');
 });

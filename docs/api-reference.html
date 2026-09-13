@@ -470,11 +470,13 @@ document.querySelector('#world-picker').addEventListener('change', (event) =&gt;
 
 <pre><code>import { createEnvironment } from 'pilot-matter';
 
-const west = createEnvironment({ environment: 'highlands', size: 8000, tile: { x: -0.5, z: 0 } });
-const east = createEnvironment({ environment: 'highlands', size: 8000, tile: { x:  0.5, z: 0 } });
+const east = createEnvironment({ environment: 'highlands', size: 8000, tile: { x: -0.5, z: 0 } });
+const west = createEnvironment({ environment: 'highlands', size: 8000, tile: { x:  0.5, z: 0 } });
 
-scene.add(west.group, east.group);
-west.join(east);                 // settles what their elements drew at the join</code></pre>
+scene.add(east.group, west.group);
+east.join(west);                 // settles what their elements drew at the join</code></pre>
+
+<p>The compass runs the other way to the sign. The world's +Z is north and the card counts clockwise from it, which puts east on <code>-X</code>, so the tile at the lower <code>x</code> is the eastern one. <code>bearingToDirection</code> and <code>directionToBearing</code> are the one statement of that frame, and anything laying a world out by compass name should read it off them rather than write it out again.</p>
 
 <p>There is no coordinate to convert. A tile's mesh is drawn where its field says it is, so a host flying across an assembly asks whichever tile the aircraft is over and passes it the world position it already has:</p>
 

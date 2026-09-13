@@ -136,10 +136,17 @@ export function bearingToDirection(degrees) {
 }
 
 /**
- * The reverse: the bearing a direction over the ground lies on, in whole
- * degrees from 0 to 359 the way the card reads. A direction of nothing at all
- * reads as north rather than as a NaN, which is what `Math.atan2` of two zeros
- * already gives.
+ * The reverse: the bearing a direction over the ground lies on, wrapped into
+ * the half-open circle the card reads - 0 up to but never 360.
+ *
+ * Fractional, unlike `headingDegrees` above it, which rounds. A bearing
+ * between two places is a measurement rather than a reading off a dial, so
+ * what is drawn is rounded where it is drawn and what is computed keeps the
+ * whole of it. A caller writing this straight onto the glass wants a
+ * `Math.round` around it, the way `formatGatePointer` has one.
+ *
+ * A direction of nothing at all reads as north, because `Math.atan2(0, 0)` is
+ * 0 and the wrap below leaves it there.
  */
 export function directionToBearing(x, z) {
     const degrees = Math.atan2(-x, z) * DEGREES_PER_RADIAN;

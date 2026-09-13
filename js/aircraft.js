@@ -236,9 +236,16 @@ export class Aircraft {
         this.throttle = updateThrottle(this.throttle, this.input, dt);
         this.speed = convergeSpeed(this.speed, targetSpeed(this.throttle, this.maxSpeed), dt);
 
-        // Pitch: W = nose up, S = nose down
-        if (this.input.pitchUp)   this.rotation.x += this.rates.pitch * dt;
-        if (this.input.pitchDown) this.rotation.x -= this.rates.pitch * dt;
+        // Pitch: W = nose up, S = nose down, which is what the pads, the
+        // control list and the documentation all say it is.
+        //
+        // The control that raises the nose is the one that lowers the angle.
+        // The model flies nose-first along +Z, so a positive rotation about
+        // +X - the axis out of the left wing - carries that nose down, which
+        // is the same sign `pitchForClimb` in js/flight-model.js negates for
+        // the same reason. Raising it here flew W into a dive.
+        if (this.input.pitchUp)   this.rotation.x -= this.rates.pitch * dt;
+        if (this.input.pitchDown) this.rotation.x += this.rates.pitch * dt;
         this.rotation.x = THREE.MathUtils.clamp(this.rotation.x, -Math.PI / 2.2, Math.PI / 2.2);
 
         // Roll

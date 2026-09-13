@@ -413,12 +413,18 @@ starting again at it.
 ```javascript
 import { createEnvironment } from 'pilot-matter';
 
-const west = createEnvironment({ environment: 'highlands', size: 8000, tile: { x: -0.5, z: 0 } });
-const east = createEnvironment({ environment: 'highlands', size: 8000, tile: { x:  0.5, z: 0 } });
+const east = createEnvironment({ environment: 'highlands', size: 8000, tile: { x: -0.5, z: 0 } });
+const west = createEnvironment({ environment: 'highlands', size: 8000, tile: { x:  0.5, z: 0 } });
 
-scene.add(west.group, east.group);
-west.join(east);                 // settles what their elements drew at the join
+scene.add(east.group, west.group);
+east.join(west);                 // settles what their elements drew at the join
 ```
+
+The compass runs the other way to the sign. The world's +Z is north and the card
+counts clockwise from it, which puts east on `-X`, so the tile at the lower `x`
+is the eastern one. `bearingToDirection` and `directionToBearing` are the one
+statement of that frame, and anything laying a world out by compass name should
+read it off them rather than write it out again.
 
 There is no coordinate to convert. A tile's mesh is drawn where its field says it
 is, so a host flying across an assembly asks whichever tile the aircraft is over
