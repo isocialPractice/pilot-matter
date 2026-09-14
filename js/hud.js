@@ -368,5 +368,14 @@ export class HUD {
         this.landedElement.style.display =
             showsLandedNotice(landed, breakdown) ? 'block' : 'none';
         this.lowAltitudeElement.style.display = low ? 'block' : 'none';
+
+        // The readouts step aside for it too, on a screen small enough that
+        // the card and the stack are the same column. Same reason as the
+        // notice: an aircraft stopped on the strip reads zero knots, zero
+        // feet a minute and the strip's own elevation, so of the two things
+        // wanting that column the stack is the one with nothing to say.
+        // Which sizes that applies at is the page's to decide; this only
+        // says when there is a landing being read off.
+        this.modeElement.classList.toggle('reporting', breakdown);
     }
 }

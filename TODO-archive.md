@@ -714,3 +714,24 @@ still be found by name.
     out, or narrow the ladder and pin it clear of the readout block - so that
     nothing a pilot flies on is obscured at the widths a phone actually has.
   - From: UI/UX Override - the landing the card is never told about
+
+## Archived 09-14-26
+
+- [x] A landing stage opens pointed away from the strip it is about
+  - **Issue**: `RUNWAY LANDING` `FINAL` opens 2400 units out from the middle of
+    the runway with the card reading `HEADING: 005`, and held, that heading
+    takes the aircraft past the side of the strip rather than onto it. Measured
+    off the chart marker over 653 units of flight from the opening at
+    `5165.0, -7469.3`: the strip lies on `5.09` degrees and the aircraft
+    actually flies `355.08`, which is the same bearing mirrored and `10.01`
+    degrees off. `bearingDirection` in `js/game-modes.js` returns
+    `{ x: sin H, z: cos H }` while an aircraft on heading `H` flies
+    `(-sin H, cos H)` through `headingToYaw` in `js/units.js`, and
+    `approachOpening` places the aircraft with the first frame and points it
+    with the second. `FINAL` sets `approach.heading: 0`, which is the stage
+    saying it opens aimed at the strip. The same mismatch reaches the score: a
+    touchdown that physically crossed the strip at `9.9` degrees was reported
+    as `4`, because a runway's own `heading` field is in the mirrored frame
+    too.
+  - **Goal**: Resolve to [stage-opening-heading.prompt.md](.claude/prompts/stage-opening-heading.prompt.md)
+  - From: UI/UX Override - the stage that opens pointed away from the strip

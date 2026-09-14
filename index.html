@@ -490,23 +490,64 @@
             background: rgba(0, 0, 0, 0.85);
         }
 
+        /* The two of them want one column on a screen this size, and the card
+           is bounded to the part of it the readouts are not using - which is
+           enough for what the card says in flight and not enough for a landing
+           read off it, which is five lines more.
+
+           So the readouts give way for as long as the breakdown is up, the way
+           the LANDED notice does and for the same reason: an aircraft stopped
+           on the strip reads zero knots, zero feet a minute and the strip's own
+           elevation, and of the two things wanting the column that is the one
+           with nothing to say. js/hud.js marks the card while a landing is
+           being read off it; the bounds below are what the mark is worth. */
+        #game-mode.floated.reporting ~ #hud.floated {
+            visibility: hidden;
+        }
+
         /* The lift itself only where the two actually meet. The clusters take
-           156 pixels in from each edge and the card is about 300 across, so a
+           156 pixels in from each edge and the card is 260 across, so a
            screen wider than the three of them together was never covering it,
            and lifting the card there would cost the height a short wide
            screen has least of, for nothing. */
         @media (max-width: 640px) {
             #game-mode.floated {
                 bottom: 172px;
-                /* Lifted that far, the card needs the height above the band
-                   rather than the corner it used to sit in, and the shortest
-                   screen does not have it. Bounded to what is there, so a
-                   phone held sideways loses the last line of the breakdown
-                   from the bottom rather than the name of the stage off the
-                   top. The score is the first line written, so what goes is
-                   always the least of it. */
-                max-height: calc(100vh - 192px);
+                /* Lifted that far, the card lands in the column the readouts
+                   were dropped into, and of the two it is the opaque one. So
+                   what it is bounded against is the underside of that stack
+                   rather than the top of the screen: 172 for the band, 16 of
+                   daylight, and the 385 the stacked readouts run to.
+
+                   It clips from the bottom, and the card is written stage
+                   name first, so a phone held sideways loses the last line of
+                   the breakdown rather than the name off the top. The score
+                   is the first line written, so what goes is always the least
+                   of it. */
+                max-height: calc(100vh - 573px);
                 overflow: hidden;
+            }
+
+            /* With the stack stood down, what is above the card is the chart,
+               which ends at 160, and 16 of daylight under it. */
+            #game-mode.floated.reporting {
+                max-height: calc(100vh - 348px);
+            }
+        }
+
+        /* Wider than that and the card clears the pads, but clearing the
+           readouts is a second thing: 260 across and centred, its left edge
+           passes their right edge only from 680 pixels of width up. Between
+           the two it keeps the corner it has always had and takes the same
+           bound, measured off its own 20 pixel inset instead of the band. */
+        @media (min-width: 641px) and (max-width: 679px) {
+            #game-mode.floated {
+                max-height: calc(100vh - 421px);
+                overflow: hidden;
+            }
+
+            #game-mode.floated.reporting {
+                max-height: calc(100vh - 196px);
             }
         }
 
@@ -838,6 +879,63 @@
             }
         }
 
+        /* A narrow screen has the card under the readouts as well as the pads
+           under both, so the stack runs out of room there sooner than the 541
+           above, which only ever counted the pads. Stacked in full it ends at
+           385; the card wants 84 for its four lines, the daylight between them
+           16, and the band 172, which is 657 pixels of screen. Below that the
+           stack is the compact one, and ending at 280 it leaves the card what
+           it needs from 552 up.
+
+           The declarations are the ones above written again rather than the
+           same query widened, because the query above is about a short screen
+           of any width and this one is about a narrow screen of a height that
+           would otherwise be comfortable. */
+        @media (max-width: 640px) and (max-height: 656px) {
+            #hud.floated {
+                font-size: 13px;
+                max-height: 100px;
+            }
+
+            #hud.floated div {
+                margin-bottom: 4px;
+                padding: 2px 6px;
+            }
+
+            #hud.floated .hud-secondary {
+                display: none;
+            }
+
+            /* 172 for the band, 16 of daylight, and the 280 the compact stack
+               runs to. */
+            #game-mode.floated {
+                max-height: calc(100vh - 468px);
+            }
+        }
+
+        /* Below 552 the two cannot both be whole. 320 x 460 is the shortest
+           screen a phone gives - a 568 pixel one with Safari's own bars taking
+           their share - and between the chart ending at 160 and the pads
+           starting at 304 there are 108 pixels for a 91 pixel stack and a card
+           as well.
+
+           So the stack gives up the two rows it can spare after THROTTLE and
+           CAMERA: a pilot on a screen this size is flying on the airspeed and
+           the altitude, and the two are what is left. That leaves the card the
+           54 pixels its stage name and its objective come to - the two lines
+           that say what is being flown and what for. Neither is drawn over the
+           other, which is the whole of what this arrangement is for. */
+        @media (max-width: 640px) and (max-height: 551px) {
+            #hud.floated {
+                max-height: 46px;
+            }
+
+            /* 172 for the band, 8 of daylight, and the 226 two rows run to. */
+            #game-mode.floated {
+                max-height: calc(100vh - 406px);
+            }
+        }
+
         /* Shorter still, and wide with it, which is a phone held sideways.
            Even the compact stack does not fit: at 330 pixels of height the
            pads start at 174 and the readouts have not begun at 180.
@@ -879,6 +977,35 @@
             #audio-muted.floated {
                 top: 20px;
                 left: 146px;
+            }
+
+            /* And the card comes off the bottom middle, because the bottom
+               middle is what the readouts have just been given. Of the two it
+               is the opaque one and the newer arrival, so it is the one that
+               moves - and a screen this short has nowhere else left, which is
+               why it goes to the one edge the readouts have just left.
+
+               Hung from the top of the same lane the readouts took, so the
+               ladder is off one end of it and the chart off the other however
+               wide the screen is. The 260 the card asks for is dropped for
+               that: at 568 across the lane is 224, and a card kept at its own
+               width would be drawn over the chart. 62 puts it under the
+               notice beside the ladder, and it stops where the band begins. */
+            #game-mode.floated {
+                top: 62px;
+                bottom: auto;
+                min-width: 0;
+                max-width: calc(100vw - 344px);
+                max-height: calc(100vh - 218px);
+                overflow: hidden;
+            }
+
+            /* The lane runs past the band rather than stopping at it - the
+               pads are in the corners and the lane is what is between them -
+               so with the stack stood down the card has the whole of it, from
+               the 62 it is hung at to the 16 the readouts were pinned above. */
+            #game-mode.floated.reporting {
+                max-height: calc(100vh - 78px);
             }
         }
     </style>
