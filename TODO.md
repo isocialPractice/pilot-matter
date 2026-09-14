@@ -23,34 +23,23 @@ its context survives being archived.
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
 
-### UI/UX Override - the band the card and the readouts were both given
+### UI/UX Override - the card's clip falls through a line
 
 #### Found Issues
 
-- [ ] The objective card is drawn over the floated readouts on a phone
-  - **Issue**: `#game-mode` is `z-index: 120` against `#hud`'s `100` and is a
-    panel with `background: rgba(0, 0, 0, 0.5)` behind its text, so where the
-    two meet it is the readouts that are lost. On **852x330** - a phone held
-    sideways in a browser with a toolbar - three seconds into an ordinary
-    flight, with no landing and nothing on the card but the stage and the
-    clock, the card sits at x `296`..`556`, y `228`..`310` and the floated
-    readouts are in the band between the clusters at y `268`..`314`, so
-    `AIRSPEED`, `ALTITUDE` and `HEADING` are behind it: the word `AIRSPEED:`
-    and `+3620 ft/min` are all that is left readable of the stack. Both
-    placements are recent and neither was checked against the other - the
-    readouts were moved into that band for being the one empty part of a short
-    screen, and the card is past the `max-width: 640px` the lift is written
-    inside, so at 852 wide it keeps the desktop placement. The landing
-    breakdown makes it worse rather than causing it: at 320x568 the card
-    covers `ALTITUDE`, `V/S`, `HEADING`, `THROTTLE` and `CAMERA` with the
-    breakdown up against `THROTTLE` and `CAMERA` without it, at 393x578 four
-    against two, and at 320x460 `AIRSPEED`, `ALTITUDE`, `V/S`, `HEADING` and
-    the lower part of both instruments against three. 393x852 is clear either
-    way, which is why a tall phone never showed it. The card's own nine lines
-    are readable at every size, so this is the other side of the collision
-    this release fixed rather than that one again.
-  - **Goal**: Resolve to [card-over-floated-readouts.prompt.md](.claude/prompts/card-over-floated-readouts.prompt.md)
-  - From: UI/UX Override - the band the card and the readouts were both given
+- [ ] The objective card clips through the middle of a line on 320x460
+  - **Issue**: the card is bounded in pixels taken off the screen and its rows
+    are whatever height the type comes to, so on the shortest screen a browser
+    leaves the two do not line up and the clip lands part way down a row. In
+    ordinary flight `FINAL  ·  STAGE 1 OF 4` runs 280 to 292 against a clip
+    ending at 287, so five pixels of it are cut and the rest is drawn sliced
+    through the glyphs; with the breakdown up the same happens to
+    `DOWN THE STRIP`, four pixels cut. Clipping there is right and intended -
+    there are 108 pixels between the chart and the pads - but clipping between
+    rows and clipping through one are not the same thing, and a half-drawn line
+    reads as a rendering fault. The other five screens are clean.
+  - **Goal**: Resolve to [card-clipped-through-a-line.prompt.md](.claude/prompts/card-clipped-through-a-line.prompt.md)
+  - From: UI/UX Override - the card's clip falls through a line
 
 ## Game UI/UX
 
@@ -225,26 +214,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 99 earlier items in `TODO-archive.md`, newest last.
+> 100 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A landing stage opens pointed away from the strip it is about
-  - **Issue**: `RUNWAY LANDING` `FINAL` opens 2400 units out from the middle of
-    the runway with the card reading `HEADING: 005`, and held, that heading
-    takes the aircraft past the side of the strip rather than onto it. Measured
-    off the chart marker over 653 units of flight from the opening at
-    `5165.0, -7469.3`: the strip lies on `5.09` degrees and the aircraft
-    actually flies `355.08`, which is the same bearing mirrored and `10.01`
-    degrees off. `bearingDirection` in `js/game-modes.js` returns
-    `{ x: sin H, z: cos H }` while an aircraft on heading `H` flies
-    `(-sin H, cos H)` through `headingToYaw` in `js/units.js`, and
-    `approachOpening` places the aircraft with the first frame and points it
-    with the second. `FINAL` sets `approach.heading: 0`, which is the stage
-    saying it opens aimed at the strip. The same mismatch reaches the score: a
-    touchdown that physically crossed the strip at `9.9` degrees was reported
-    as `4`, because a runway's own `heading` field is in the mirrored frame
-    too.
-  - **Goal**: Resolve to [stage-opening-heading.prompt.md](.claude/prompts/stage-opening-heading.prompt.md)
-  - From: UI/UX Override - the stage that opens pointed away from the strip
 - [x] Floated Readouts 1: the readouts dropped below the ladder land in the
   pads instead
   - **Issue**: `#hud.floated` starts at `top: 180px` and is six 16 pixel rows,
@@ -407,3 +378,27 @@ how the simulator got here rather than as a list still to be worked.
   - **Goal**: Delete `colorAt`, or call it from the sampling the rewrite kept
     if one is still wanted.
   - From: UI/UX Override - the card lifted onto the notice
+- [x] The objective card is drawn over the floated readouts on a phone
+  - **Issue**: `#game-mode` is `z-index: 120` against `#hud`'s `100` and is a
+    panel with `background: rgba(0, 0, 0, 0.5)` behind its text, so where the
+    two meet it is the readouts that are lost. On **852x330** - a phone held
+    sideways in a browser with a toolbar - three seconds into an ordinary
+    flight, with no landing and nothing on the card but the stage and the
+    clock, the card sits at x `296`..`556`, y `228`..`310` and the floated
+    readouts are in the band between the clusters at y `268`..`314`, so
+    `AIRSPEED`, `ALTITUDE` and `HEADING` are behind it: the word `AIRSPEED:`
+    and `+3620 ft/min` are all that is left readable of the stack. Both
+    placements are recent and neither was checked against the other - the
+    readouts were moved into that band for being the one empty part of a short
+    screen, and the card is past the `max-width: 640px` the lift is written
+    inside, so at 852 wide it keeps the desktop placement. The landing
+    breakdown makes it worse rather than causing it: at 320x568 the card
+    covers `ALTITUDE`, `V/S`, `HEADING`, `THROTTLE` and `CAMERA` with the
+    breakdown up against `THROTTLE` and `CAMERA` without it, at 393x578 four
+    against two, and at 320x460 `AIRSPEED`, `ALTITUDE`, `V/S`, `HEADING` and
+    the lower part of both instruments against three. 393x852 is clear either
+    way, which is why a tall phone never showed it. The card's own nine lines
+    are readable at every size, so this is the other side of the collision
+    this release fixed rather than that one again.
+  - **Goal**: Resolve to [card-over-floated-readouts.prompt.md](.claude/prompts/card-over-floated-readouts.prompt.md)
+  - From: UI/UX Override - the band the card and the readouts were both given
