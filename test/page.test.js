@@ -70,6 +70,21 @@ const SHORTEST_SIDEWAYS = 320;
 // narrowed to fit the narrowest phone, and this is where that stops.
 const SMALLEST_TAP = 44;
 
+// The six screens the card and the readouts were finally driven against each
+// other at: the tall phone that never showed the collision, the four that lost
+// readouts behind the card, and the one held sideways that lost the edge of
+// the chart to it. Held here as sizes rather than as a list of what each one
+// covered, because what is checked is the arrangement rather than the day's
+// measurements of it.
+const MEASURED_SCREENS = [
+    { width: 393, height: 852 },
+    { width: 320, height: 568 },
+    { width: 393, height: 578 },
+    { width: 320, height: 460 },
+    { width: 852, height: 330 },
+    { width: 568, height: 320 }
+];
+
 // Every menu drawn into the page: the two cards, the panels they open, and the
 // three lists one panel is split across.
 const MENU_LISTS = [
@@ -609,12 +624,20 @@ test('the floated card is lifted clear of the band the pads take', () => {
     assert.ok(Number.isFinite(lift), 'the lifted card should be placed in pixels');
     assert.ok(lift >= band, `the card sits ${lift}px up and the pads reach ${band}px up`);
 
-    // Lifted that far it needs the height above the band rather than the
-    // corner it used to have, and the shortest screen does not have it. The
-    // bound is what keeps the top line on the screen.
+    // Lifted that far it lands in the column the readouts were dropped into,
+    // so what it is bounded against is the underside of that stack rather
+    // than the top of the screen. Bounded to the screen it cleared the pads
+    // and covered three of the four values a pilot flies on instead.
+    const stack = pixels(indexHtml, '#hud.floated', 'top')
+                + pixels(indexHtml, '#hud.floated', 'max-height');
     const bound = declarations(narrow, '#game-mode.floated').get('max-height');
-    assert.equal(bound, `calc(100vh - ${lift + 20}px)`,
-        'the card should be bounded to the room above the band, so it clips rather than overflows');
+    const under = Number(bound?.match(/^calc\(100vh - (\d+)px\)$/)?.[1]);
+
+    assert.ok(Number.isFinite(under),
+        'the card should be bounded to the room it has, so it clips rather than overflows');
+    assert.ok(under >= lift + stack,
+        `the card is bounded to ${under}px off the screen and the band and the stacked `
+      + `readouts above it come to ${lift + stack}px`);
     assert.equal(declarations(narrow, '#game-mode.floated').get('overflow'), 'hidden');
 
     // And it lands over the readouts wherever it lands, so it has to be read
@@ -625,6 +648,110 @@ test('the floated card is lifted clear of the band the pads take', () => {
     assert.ok(alpha('#game-mode.floated') > alpha('#game-mode'),
         `the floated card reads at ${alpha('#game-mode.floated')} over the readouts `
       + `and the placed one at ${alpha('#game-mode')}`);
+});
+
+/**
+ * The lift and the drop were each placed well and neither was placed against
+ * the other. The card is opaque and draws at 120 against the readouts' 100,
+ * so where the two meet it is the card that is read and the readouts that are
+ * lost - which is why the card's own lines were correct while three of the
+ * four values a pilot flies on were behind it.
+ *
+ * Every other check in this file measures one overlay against the pads. This
+ * one measures the two of them against each other, at the sizes they were
+ * actually driven at, which is the check neither release made.
+ */
+test('the card and the readouts are never given the same band of the screen', () => {
+    for (const screen of MEASURED_SCREENS) {
+        const size = `${screen.width}x${screen.height}`;
+        const card = verticalBand(indexHtml, ['#game-mode', '#game-mode.floated'], screen);
+        const readouts = verticalBand(indexHtml, ['#hud', '#hud.floated'], screen);
+
+        assert.ok(card, `the card should be placed and bounded in pixels at ${size}`);
+        assert.ok(readouts, `and so should the readouts it shares the screen with at ${size}`);
+
+        assert.ok(card.to <= readouts.from || readouts.to <= card.from,
+            `at ${size} the card takes ${card.from}px to ${card.to}px and the readouts `
+          + `${readouts.from}px to ${readouts.to}px`);
+    }
+});
+
+/**
+ * On a screen too short for the stack the readouts go in the band between the
+ * pad clusters, and the card was centred on that same band. So on a phone held
+ * sideways - which js/tilt-controls.js calls the ordinary way this is flown -
+ * it is the card that leaves, for the lane the readouts have just left: hung
+ * from the top of it, narrowed to it, and stopping where the band begins.
+ */
+test('the card takes the lane the readouts left on a phone held sideways', () => {
+    const sideways = media(indexHtml, '(max-height: 540px) and (min-width: 500px)');
+    assert.ok(sideways, 'index.html should say where the card goes on a phone held sideways');
+
+    const lane = pixels(sideways, '#hud.floated', 'left');
+    const width = declarations(sideways, '#game-mode.floated').get('max-width');
+    const gap = Number(width?.match(/^calc\(100vw - (\d+)px\)$/)?.[1]);
+
+    assert.equal(declarations(sideways, '#game-mode.floated').get('bottom'), 'auto',
+        'the card comes off the bottom middle, which is the band the readouts were given');
+    assert.ok(Number.isFinite(pixels(sideways, '#game-mode.floated', 'top')),
+        'and is hung from the top edge instead, in pixels');
+
+    assert.ok(Number.isFinite(gap), 'the card should be narrowed to the lane it is hung in');
+    assert.equal(gap, lane * 2,
+        `the card is held ${gap / 2}px off each edge and the readouts ${lane}px`);
+    assert.equal(declarations(sideways, '#game-mode.floated').get('min-width'), '0',
+        'the 260 it asks for is wider than that lane on a 568 pixel screen, so it gives it up');
+
+    // The lane is what keeps the card off the two instruments, whatever the
+    // screen is: the ladder is inside one end of it and the chart the other.
+    const ladder = pixels(indexHtml, '#attitude.floated', 'left')
+                 + pixels(indexHtml, '#attitude.floated', 'width');
+    const chart  = pixels(indexHtml, '#minimap', 'right') + pixels(indexHtml, '#minimap', 'width');
+
+    assert.ok(lane >= ladder, `the lane starts at ${lane}px and the ladder ends at ${ladder}px`);
+    assert.ok(lane >= chart, `and the chart reaches ${chart}px in from the other edge`);
+
+    // And the notice is above it rather than behind it. The card is centred,
+    // so on every width below 804 its left edge is inside the notice.
+    const notice = pixels(sideways, '#audio-muted.floated', 'top');
+    assert.ok(pixels(sideways, '#game-mode.floated', 'top') > notice,
+        `the card is hung at ${pixels(sideways, '#game-mode.floated', 'top')}px and the `
+      + `notice at ${notice}px`);
+});
+
+/**
+ * Bounded to the room the readouts are not using, the card holds what it says
+ * in flight and not a landing read off it, which is five lines more. So for
+ * the moment the breakdown is up the readouts stand down and the card has the
+ * column - the same trade the LANDED notice already makes, and the same
+ * reason: an aircraft stopped on the strip reads zero knots and the strip's
+ * own elevation, so of the two it is the stack with nothing to say.
+ */
+test('the readouts stand down for the landing the card is reading off', () => {
+    assert.ok(/classList\.toggle\('reporting', breakdown\)/.test(hudSource),
+        'js/hud.js should mark the card while a landing is being read off it');
+    assert.ok(/showsLandedNotice\(landed, breakdown\)/.test(hudSource),
+        'off the one reading the notice steps aside for, rather than a second one of its own');
+
+    const stoodDown = styleRules(indexHtml).find(rule =>
+        rule.selectors.some(selector => /#game-mode\.floated\.reporting\s*~\s*#hud\.floated/.test(selector)));
+    assert.ok(stoodDown, 'and the page should stand the readouts down for that mark');
+    assert.equal(new Map((stoodDown.body ?? '').split(';')
+        .map(part => part.split(':').map(piece => piece.trim()))).get('visibility'), 'hidden',
+        'by visibility rather than display, which the run writes inline and a rule cannot reach');
+
+    // And the card is given the column it just freed, or standing the stack
+    // down has cost the readouts something and bought the breakdown nothing.
+    for (const screen of MEASURED_SCREENS) {
+        const flying = verticalBand(indexHtml, ['#game-mode', '#game-mode.floated'], screen);
+        const reading = verticalBand(indexHtml,
+            ['#game-mode', '#game-mode.floated', '#game-mode.floated.reporting'], screen);
+
+        assert.ok(reading && reading.to - reading.from > flying.to - flying.from,
+            `at ${screen.width}x${screen.height} the card is bounded to `
+          + `${reading ? reading.to - reading.from : null}px reading a landing off and `
+          + `${flying.to - flying.from}px flying`);
+    }
 });
 
 // The card is lifted by the same flag that floats the overlays the pads took
@@ -828,6 +955,108 @@ function media(css, condition) {
     }
 
     return null;
+}
+
+/**
+ * Every `@media` block in the page, in the order the cascade reads them. The
+ * blocks are what a question about one screen has to be answered out of: two
+ * of them place `#hud.floated` and three of them place `#game-mode.floated`,
+ * and the last one to speak is the one that holds.
+ */
+function mediaBlocks(css) {
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const blocks = [];
+
+    for (const match of stripped.matchAll(/@media([^{]*)\{/g)) {
+        let depth = 1;
+        let at = match.index + match[0].length;
+        const from = at;
+        while (at < stripped.length && depth > 0) {
+            if (stripped[at] === '{') depth++;
+            if (stripped[at] === '}') depth--;
+            at++;
+        }
+        blocks.push({
+            condition: match[1].replace(/\s+/g, ' ').trim(),
+            body: stripped.slice(from, at - 1)
+        });
+    }
+
+    return blocks;
+}
+
+/**
+ * True when a block's condition holds on a screen of a given size. A feature
+ * this does not know how to answer - the reduced-motion one, say - reads as
+ * not holding, so a block about something other than size is left out rather
+ * than guessed at.
+ */
+function blockApplies(condition, screen) {
+    const features = [...condition.matchAll(/\((min|max)-(width|height):\s*(\d+)px\)/g)];
+    if (!features.length || condition.split(' and ').length !== features.length) return false;
+
+    return features.every(([, bound, axis, value]) => {
+        const size = axis === 'width' ? screen.width : screen.height;
+        return bound === 'min' ? size >= Number(value) : size <= Number(value);
+    });
+}
+
+/**
+ * What a stack of selectors resolves to on a screen of a given size. Each is
+ * read across the whole page in source order - the rules written for every
+ * screen, then every media block that matches - and the later selector wins
+ * the properties both declare, which is the order they are passed in.
+ */
+function resolved(css, selectors, screen) {
+    const blocks = mediaBlocks(css);
+    // The bodies were cut out of the page with its comments already off, so
+    // what they are taken back out of has to have its comments off too. Five
+    // of the seven blocks carry one, and a body with its comment removed is
+    // not a string the raw page contains - left in, every rule in those five
+    // reads as a rule written for every screen, whatever the size asked about.
+    const plain = blocks.reduce(
+        (rest, block) => rest.replace(block.body, ''),
+        css.replace(/\/\*[\s\S]*?\*\//g, '')
+    );
+    const out = new Map();
+
+    for (const selector of selectors) {
+        for (const source of [plain, ...blocks.filter(block => blockApplies(block.condition, screen))
+            .map(block => block.body)]) {
+            for (const [property, value] of declarations(source, selector)) out.set(property, value);
+        }
+    }
+
+    return out;
+}
+
+/** A declared length as a number, viewport units resolved against the screen. */
+function length(value, screen) {
+    if (value?.endsWith('px')) return Number(value.slice(0, -2));
+
+    const viewport = value?.match(/^calc\(100(vh|vw) - (\d+)px\)$/);
+    if (!viewport) return null;
+    return (viewport[1] === 'vh' ? screen.height : screen.width) - Number(viewport[2]);
+}
+
+/**
+ * The band of the screen an overlay takes, top edge and bottom edge, read off
+ * where it is hung and how far it is allowed to run. The content's own height
+ * is nowhere in the stylesheet, which is what makes an overlay checkable at
+ * all: a declared bound is a promise about where it stops, and an overlay
+ * without one could be any height and cannot be measured against anything.
+ */
+function verticalBand(css, selectors, screen) {
+    const box = resolved(css, selectors, screen);
+    const bound = length(box.get('max-height'), screen);
+    if (bound === null) return null;
+
+    const top = length(box.get('top'), screen);
+    if (top !== null) return { from: top, to: top + bound };
+
+    const bottom = length(box.get('bottom'), screen);
+    if (bottom === null) return null;
+    return { from: screen.height - bottom - bound, to: screen.height - bottom };
 }
 
 /**

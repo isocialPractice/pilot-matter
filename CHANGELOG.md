@@ -5,6 +5,75 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.2-alpha] - 2026-09-14
+
+The objective card and the floated readouts placed against each other rather
+than each against the pads, which is the check neither of the releases that
+moved them made.
+
+### Fixed
+
+- **The objective card is not drawn over the floated readouts.** The release
+  that lifted the card clear of the pads and the one before it that dropped the
+  readouts below the two instruments each placed one overlay well and neither
+  placed it against the other, so on a phone the two ended up in one column.
+  `#game-mode` is opaque at `z-index: 120` against `#hud`'s `100`, so where they
+  met it was the card that read correctly and the readouts that were lost: on an
+  852x330 screen - a phone held sideways in a browser with a toolbar - three
+  seconds into an ordinary flight, with nothing on the card but the stage and
+  the clock, `AIRSPEED`, `ALTITUDE` and `HEADING` were behind it for the whole
+  flight. Every size but a tall phone lost readouts with the card at its
+  shortest, and the landing breakdown made it worse rather than causing it.
+
+  The card is placed against the readouts now, at every size a phone comes in.
+  On a short wide screen it leaves the bottom middle, which is the band the
+  readouts were given, for the top of that same lane: hung at 62 under the muted
+  notice, narrowed to the lane so the ladder is off one end of it and the chart
+  off the other, and stopping where the band begins. Everywhere else it keeps
+  the corner it had and is bounded to the room under the stack rather than to
+  the top of the screen, clipping from the bottom, which is the order its lines
+  are written in. A narrow screen compacts the readouts from 657 pixels of
+  height rather than 541, because a narrow screen has the card under them as
+  well as the pads under both
+- **The card is not drawn over the left edge of the chart on a phone held
+  sideways.** The card is 260 across and centred, and on a 568x320 screen the
+  lift put it at x 134..434 against a chart starting at 408. Narrowed to the
+  lane the readouts use, it ends at 396 and the chart is clear of it
+
+### Changed
+
+- **The readouts stand down while a landing is being read off the card.**
+  Bounded to the room the readouts leave, the card holds the four lines it
+  carries in flight and not a landing breakdown, which is five lines more - so
+  the breakdown clipped away on every screen it was most wanted on. The
+  readouts give way for as long as it is up and the card takes the column,
+  which is the trade the `LANDED` banner already makes and the same reason for
+  it: an aircraft stopped on the strip reads zero knots, zero feet a minute and
+  the strip's own elevation, so of the two wanting that column it is the stack
+  with nothing to say. `js/hud.js` marks the card off the same reading the
+  banner steps aside for, so a screen cleared with `Tab` brings the readouts
+  back with the card. The whole breakdown is readable at 393x852, 320x568,
+  393x578, 852x330 and 568x320; at 320x460, where there are 108 pixels between
+  the chart and the pads, the score line reads and the four rows under it clip
+- **The cheatsheet and the controls page name the height a narrow screen
+  compacts the readouts at.** Both said 541, which is where a wide screen
+  compacts them; on one 640 pixels or narrower it is 657, because the card is
+  under the readouts there as well as the pads under both. A phone in portrait
+  at 320x568 sits between the two, so `THROTTLE` and `CAMERA` come off a screen
+  both pages said was still carrying them
+
+### Added
+
+- **A check that the card and the readouts are never given the same band of
+  the screen**, at the six sizes the collision was driven at. Every other
+  layout check in `test/page.test.js` measures one overlay against the pads;
+  this one resolves both out of the stylesheet for a given viewport - the rules
+  written for every screen, then every media block that matches, in source
+  order - and asks whether the two bands intersect. The blocks are cut out of
+  the page with its comments off and taken back out of it the same way, so a
+  block carrying a comment is not left reading as a rule written for every
+  screen whatever the size being asked about
+
 ## [1.16.1-alpha] - 2026-09-13
 
 The stick wired the way everything written about it says, and the controls a
