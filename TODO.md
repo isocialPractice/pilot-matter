@@ -23,62 +23,32 @@ its context survives being archived.
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
 
-### UI/UX Override - the card's clip falls through a line
+### UI/UX Override - the card's rows are bounded at one mode's line heights
 
-#### Found Issues
+#### Resolve Issues
 
-- [ ] The objective card clips through the middle of a line on 320x460
-  - **Issue**: the card is bounded in pixels taken off the screen and its rows
-    are whatever height the type comes to, so on the shortest screen a browser
-    leaves the two do not line up and the clip lands part way down a row. In
-    ordinary flight `FINAL  ·  STAGE 1 OF 4` runs 280 to 292 against a clip
-    ending at 287, so five pixels of it are cut and the rest is drawn sliced
-    through the glyphs; with the breakdown up the same happens to
-    `DOWN THE STRIP`, four pixels cut. Clipping there is right and intended -
-    there are 108 pixels between the chart and the pads - but clipping between
-    rows and clipping through one are not the same thing, and a half-drawn line
-    reads as a rendering fault. The other five screens are clean.
-  - **Goal**: Resolve to [card-clipped-through-a-line.prompt.md](.claude/prompts/card-clipped-through-a-line.prompt.md)
+- [ ] Card Clip 1: the card still clips through the middle of a line, in the
+  other mode
+  - **Issue**: The bounds are sums of the row heights declared on `#game-mode`,
+    and each of those is a single line of that row's type. The card is
+    `min-width: 260px` with `20px` of side padding and a `1px` border, so a row
+    has 218 pixels to be written across at the card's narrowest and a longer one
+    wraps to two lines. `RUNWAY LANDING` fits: its name, objective, status and
+    clock lay out at 14, 20, 15 and 15 pixels, which is what they declare, and
+    all six screens are clean in both readings. `FLYING THROUGH LOOPS` does not:
+    the same four lay out at 28, 36, 27 and 15, and the pointer at 37 against
+    the 19 it declares. So in ordinary flight, pads out, no landing and no gate
+    involved, `FLY THROUGH EVERY LOOP` runs 277 to 309 against a clip ending at
+    287 on 320x460 and is cut by 22 pixels - most of the row, on the shortest
+    screen a browser leaves, which is the screen the completed item is named
+    for. `THREE GATES  ·  STAGE 1 OF 4  ·  LOOP 1 OF 3` is cut by 1 on 320x568
+    and the `TIME` line by 6 on 393x578. 393x852, 852x330 and 568x320 are clean,
+    because the card is past its minimum width there and nothing wraps. Nothing
+    fails: `npm test` is 937 passing, and `CARD_STATES` in `test/page.test.js`
+    models the card the way the stylesheet does, one declared height per row, so
+    the model and the stylesheet agree about a height neither of them measures.
+  - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
   - From: UI/UX Override - the card's clip falls through a line
-
-### Code Review Override - the stand-down past the bound it pays for
-
-#### Found Issues
-
-- [ ] The readouts stand down on screens the card was never bounded against
-  - **Issue**: `#game-mode.floated.reporting ~ #hud.floated` in `index.html` is
-    written outside every media query, so it fires wherever the pads are out.
-    The bound it pays for is not: `#game-mode.floated` is given a
-    `max-height` by `(max-width: 640px)`, by `(min-width: 641px) and
-    (max-width: 679px)`, and by `(max-height: 540px) and (min-width: 500px)`,
-    and by nothing at all above 679 pixels of width on a screen taller than
-    540. On a tablet flown from the glass at 1024x768 the card sits at
-    x 382..642 and the readouts at x 20..228, y 180..385, so the two never
-    meet - and the whole stack, `AIRSPEED` through `CAMERA`, goes invisible
-    for as long as a breakdown is up and comes back with nothing gained. The
-    rule's own comment says "on a screen this size", which is a size the rule
-    never names. The card is also unclipped there: no `max-height` and no
-    `overflow`, so the bound the CHANGELOG describes as everywhere is not.
-  - **Goal**: Give the stand-down the same screens the bound has - scoped to
-    the widths where the card is actually bounded against the stack - or bound
-    the card above 679 pixels of width so the trade is paid for wherever it is
-    taken. Pin whichever it is in `test/page.test.js` beside the six sizes.
-  - From: Code Review Override - the stand-down past the bound it pays for
-- [ ] No screen wider than the card's narrow case is measured
-  - **Issue**: `MEASURED_SCREENS` in `test/page.test.js` is 393x852, 320x568,
-    393x578, 320x460, 852x330 and 568x320. Four are 640 or narrower and the
-    other two are 540 or shorter, so every one of them resolves through either
-    `(max-width: 640px)` or `(max-height: 540px) and (min-width: 500px)`. The
-    `(min-width: 641px) and (max-width: 679px)` block this turn added - the
-    421 and the 196 it declares - is read by no check at all, and neither is
-    the case above 679 where the card carries no bound. A wrong number in that
-    block, or the bound dropped from it, fails nothing.
-  - **Goal**: Add a screen in the 641..679 band on a height above 540 and one
-    wider than 679 to `MEASURED_SCREENS`, so the two arrangements this turn
-    wrote are measured the way the other six are. Note that the band check
-    reads a missing `max-height` as unmeasurable rather than as clear, so the
-    wider screen wants the bound question settled first.
-  - From: Code Review Override - the stand-down past the bound it pays for
 
 ## Game UI/UX
 
@@ -253,70 +223,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 100 earlier items in `TODO-archive.md`, newest last.
+> 103 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Floated Readouts 1: the readouts dropped below the ladder land in the
-  pads instead
-  - **Issue**: `#hud.floated` starts at `top: 180px` and is six 16 pixel rows,
-    `204.75` pixels of them, so it ends `384.8` pixels down. The pads take the
-    bottom `172`, and `#touch-controls` is `z-index: 130` against `#hud`'s
-    `100`, so they paint over the readouts. The two are clear of each other
-    only above `557` pixels of viewport height. A phone held sideways - which
-    `js/tilt-controls.js` calls the ordinary way this is flown - gives `393` at
-    most and about `330` in a browser with a toolbar: at `330` the whole block
-    is inside the pad band and `THROTTLE` and `CAMERA` are off the bottom edge
-    entirely. On a 320 pixel phone in portrait, the width the
-    `#audio-muted.floated` comment says the layout was measured at, Safari
-    leaves `460` and the right-hand cluster at x `148`..`304` covers the
-    right-hand end of `HEADING`, `THROTTLE` and `CAMERA`. The left-hand cluster
-    empties only when tilt is flying, so a device with no gyroscope - the state
-    the same turn's other fix exists to preserve - keeps `PITCH +`, `PITCH -`,
-    `ROLL L` and `ROLL R` at x `16`..`172`, directly under them. Read off the
-    stylesheet rather than measured in a browser; the same model reproduces the
-    completed item's own browser measurement of `#hud` at x `208.8` exactly.
-  - **Goal**: Resolve to [floated-readouts-height.prompt.md](.claude/prompts/floated-readouts-height.prompt.md)
-  - From: UI/UX Override - the landing the card is never told about
-- [x] **Landing Breakdown**: The landing breakdown is read off from under the pads
-  - **Issue**: `#game-mode-report` is the bottom of a card pinned at
-    `bottom: 20px`, `min-width: 260px` wide with `20px` of side padding and
-    centred, so the report sits `28` to `114` pixels up from the bottom edge.
-    Both pad clusters occupy the bottom `16` to `172` pixels, at x `16`..`172`
-    and x `W-172`..`W-16`, and `#touch-controls` is `z-index: 130` against the
-    card's `120`. On a 393 pixel phone the five rows are centred across x
-    `89`..`304`, so every one of them runs `44` to `83` pixels into a cluster
-    at each end - `OFF THE CENTRELINE  12 ft` is the widest and loses `83` off
-    both, behind `ROLL R` on one side and `YAW L` on the other. The card's
-    place is older than this turn. The breakdown is what this turn made appear,
-    and until now there was nothing in that part of the card to be covered.
-  - **Goal**: Give the breakdown somewhere on a touch screen that the pads are
-    not. Lifting the card clear of the pad band while `#touch-controls` is
-    shown is the smallest version, and the same `floated` idea `#hud` and
-    `#attitude` already use, but the card is centred and the band is `172`
-    pixels deep, so check what it meets on the way up before settling on it.
-    Whatever it comes to, pin it in `test/page.test.js` the way the floated
-    overlays are.
-  - From: Code Review Override - the phone layout the two fixes left behind
-- [x] Landing Breakdown 2: the lifted card lands under the LANDED notice on a
-  phone held upright
-  - **Issue**: The card clears the pads at every size checked - no line of it is
-    behind a pad on 393x852, 320x568, 852x393, 852x330, 568x320, 393x578 or
-    320x460 - but it does not clear `#landed`, which `js/hud.js` shows for the
-    whole time the aircraft is stopped on the strip, which is the whole time the
-    breakdown is up. `#landed` is centred at `top: 50%`, 112 pixels tall, with
-    `background: rgba(0, 0, 0, 0.55)` at `z-index: 150` against the card's
-    `120`, so it paints over it. One landing was flown out on `FINAL`, the frame
-    held, and `#game-mode.floated` taken off and put back on it to separate the
-    lift from what was already there. On 320x568 the notice takes 228-340, the
-    lifted card 214-380 and the unlifted card 382-548: seven of the card's lines
-    are behind the notice now and none of them were before, and the line lost is
-    `LANDING  ·  <score>`, the headline of the breakdown. The same on 393x578,
-    seven against none. On 320x460 it goes from one line to six. On 852x393 and
-    852x330 the card is past the `max-width: 640px` the lift is written inside,
-    does not move, and its two and four covered lines are older than this
-    change. The request's own reading for 320x568 is "all five breakdown rows
-    fully readable"; they are clear of the pads and they are not readable.
-  - **Goal**: Resolve to [breakdown-under-landed-notice.prompt.md](.claude/prompts/breakdown-under-landed-notice.prompt.md)
-  - From: Code Review Override - the phone layout the two fixes left behind
 - [x] The right-hand pad cluster is drawn off the edge of a 320 pixel screen
   - **Issue**: With the pads out at 320x568 and at 320x460, the left cluster
     occupies x 16..172 and the right one x 172..328 on a screen 320 wide, so
@@ -441,3 +349,50 @@ how the simulator got here rather than as a list still to be worked.
     this release fixed rather than that one again.
   - **Goal**: Resolve to [card-over-floated-readouts.prompt.md](.claude/prompts/card-over-floated-readouts.prompt.md)
   - From: UI/UX Override - the band the card and the readouts were both given
+- [x] **Card Clip**: The objective card clips through the middle of a line on 320x460
+  - **Issue**: the card is bounded in pixels taken off the screen and its rows
+    are whatever height the type comes to, so on the shortest screen a browser
+    leaves the two do not line up and the clip lands part way down a row. In
+    ordinary flight `FINAL  ·  STAGE 1 OF 4` runs 280 to 292 against a clip
+    ending at 287, so five pixels of it are cut and the rest is drawn sliced
+    through the glyphs; with the breakdown up the same happens to
+    `DOWN THE STRIP`, four pixels cut. Clipping there is right and intended -
+    there are 108 pixels between the chart and the pads - but clipping between
+    rows and clipping through one are not the same thing, and a half-drawn line
+    reads as a rendering fault. The other five screens are clean.
+  - **Goal**: Resolve to [card-clipped-through-a-line.prompt.md](.claude/prompts/card-clipped-through-a-line.prompt.md)
+  - From: UI/UX Override - the card's clip falls through a line
+- [x] The readouts stand down on screens the card was never bounded against
+  - **Issue**: `#game-mode.floated.reporting ~ #hud.floated` in `index.html` is
+    written outside every media query, so it fires wherever the pads are out.
+    The bound it pays for is not: `#game-mode.floated` is given a
+    `max-height` by `(max-width: 640px)`, by `(min-width: 641px) and
+    (max-width: 679px)`, and by `(max-height: 540px) and (min-width: 500px)`,
+    and by nothing at all above 679 pixels of width on a screen taller than
+    540. On a tablet flown from the glass at 1024x768 the card sits at
+    x 382..642 and the readouts at x 20..228, y 180..385, so the two never
+    meet - and the whole stack, `AIRSPEED` through `CAMERA`, goes invisible
+    for as long as a breakdown is up and comes back with nothing gained. The
+    rule's own comment says "on a screen this size", which is a size the rule
+    never names. The card is also unclipped there: no `max-height` and no
+    `overflow`, so the bound the CHANGELOG describes as everywhere is not.
+  - **Goal**: Give the stand-down the same screens the bound has - scoped to
+    the widths where the card is actually bounded against the stack - or bound
+    the card above 679 pixels of width so the trade is paid for wherever it is
+    taken. Pin whichever it is in `test/page.test.js` beside the six sizes.
+  - From: Code Review Override - the stand-down past the bound it pays for
+- [x] No screen wider than the card's narrow case is measured
+  - **Issue**: `MEASURED_SCREENS` in `test/page.test.js` is 393x852, 320x568,
+    393x578, 320x460, 852x330 and 568x320. Four are 640 or narrower and the
+    other two are 540 or shorter, so every one of them resolves through either
+    `(max-width: 640px)` or `(max-height: 540px) and (min-width: 500px)`. The
+    `(min-width: 641px) and (max-width: 679px)` block this turn added - the
+    421 and the 196 it declares - is read by no check at all, and neither is
+    the case above 679 where the card carries no bound. A wrong number in that
+    block, or the bound dropped from it, fails nothing.
+  - **Goal**: Add a screen in the 641..679 band on a height above 540 and one
+    wider than 679 to `MEASURED_SCREENS`, so the two arrangements this turn
+    wrote are measured the way the other six are. Note that the band check
+    reads a missing `max-height` as unmeasurable rather than as clear, so the
+    wider screen wants the bound question settled first.
+  - From: Code Review Override - the stand-down past the bound it pays for
