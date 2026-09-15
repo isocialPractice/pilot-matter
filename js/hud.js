@@ -321,7 +321,14 @@ export class HUD {
     setGatePointer(pointer) {
         const text = formatGatePointer(pointer, this.altitudeUnit);
         this.modePointerElement.textContent = text;
-        this.modePointerElement.style.display = text ? 'block' : 'none';
+
+        // Marked on the card rather than written onto the row, for the same
+        // reason the breakdown is: the row is the last one on the card and so
+        // the first the bottom clip reaches, and a screen with no room to draw
+        // it whole has to be able to take it off. A display written inline
+        // here is one no rule can reach, and the row would be sliced through
+        // its own glyphs instead. Which sizes have the room is the page's.
+        this.modeElement.classList.toggle('pointing', Boolean(text));
     }
 
     /**

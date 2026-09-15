@@ -735,3 +735,68 @@ still be found by name.
     too.
   - **Goal**: Resolve to [stage-opening-heading.prompt.md](.claude/prompts/stage-opening-heading.prompt.md)
   - From: UI/UX Override - the stage that opens pointed away from the strip
+
+## Archived 09-15-26
+
+- [x] Floated Readouts 1: the readouts dropped below the ladder land in the
+  pads instead
+  - **Issue**: `#hud.floated` starts at `top: 180px` and is six 16 pixel rows,
+    `204.75` pixels of them, so it ends `384.8` pixels down. The pads take the
+    bottom `172`, and `#touch-controls` is `z-index: 130` against `#hud`'s
+    `100`, so they paint over the readouts. The two are clear of each other
+    only above `557` pixels of viewport height. A phone held sideways - which
+    `js/tilt-controls.js` calls the ordinary way this is flown - gives `393` at
+    most and about `330` in a browser with a toolbar: at `330` the whole block
+    is inside the pad band and `THROTTLE` and `CAMERA` are off the bottom edge
+    entirely. On a 320 pixel phone in portrait, the width the
+    `#audio-muted.floated` comment says the layout was measured at, Safari
+    leaves `460` and the right-hand cluster at x `148`..`304` covers the
+    right-hand end of `HEADING`, `THROTTLE` and `CAMERA`. The left-hand cluster
+    empties only when tilt is flying, so a device with no gyroscope - the state
+    the same turn's other fix exists to preserve - keeps `PITCH +`, `PITCH -`,
+    `ROLL L` and `ROLL R` at x `16`..`172`, directly under them. Read off the
+    stylesheet rather than measured in a browser; the same model reproduces the
+    completed item's own browser measurement of `#hud` at x `208.8` exactly.
+  - **Goal**: Resolve to [floated-readouts-height.prompt.md](.claude/prompts/floated-readouts-height.prompt.md)
+  - From: UI/UX Override - the landing the card is never told about
+- [x] **Landing Breakdown**: The landing breakdown is read off from under the pads
+  - **Issue**: `#game-mode-report` is the bottom of a card pinned at
+    `bottom: 20px`, `min-width: 260px` wide with `20px` of side padding and
+    centred, so the report sits `28` to `114` pixels up from the bottom edge.
+    Both pad clusters occupy the bottom `16` to `172` pixels, at x `16`..`172`
+    and x `W-172`..`W-16`, and `#touch-controls` is `z-index: 130` against the
+    card's `120`. On a 393 pixel phone the five rows are centred across x
+    `89`..`304`, so every one of them runs `44` to `83` pixels into a cluster
+    at each end - `OFF THE CENTRELINE  12 ft` is the widest and loses `83` off
+    both, behind `ROLL R` on one side and `YAW L` on the other. The card's
+    place is older than this turn. The breakdown is what this turn made appear,
+    and until now there was nothing in that part of the card to be covered.
+  - **Goal**: Give the breakdown somewhere on a touch screen that the pads are
+    not. Lifting the card clear of the pad band while `#touch-controls` is
+    shown is the smallest version, and the same `floated` idea `#hud` and
+    `#attitude` already use, but the card is centred and the band is `172`
+    pixels deep, so check what it meets on the way up before settling on it.
+    Whatever it comes to, pin it in `test/page.test.js` the way the floated
+    overlays are.
+  - From: Code Review Override - the phone layout the two fixes left behind
+- [x] Landing Breakdown 2: the lifted card lands under the LANDED notice on a
+  phone held upright
+  - **Issue**: The card clears the pads at every size checked - no line of it is
+    behind a pad on 393x852, 320x568, 852x393, 852x330, 568x320, 393x578 or
+    320x460 - but it does not clear `#landed`, which `js/hud.js` shows for the
+    whole time the aircraft is stopped on the strip, which is the whole time the
+    breakdown is up. `#landed` is centred at `top: 50%`, 112 pixels tall, with
+    `background: rgba(0, 0, 0, 0.55)` at `z-index: 150` against the card's
+    `120`, so it paints over it. One landing was flown out on `FINAL`, the frame
+    held, and `#game-mode.floated` taken off and put back on it to separate the
+    lift from what was already there. On 320x568 the notice takes 228-340, the
+    lifted card 214-380 and the unlifted card 382-548: seven of the card's lines
+    are behind the notice now and none of them were before, and the line lost is
+    `LANDING  ·  <score>`, the headline of the breakdown. The same on 393x578,
+    seven against none. On 320x460 it goes from one line to six. On 852x393 and
+    852x330 the card is past the `max-width: 640px` the lift is written inside,
+    does not move, and its two and four covered lines are older than this
+    change. The request's own reading for 320x568 is "all five breakdown rows
+    fully readable"; they are clear of the pads and they are not readable.
+  - **Goal**: Resolve to [breakdown-under-landed-notice.prompt.md](.claude/prompts/breakdown-under-landed-notice.prompt.md)
+  - From: Code Review Override - the phone layout the two fixes left behind

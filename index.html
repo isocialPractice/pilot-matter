@@ -275,6 +275,21 @@
         /* What the pilot is being asked to do, on the one edge of the screen
            no instrument has already claimed. */
         #game-mode {
+            /* Every row the card can carry, at the height its own type comes
+               to: the row itself and the margin above it. Declared here so the
+               bounds below are written in rows rather than in pixels counted
+               off the screen - the two did not line up, and a clip that landed
+               part way down a row drew that row sliced through its own glyphs,
+               which reads as a rendering fault rather than as a card that
+               stops. A type size changed here moves every bound with it. */
+            --card-edges: 18px;      /* the border and the padding, both ends */
+            --card-name: 14px;       /* what is being flown */
+            --card-objective: 20px;  /* and what for */
+            --card-status: 15px;     /* which stage of it, of how many */
+            --card-clock: 15px;      /* the time on it and the time to beat */
+            --card-pointer: 19px;    /* which way the gate lies */
+            --card-score: 28px;      /* the rule over a landing and its score */
+            --card-part: 14px;       /* each measurement under that score */
             display: none;
             position: fixed;
             bottom: 20px;
@@ -344,6 +359,15 @@
             color: #ffb000;
             font-size: 13px;
             letter-spacing: 2px;
+        }
+
+        /* Raised off a mark on the card, the way the landing breakdown is,
+           rather than off a style written onto the row itself. A display
+           written inline by the run is a display no rule can reach, and a row
+           no rule can reach is one the clip slices rather than one the page
+           can take off - which is the whole of what the bounds below do. */
+        #game-mode.pointing #game-mode-pointer {
+            display: block;
         }
 
         /* The controls for a machine with no keys to fly with: two crosses of
@@ -490,21 +514,6 @@
             background: rgba(0, 0, 0, 0.85);
         }
 
-        /* The two of them want one column on a screen this size, and the card
-           is bounded to the part of it the readouts are not using - which is
-           enough for what the card says in flight and not enough for a landing
-           read off it, which is five lines more.
-
-           So the readouts give way for as long as the breakdown is up, the way
-           the LANDED notice does and for the same reason: an aircraft stopped
-           on the strip reads zero knots, zero feet a minute and the strip's own
-           elevation, and of the two things wanting the column that is the one
-           with nothing to say. js/hud.js marks the card while a landing is
-           being read off it; the bounds below are what the mark is worth. */
-        #game-mode.floated.reporting ~ #hud.floated {
-            visibility: hidden;
-        }
-
         /* The lift itself only where the two actually meet. The clusters take
            156 pixels in from each edge and the card is 260 across, so a
            screen wider than the three of them together was never covering it,
@@ -548,6 +557,46 @@
 
             #game-mode.floated.reporting {
                 max-height: calc(100vh - 196px);
+            }
+        }
+
+        /* Wider than 679 and the card has passed the stack rather than been
+           bounded under it, so there is nothing above it to measure against:
+           the readouts end 210 pixels in from the left edge and the card's own
+           left edge is past that from 680 up. It is still bounded, because an
+           overlay with no declared height is one nothing on the page can be
+           placed against - but the bound here is the inset it is held at
+           rather than the underside of anything, so the card carries whatever
+           it has to say and stops at the top of the screen. */
+        @media (min-width: 680px) and (min-height: 541px) {
+            #game-mode.floated {
+                max-height: calc(100vh - 40px);
+                overflow: hidden;
+            }
+        }
+
+        /* The two of them want one column on a screen no wider than that, and
+           the card is bounded to the part of it the readouts are not using -
+           which is enough for what the card says in flight and not enough for
+           a landing read off it, which is five lines more.
+
+           So the readouts give way for as long as the breakdown is up, the way
+           the LANDED notice does and for the same reason: an aircraft stopped
+           on the strip reads zero knots, zero feet a minute and the strip's own
+           elevation, and of the two things wanting the column that is the one
+           with nothing to say. js/hud.js marks the card while a landing is
+           being read off it; the bounds above are what the mark is worth.
+
+           Written inside the widths the bound is written inside, rather than
+           outside every query the way it first was. Out there it fired
+           wherever the pads were: on a tablet flown from the glass at
+           1024x768 the card sits at x 382..642 and the readouts at x 20..228,
+           so the two never meet - and the whole stack went invisible for the
+           length of a breakdown and came back with nothing gained. A trade is
+           only worth making where there is something to trade for. */
+        @media (max-width: 679px) {
+            #game-mode.floated.reporting ~ #hud.floated {
+                visibility: hidden;
             }
         }
 
@@ -930,9 +979,58 @@
                 max-height: 46px;
             }
 
-            /* 172 for the band, 8 of daylight, and the 226 two rows run to. */
+            /* 54 pixels is what 172 for the band, 8 of daylight and the 226
+               two rows run to leaves, and 54 is two more than two rows come
+               to and seven of a third. So the clip landed seven pixels into
+               `FINAL  ·  STAGE 1 OF 4` and cut the bottom five off it square.
+
+               The rows that cannot be drawn whole come off instead, the way
+               the stack drops THROTTLE and CAMERA on a screen this short, and
+               the bound is the rows that are left added up rather than the
+               room they are left in. Tightening the count alone would not
+               have done it: the card's bottom padding is not space the row
+               under it respects, so a bound landing on a row boundary still
+               slices the row after it. */
+            #game-mode.floated #game-mode-status,
+            #game-mode.floated #game-mode-clock {
+                display: none;
+            }
+
             #game-mode.floated {
-                max-height: calc(100vh - 406px);
+                max-height: calc(var(--card-edges) + var(--card-name) + var(--card-objective));
+            }
+
+            /* With the stack stood down there are 112 rather than 54, which is
+               the four rows that head the card and the score line under them -
+               the reading of the landing - and not the four measurements
+               behind it. Those are what goes, and the headers come back. */
+            #game-mode.floated.reporting #game-mode-status,
+            #game-mode.floated.reporting #game-mode-clock {
+                display: block;
+            }
+
+            #game-mode.floated.reporting #game-mode-report div + div {
+                display: none;
+            }
+
+            #game-mode.floated.reporting {
+                max-height: calc(var(--card-edges) + var(--card-name) + var(--card-objective)
+                               + var(--card-status) + var(--card-clock) + var(--card-score));
+            }
+        }
+
+        /* The gate pointer is the card's fifth row and the last of them, so it
+           is the first thing the bottom clip reaches. On a narrow screen the
+           card is bounded to the room under the readouts, and that room only
+           holds five rows from 674 pixels of height up: below it the stack
+           takes what the card would need, in steps, so the room the card has
+           falls as the screen grows rather than rising with it. Under that the
+           row comes off, and the chart in the corner is left to say which way
+           the gate lies - which it is drawing already, held at its own edge
+           for a gate past the ground shown. */
+        @media (max-width: 640px) and (max-height: 673px) {
+            #game-mode.floated.pointing #game-mode-pointer {
+                display: none;
             }
         }
 
@@ -1006,6 +1104,14 @@
                the 62 it is hung at to the 16 the readouts were pinned above. */
             #game-mode.floated.reporting {
                 max-height: calc(100vh - 78px);
+            }
+
+            /* And the stand-down comes with it. A screen this short is a wide
+               one, so the width the rule above is scoped to does not reach it -
+               but the card and the readouts are in the same lane here, which
+               is the closest the two ever get. */
+            #game-mode.floated.reporting ~ #hud.floated {
+                visibility: hidden;
             }
         }
     </style>

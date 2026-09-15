@@ -70,19 +70,75 @@ const SHORTEST_SIDEWAYS = 320;
 // narrowed to fit the narrowest phone, and this is where that stops.
 const SMALLEST_TAP = 44;
 
-// The six screens the card and the readouts were finally driven against each
-// other at: the tall phone that never showed the collision, the four that lost
-// readouts behind the card, and the one held sideways that lost the edge of
-// the chart to it. Held here as sizes rather than as a list of what each one
-// covered, because what is checked is the arrangement rather than the day's
-// measurements of it.
+// The screens the card and the readouts are driven against each other at: the
+// tall phone that never showed the collision, the four that lost readouts
+// behind the card, the one held sideways that lost the edge of the chart to
+// it, and the two wider arrangements that were written and then measured by
+// nothing - the band between 641 and 679 where the card keeps its corner and
+// takes the stack's bound, and the screen past it where the card has gone by
+// the stack altogether. Held here as sizes rather than as a list of what each
+// one covered, because what is checked is the arrangement rather than the
+// day's measurements of it.
 const MEASURED_SCREENS = [
     { width: 393, height: 852 },
     { width: 320, height: 568 },
     { width: 393, height: 578 },
     { width: 320, height: 460 },
     { width: 852, height: 330 },
-    { width: 568, height: 320 }
+    { width: 568, height: 320 },
+    { width: 660, height: 720 },
+    { width: 1024, height: 768 }
+];
+
+// The width the card's left edge passes the readouts' right edge at, read off
+// the top of the band the page keeps the two bounded against each other in.
+// Above it they are side by side rather than one over the other, so a bound
+// measured down the screen says nothing about whether they meet.
+const CARD_CLEARS_STACK = Number(
+    indexHtml.match(/\(min-width: 641px\) and \(max-width: (\d+)px\)/)?.[1]
+);
+
+// What the card carries, in the order it is written down the card, and the
+// property each row's height is declared in. The card clips from the bottom,
+// so a row that cannot be drawn whole has to be taken off rather than left to
+// the clip: the card's bottom padding is not space the row under it respects,
+// so a bound landing on a row boundary still slices the row after it.
+const CARD_STATES = [
+    {
+        reading: 'in ordinary flight',
+        selectors: ['#game-mode', '#game-mode.floated'],
+        rows: [
+            { height: '--card-name',      shown: ['#game-mode-name'] },
+            { height: '--card-objective', shown: ['#game-mode-objective'] },
+            { height: '--card-status',    shown: ['#game-mode.floated #game-mode-status'] },
+            { height: '--card-clock',     shown: ['#game-mode.floated #game-mode-clock'] },
+            { height: '--card-pointer',   shown: [
+                '#game-mode.pointing #game-mode-pointer',
+                '#game-mode.floated.pointing #game-mode-pointer'
+            ] }
+        ]
+    },
+    {
+        reading: 'with a landing read off it',
+        selectors: ['#game-mode', '#game-mode.floated', '#game-mode.floated.reporting'],
+        rows: [
+            { height: '--card-name',      shown: ['#game-mode-name'] },
+            { height: '--card-objective', shown: ['#game-mode-objective'] },
+            { height: '--card-status',    shown: [
+                '#game-mode.floated #game-mode-status',
+                '#game-mode.floated.reporting #game-mode-status'
+            ] },
+            { height: '--card-clock',     shown: [
+                '#game-mode.floated #game-mode-clock',
+                '#game-mode.floated.reporting #game-mode-clock'
+            ] },
+            { height: '--card-score',     shown: ['#game-mode-report .landing-score'] },
+            ...Array.from({ length: 4 }, () => ({ height: '--card-part', shown: [
+                '#game-mode-report div + div',
+                '#game-mode.floated.reporting #game-mode-report div + div'
+            ] }))
+        ]
+    }
 ];
 
 // Every menu drawn into the page: the two cards, the panels they open, and the
@@ -466,6 +522,23 @@ test('the gate pointer starts off and waits for a gate to point at', () => {
         '#game-mode-pointer should start hidden');
 });
 
+/**
+ * And is raised off a mark on the card, the way the landing breakdown is. The
+ * pointer is the last row written on a card that clips from the bottom, so it
+ * is the first row the clip reaches - and a display written inline by the run
+ * is one no rule can reach, which leaves the row to be sliced through its own
+ * glyphs on a screen with no room to draw it whole.
+ */
+test('the gate pointer is raised off a mark the page can take the row off by', () => {
+    assert.ok(/classList\.toggle\('pointing', Boolean\(text\)\)/.test(hudSource),
+        "js/hud.js should mark the card while a gate is being pointed at");
+    assert.ok(!/modePointerElement\.style\.display/.test(hudSource),
+        'and leave the row itself to the page, rather than writing a display onto it');
+
+    assert.equal(declarations(indexHtml, '#game-mode.pointing #game-mode-pointer').get('display'),
+        'block', 'and the page should draw the row off that mark');
+});
+
 // --- The course on the chart ----------------------------------------------
 
 test('the chart carries the course the minimap draws into', () => {
@@ -662,6 +735,9 @@ test('the floated card is lifted clear of the band the pads take', () => {
  * actually driven at, which is the check neither release made.
  */
 test('the card and the readouts are never given the same band of the screen', () => {
+    assert.ok(Number.isFinite(CARD_CLEARS_STACK),
+        'the page should say what width the card passes the stack at');
+
     for (const screen of MEASURED_SCREENS) {
         const size = `${screen.width}x${screen.height}`;
         const card = verticalBand(indexHtml, ['#game-mode', '#game-mode.floated'], screen);
@@ -670,7 +746,12 @@ test('the card and the readouts are never given the same band of the screen', ()
         assert.ok(card, `the card should be placed and bounded in pixels at ${size}`);
         assert.ok(readouts, `and so should the readouts it shares the screen with at ${size}`);
 
-        assert.ok(card.to <= readouts.from || readouts.to <= card.from,
+        // Past the width the card's left edge passes their right edge at, the
+        // two are beside each other rather than one over the other, and a
+        // band measured down the screen says nothing about whether they meet.
+        const apart = screen.width > CARD_CLEARS_STACK && !sharesTheLane(indexHtml, screen);
+
+        assert.ok(card.to <= readouts.from || readouts.to <= card.from || apart,
             `at ${size} the card takes ${card.from}px to ${card.to}px and the readouts `
           + `${readouts.from}px to ${readouts.to}px`);
     }
@@ -742,7 +823,7 @@ test('the readouts stand down for the landing the card is reading off', () => {
 
     // And the card is given the column it just freed, or standing the stack
     // down has cost the readouts something and bought the breakdown nothing.
-    for (const screen of MEASURED_SCREENS) {
+    for (const screen of MEASURED_SCREENS.filter(screen => standsDown(indexHtml, screen))) {
         const flying = verticalBand(indexHtml, ['#game-mode', '#game-mode.floated'], screen);
         const reading = verticalBand(indexHtml,
             ['#game-mode', '#game-mode.floated', '#game-mode.floated.reporting'], screen);
@@ -751,6 +832,88 @@ test('the readouts stand down for the landing the card is reading off', () => {
             `at ${screen.width}x${screen.height} the card is bounded to `
           + `${reading ? reading.to - reading.from : null}px reading a landing off and `
           + `${flying.to - flying.from}px flying`);
+    }
+});
+
+/**
+ * The trade is only worth making where there is something to trade for. Written
+ * outside every media query, the rule fired wherever the pads were out - and on
+ * a tablet flown from the glass at 1024x768 the card sits at x 382..642 against
+ * readouts at x 20..228, so the two never meet. The whole stack, AIRSPEED
+ * through CAMERA, went invisible for the length of a breakdown and came back
+ * with nothing gained, on every screen the card had already passed it on.
+ *
+ * So the stand-down is scoped to the screens the card is bounded against the
+ * stack on, which is what it is paying for, and the two have to be the same
+ * screens rather than nearly the same ones.
+ */
+test('the readouts only stand down where the card is bounded against them', () => {
+    for (const screen of MEASURED_SCREENS) {
+        const size = `${screen.width}x${screen.height}`;
+        const meets = cardMeetsReadouts(indexHtml, screen);
+
+        assert.equal(standsDown(indexHtml, screen), meets,
+            meets
+                ? `at ${size} the card takes the readouts' band and they do not stand down`
+                : `at ${size} the readouts stand down and the card was never over them`);
+    }
+});
+
+/**
+ * Whatever else it does, the card stops somewhere on every screen it is drawn
+ * on. An overlay with no declared height is one nothing on the page can be
+ * placed against - the content's own height is nowhere in the stylesheet - so
+ * an unbounded card reads as clear of everything by being unmeasurable, which
+ * is how a tablet ended up with the one arrangement no check could see.
+ */
+test('the card is bounded on every screen the pads are out on', () => {
+    for (const screen of MEASURED_SCREENS) {
+        const size = `${screen.width}x${screen.height}`;
+        const box = resolved(indexHtml, ['#game-mode', '#game-mode.floated'], screen);
+
+        assert.ok(length(box.get('max-height'), screen, box) !== null,
+            `the card should declare where it stops at ${size}`);
+        assert.equal(box.get('overflow'), 'hidden',
+            `and bind it at ${size}, or it is a number rather than a bound`);
+    }
+});
+
+/**
+ * The card clips from the bottom, and the bound it clips at was a count taken
+ * off the screen while its rows are whatever height the type comes to. The two
+ * do not line up: on 320x460 the clip landed seven pixels into
+ * `FINAL  ·  STAGE 1 OF 4` and cut the bottom five off it square, which reads
+ * as a rendering fault rather than as a card that stops. The other screens
+ * were clean by luck rather than by rule, which is the other half of it.
+ *
+ * So every row the card carries is either drawn whole or taken off, and what
+ * makes that true is the bound being at least the rows left on the card rather
+ * than a number that happens to fall between two of them. Tightening the count
+ * would not have done it on its own: the card's bottom padding is not space
+ * the row under it respects, so a bound landing on a row boundary still slices
+ * the row after it.
+ */
+test('the card stops between its rows rather than part way down one', () => {
+    const edges = declarations(indexHtml, '#game-mode').get('--card-edges');
+    assert.ok(edges?.endsWith('px'), 'the card should declare what its own border and padding come to');
+
+    for (const screen of MEASURED_SCREENS) {
+        for (const state of CARD_STATES) {
+            const size = `${screen.width}x${screen.height}`;
+            const box = resolved(indexHtml, state.selectors, screen);
+            const bound = length(box.get('max-height'), screen, box);
+
+            assert.ok(bound !== null, `the card should be bounded at ${size} ${state.reading}`);
+
+            const drawn = state.rows.filter(row =>
+                resolved(indexHtml, row.shown, screen).get('display') !== 'none');
+            const rows = drawn.reduce((total, row) => total + Number(box.get(row.height).slice(0, -2)),
+                Number(edges.slice(0, -2)));
+
+            assert.ok(bound >= rows,
+                `at ${size} ${state.reading} the card is bounded to ${bound}px and the `
+              + `${drawn.length} rows it still carries come to ${rows}px`);
+        }
     }
 });
 
@@ -1008,21 +1171,10 @@ function blockApplies(condition, screen) {
  * the properties both declare, which is the order they are passed in.
  */
 function resolved(css, selectors, screen) {
-    const blocks = mediaBlocks(css);
-    // The bodies were cut out of the page with its comments already off, so
-    // what they are taken back out of has to have its comments off too. Five
-    // of the seven blocks carry one, and a body with its comment removed is
-    // not a string the raw page contains - left in, every rule in those five
-    // reads as a rule written for every screen, whatever the size asked about.
-    const plain = blocks.reduce(
-        (rest, block) => rest.replace(block.body, ''),
-        css.replace(/\/\*[\s\S]*?\*\//g, '')
-    );
     const out = new Map();
 
     for (const selector of selectors) {
-        for (const source of [plain, ...blocks.filter(block => blockApplies(block.condition, screen))
-            .map(block => block.body)]) {
+        for (const source of sheets(css, screen)) {
             for (const [property, value] of declarations(source, selector)) out.set(property, value);
         }
     }
@@ -1030,13 +1182,54 @@ function resolved(css, selectors, screen) {
     return out;
 }
 
-/** A declared length as a number, viewport units resolved against the screen. */
-function length(value, screen) {
+/**
+ * Every stylesheet a screen of a given size reads, in cascade order: the rules
+ * written for every screen, then the body of each media block whose condition
+ * holds.
+ *
+ * The block bodies were cut out of the page with its comments already off, so
+ * what they are taken back out of has to have its comments off too. Most of
+ * the blocks carry one, and a body with its comment removed is not a string
+ * the raw page contains - left in, every rule in those blocks reads as a rule
+ * written for every screen, whatever the size asked about.
+ */
+function sheets(css, screen) {
+    const blocks = mediaBlocks(css);
+    const plain = blocks.reduce(
+        (rest, block) => rest.replace(block.body, ''),
+        css.replace(/\/\*[\s\S]*?\*\//g, '')
+    );
+
+    return [plain, ...blocks
+        .filter(block => blockApplies(block.condition, screen))
+        .map(block => block.body)];
+}
+
+/**
+ * A declared length as a number: a plain count of pixels, a count taken off
+ * the screen, or - where an overlay declares its own rows - those rows added
+ * up. The last is what keeps a bound and the content under it in step: a bound
+ * written in rows moves when a type size does, and a bound written in pixels
+ * counted off the screen falls wherever the arithmetic leaves it.
+ */
+function length(value, screen, declared = null) {
     if (value?.endsWith('px')) return Number(value.slice(0, -2));
 
     const viewport = value?.match(/^calc\(100(vh|vw) - (\d+)px\)$/);
-    if (!viewport) return null;
-    return (viewport[1] === 'vh' ? screen.height : screen.width) - Number(viewport[2]);
+    if (viewport) return (viewport[1] === 'vh' ? screen.height : screen.width) - Number(viewport[2]);
+
+    const rows = value?.replace(/\s+/g, ' ')
+        .match(/^calc\( ?(var\(--[\w-]+\)(?: \+ var\(--[\w-]+\))*) ?\)$/);
+    if (!rows || !declared) return null;
+
+    let total = 0;
+    for (const [, name] of rows[1].matchAll(/var\((--[\w-]+)\)/g)) {
+        const height = declared.get(name);
+        if (!height?.endsWith('px')) return null;
+        total += Number(height.slice(0, -2));
+    }
+
+    return total;
 }
 
 /**
@@ -1048,15 +1241,60 @@ function length(value, screen) {
  */
 function verticalBand(css, selectors, screen) {
     const box = resolved(css, selectors, screen);
-    const bound = length(box.get('max-height'), screen);
+    const bound = length(box.get('max-height'), screen, box);
     if (bound === null) return null;
 
-    const top = length(box.get('top'), screen);
+    const top = length(box.get('top'), screen, box);
     if (top !== null) return { from: top, to: top + bound };
 
-    const bottom = length(box.get('bottom'), screen);
+    const bottom = length(box.get('bottom'), screen, box);
     if (bottom === null) return null;
     return { from: screen.height - bottom - bound, to: screen.height - bottom };
+}
+
+/**
+ * Whether the readouts are stood down for the breakdown on a screen of a given
+ * size. The rule is one declaration, but which screens it is written inside is
+ * the whole of what it is worth: out in the open it fired wherever the pads
+ * were, including the screens the card had already passed the stack on.
+ */
+function standsDown(css, screen) {
+    return sheets(css, screen).some(source => styleRules(source).some(rule =>
+        rule.selectors.some(selector =>
+            /#game-mode\.floated\.reporting\s*~\s*#hud\.floated/.test(selector))
+        && /visibility:\s*hidden/.test(rule.body ?? '')));
+}
+
+/**
+ * Whether the card is hung in the same lane the readouts are. On a screen too
+ * short for the stack the readouts take the band between the two pad clusters
+ * and the card is narrowed to that same lane, which is the one arrangement
+ * where width settles nothing: the two are in one column however wide the
+ * screen gets.
+ */
+function sharesTheLane(css, screen) {
+    const lane = length(resolved(css, ['#hud', '#hud.floated'], screen).get('left'), screen);
+    const card = resolved(css, ['#game-mode', '#game-mode.floated'], screen);
+    const width = length(card.get('max-width'), screen, card);
+
+    return lane !== null && width !== null && screen.width - lane * 2 === width;
+}
+
+/**
+ * Whether the card and the readouts are given the same part of the screen, and
+ * so whether there is anything for the stand-down to trade for. They meet when
+ * their bands overlap down the screen and the screen is too narrow to have put
+ * them side by side - or when both are in the lane, where width settles
+ * nothing.
+ */
+function cardMeetsReadouts(css, screen) {
+    const card = verticalBand(css,
+        ['#game-mode', '#game-mode.floated', '#game-mode.floated.reporting'], screen);
+    const readouts = verticalBand(css, ['#hud', '#hud.floated'], screen);
+    if (!card || !readouts) return false;
+    if (card.to <= readouts.from || readouts.to <= card.from) return false;
+
+    return screen.width <= CARD_CLEARS_STACK || sharesTheLane(css, screen);
 }
 
 /**
