@@ -71,12 +71,24 @@ phone comes in.
 
 Bounded to the room the readouts leave, the card holds what it says in flight
 and not a landing read off it, which is five lines more. So the readouts stand
-down for as long as a breakdown is up and the card takes the column: an
-aircraft stopped on a strip reads zero knots, zero feet a minute and the
-strip's own elevation, which is everything the breakdown says and nothing it
-does not. On the shortest screen a browser leaves, 320 by 460, there are 108
-pixels between the chart and the pads for both of them, so the stack keeps the
-airspeed and the altitude and the card keeps its stage and its objective.
+down for as long as a breakdown is up and the card takes the column - on the
+screens the two are in one column on. An aircraft stopped on a strip reads zero
+knots, zero feet a minute and the strip's own elevation, which is everything
+the breakdown says and nothing it does not, so of the two wanting that column
+it is the stack that gives way. From 680 pixels of width, on a screen tall
+enough to keep the readouts in their own corner, the card's left edge is past
+their right edge and the two never meet, so there the stack stays up and the
+card is bounded to the screen rather than to anything above it. A screen short
+enough to have put the readouts in the middle lane is the exception at any
+width, because the card is hung in that same lane and the two are back in one
+column.
+
+On the shortest screen a browser leaves, 320 by 460, there are 108 pixels
+between the chart and the pads for both of them, so the stack keeps the
+airspeed and the altitude and the card keeps its stage and its objective. What
+the card has no room for comes off rather than being cut through: the bound is
+written in the card's own rows, so every line on it is either read whole or not
+drawn at all.
 
 ## Flight numbers
 

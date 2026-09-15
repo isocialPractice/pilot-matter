@@ -5,6 +5,75 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.3-alpha] - 2026-09-15
+
+The objective card's bound measured against the rows it is actually holding,
+and the trade it is paid for with scoped to the screens that take it.
+
+### Fixed
+
+- **The card stops between its rows rather than part way down one.** The bound
+  was a count of pixels taken off the screen and the card's rows are whatever
+  height the type comes to, so the two did not line up. On 320x460 - the
+  shortest screen a browser leaves - the clip landed seven pixels into
+  `FINAL  ·  STAGE 1 OF 4` and cut the bottom five off it square; with a
+  landing read off the card the same happened to `DOWN THE STRIP`, four pixels
+  cut. Clipping there is right and intended, because there are 108 pixels
+  between the chart and the pads and the card and the readouts both want them,
+  but clipping between rows and clipping through one are not the same thing and
+  a half-drawn line reads as a rendering fault.
+
+  The card declares its own row heights now, and the bounds are written in
+  those rows rather than in a count off the screen, so a type size changed once
+  moves every bound that counts that row. The rows there is no room to draw
+  whole come off instead, the way the readouts already drop `THROTTLE` and
+  `CAMERA`: in flight the stage and the clock, and with a breakdown up the four
+  measurements under the score. Tightening the count alone would not have done
+  it - the card's bottom padding is not space the row under it respects, so a
+  bound landing on a row boundary still slices the row after it
+- **The readouts stand down only where the card is bounded against them.** The
+  rule that hides them for the length of a breakdown was written outside every
+  media query, so it fired wherever the pads were out, while the bound it is
+  paid for is given on three bands of screen and nowhere else. On a tablet
+  flown from the glass at 1024x768 the card sits at x 382..642 and the readouts
+  at x 20..228, so the two never meet - and the whole stack, `AIRSPEED` through
+  `CAMERA`, went invisible for as long as a breakdown was up and came back with
+  nothing gained. It is scoped to the widths the card is bounded under the
+  stack at, and to the short wide screen where the two share the lane
+- **The card is bounded on every screen it is drawn on.** Past 679 pixels of
+  width, on a screen tall enough to keep the readouts in their own corner, it
+  carried no `max-height` and no `overflow` at all, so the bound the last
+  release describes as everywhere was not. It is bounded to the 20 pixel inset
+  it is held at there, which is the one thing above it on a screen that wide. A
+  screen short enough to put the readouts in the middle lane was already
+  bounded to that lane at every width
+
+### Changed
+
+- **The gate pointer is raised off a mark on the card rather than a style
+  written onto the row.** The pointer is the last line written on a card that
+  clips from the bottom, so it is the first row the clip reaches - and a
+  display written inline by the run is one no rule can reach, which left the
+  row to be sliced rather than taken off. It is marked the way the landing
+  breakdown is now, and on a narrow screen with less than five rows of room for
+  the card it comes off: the chart in the corner is drawing the same gate,
+  held hollow at its own edge for one past the ground shown
+
+### Testing
+
+- **The two arrangements no screen measured are measured.** `MEASURED_SCREENS`
+  was 393x852, 320x568, 393x578, 320x460, 852x330 and 568x320, every one of
+  which resolves through `(max-width: 640px)` or `(max-height: 540px) and
+  (min-width: 500px)`. The band between 641 and 679 pixels of width was read by
+  no check at all, and neither was the screen past it. 660x720 and 1024x768 are
+  driven with the other six now
+- **Three checks on the card's bound.** That every row it still carries is
+  drawn whole or not at all, at both readings and every measured screen; that
+  the readouts stand down on exactly the screens the card takes their band on;
+  and that the card declares where it stops wherever the pads are out, since an
+  overlay with no declared height reads as clear of everything by being
+  unmeasurable
+
 ## [1.16.2-alpha] - 2026-09-14
 
 The objective card and the floated readouts placed against each other rather
