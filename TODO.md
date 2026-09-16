@@ -23,6 +23,43 @@ its context survives being archived.
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
 
+### User Overrides
+
+#### Resolve Issues
+
+- [ ] Level Off 1 - the vertical speed reads zero while the aircraft still sits
+      nose-up
+  - **Issue**: `space` sets `V/S` to zero and nothing else moves. Altitude does
+    hold, so the number is telling the truth, but pitch stays wherever the
+    pilot left it: the horizon stays tilted, the attitude indicator keeps
+    showing a climb, and the aircraft reads as still going up while the
+    instrument says it is not. The two disagree on screen at the moment a pilot
+    is trusting one of them. Seen in
+    [level-off.gif](.support/level-off.gif).
+  - **This is the earlier decision, not a missed case.** The item completed at
+    `1.17.0-alpha` set vertical speed and deliberately left pitch alone, so
+    every part of it worked as written. What it did not account for is that
+    levelling off is something a pilot watches happen, and half of what they
+    watch is the attitude.
+  - **Goal**: One keypress brings the aircraft to level flight, and both the
+    model and the instruments arrive there together. Pitch eases to level over
+    a short interval rather than snapping, so the movement reads as the
+    aircraft settling rather than as a jump, and the attitude indicator follows
+    the model rather than being driven separately.
+  - **Done when all three agree at rest**: `V/S` at `0 ft/min`, pitch within a
+    degree of level, and the attitude horizon centred - checked after the ease
+    has finished, not on the frame the key goes down. State the interval used
+    so the next reader can change it without guessing at it.
+  - **Where it lives**: the level-off path is in `js/aircraft.js` and the
+    indicator is drawn in `js/attitude.js` from `#attitude-ball`,
+    `#attitude-horizon` and `#attitude-ladder`. Keep the indicator reading the
+    model's pitch rather than easing on its own - two easings of one value is
+    how they come to disagree by a frame.
+  - **Leave roll alone.** Nothing here asks for it, a wing-level is a separate
+    decision, and rolling the aircraft on a keypress nobody pressed for it is
+    the kind of surprise this item exists to remove.
+  - From: User Overrides
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -349,7 +386,7 @@ how the simulator got here rather than as a list still to be worked.
     control that owns it, in the same pass - splitting them means editing
     `js/camera.js` twice for one decision.
   - From: User Overrides
-- [x] `space` levels the flight off at `V/S: 0 ft/min`
+- [x] **Level Off**: `space` levels the flight off at `V/S: 0 ft/min`
   - **Issue**: Holding an altitude means trimming the vertical speed to zero by
     hand, which is a fiddle in the middle of everything else a landing asks
     for.
