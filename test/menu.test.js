@@ -19,6 +19,7 @@ import {
     isMenuAdjustKey,
     isMenuControlKey,
     menuAdjustStep,
+    menuPointerStep,
     applyMenuKey,
     applyMenuPointer,
     followPointers
@@ -252,7 +253,12 @@ function fakeList() {
             this.parent = null;
         },
         addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
-        fire(type) { for (const handler of this.listeners[type] ?? []) handler(); }
+        fire(type, event) { for (const handler of this.listeners[type] ?? []) handler(event); },
+        // A row laid out, for the one thing a click needs off the page: which
+        // half of it was pressed. A row nothing has laid out has no halves, and
+        // says so by having no box.
+        box: null,
+        getBoundingClientRect() { return this.box ?? undefined; }
     });
 
     globalThis.document = {
@@ -561,4 +567,54 @@ test('a row says what kind it is, for a panel that draws kinds differently', () 
 
     assert.deepEqual(list.children.map(item => item.dataset.kind),
         ['element', 'range', 'range', 'element']);
+});
+
+// --- Which way a click steps a value ---------------------------------------
+
+/**
+ * A row holding a value is drawn `LABEL  <left mark> VALUE <right mark>`, so it
+ * reads as a control with a down at one end and an up at the other - and every
+ * control of that shape reads left as down. A click stepped the value up
+ * wherever it landed, which did the opposite of what the row looked like on
+ * half of every press, in the settings panel and the element editor at once.
+ */
+test('the left of a row steps a value down and the right steps it up', () => {
+    assert.equal(menuPointerStep(0, 200), -1, 'the left edge');
+    assert.equal(menuPointerStep(99, 200), -1, 'and anywhere short of the middle');
+    assert.equal(menuPointerStep(100, 200), 1, 'the middle reads as the up half');
+    assert.equal(menuPointerStep(199, 200), 1, 'and so does the right edge');
+});
+
+test('a row nothing has laid out has no halves to be clicked in', () => {
+    assert.equal(menuPointerStep(0, 0), 1, 'so it steps up, the way choosing a row always has');
+    assert.equal(menuPointerStep(10, 0), 1);
+});
+
+test('a click reports which way it steps the row it landed on', () => {
+    const list = fakeList();
+    const menu = new MenuList(list, createMenuState(GROWN));
+
+    const steps = [];
+    menu.followPointer((index, choose, step) => steps.push([index, choose, step]));
+
+    const row = list.children[1];
+    row.box = { left: 40, width: 200 };
+
+    row.fire('click', { clientX: 60 });
+    row.fire('click', { clientX: 220 });
+
+    assert.deepEqual(steps, [[1, true, -1], [1, true, 1]],
+        'the same row, clicked either side of its middle, steps either way');
+});
+
+test('crossing onto a row moves the cursor and steps nothing', () => {
+    const list = fakeList();
+    const menu = new MenuList(list, createMenuState(GROWN));
+
+    const crossed = [];
+    menu.followPointer((index, choose, step) => crossed.push([index, choose, step]));
+    list.children[2].fire('mouseenter');
+
+    assert.deepEqual(crossed, [[2, false, undefined]],
+        'a pointer passing over a row is not a press on either half of it');
 });

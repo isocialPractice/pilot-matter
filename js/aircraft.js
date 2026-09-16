@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { createInputState, applyKeyToInput, isResetKey, DEFAULT_KEYMAP } from './input-map.js';
+import {
+    createInputState, applyKeyToInput, isResetKey, isLevelOffKey, wantsVerticalChange,
+    DEFAULT_KEYMAP
+} from './input-map.js';
 import { createFlightState } from './flight-state.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY,
@@ -8,7 +11,8 @@ import {
 import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED,
     CRASHED, LANDED, createCrashState, clearCrash, updateCrash, controlsLocked,
-    touchdownOutcome, recordTouchdown, releaseGround, groundOutcome, headingOffsetTo
+    touchdownOutcome, recordTouchdown, releaseGround, groundOutcome, headingOffsetTo,
+    ranOffRunway
 } from './crash.js';
 import { isOnRunway, nearestRunway } from './environment/elements.js';
 import { wrapPosition } from './world-edge.js';
@@ -167,6 +171,14 @@ export class Aircraft {
             e.preventDefault();
         }
         if (down && isResetKey(e.code)) this.reset();
+
+        // Space scrolls a page given the chance, so the key is taken as well as
+        // read. Repeats are left alone: the level off is a press rather than a
+        // hold, and a held key would keep asking for something already in force.
+        if (down && isLevelOffKey(e.code)) {
+            e.preventDefault();
+            if (!e.repeat) this.levelOff();
+        }
     }
 
     reset() {
@@ -186,6 +198,16 @@ export class Aircraft {
         // to go, and the first arrival it will be judged on is the one it flies
         // back to after leaving. A flight that opens in the air is already up.
         this.airborne = !start.grounded;
+
+        // Whether the run along the ground is on a strip, which is what makes
+        // leaving one an event. Left unset rather than worked out here: the
+        // strips arrive from the caller and a reset can run before they do, so
+        // the first grounded frame reads the ground itself.
+        this.onStrip = null;
+
+        // Whether the pilot has asked for the climb to be trimmed out, which
+        // holds until they ask for a different vertical state.
+        this.holdingAltitude = false;
 
         // Nothing is told about the reset the constructor runs: there is no
         // model to place and no flight to have been interrupted yet, so a host
@@ -278,6 +300,21 @@ export class Aircraft {
             cruiseSpeed: this.cruiseSpeed
         }) * dt;
 
+        // The level off, which is the whole of what a vertical speed trimmed to
+        // zero means: the altitude the aircraft was at is the altitude it keeps,
+        // and the nose stays exactly where the pilot put it. Holding one by hand
+        // is a fiddle in the middle of everything else a landing asks for, and
+        // this is the trim wheel for it.
+        //
+        // The next call for a different vertical state hands the aircraft back.
+        // Roll and yaw are not that call: an altitude held through a turn is
+        // what holding one is for.
+        if (wantsVerticalChange(this.input)) this.holdingAltitude = false;
+
+        // Only in the air. On the ground the altitude is the ground's, and the
+        // hold would be pinning the aircraft to a strip it is trying to leave.
+        if (this.holdingAltitude && this.airborne) this.position.y = startY;
+
         // Ground contact. Off a runway, meeting the terrain gently is flown out
         // of and arriving faster than the impact threshold is a crash. On one, a
         // soft square arrival is a landing, which is an outcome the HUD and the
@@ -293,6 +330,7 @@ export class Aircraft {
 
         if (onGround) {
             this.position.y = minY;
+            const onStrip = this.runwayUnder() != null;
 
             if (this.airborne) {
                 this.airborne = false;
@@ -310,17 +348,24 @@ export class Aircraft {
                     this.options.onLanding?.(this.runwayUnder(), contact);
                 }
 
-                if (outcome === CRASHED) {
-                    this.speed = 0;
-                    this.throttle = 0;
-                    this.verticalSpeed = 0;
-                    this.group.position.copy(this.position);
-                    this.group.rotation.copy(this.rotation);
-                    return;
-                }
+                this.onStrip = onStrip;
+                if (outcome === CRASHED) return this.stopOnTheGround();
+            } else if (ranOffRunway(this.onStrip, onStrip)) {
+                // The run has left the strip it was running on - a takeoff
+                // that went past the end of it, or a rollout off the side.
+                // That ends the attempt through the same path any other
+                // arrival on ground the aircraft cannot use takes, rather than
+                // leaving it driving across the country as though it were
+                // taxiing.
+                this.onStrip = false;
+                recordTouchdown(this.crash, CRASHED);
+                return this.stopOnTheGround();
+            } else {
+                this.onStrip = onStrip;
             }
         } else if (!this.airborne) {
             this.airborne = true;
+            this.onStrip = null;
             releaseGround(this.crash);
         }
 
@@ -329,6 +374,41 @@ export class Aircraft {
         // A frozen clock leaves the last reading on the dial.
         if (dt > 0) this.verticalSpeed = (this.position.y - startY) / dt;
 
+        this.group.position.copy(this.position);
+        this.group.rotation.copy(this.rotation);
+    }
+
+    /**
+     * Trims the climb out and leaves the nose where it is, which is what the
+     * pilot is asking for when they hold an altitude by hand: the vertical
+     * speed reads zero from the next frame and the aircraft keeps the altitude
+     * it was at until the pilot calls for a different one.
+     *
+     * Refused while the controls are locked, because a wreck is not being
+     * flown. Returns true when the hold is now in force.
+     */
+    levelOff() {
+        if (controlsLocked(this.crash)) return false;
+        this.holdingAltitude = true;
+        return true;
+    }
+
+    /** True while the flight is holding the altitude the pilot levelled it at. */
+    isHoldingAltitude() {
+        return this.holdingAltitude === true;
+    }
+
+    /**
+     * Puts the wreck down where it is: no speed, no power, no climb, and the
+     * model left standing where the flight ended. Both ways a flight ends on
+     * the ground come through here, so an overrun is stopped exactly the way an
+     * arrival that broke the aircraft is.
+     */
+    stopOnTheGround() {
+        this.speed = 0;
+        this.throttle = 0;
+        this.verticalSpeed = 0;
+        this.holdingAltitude = false;
         this.group.position.copy(this.position);
         this.group.rotation.copy(this.rotation);
     }

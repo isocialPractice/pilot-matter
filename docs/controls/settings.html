@@ -92,7 +92,7 @@
 
 <p>The settings panel opens on <kbd>O</kbd>, and from either menu, and holds the same choices whichever way it was opened. It is the one overlay that clears the screen it was opened from, because the point of picking an environment is seeing the environment, and it holds the simulation clock while it is up, so a setting is changed by looking at the world rather than by flying into it while looking.</p>
 
-<p>The panel is in three parts, each under a heading of its own, and one cursor walks all three as though they were one list - with the keys, or with the mouse. A click does whatever choosing that row does: it picks a world, steps an option on to its next setting, or turns a box over.</p>
+<p>The panel is in three parts, each under a heading of its own, and one cursor walks all three as though they were one list - with the keys, or with the mouse. A click does whatever choosing that row does: it picks a world, steps an option along, or turns a box over. An option is drawn with a mark either side of its reading, so which half of the row the click landed in is which way it steps: left steps the setting back and right steps it on, the same way <kbd>&larr;</kbd> and <kbd>&rarr;</kbd> do. The element editor's ranges read the same way, for the same reason.</p>
 
 <h2 id="environment">Environment</h2>
 
@@ -149,6 +149,7 @@
     <thead><tr><th>Option</th><th>Steps through</th><th>Changes</th></tr></thead>
     <tbody>
         <tr><td><code>CONTROL SENSITIVITY</code></td><td>50% to 200%</td><td>How far pitch, roll, and yaw move per key press. All three scale together, so the aircraft stays the same aircraft</td></tr>
+        <tr><td><code>ORBIT SWEEP</code></td><td><code>6°/S</code> to <code>36°/S</code></td><td>How fast the orbit camera circles the aircraft, as the bearing it turns through in a second: <code>12°/S</code> is half a minute the whole way round, and is what a flight opens on</td></tr>
         <tr><td><code>FOG DENSITY</code></td><td><code>CLEAR</code> to <code>THICK</code></td><td>How far into the distance the world is visible. <code>CLEAR</code> is the thinnest offered rather than none at all, because the fog is what hides the world repeating</td></tr>
         <tr><td><code>AIRSPEED IN</code></td><td><code>KNOTS</code>, <code>MPH</code></td><td>The scale the airspeed readout is on</td></tr>
         <tr><td><code>ALTITUDE IN</code></td><td><code>FEET</code>, <code>METERS</code></td><td>The scale the altimeter and the climb rate are on</td></tr>

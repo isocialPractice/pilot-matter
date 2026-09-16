@@ -17,6 +17,7 @@ import {
     verticalSpeedToFeetPerMinute,
     formatVerticalSpeed,
     isLowAltitude,
+    showsLowAltitude,
     DISTANCE_STEP,
     formatGateDistance,
     formatGatePointer,
@@ -180,6 +181,37 @@ test('the warning has room to sound before the ground arrives', () => {
         'a warning that only trips on contact warns of nothing');
 });
 
+/**
+ * Which is exactly why it said nothing worth hearing at the start of a flight:
+ * an aircraft held on the strip is as low as the warning ever gets, and the
+ * first thing a pilot saw was a warning about the state the simulator had just
+ * put them in.
+ */
+test('a flight still on the ground is not being warned about its altitude', () => {
+    assert.equal(showsLowAltitude(GROUND_CLEARANCE, false), false, 'held on the strip');
+    assert.equal(showsLowAltitude(0, false), false, 'and rolling out on it');
+});
+
+test('an altitude the pilot flew to is one the warning speaks about', () => {
+    assert.equal(showsLowAltitude(GROUND_CLEARANCE, true), true);
+    assert.equal(showsLowAltitude(LOW_ALTITUDE_FEET / FEET_PER_UNIT - 1, true), true);
+});
+
+test('leaving the ground is the condition rather than a timer', () => {
+    const clear = createFlightState().position.y;
+    assert.equal(showsLowAltitude(clear, true), false,
+        'a flight up where the warning has nothing to say stays quiet');
+    assert.equal(showsLowAltitude(clear, false), false,
+        'and so does one that never left the runway, however long it sits there');
+});
+
+// A host flying an aircraft that does not answer the question keeps the warning
+// it always had: an unanswered question is not a grounded aircraft.
+test('an aircraft that does not report being airborne warns as it always did', () => {
+    assert.equal(showsLowAltitude(GROUND_CLEARANCE, undefined), true);
+    assert.equal(showsLowAltitude(GROUND_CLEARANCE, null), true);
+});
+
 // --- What the HUD reads its instruments from ---
 
 test('the aircraft answers every reading the HUD asks it for', () => {
@@ -203,6 +235,13 @@ test('the new instruments are wired to the aircraft and not to guesses', () => {
     for (const method of ['getHeading', 'getVerticalSpeed', 'getHeightAboveTerrain', 'isCrashed']) {
         assert.ok(asked.has(method), `the HUD should read ${method}() off the aircraft`);
     }
+
+    // Asked rather than assumed, and asked in a way a host's own aircraft can
+    // decline to answer.
+    assert.ok(hudSource.includes('aircraft.isAirborne?.()'),
+        'and ask whether the flight has left the ground before warning about its altitude');
+    assert.ok(/isAirborne\(\)\s*\{/.test(aircraftSource),
+        'which js/aircraft.js should be able to answer');
 });
 
 // --- What the objective card is told --------------------------------------

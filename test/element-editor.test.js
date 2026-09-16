@@ -31,6 +31,9 @@ import {
     adjustEditorRange,
     chooseEditorEntry,
     editorPlacements,
+    setEditorClearance,
+    heldOffRunway,
+    EDITOR_CLEARED_NOTE,
     rowId
 } from '../js/element-editor.js';
 import {
@@ -465,4 +468,102 @@ test('a colour handed out is the colour it was handed out as', () => {
 
     assert.equal(JSON.stringify(recorded), before);
     assert.notEqual(JSON.stringify(editorPlacements(state)), before);
+});
+
+// --- Which way a chosen row moves ------------------------------------------
+
+/**
+ * A range row is drawn with a mark either side of its reading, so it reads as a
+ * control with a down at one end and an up at the other. A click on the left of
+ * one used to raise the value, which is the opposite of what the row looks like.
+ */
+test('a chosen range moves the way the choice says it went', () => {
+    const state = createEditorState('highlands');
+    const element = state.elements.find(item => item.type === 'mountain');
+    chooseEditorEntry(state, element.id);
+
+    const row = rowId(element.id, 'height', 'max');
+    const reading = () => editorEntry(state, row).value;
+    const opened = reading();
+
+    assert.equal(chooseEditorEntry(state, row, -1), element.id);
+    assert.ok(reading() < opened, `the left of the row moved it from ${opened} to ${reading()}`);
+
+    chooseEditorEntry(state, row, 1);
+    assert.equal(reading(), opened, 'and the right of it moved it back');
+});
+
+test('a choice that knows nothing about halves of a row steps it on', () => {
+    const state = createEditorState('highlands');
+    const element = state.elements.find(item => item.type === 'mountain');
+    chooseEditorEntry(state, element.id);
+
+    const row = rowId(element.id, 'height', 'max');
+    const opened = editorEntry(state, row).value;
+
+    chooseEditorEntry(state, row);
+    assert.ok(editorEntry(state, row).value > opened, 'the way choosing a row always has');
+});
+
+// --- What the world held off the strip -------------------------------------
+
+/**
+ * The runway is the one surface a flight depends on existing, so it is the one
+ * piece of ground the editor may not edit around: the generator cuts the strip
+ * clear of anything that settled on it, and the panel has to say which element
+ * that was. A range moved until it reached the runway and then quietly ignored
+ * is a setting that reads as applied and is not.
+ */
+test('an element the world held off the strip says so on its own row', () => {
+    const state = createEditorState('highlands', true);
+    const water = state.elements.find(element => element.type === 'water');
+    const before = editorEntry(state, water.id).note;
+
+    assert.equal(heldOffRunway(state, 'water'), false, 'nothing is held off to begin with');
+    assert.equal(setEditorClearance(state, ['water']), true, 'and the panel is drawn again for it');
+
+    assert.equal(heldOffRunway(state, 'water'), true);
+    assert.ok(editorEntry(state, water.id).note.startsWith(EDITOR_CLEARED_NOTE),
+        `the row reads \`${editorEntry(state, water.id).note}\``);
+    assert.ok(editorEntry(state, water.id).note.includes(before),
+        'and still says what the element can be moved along');
+});
+
+test('the rows of every other element are left as they were', () => {
+    const state = createEditorState('highlands', true);
+    const notes = () => Object.fromEntries(
+        state.elements.map(element => [element.type, editorEntry(state, element.id).note]));
+    const before = notes();
+
+    setEditorClearance(state, ['water']);
+    for (const [type, note] of Object.entries(notes())) {
+        if (type === 'water') continue;
+        assert.equal(note, before[type], `${type} was not held off anything`);
+    }
+});
+
+test('a strip that held nothing off puts every row back', () => {
+    const state = createEditorState('highlands', true);
+    const water = state.elements.find(element => element.type === 'water');
+    const before = editorEntry(state, water.id).note;
+
+    setEditorClearance(state, ['water']);
+    assert.equal(setEditorClearance(state, []), true);
+    assert.equal(editorEntry(state, water.id).note, before);
+    assert.equal(heldOffRunway(state, 'water'), false);
+});
+
+test('the same clearance twice is not a panel to draw again', () => {
+    const state = createEditorState('highlands', true);
+    setEditorClearance(state, ['water']);
+
+    assert.equal(setEditorClearance(state, ['water']), false);
+    assert.equal(setEditorClearance(state, ['water', 'water']), false, 'however it is written');
+});
+
+test('a strip naming something that is not an element names nothing', () => {
+    const state = createEditorState('highlands', true);
+    assert.equal(setEditorClearance(state, ['not-an-element']), false);
+    assert.equal(setEditorClearance(state, null), false, 'and a world with no strip holds nothing');
+    assert.deepEqual(state.cleared, []);
 });

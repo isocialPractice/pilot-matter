@@ -818,10 +818,10 @@ test('a stage started again has nothing missed against it', () => {
 // is the one thing that has not happened.
 test('a miss is reported as the gate to come round to, not as a failure', () => {
     const state = createRunState(LOOP_COURSE);
-    assert.equal(missNotice(state), 'LOOP 1 MISSED  ·  COME ROUND AGAIN');
+    assert.equal(missNotice(state), 'LOOP 1 MISSED  ·  COME ROUND');
 
     recordGate(state, 0);
-    assert.equal(missNotice(state), 'LOOP 2 MISSED  ·  COME ROUND AGAIN');
+    assert.equal(missNotice(state), 'LOOP 2 MISSED  ·  COME ROUND');
 });
 
 test('a course with nothing left to fly has no gate to report', () => {

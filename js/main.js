@@ -21,7 +21,8 @@ import {
     chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
     isSettingsCloseKey, isSettingsOpenKey,
     SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP,
-    SENSITIVITY_OPTION, FOG_OPTION, SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
+    SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION,
+    SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
 import { runwayWanted } from './config.js';
 import { headingDegrees } from './units.js';
@@ -42,7 +43,7 @@ import {
 import {
     createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
-    isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
+    setEditorClearance, isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { ApproachGuidance } from './guidance.js';
@@ -253,7 +254,7 @@ class FlightSimulator {
         this.startMenu.followPointer((index, choose) => this.onStartPointer(index, choose));
         this.pauseMenu.followPointer((index, choose) => this.onPausePointer(index, choose));
         this.modesMenu.followPointer((index, choose) => this.onGameModesPointer(index, choose));
-        this.editorMenu.followPointer((index, choose) => this.onEditorPointer(index, choose));
+        this.editorMenu.followPointer((index, choose, step) => this.onEditorPointer(index, choose, step));
 
         // One cursor, three lists: the worlds under one heading of the panel,
         // the start state under the next, and the options that hold whichever
@@ -276,7 +277,7 @@ class FlightSimulator {
         // drawn into, so the mouse and the keys walk the same panel.
         followPointers(
             [this.settingsMenu, this.settingsStart, this.settingsOptions],
-            (index, choose) => this.onSettingsPointer(index, choose)
+            (index, choose, step) => this.onSettingsPointer(index, choose, step)
         );
 
         // The control list is the one thing the Controls entry puts on screen,
@@ -313,6 +314,7 @@ class FlightSimulator {
     applySettings() {
         this.syncEditor();
         this.aircraft.setSensitivity(currentOption(this.settings, SENSITIVITY_OPTION));
+        this.camera2.setOrbitRate(currentOption(this.settings, ORBIT_RATE_OPTION));
         this.sky.setFogDensity(currentOption(this.settings, FOG_OPTION));
         this.hud.setUnits({
             speed:    currentOption(this.settings, SPEED_UNIT_OPTION),
@@ -373,6 +375,13 @@ class FlightSimulator {
         // The aircraft is told where the strips are rather than going looking,
         // because it does not know what it is flying over.
         this.aircraft.setRunways(this.terrain.getRunways());
+
+        // And the editor is told which elements the strip was cut clear of, so
+        // a range moved until it reached the runway reads as refused on its own
+        // row rather than as a setting that did nothing.
+        if (setEditorClearance(this.editor, this.terrain.getRunway()?.cleared)) {
+            this.redrawEditor();
+        }
 
         // A course is laid over the ground it is flown through, so it is built
         // from the world rather than beside it.
@@ -688,10 +697,14 @@ class FlightSimulator {
      * through the same place a chosen entry does, so a click on a world picks
      * it, a click on an option steps it on, and a click on a box turns it over -
      * the same answers the keys get.
+     *
+     * An option is stepped the way the click reads: the left of the row moves
+     * it down and the right moves it up, which is what the marks either side of
+     * the reading say the row does.
      */
-    onSettingsPointer(index, choose) {
+    onSettingsPointer(index, choose, step = 1) {
         const chosen = applyMenuPointer(this.settingsState, index, choose);
-        if (chosen) this.chooseSettingsEntry(chosen);
+        if (chosen) this.chooseSettingsEntry(chosen, step);
         this.syncOverlays();
     }
 
@@ -722,8 +735,8 @@ class FlightSimulator {
         this.syncOverlays();
     }
 
-    chooseSettingsEntry(id) {
-        const applied = chooseSetting(this.settings, id);
+    chooseSettingsEntry(id, step = 1) {
+        const applied = chooseSetting(this.settings, id, step);
         if (!applied || applied === SETTINGS_BACK_ID) return;
 
         // Every choice the panel offers goes back through the same place: the
@@ -802,15 +815,19 @@ class FlightSimulator {
      * The editor under the mouse. Every choice the panel offers goes through
      * the same place a chosen row does, so a click on an element opens it and a
      * click on a range steps it on - the same answers the keys get.
+     *
+     * A range moves the way the click reads: the left of the row moves it down
+     * and the right moves it up, which is what the marks either side of the
+     * reading say the row does.
      */
-    onEditorPointer(index, choose) {
+    onEditorPointer(index, choose, step = 1) {
         const chosen = applyMenuPointer(this.editorState, index, choose);
-        if (chosen) this.chooseEditorRow(chosen);
+        if (chosen) this.chooseEditorRow(chosen, step);
         this.syncOverlays();
     }
 
-    chooseEditorRow(id) {
-        const applied = chooseEditorEntry(this.editor, id);
+    chooseEditorRow(id, step = 1) {
+        const applied = chooseEditorEntry(this.editor, id, step);
         this.redrawEditor();
 
         if (applied && applied !== EDITOR_BACK_ID) this.refreshWorld();

@@ -59,6 +59,12 @@ export const EDITOR_BACK_LABEL = 'BACK';
 export const ELEMENT_OPEN_MARK  = '[-]';
 export const ELEMENT_SHUT_MARK  = '[+]';
 
+// What an element's row says when the world had to hold it off the strip. The
+// runway is the one piece of ground a flight depends on existing, so it is the
+// one the editor may not edit around - and a range moved until it reached the
+// strip has to read as refused rather than as quietly ignored.
+export const EDITOR_CLEARED_NOTE = 'held off the runway';
+
 /**
  * How far one press moves a range: a fiftieth of what the range allows, put on
  * the nearest of 1, 2, or 5 times a power of ten, so a peak height in the
@@ -202,6 +208,10 @@ export function createEditorState(environmentId, runway = false) {
         environmentId: null,
         runway: null,
         elements: [],
+        // The element types the generated world had to hold off the strip, as
+        // the strip itself reported them. Filled in by the caller after the
+        // ground is built, because only the built ground knows.
+        cleared: [],
         entries: []
     };
 
@@ -231,6 +241,29 @@ export function setEditorWorld(state, environmentId, runway = false) {
     state.elements = editorElements(getEnvironment(wanted), strip);
     syncEditorEntries(state);
 
+    return true;
+}
+
+/** True when the world had to hold an element off the strip it cut. */
+export function heldOffRunway(state, type) {
+    return (state.cleared ?? []).includes(type);
+}
+
+/**
+ * Records which elements the generated world held off the strip, so the panel
+ * can say which one was refused rather than leaving a range that looks applied
+ * and is not.
+ *
+ * Returns true when what is held changed, which is the caller's cue to draw the
+ * panel again.
+ */
+export function setEditorClearance(state, cleared = []) {
+    const held = [...new Set(cleared ?? [])].filter(type => ELEMENTS_BY_ID.has(type));
+    const was  = state.cleared ?? [];
+    if (held.length === was.length && held.every(type => was.includes(type))) return false;
+
+    state.cleared = held;
+    syncEditorEntries(state);
     return true;
 }
 
@@ -326,7 +359,9 @@ export function editorEntries(state) {
             id: element.id,
             element: element.id,
             label: element.label,
-            note: element.note,
+            note: heldOffRunway(state, element.type)
+                ? `${EDITOR_CLEARED_NOTE}  ·  ${element.note}`
+                : element.note,
             current: element.open,
             text: elementEntryText(element)
         });
@@ -438,8 +473,13 @@ export function adjustEditorRange(state, id, step) {
  * An element's own row has no value to step, so choosing it opens its ranges
  * rather than doing nothing, which is the one thing a row under the cursor
  * should never do.
+ *
+ * `step` is which way the choice moves a range, for a caller that knows - a
+ * click on the left of the row moves it down and a click on the right moves it
+ * up, which is what the marks either side of the reading say the row does. A
+ * key press knows nothing about halves of a row and takes the default.
  */
-export function chooseEditorEntry(state, id) {
+export function chooseEditorEntry(state, id, step = 1) {
     if (id === EDITOR_BACK_ID) {
         closeEditor(state);
         return EDITOR_BACK_ID;
@@ -451,7 +491,7 @@ export function chooseEditorEntry(state, id) {
     }
 
     const entry = editorEntry(state, id);
-    if (entry?.kind === RANGE_ENTRY) return adjustEditorRange(state, id, 1);
+    if (entry?.kind === RANGE_ENTRY) return adjustEditorRange(state, id, step);
 
     const element = editorElement(state, id);
     if (!element) return null;

@@ -6,8 +6,12 @@ import {
     createField, fieldX, fieldZ, paint, readColor, mixColor, slopeAt, sampleHeight,
     createRandom, pick, span, scalar, gradient, blend,
     resolveConfig, applyBase, applyElement, orderPlacements,
-    getElement, isElementId, carveProfile
+    getElement, isElementId, carveProfile,
+    isOnRunway, waterSurface, clearRunwayGround, RUNWAY_FREEBOARD
 } from '../js/environment/elements.js';
+import {
+    buildEnvironment, getEnvironment, environmentIds, environmentElements
+} from '../js/environment/presets.js';
 
 const smallField = () => createField({ size: 4000, segments: 40 });
 
@@ -350,4 +354,85 @@ test('an element placed twice from the same seed draws the same thing twice', ()
 test('the field the simulator flies over is the size the terrain declares', () => {
     assert.equal(DEFAULT_SIZE, 16000);
     assert.equal(DEFAULT_SEGMENTS, 200);
+});
+
+// --- The strip is ground nothing else may be placed on ---------------------
+
+/**
+ * The strip is cut last, over whatever else claimed the ground, and levelling
+ * is enough for everything drawn as a height. The one thing it is not enough
+ * for is a surface read back off the finished field afterwards: the water is
+ * the vertices lying under its own line, so a strip graded at or below that
+ * line comes back out of the field as water and a flight starts from the
+ * bottom of a lake.
+ */
+test('a strip the water settled on is cut clear of it', () => {
+    const field = createField({ size: 1000, segments: 10 });
+    field.water = { level: 40 };
+
+    const cut = clearRunwayGround(field, 12);
+    assert.ok(cut.elevation > 40, `the strip is cut at ${cut.elevation}, above the water at 40`);
+    assert.equal(cut.elevation, 40 + RUNWAY_FREEBOARD);
+    assert.deepEqual(cut.cleared, ['water'], 'and says which element it was cut clear of');
+});
+
+test('a strip already above the water line is left where the ground put it', () => {
+    const field = createField({ size: 1000, segments: 10 });
+    field.water = { level: 4 };
+
+    assert.deepEqual(clearRunwayGround(field, 42), { elevation: 42, cleared: [] });
+});
+
+test('a world with no water in it has nothing to cut the strip clear of', () => {
+    const field = createField({ size: 1000, segments: 10 });
+    assert.deepEqual(clearRunwayGround(field, 42), { elevation: 42, cleared: [] });
+
+    field.water = { level: NaN };
+    assert.deepEqual(clearRunwayGround(field, 42), { elevation: 42, cleared: [] });
+});
+
+/**
+ * And the whole of it holds where it matters: in every world, with every range
+ * of every element pushed to the end of what the element editor can ask for,
+ * the strip comes out of the generator as dry ground.
+ */
+test('no element the editor can move reaches the strip', () => {
+    for (const id of environmentIds()) {
+        const environment = getEnvironment(id);
+        // The strip the editor lists, as the generator would lay it down: an
+        // element list handed over replaces the preset's, so the runway has to
+        // be in the list rather than asked for beside it.
+        const placements = environmentElements(environment, true);
+
+        for (const placement of placements) {
+            if (placement.type === 'runway') continue;
+            const element = getElement(placement.type);
+
+            for (const [name, range] of Object.entries(element.ranges)) {
+                if (range.kind === 'gradient') continue;
+
+                const config = { ...resolveConfig(element, placement.config) };
+                config[name] = range.kind === 'span' ? [range.low, range.high] : range.high;
+
+                const field = buildEnvironment(environment, {
+                    runway: true,
+                    elements: placements.map(entry =>
+                        entry === placement ? { type: entry.type, config } : entry)
+                });
+
+                const strip = field.runways[0];
+                assert.ok(strip, `${id} with ${placement.type}.${name} wide open should still have a strip`);
+
+                const wet = new Set(Array.from(waterSurface(field)?.vertices ?? []));
+                const on = [...Array(field.count).keys()]
+                    .filter(i => isOnRunway(strip, fieldX(field, i), fieldZ(field, i)));
+
+                assert.ok(on.length > 0, `${id} with ${placement.type}.${name} wide open should draw a strip`);
+                assert.equal(on.filter(i => wet.has(i)).length, 0,
+                    `${id}: ${placement.type}.${name} at its limit put water on the strip`);
+                assert.ok(on.every(i => Math.abs(field.height[i] - field.height[on[0]]) < 0.01),
+                    `${id}: ${placement.type}.${name} at its limit left the strip uneven`);
+            }
+        }
+    }
 });

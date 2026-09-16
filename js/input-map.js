@@ -20,9 +20,25 @@ export const DEFAULT_KEYMAP = {
     throttleDown: ['ControlLeft', 'ControlRight']
 };
 
+// The controls that mean the pilot wants a different vertical state, which is
+// what hands the aircraft back after a level off. Roll and yaw are not among
+// them: an altitude held through a turn is the whole point of holding one.
+export const VERTICAL_CONTROLS = ['pitchUp', 'pitchDown', 'throttleUp', 'throttleDown'];
+
 // Reset is not a control surface, so it is not part of the input state: it is
 // an instruction to put the flight back where it started.
 export const RESET_KEYS = ['KeyR'];
+
+// Levelling off is not a control surface either, and is bound here beside
+// reset for the same reason: it is an instruction to trim the climb out and
+// leave the nose exactly where the pilot put it, rather than a surface held
+// while a key is down.
+//
+// It also has to stay out of the input state because space is the key a menu
+// is chosen with. A menu takes its own keys before the flight behind it reads
+// them, but a control surface a menu key could write to is a control surface
+// waiting for the one path that forgets to.
+export const LEVEL_OFF_KEYS = ['Space'];
 
 export const CONTROL_NAMES = Object.keys(DEFAULT_KEYMAP);
 
@@ -34,6 +50,19 @@ export function createInputState() {
 
 export function isResetKey(code, keys = RESET_KEYS) {
     return keys.includes(code);
+}
+
+export function isLevelOffKey(code, keys = LEVEL_OFF_KEYS) {
+    return keys.includes(code);
+}
+
+/**
+ * True when the input is calling for a different vertical state, which is what
+ * ends a level off. The pilot asked for the climb to be trimmed out; the next
+ * thing they ask of the nose or the lever is them taking it back.
+ */
+export function wantsVerticalChange(input, controls = VERTICAL_CONTROLS) {
+    return controls.some(name => input?.[name] === true);
 }
 
 /**

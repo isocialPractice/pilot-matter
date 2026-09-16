@@ -411,10 +411,16 @@ export function runStatus(state) {
  * is still waiting on it. The second half is the part that matters - a pilot
  * told only that they missed has been told the course is over, which it is
  * not.
+ *
+ * It is written into the objective row of the card, which is the row it is
+ * longest in: the goals it stands in for run to 22 characters and this ran to
+ * 34, six past the two lines that row is declared at on a card at its 260
+ * pixel minimum. `COME ROUND` says the same thing as `COME ROUND AGAIN` in a
+ * line the row it is written in can hold.
  */
 export function missNotice(state) {
     const gate = nextGate(state);
-    return gate < 0 ? '' : `LOOP ${gate + 1} MISSED  ·  COME ROUND AGAIN`;
+    return gate < 0 ? '' : `LOOP ${gate + 1} MISSED  ·  COME ROUND`;
 }
 
 // --- Where the gate is -----------------------------------------------------

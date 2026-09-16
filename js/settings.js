@@ -21,6 +21,7 @@ import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID, isEnvironmentId } from './environ
 import {
     START_FIELDS, START_FIELD_IDS, CHOICE_FIELD, TOGGLE_FIELD, resolveStart, runwayForced
 } from './config.js';
+import { ORBIT_RATE, ORBIT_RATES } from './camera-math.js';
 
 export { isEnvironmentId } from './environment/presets.js';
 
@@ -59,6 +60,7 @@ export const OPTION_GROUP = 'options';
 // The options by name, so what a setting drives is looked up by an id both
 // sides agree on rather than by a string typed twice.
 export const SENSITIVITY_OPTION   = 'sensitivity';
+export const ORBIT_RATE_OPTION    = 'orbitRate';
 export const FOG_OPTION           = 'fog';
 export const SPEED_UNIT_OPTION    = 'speedUnit';
 export const ALTITUDE_UNIT_OPTION = 'altitudeUnit';
@@ -89,6 +91,18 @@ export const FLIGHT_OPTIONS = [
             { value: 1.5,  label: '150%' },
             { value: 2,    label: '200%' }
         ]
+    },
+    {
+        // The rate the orbit view sweeps at, in degrees a second, so the
+        // setting reads as the circle it draws: 12 is half a minute round and
+        // 36 is ten seconds. The default used to be 23 and was written into
+        // the camera rather than offered, which left a sweep too fast to read
+        // the world from and no way to slow it.
+        id: ORBIT_RATE_OPTION,
+        label: 'ORBIT SWEEP',
+        note: 'how fast the orbit camera circles the aircraft',
+        default: ORBIT_RATE,
+        values: ORBIT_RATES.map(rate => ({ value: rate, label: `${rate}°/S` }))
     },
     {
         id: FOG_OPTION,
@@ -520,8 +534,13 @@ function flipToggle(state, entry) {
  * when a different world was picked, the option's id when an option was
  * stepped on to its next setting, and null when the choice changed nothing:
  * an unknown entry, a held toggle, or the environment already being flown.
+ *
+ * `step` is which way the choice steps an option, for a caller that knows -
+ * a click on the left of the row steps it down and a click on the right steps
+ * it up. A key press knows nothing about halves of a row and takes the default,
+ * which is the next setting along, the way choosing one always has.
  */
-export function chooseSetting(state, id) {
+export function chooseSetting(state, id, step = 1) {
     if (id === SETTINGS_BACK_ID) {
         closeSettings(state);
         return SETTINGS_BACK_ID;
@@ -532,8 +551,8 @@ export function chooseSetting(state, id) {
     if (entry?.kind === TOGGLE_ENTRY) return flipToggle(state, entry);
 
     // An option has no single thing to choose, so choosing one steps it on to
-    // its next setting - the same thing the right arrow does to it.
-    if (settingsOption(id, state.options ?? SETTINGS_OPTIONS)) return adjustSetting(state, id, 1);
+    // its next setting - the same thing the arrow keys do to it.
+    if (settingsOption(id, state.options ?? SETTINGS_OPTIONS)) return adjustSetting(state, id, step);
 
     if (!isEnvironmentId(id) || state.values.environment === id) return null;
 

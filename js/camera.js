@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import {
-    CHASE_POSITION_LAMBDA, CHASE_TARGET_LAMBDA,
-    CAMERA_MODES, modeIndexOf, damp, shouldSnap
+    CHASE_POSITION_LAMBDA, CHASE_TARGET_LAMBDA, ORBIT_RATE,
+    CAMERA_MODES, modeIndexOf, damp, shouldSnap, orbitStep
 } from './camera-math.js';
 
-export { CAMERA_MODES, modeIndexOf } from './camera-math.js';
+export { CAMERA_MODES, modeIndexOf, ORBIT_RATE, ORBIT_RATES } from './camera-math.js';
 
 export class CameraController {
     constructor(camera, aircraft, mode = CAMERA_MODES[0]) {
@@ -14,6 +14,7 @@ export class CameraController {
         this.height     = 10;
         this.modeIndex  = modeIndexOf(mode);
         this.orbitAngle = 0;
+        this.orbitRate  = ORBIT_RATE;
 
         // Where the chase camera has eased to, and the point it is easing to
         // look at. Null until the first chase frame places them.
@@ -41,6 +42,19 @@ export class CameraController {
         return this.getCurrentMode();
     }
 
+    /**
+     * How fast the orbit view sweeps, in degrees a second, for the settings
+     * panel to hold. A rate that is not a number leaves the one in force, so a
+     * setting from a version that offered different ones does not stop the
+     * camera turning.
+     *
+     * Returns the rate now in force.
+     */
+    setOrbitRate(degreesPerSecond) {
+        if (Number.isFinite(degreesPerSecond)) this.orbitRate = degreesPerSecond;
+        return this.orbitRate;
+    }
+
     update(dt = 0) {
         const pos  = this.aircraft.getPosition();
         const quat = this.aircraft.getQuaternion();
@@ -56,8 +70,9 @@ export class CameraController {
                 break;
             }
             case 'ORBIT': {
-                // Slow circle around the aircraft in world space
-                this.orbitAngle += 0.4 * dt;
+                // Slow circle around the aircraft in world space, at whatever
+                // rate the pilot has the sweep set to.
+                this.orbitAngle += orbitStep(this.orbitRate, dt);
                 const offset = new THREE.Vector3(
                     Math.sin(this.orbitAngle) * this.distance * 2,
                     this.height * 1.5,

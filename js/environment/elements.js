@@ -740,6 +740,36 @@ const RUNWAY_BAND_PENALTY = 4;
 const RUNWAY_SHOULDER  = 0.78;
 const RUNWAY_THRESHOLD = 0.9;
 
+// How far a strip is lifted clear of a water line it would otherwise be cut
+// under, in world units. Small on purpose: enough that the surface is not drawn
+// over the paving, and little enough that the apron eases into the shore rather
+// than standing the strip on a plinth.
+export const RUNWAY_FREEBOARD = 2;
+
+/**
+ * The elements a strip was cut clear of, and the ground it was cut to.
+ *
+ * The strip is applied last, over whatever else claimed the ground, and
+ * levelling that ground is enough for everything that is drawn as a height: a
+ * grove, a town, a dune all go under the grader. The one thing that does not is
+ * a surface read back off the finished field afterwards - the water, which is
+ * the vertices lying under its own line rather than the heights it wrote. A
+ * strip graded at or below that line comes back out of the field as water, and
+ * a flight starts from the bottom of a lake.
+ *
+ * So the strip is moved clear of it instead: cut above the line rather than
+ * left to be drawn under it. A runway is the one surface a flight depends on
+ * existing, so it is the one piece of ground an element may not be placed onto.
+ * What it was moved clear of is carried on the strip, because a panel that let
+ * an element onto the runway has to be able to say which one.
+ */
+export function clearRunwayGround(field, elevation) {
+    const level = field.water?.level;
+    if (!Number.isFinite(level) || elevation > level) return { elevation, cleared: [] };
+
+    return { elevation: level + RUNWAY_FREEBOARD, cleared: ['water'] };
+}
+
 const runway = {
     id: 'runway',
     label: 'Runway',
@@ -766,7 +796,7 @@ const runway = {
         const site   = chooseRunwaySite(field, config, length, width, random);
         if (!site) return null;
 
-        const strip = { ...site, length, width };
+        const strip = { ...site, ...clearRunwayGround(field, site.elevation), length, width };
         gradeRunway(field, strip, config);
         field.runways.push(strip);
         return strip;

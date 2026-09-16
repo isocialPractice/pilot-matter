@@ -28,9 +28,17 @@ import {
     recordTouchdown,
     releaseGround,
     groundOutcome,
-    hasLanded
+    hasLanded,
+    ranOffRunway
 } from '../js/crash.js';
 import { GRAVITY, STALL_SINK_MULTIPLIER, MAX_SPEED, sinkRate } from '../js/flight-model.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const aircraftSource = readFileSync(
+    fileURLToPath(new URL('../js/aircraft.js', import.meta.url)),
+    'utf8'
+);
 
 // --- What counts as a crash ---
 
@@ -310,4 +318,37 @@ test('a state from nowhere reads as a flight in progress rather than throwing', 
     assert.equal(groundOutcome(null), FLYING);
     assert.equal(groundOutcome(undefined), FLYING);
     assert.equal(hasLanded(null), false);
+});
+
+// --- Running off the strip -------------------------------------------------
+
+/**
+ * A takeoff that goes past the end of the runway used to carry on over the
+ * country as though it were taxiing: no outcome, no reset, and a flight going
+ * on in a state nothing had rules for.
+ */
+test('a run that leaves the strip it was running on has left it', () => {
+    assert.equal(ranOffRunway(true, false), true, 'off the end, or off the side');
+    assert.equal(ranOffRunway(true, true), false, 'still on it is still a rollout');
+});
+
+test('a run that was never on a strip is never leaving one', () => {
+    assert.equal(ranOffRunway(false, false), false, 'open ground is open ground');
+    assert.equal(ranOffRunway(false, true), false, 'and arriving on a strip is an arrival');
+    assert.equal(ranOffRunway(null, false), false, 'a run nothing has read yet is not a run off');
+    assert.equal(ranOffRunway(undefined, false), false);
+});
+
+// The rule is bound to the strip rather than to a distance from where the run
+// began, so an overrun off either end and a swerve off either side are the one
+// event. The aircraft is what reads the ground, and it reads it the same way a
+// landing does - through `isOnRunway`, off the strips it was handed.
+test('the aircraft ends a run off the strip through the path every crash takes', () => {
+    assert.ok(aircraftSource.includes('ranOffRunway'),
+        'js/aircraft.js should ask the rule rather than working it out again');
+    assert.ok(/ranOffRunway\(this\.onStrip, onStrip\)[\s\S]*?recordTouchdown\(this\.crash, CRASHED\)/
+        .test(aircraftSource),
+        'and record the crash the way an arrival that broke the aircraft is recorded');
+    assert.ok(/stopOnTheGround\(\)\s*\{/.test(aircraftSource),
+        'both ways a flight ends on the ground should come through one place');
 });

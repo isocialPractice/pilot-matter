@@ -117,6 +117,22 @@ export function menuAdjustStep(code) {
 }
 
 /**
+ * Which way a click on a row steps the value on it, from where along the row it
+ * landed: the left half steps down and the right half steps up.
+ *
+ * A row holding a value is drawn `LABEL  ‹ VALUE ›`, so it reads as a control
+ * with a down at one end and an up at the other - and every control of that
+ * shape reads left as down. A click that stepped the value up wherever it
+ * landed did the opposite of what the row looked like, on half of every press.
+ *
+ * A row of no width - one nothing has laid out yet - has no halves to be
+ * clicked in, so it steps up, which is what choosing a row has always done.
+ */
+export function menuPointerStep(offsetX, width) {
+    return width > 0 && offsetX < width / 2 ? -1 : 1;
+}
+
+/**
  * Applies a key event to the menu. Key releases and auto-repeat are ignored,
  * so a held key neither runs the cursor down the list nor chooses an entry
  * over and over.
@@ -181,6 +197,17 @@ export function followPointers(lists = [], handler) {
  * pointer crosses onto and the entry it is clicked on. A list that is not
  * handed to it is worked with the keys alone.
  */
+/**
+ * Which way a click on a drawn row steps it. The row is measured rather than
+ * asked for an offset, because a click reports where it landed in the box it
+ * was caught on and a row can carry marks of its own.
+ */
+function clickStep(event, item) {
+    const box = item.getBoundingClientRect?.();
+    if (!box) return 1;
+    return menuPointerStep(event.clientX - box.left, box.width);
+}
+
 export class MenuList {
     constructor(listElement, state, include = () => true) {
         this.list    = listElement;
@@ -248,13 +275,18 @@ export class MenuList {
      * The handler is given an entry's place in the whole menu rather than its
      * row in this list, so a filtered list points at the same entry the cursor
      * walks to rather than at whatever sits that far down the panel.
+     *
+     * A click also reports which way it steps a value, read off which half of
+     * the row it landed in. The cursor does not care, and a row holding a value
+     * does: the marks either side of the reading say the row is stepped, so
+     * which side was pressed is half of what the press meant.
      */
     followPointer(handler) {
         this.handler = handler;
 
         for (const { index, item } of this.items) {
             item.addEventListener('mouseenter', () => handler(index, false));
-            item.addEventListener('click',      () => handler(index, true));
+            item.addEventListener('click', (event) => handler(index, true, clickStep(event, item)));
         }
         return this;
     }

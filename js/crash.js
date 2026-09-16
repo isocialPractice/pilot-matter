@@ -208,6 +208,26 @@ export function recordTouchdown(state, outcome, duration = CRASH_DURATION) {
 }
 
 /**
+ * True when a run along the ground has left the strip it was running on.
+ *
+ * A takeoff that goes past the end of the runway, or off the side of it, has
+ * nowhere left to go: the prepared ground the aircraft was using has stopped
+ * being under it, and everything past it is country. Until this rule existed
+ * the aircraft simply carried on over the terrain as though it were taxiing,
+ * so a failed takeoff had no outcome at all and the flight continued in a
+ * state nothing had rules for.
+ *
+ * Bound to the strip rather than to a distance from where the run began, so an
+ * overrun off either end and a swerve off either side are the same event. It
+ * is asked about a run already under way, so a flight that never had a strip
+ * under it - one that opened on open ground, or settled onto a hillside - is
+ * never leaving one.
+ */
+export function ranOffRunway(wasOnRunway, onRunway) {
+    return wasOnRunway === true && onRunway !== true;
+}
+
+/**
  * Puts the outcome back to a flight in progress, for an aircraft that has left
  * the ground again. A crash is not cleared this way: a wreck is not flying
  * however far off the ground the reset leaves it.

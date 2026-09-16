@@ -80,6 +80,25 @@ export function isLowAltitude(heightAboveTerrain, thresholdFeet = LOW_ALTITUDE_F
 }
 
 /**
+ * Whether the low altitude warning has anything to say yet.
+ *
+ * It speaks about an altitude the pilot flew to, so it says nothing while the
+ * aircraft is on the ground. A flight held on the strip is low because nothing
+ * has taken off yet, and the first thing a pilot saw was a warning about the
+ * state the simulator had just put them in - true, and useless. A rollout is
+ * the same reading from the other end: the ground under the aircraft is where
+ * it is meant to be.
+ *
+ * Takeoff is the condition rather than a timer, so a flight that never leaves
+ * the runway never raises it, however long it is left sitting there. A host
+ * flying an aircraft that does not report being airborne keeps the warning it
+ * always had, because an unanswered question is not a grounded aircraft.
+ */
+export function showsLowAltitude(heightAboveTerrain, airborne, thresholdFeet = LOW_ALTITUDE_FEET) {
+    return airborne !== false && isLowAltitude(heightAboveTerrain, thresholdFeet);
+}
+
+/**
  * How far off a gate is, written the way a distance is read off a HUD: on
  * whichever scale the altimeter is set to, so the pilot has one length scale
  * to think in rather than two, and rounded so the number settles rather than
@@ -370,7 +389,8 @@ export class HUD {
         );
         const crashed = !frozen && aircraft.isCrashed();
         const landed  = !frozen && !crashed && aircraft.getGroundOutcome?.() === LANDED;
-        const low = !frozen && !crashed && !landed && isLowAltitude(aircraft.getHeightAboveTerrain());
+        const low = !frozen && !crashed && !landed
+            && showsLowAltitude(aircraft.getHeightAboveTerrain(), aircraft.isAirborne?.());
         this.crashElement.style.display = crashed ? 'block' : 'none';
         this.landedElement.style.display =
             showsLandedNotice(landed, breakdown) ? 'block' : 'none';

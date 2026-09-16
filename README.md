@@ -90,6 +90,7 @@ Then open `http://localhost:8080` in your browser.
 | `E` | Yaw right |
 | `Shift` | Throttle up (hold to open the lever) |
 | `Ctrl` | Throttle down (hold to close it) |
+| `Space` | Level off: trims the climb to zero and holds the altitude |
 | `C` | Cycle camera (chase, cockpit, orbit) |
 | `P` | Pause / resume, and open the pause menu |
 | `O` | Open the settings panel, and close it again |
@@ -107,7 +108,9 @@ stick for pitch and roll. Neither is offered to a machine that has keys.
 In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space`
 chooses one. The mouse works the menus too: the pointer moves the cursor and a
 click chooses. In the settings panel and the element editor, `A`/`D` or `←`/`→`
-step the value under the cursor through its settings. `Esc` backs out.
+step the value under the cursor through its settings, and a click on a row
+holding a value steps it the way the click reads: left of the middle steps it
+back, right of it steps it on. `Esc` backs out.
 
 **Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft
 with the throttle set at 20%. That airspeed is the stall speed itself, so the

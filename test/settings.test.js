@@ -23,6 +23,7 @@ import {
     isRangeOption,
     startSettings,
     SENSITIVITY_OPTION,
+    ORBIT_RATE_OPTION,
     FOG_OPTION,
     SPEED_UNIT_OPTION,
     ALTITUDE_UNIT_OPTION,
@@ -194,6 +195,71 @@ test('choosing an option is the same as stepping it forward', () => {
     assert.equal(chooseSetting(state, FOG_OPTION), FOG_OPTION);
     assert.equal(currentOption(state, FOG_OPTION), values[(start + 1) % values.length]);
     assert.equal(settingsShowing(state), false, 'and it does not close the panel on the way');
+});
+
+/**
+ * Unless the choice knows which way it meant. A row is drawn with a mark either
+ * side of its reading, so it reads as a control with a down at one end and an
+ * up at the other - and a click on the left of it used to raise the value, in
+ * this panel and the element editor at once.
+ */
+test('a choice that knows which way it went steps the option that way', () => {
+    const state = createSettingsState(null);
+    const values = settingsOption(FOG_OPTION).values.map(entry => entry.value);
+    const start = values.indexOf(currentOption(state, FOG_OPTION));
+
+    assert.equal(chooseSetting(state, FOG_OPTION, -1), FOG_OPTION);
+    assert.equal(currentOption(state, FOG_OPTION),
+        values[(start - 1 + values.length) % values.length],
+        'the left of the row steps it back');
+
+    chooseSetting(state, FOG_OPTION, 1);
+    assert.equal(currentOption(state, FOG_OPTION), values[start], 'and the right steps it on');
+});
+
+test('a choice that knows nothing about halves of a row steps it on', () => {
+    const state = createSettingsState(null);
+    const values = settingsOption(FOG_OPTION).values.map(entry => entry.value);
+    const start = values.indexOf(currentOption(state, FOG_OPTION));
+
+    chooseSetting(state, FOG_OPTION);
+    assert.equal(currentOption(state, FOG_OPTION), values[(start + 1) % values.length]);
+});
+
+// --- The orbit sweep -------------------------------------------------------
+
+/**
+ * The rate the orbit camera circles at was a constant in the camera code, which
+ * left a sweep too fast to read the world from and nowhere for a pilot to say
+ * so. It is an option beside the other camera settings now, so the new default
+ * is a starting point rather than a second hardcoded number.
+ */
+test('the orbit sweep is a setting a pilot holds', () => {
+    const option = settingsOption(ORBIT_RATE_OPTION);
+    assert.ok(option, 'the panel should offer the sweep');
+    assert.equal(option.group, OPTION_GROUP, 'among the settings that hold whichever world is flown');
+    assert.ok(option.values.length > 1, 'with something to step between');
+    assert.ok(option.values.some(entry => entry.value === option.default),
+        'and a default that is one of them');
+});
+
+test('the sweep is remembered between flights like every other setting', () => {
+    const storage = new Map();
+    const store = {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value)
+    };
+
+    const state = createSettingsState(store);
+    const option = settingsOption(ORBIT_RATE_OPTION);
+    const wanted = option.values.find(entry => entry.value !== option.default).value;
+
+    adjustSetting(state, ORBIT_RATE_OPTION,
+        option.values.findIndex(entry => entry.value === wanted)
+        - option.values.findIndex(entry => entry.value === option.default));
+
+    assert.equal(currentOption(state, ORBIT_RATE_OPTION), wanted);
+    assert.equal(readSettings(store)[ORBIT_RATE_OPTION], wanted);
 });
 
 test('the list redraws itself from the choices behind it', () => {

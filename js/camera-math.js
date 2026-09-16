@@ -27,6 +27,28 @@ export function modeIndexOf(mode) {
 export const CHASE_POSITION_LAMBDA = 6;
 export const CHASE_TARGET_LAMBDA   = 10;
 
+/**
+ * How fast the orbit camera circles the aircraft, in degrees a second.
+ *
+ * Written as a bearing rate rather than as radians because that is the way the
+ * sweep is read: 12 degrees a second is a circle in half a minute, which is
+ * slow enough to look out of and fast enough to get round. It used to be 0.4
+ * radians a second - 23 degrees, a circle in under 16 - which swept past the
+ * ground faster than a pilot could read it.
+ *
+ * The rate lives here beside the chase camera's easing rather than inside the
+ * frame loop, because it is a setting the pilot holds rather than a constant
+ * the view is built from.
+ */
+export const ORBIT_RATE = 12;
+export const ORBIT_RATES = Object.freeze([6, 9, 12, 18, 24, 36]);
+
+/** How far round the orbit turns in one frame, in radians. */
+export function orbitStep(degreesPerSecond, dt) {
+    if (!(dt > 0) || !Number.isFinite(degreesPerSecond)) return 0;
+    return degreesPerSecond * Math.PI / 180 * dt;
+}
+
 // A gap this wide, in world units, is a teleport rather than a manoeuvre -
 // a reset, a crash recovery, or a return from another camera mode - and the
 // camera cuts to the new position instead of flying across the world to it.
