@@ -50,6 +50,69 @@ its context survives being archived.
   - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
   - From: UI/UX Override - the card's clip falls through a line
 
+### User Overrides
+
+- [ ] Slow the orbiting camera's spin, and make the rate something a pilot sets
+  - **Issue**: The drone-style orbit sweeps fast enough to be hard to read the
+    world from, and the rate is a constant in the camera code rather than
+    anything a pilot can reach.
+  - **Goal**: Slow the default sweep, then expose the rate in the **Settings**
+    panel beside the other camera options, so the new default is a starting
+    point rather than a second hardcoded number. One change: the value and the
+    control that owns it, in the same pass - splitting them means editing
+    `js/camera.js` twice for one decision.
+  - From: User Overrides
+- [ ] `space` levels the flight off at `V/S: 0 ft/min`
+  - **Issue**: Holding an altitude means trimming the vertical speed to zero by
+    hand, which is a fiddle in the middle of everything else a landing asks
+    for.
+  - **Goal**: A `space` keypress sets vertical speed to zero and leaves pitch
+    where the pilot put it, so the aircraft holds its altitude until the next
+    input. Register it where the other keys are bound rather than as a special
+    case, and say so in the controls list the **Controls** entry shows.
+  - From: User Overrides
+
+#### Found Issues
+
+- [ ] Low Altitude warns before the flight has started
+  - **Issue**: The low altitude alert fires while the aircraft is still on the
+    runway at the start of a flight. It is true and useless: altitude is low
+    because nothing has taken off yet, and the first thing a pilot sees is a
+    warning about the state the simulator just put them in.
+  - **Goal**: Gate the alert on the flight having left the ground, so it only
+    speaks about an altitude the pilot flew to. Takeoff is the condition, not a
+    timer - a flight that never leaves the runway should never raise it.
+  - From: User Overrides
+- [ ] A takeoff that runs off the runway drives across the terrain
+  - **Issue**: Running past the end of the runway does not end the attempt. The
+    aircraft keeps going over the environment as though it were taxiing, so a
+    failed takeoff has no outcome and the flight continues in a state the
+    simulator has no rules for.
+  - **Goal**: Leaving the runway surface while still on the ground registers a
+    crash, through the same path any other crash takes, so the attempt ends and
+    is recorded like one. Bound it to the runway area rather than to a distance
+    from the start, so an overrun to either side counts the same as one off the
+    end.
+  - From: User Overrides
+- [ ] Placing elements can overlap the runway
+  - **Issue**: Elements placed in the **Element Editor** sometimes land on or
+    through the rendered runway, leaving the strip a flight starts from
+    obstructed or visually broken.
+  - **Goal**: Treat the runway as reserved ground that placement cannot enter:
+    an element that would intersect it is refused or moved clear, and the
+    editor says which. The runway is the one surface a flight depends on
+    existing, so it is the one the editor may not edit around.
+  - From: User Overrides
+- [ ] Clicking left of a value raises it
+  - **Issue**: In the **Element Editor** and the **Settings** panel, clicking
+    the left side of a value increases it. Every control of this shape reads
+    left as down, so the click does the opposite of what it looks like, in two
+    panels at once.
+  - **Goal**: Left decreases and right increases, everywhere this control is
+    used. One fix at the control rather than per panel, since both panels are
+    wrong in the same direction and for the same reason.
+  - From: User Overrides
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -206,12 +269,84 @@ this section applies a minor version update.
   with **Controls** and **Settings** entries
 - [ ] Show the controls list under the start screen **Controls** entry, so it
   matches the pause menu entry of the same name
+- [ ] Rename the **Controls** entry to **Control Settings**, and make what it
+      opens a panel of settings rather than a list
+  - Four sites carry the name today: the start screen and pause menu entries in
+    `js/menu.js`, and the two `case 'controls':` handlers in `js/main.js`. The
+    list itself is `js/controls-help.js`.
+  - **What it opens changes with the name.** The entry currently shows a reference
+    list; it should open the settings that govern the controls, with the reference
+    list reachable from inside it rather than instead of it. The toggles under
+    **Flight Controls** are the first things that belong there.
+  - **Reword the two items above in the same pass.** Both name a **Controls**
+    entry, so a run that renames the entry without touching them leaves the queue
+    asking for the old name back.
+- [ ] Accept typed values in the **Element Editor** and the **Settings** panel
+  - Every value is stepped by clicking today, which is slow for a number a pilot
+    already knows. Allow the value to be typed as well, validated against the
+    same range the stepper honours, so the two routes cannot disagree about what
+    is allowed.
 - [ ] Add a **Settings** entry to the pause menu that opens the same panel
   the start screen opens
 - [ ] Add an environment selection to the settings panel, defaulting to the
   current generated terrain
 - [ ] Add 5 assembled environments, each a named preset of the Environment
   Design elements, selectable from the environment setting
+
+## Flight Controls
+
+How the aircraft is flown rather than what it is flown over: what the keys
+mean, how far the attitude may go, and which of that a pilot is allowed to
+change. Completing items in this section applies a minor version update.
+
+- [ ] Allow a full 360 in pitch and in roll, without breaking the controls at
+  the limit
+  - The attitude is clamped at a maximum pitch and roll today, which is what
+    keeps the input sane: past the limit, "up" stops meaning up. A loop or a
+    barrel roll needs the clamp to open, and needs the controls to stay
+    coherent on the way round rather than fighting the pilot at the top.
+  - **The algorithm is the item.** Watch for the attitude crossing the current
+    maximum and carry the frame round with it, so the input keeps meaning what
+    it meant before the crossing. Decide it once, in the attitude code, rather
+    than special-casing each key - a fix per key is how two keys come to
+    disagree about which way is up at 180 degrees.
+  - Leave the clamp in place for pilots who have not asked for this: it is the
+    thing that makes ordinary flight readable, so the 360 is a setting rather
+    than a new default.
+- [ ] Toggle pitch and roll between inverted and directional, independently
+  - Four states fall out of two toggles, and all four are wanted: pitch
+    inverted with roll directional, both inverted, both directional, and pitch
+    directional with roll inverted. Inverted means up lowers the nose and right
+    turns left, which is what a pilot coming from a yoke expects; directional
+    means the key points where the aircraft goes.
+  - Both toggles live in the control settings, and both apply to `WASD` and the
+    arrow keys alike, since they are two spellings of one input rather than two
+    control schemes.
+  - Depends on the control settings panel existing - see **Simulator
+    Configuration**.
+- [ ] Propose seven control settings worth having, as items in this section
+  - The panel is worth more than the two toggles above, and what else belongs
+    in it is a question about this simulator rather than a general one: read
+    `js/input-map.js`, `js/controls-help.js` and `js/tilt-controls.js` and
+    propose from what is already configurable in code but not in the interface.
+  - Seven items, each one thing a pilot would change and a reason they would
+    change it. Anything that is really a flight-model constant belongs under
+    **Simulator Configuration** instead.
+
+## Interactive Build Mode
+
+The twelve-tool editor laid over the world, where ground is shaped by pointing
+at it rather than by stepping numbers in a list. The plan for it is already
+written; this section is what carries it out. Completing items in this section
+applies a minor version update.
+
+- [ ] Carry out the interactive build mode plan
+  - **Goal**: Resolve to [interactive-mode-plan.prompt.md](.claude/prompts/interactive-mode-plan.prompt.md)
+  - The plan states the twelve tools, the two-column palette, the per-tool
+    panel and how each is configured, and says outright that this is not a
+    second element editor. Work it from there rather than from this item, and
+    break it into items here as its stages become clear - one item for twelve
+    tools is not a queue, it is a heading.
 
 ## Documentation & Polish
 
