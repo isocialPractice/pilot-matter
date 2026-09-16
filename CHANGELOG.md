@@ -5,6 +5,89 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0-alpha] - 2026-09-16
+
+A level off on the stick, an orbit sweep a pilot sets, and five things the
+simulator was doing that nobody asked it to do.
+
+### Added
+
+- **`Space` levels the flight off.** Holding an altitude meant trimming the
+  vertical speed to zero by hand, a nudge of the nose at a time, which is a
+  fiddle in the middle of everything else an approach is asking for. One press
+  now puts the vertical speed on zero and leaves the nose exactly where the
+  pilot put it, and the aircraft keeps the altitude it was at. The hold lasts
+  until the pilot calls for a different vertical state - a pitch or a throttle
+  input - so a turn does not end it, which is the whole point of holding an
+  altitude through one. It is bound in `js/input-map.js` beside reset rather
+  than among the control surfaces, because it is an instruction rather than a
+  surface held while a key is down, and because `Space` is also the key a menu
+  is chosen with: a surface a menu key could write to is a surface waiting for
+  the one path that forgets to take the key first
+- **`ORBIT SWEEP` in the settings panel.** The rate the orbit camera circles at
+  was a constant in the camera code, and it swept fast enough that the ground
+  it was showing went past faster than it could be read. The default is half
+  what it was - 12 degrees a second, half a minute the whole way round, against
+  the 23 it used to be - and the rate is a setting beside the other camera
+  options rather than a second number written into the source, offered from
+  `6°/S` to `36°/S` and remembered with the rest of them
+
+### Fixed
+
+- **`LOW ALTITUDE` no longer warns before the flight has started.** An aircraft
+  held on the strip is as low as the warning ever gets, so the first thing a
+  pilot saw was a warning about the state the simulator had just put them in:
+  true, and useless. The warning speaks about an altitude the pilot flew to
+  now, gated on the flight having left the ground. Takeoff is the condition
+  rather than a timer, so a flight that never leaves the runway never raises it
+  however long it sits there, and a host flying an aircraft that does not report
+  being airborne keeps the warning it always had
+- **A run off the end of the runway ends the attempt.** A takeoff that went past
+  the end of the strip kept going over the environment as though it were
+  taxiing, so a failed takeoff had no outcome at all and the flight continued in
+  a state nothing had rules for. Leaving the runway surface while still on the
+  ground is a crash now, recorded through the same path any other arrival on
+  ground the aircraft cannot use takes. The rule is bound to the runway rather
+  than to a distance from where the run began, so an overrun off either end and
+  a swerve off either side are the same event, and a flight that never had a
+  strip under it is never leaving one
+- **Nothing the element editor can move reaches the runway.** The strip is cut
+  last, over whatever else claimed the ground, and levelling is enough for
+  everything drawn as a height - but the water is read back off the finished
+  field afterwards, as the vertices lying under its own line, so a strip graded
+  at or below that line came back out as water and a flight started from the
+  bottom of a lake. Raising the water level in the editor did it in three of the
+  five worlds. A strip sited on ground the water settled on is lifted clear of
+  the line now, and the element it was moved clear of is named on its own row in
+  the panel, because a range that reads as applied and is not is worse than one
+  that was refused out loud
+- **Clicking left of a value no longer raises it.** A row holding a value is
+  drawn with a mark either side of its reading, so it reads as a control with a
+  down at one end and an up at the other - and every control of that shape reads
+  left as down. A click stepped the value up wherever it landed, which did the
+  opposite of what the row looked like on half of every press, in the settings
+  panel and the element editor at once. The fix is at the menu the two panels
+  share rather than in either of them, since both were wrong in the same
+  direction and for the same reason
+- **The card's rows are bounded at the heights they actually draw at.** The
+  bounds are sums of the row heights declared on `#game-mode`, and each of those
+  was one line of that row's type. At the card's 260 pixel minimum a row has 218
+  pixels to be written across, and four of the five rows run past it and wrap -
+  so on `FLYING THROUGH LOOPS` the bound landed part way down a wrapped row and
+  cut it through its own glyphs, which is the same fault the rows were
+  introduced to close arriving by a different route. `FLY THROUGH EVERY LOOP`
+  lost 22 of its 32 pixels on 320x460, in ordinary flight, with no landing or
+  gate involved.
+
+  The rows that wrap declare the height they wrap to, at the widths they wrap
+  at, from what a browser laid them out at; the ladder that takes rows off a
+  card with no room for them steps where the wrapped heights say it has to; and
+  `test/page.test.js` holds every line the card can be asked for - every mode,
+  every stage, every gate, the miss notice, the stage report, the clock and the
+  pointer - to the lengths those heights were measured against, so a mode with a
+  longer name fails a check rather than slicing a row. The miss notice lost
+  `AGAIN`, which put it inside the two lines the row it is written in declares
+
 ## [1.16.3-alpha] - 2026-09-15
 
 The objective card's bound measured against the rows it is actually holding,

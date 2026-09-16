@@ -15,6 +15,7 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `D` `→` | Roll right |
 | `Q` / `E` | Yaw left / right |
 | `Shift` / `Ctrl` | Throttle up / down |
+| `Space` | Level off: vertical speed to zero, nose left where it is |
 | `C` | Cycle camera: chase, cockpit, orbit |
 | `P` | Pause, and the pause menu |
 | `O` | Settings panel, and close it |
@@ -132,6 +133,7 @@ never set.
 | Option | Steps through |
 |--------|---------------|
 | `CONTROL SENSITIVITY` | 50% to 200% |
+| `ORBIT SWEEP` | `6°/S` to `36°/S`, default `12°/S` |
 | `FOG DENSITY` | `CLEAR` to `THICK` |
 | `AIRSPEED IN` | `KNOTS`, `MPH` |
 | `ALTITUDE IN` | `FEET`, `METERS` |
@@ -220,7 +222,7 @@ held hollow at that edge.
 |---------|-------|------|
 | `TIME` / `BEST` | Objective card | The stage clock, and your best for this stage of this mode |
 | `↑ LOOP 3 · 045° · 4200 ft` | Objective card | The gate the course is waiting on, while it is more than 35 degrees off the nose |
-| `LOOP 3 MISSED · COME ROUND AGAIN` | Objective card | You crossed the gate's plane outside the hoop, going the way the course runs |
+| `LOOP 3 MISSED · COME ROUND` | Objective card | You crossed the gate's plane outside the hoop, going the way the course runs |
 | `LANDING · 85` | Objective card | What a landing came to, shown once the aircraft has stopped |
 | `DOWN THE STRIP` `OFF THE CENTRELINE` `SINK RATE` `OFF THE STRIP` | Objective card | The four readings behind that score, each marked against its own limit |
 
