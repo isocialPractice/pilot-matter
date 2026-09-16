@@ -23,96 +23,6 @@ its context survives being archived.
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
 
-### UI/UX Override - the card's rows are bounded at one mode's line heights
-
-#### Resolve Issues
-
-- [ ] Card Clip 1: the card still clips through the middle of a line, in the
-  other mode
-  - **Issue**: The bounds are sums of the row heights declared on `#game-mode`,
-    and each of those is a single line of that row's type. The card is
-    `min-width: 260px` with `20px` of side padding and a `1px` border, so a row
-    has 218 pixels to be written across at the card's narrowest and a longer one
-    wraps to two lines. `RUNWAY LANDING` fits: its name, objective, status and
-    clock lay out at 14, 20, 15 and 15 pixels, which is what they declare, and
-    all six screens are clean in both readings. `FLYING THROUGH LOOPS` does not:
-    the same four lay out at 28, 36, 27 and 15, and the pointer at 37 against
-    the 19 it declares. So in ordinary flight, pads out, no landing and no gate
-    involved, `FLY THROUGH EVERY LOOP` runs 277 to 309 against a clip ending at
-    287 on 320x460 and is cut by 22 pixels - most of the row, on the shortest
-    screen a browser leaves, which is the screen the completed item is named
-    for. `THREE GATES  ·  STAGE 1 OF 4  ·  LOOP 1 OF 3` is cut by 1 on 320x568
-    and the `TIME` line by 6 on 393x578. 393x852, 852x330 and 568x320 are clean,
-    because the card is past its minimum width there and nothing wraps. Nothing
-    fails: `npm test` is 937 passing, and `CARD_STATES` in `test/page.test.js`
-    models the card the way the stylesheet does, one declared height per row, so
-    the model and the stylesheet agree about a height neither of them measures.
-  - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
-  - From: UI/UX Override - the card's clip falls through a line
-
-### User Overrides
-
-- [ ] Slow the orbiting camera's spin, and make the rate something a pilot sets
-  - **Issue**: The drone-style orbit sweeps fast enough to be hard to read the
-    world from, and the rate is a constant in the camera code rather than
-    anything a pilot can reach.
-  - **Goal**: Slow the default sweep, then expose the rate in the **Settings**
-    panel beside the other camera options, so the new default is a starting
-    point rather than a second hardcoded number. One change: the value and the
-    control that owns it, in the same pass - splitting them means editing
-    `js/camera.js` twice for one decision.
-  - From: User Overrides
-- [ ] `space` levels the flight off at `V/S: 0 ft/min`
-  - **Issue**: Holding an altitude means trimming the vertical speed to zero by
-    hand, which is a fiddle in the middle of everything else a landing asks
-    for.
-  - **Goal**: A `space` keypress sets vertical speed to zero and leaves pitch
-    where the pilot put it, so the aircraft holds its altitude until the next
-    input. Register it where the other keys are bound rather than as a special
-    case, and say so in the controls list the **Controls** entry shows.
-  - From: User Overrides
-
-#### Found Issues
-
-- [ ] Low Altitude warns before the flight has started
-  - **Issue**: The low altitude alert fires while the aircraft is still on the
-    runway at the start of a flight. It is true and useless: altitude is low
-    because nothing has taken off yet, and the first thing a pilot sees is a
-    warning about the state the simulator just put them in.
-  - **Goal**: Gate the alert on the flight having left the ground, so it only
-    speaks about an altitude the pilot flew to. Takeoff is the condition, not a
-    timer - a flight that never leaves the runway should never raise it.
-  - From: User Overrides
-- [ ] A takeoff that runs off the runway drives across the terrain
-  - **Issue**: Running past the end of the runway does not end the attempt. The
-    aircraft keeps going over the environment as though it were taxiing, so a
-    failed takeoff has no outcome and the flight continues in a state the
-    simulator has no rules for.
-  - **Goal**: Leaving the runway surface while still on the ground registers a
-    crash, through the same path any other crash takes, so the attempt ends and
-    is recorded like one. Bound it to the runway area rather than to a distance
-    from the start, so an overrun to either side counts the same as one off the
-    end.
-  - From: User Overrides
-- [ ] Placing elements can overlap the runway
-  - **Issue**: Elements placed in the **Element Editor** sometimes land on or
-    through the rendered runway, leaving the strip a flight starts from
-    obstructed or visually broken.
-  - **Goal**: Treat the runway as reserved ground that placement cannot enter:
-    an element that would intersect it is refused or moved clear, and the
-    editor says which. The runway is the one surface a flight depends on
-    existing, so it is the one the editor may not edit around.
-  - From: User Overrides
-- [ ] Clicking left of a value raises it
-  - **Issue**: In the **Element Editor** and the **Settings** panel, clicking
-    the left side of a value increases it. Every control of this shape reads
-    left as down, so the click does the opposite of what it looks like, in two
-    panels at once.
-  - **Goal**: Left decreases and right increases, everywhere this control is
-    used. One fix at the control rather than per panel, since both panels are
-    wrong in the same direction and for the same reason.
-  - From: User Overrides
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -358,132 +268,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 103 earlier items in `TODO-archive.md`, newest last.
+> 110 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The right-hand pad cluster is drawn off the edge of a 320 pixel screen
-  - **Issue**: With the pads out at 320x568 and at 320x460, the left cluster
-    occupies x 16..172 and the right one x 172..328 on a screen 320 wide, so
-    `YAW R` is drawn at x 280..328 and eight pixels of it are outside the
-    viewport. `#touch-controls` is a flex row with `padding: 0 16px 16px` and
-    `justify-content: space-between`, and each `.touch-cluster` is
-    `repeat(3, 48px)` with `gap: 6px`, so the two come to 16 + 156 + 156 + 16 =
-    344 and do not fit 320: `space-between` has no space to distribute, packs
-    from the left, and the right cluster runs off the end. At 360 wide the two
-    are clear at 16..172 and 188..344, and every wider size is clear. 320 is the
-    width the stylesheet's own comments reason about and the width the two
-    completed items were modelled at - both of them put the right cluster at
-    x 148..304, which is where `space-between` would place it if it fitted.
-  - **Goal**: Fit the two clusters inside the narrowest screen rather than
-    letting one overflow it - a smaller cell or gap below 288 pixels of cluster,
-    or less side padding, whichever reads better under a thumb - so that no pad
-    is drawn outside the viewport at 320 CSS pixels. Pin the widths in
-    `test/page.test.js` beside the floated overlays.
-  - From: UI/UX Override - the card lifted onto the notice
-- [x] The muted notice sits in the pad band on a screen held sideways
-  - **Issue**: `#audio-muted.floated` is placed at `top: 140px` and is 22 pixels
-    tall, so it occupies y 140..162 at every size. With the pads out the band
-    starts at 158 on an 852x330 screen and at 148 on a 568x320 one, so the
-    notice runs 4 and 14 pixels into it and overlaps `PITCH +`, which paints
-    over it at `z-index: 130`. On 393x852 the band starts at 680 and the notice
-    is clear. Named in the run's own request as a known limit left out of scope
-    and to be reported rather than fixed.
-  - **Goal**: Give the notice what the readouts were given - moved into the band
-    between the two clusters on a screen too short for the left edge, or taken
-    up under the ladder - so it is not under a thumb at the sizes a phone held
-    sideways actually gives.
-  - From: UI/UX Override - the card lifted onto the notice
-- [x] The pitch keys carry the nose the opposite way to what the controls say
-  - **Issue**: From a steady cruise, holding `W` for 1.2 seconds took the
-    altimeter from 1073 to 860 ft with the vertical speed reading -20950 ft/min
-    and the attitude ladder's horizon moving from `translate(0 14.91)` to
-    `translate(0 -100.60)`; holding `S` put both back. The ladder agrees with
-    the world, so what is inverted is the binding rather than the instrument:
-    `js/aircraft.js` raises `rotation.x` for `pitchUp`, and `pitchForClimb` in
-    `js/flight-model.js` states in its own comment that "a positive rotation
-    about +X - the axis out of the left wing - carries that nose down".
-    `docs/controls/index.html` reads "W / up - Pitch up (nose up)",
-    `CHEATSHEET.md` names `PITCH +` and `PITCH -` as "Nose up / down", and
-    `PITCH +` is a label on the glass on the touch layout, so the claim is made
-    on screen as well as in the documentation. A run before this one saw the
-    same sign and left it alone on the grounds that the in-game control list
-    claims no direction; the documentation and the pad label do claim one.
-  - **Goal**: Make the binding and what is written about it agree. Flipping the
-    two pitch cases in `js/aircraft.js` so `pitchUp` lowers `rotation.x` is the
-    smaller change to what a pilot reads, and `js/tilt-controls.js` maps a
-    device tilted back to the same `pitchUp` and has to be checked with it.
-    Changing the documentation and the pad labels instead is the other way, and
-    is a decision rather than a repair.
-  - From: UI/UX Override - the card lifted onto the notice
-- [x] The one compass frame is still written down two ways
-  - **Issue**: This release makes east the world's `-X` and says so in
-    `js/units.js`, `js/minimap.js` and `docs/controls/instruments.html`. The
-    tiled-world example in `docs/api.md` was not taken with them: lines 416 and
-    417 still name the tile at `x: -0.5` `west` and the one at `x: 0.5` `east`,
-    which is the mirror of the frame the release just settled, so the two pages
-    of the same site now contradict each other on which way the x axis runs.
-    `docs/api-reference.html` carries the same two lines at 473 and 474 because
-    it is generated from that markdown, and `test/environment-tiles.test.js`
-    names `tile(0, 0)` west and `tile(1, 0)` east at lines 90, 165 and 196.
-    Nothing fails and the suite passes - a join is a join whichever name the
-    variable carries - but a host building an assembly from the example ends up
-    with every compass name in it reversed, and the example is the one place
-    the API says anything about the axis at all.
-  - **Goal**: Swap the two names in `docs/api.md` so the tile at the lower x is
-    the east one, regenerate the page with `npm run docs:api`, and rename the
-    three pairs in `test/environment-tiles.test.js` to match. `test/site.test.js`
-    renders the reference again and fails if what is committed is not what the
-    markdown comes to, so the regeneration is checked rather than trusted.
-  - From: UI/UX Override - the card lifted onto the notice
-- [x] The module that owns the compass frame misdescribes its own reverse
-  - **Issue**: `directionToBearing` in `js/units.js` is documented as coming
-    back "in whole degrees from 0 to 359", which is the phrasing of
-    `headingDegrees` thirty lines above it, but only `headingDegrees` rounds -
-    this one returns whatever `Math.atan2` gave it. Every caller happens to
-    cover for it, so nothing reads wrong today: `js/hud.js:105` rounds the gate
-    bearing before drawing it, and `courseOpening` hands its result to
-    `snapStartValue`. A caller added later that takes the sentence at its word
-    draws `HEADING: 037.48312`. The same docstring also says `Math.atan2` of
-    two zeros gives a NaN. It gives `0`, so the sentence credits a guard that
-    neither exists nor is needed - what actually makes `directionToBearing(0, 0)`
-    read as north is the wrap on the line below.
-  - **Goal**: Make both sentences true. Either round the return and keep the
-    claim, or drop "whole" and say it comes back fractional; and delete the NaN
-    claim rather than rewording it. This module is the one place the release
-    designates as the authority for the frame, so its description of itself is
-    what the next caller builds on.
-  - From: UI/UX Override - the card lifted onto the notice
-- [x] A test helper left behind by the rewrite it was rewritten out of
-  - **Issue**: `colorAt` at `test/runway.test.js:327` has no callers. Its only
-    one was `the strip is painted so it can be picked out from the air`, which
-    this run rewrote to read every vertex through `paintBands` and `colorOf`
-    instead of sampling three places. The helper was left where it was.
-  - **Goal**: Delete `colorAt`, or call it from the sampling the rewrite kept
-    if one is still wanted.
-  - From: UI/UX Override - the card lifted onto the notice
-- [x] The objective card is drawn over the floated readouts on a phone
-  - **Issue**: `#game-mode` is `z-index: 120` against `#hud`'s `100` and is a
-    panel with `background: rgba(0, 0, 0, 0.5)` behind its text, so where the
-    two meet it is the readouts that are lost. On **852x330** - a phone held
-    sideways in a browser with a toolbar - three seconds into an ordinary
-    flight, with no landing and nothing on the card but the stage and the
-    clock, the card sits at x `296`..`556`, y `228`..`310` and the floated
-    readouts are in the band between the clusters at y `268`..`314`, so
-    `AIRSPEED`, `ALTITUDE` and `HEADING` are behind it: the word `AIRSPEED:`
-    and `+3620 ft/min` are all that is left readable of the stack. Both
-    placements are recent and neither was checked against the other - the
-    readouts were moved into that band for being the one empty part of a short
-    screen, and the card is past the `max-width: 640px` the lift is written
-    inside, so at 852 wide it keeps the desktop placement. The landing
-    breakdown makes it worse rather than causing it: at 320x568 the card
-    covers `ALTITUDE`, `V/S`, `HEADING`, `THROTTLE` and `CAMERA` with the
-    breakdown up against `THROTTLE` and `CAMERA` without it, at 393x578 four
-    against two, and at 320x460 `AIRSPEED`, `ALTITUDE`, `V/S`, `HEADING` and
-    the lower part of both instruments against three. 393x852 is clear either
-    way, which is why a tall phone never showed it. The card's own nine lines
-    are readable at every size, so this is the other side of the collision
-    this release fixed rather than that one again.
-  - **Goal**: Resolve to [card-over-floated-readouts.prompt.md](.claude/prompts/card-over-floated-readouts.prompt.md)
-  - From: UI/UX Override - the band the card and the readouts were both given
 - [x] **Card Clip**: The objective card clips through the middle of a line on 320x460
   - **Issue**: the card is bounded in pixels taken off the screen and its rows
     are whatever height the type comes to, so on the shortest screen a browser
@@ -531,3 +317,82 @@ how the simulator got here rather than as a list still to be worked.
     reads a missing `max-height` as unmeasurable rather than as clear, so the
     wider screen wants the bound question settled first.
   - From: Code Review Override - the stand-down past the bound it pays for
+- [x] Card Clip 1: the card still clips through the middle of a line, in the
+  other mode
+  - **Issue**: The bounds are sums of the row heights declared on `#game-mode`,
+    and each of those is a single line of that row's type. The card is
+    `min-width: 260px` with `20px` of side padding and a `1px` border, so a row
+    has 218 pixels to be written across at the card's narrowest and a longer one
+    wraps to two lines. `RUNWAY LANDING` fits: its name, objective, status and
+    clock lay out at 14, 20, 15 and 15 pixels, which is what they declare, and
+    all six screens are clean in both readings. `FLYING THROUGH LOOPS` does not:
+    the same four lay out at 28, 36, 27 and 15, and the pointer at 37 against
+    the 19 it declares. So in ordinary flight, pads out, no landing and no gate
+    involved, `FLY THROUGH EVERY LOOP` runs 277 to 309 against a clip ending at
+    287 on 320x460 and is cut by 22 pixels - most of the row, on the shortest
+    screen a browser leaves, which is the screen the completed item is named
+    for. `THREE GATES  ·  STAGE 1 OF 4  ·  LOOP 1 OF 3` is cut by 1 on 320x568
+    and the `TIME` line by 6 on 393x578. 393x852, 852x330 and 568x320 are clean,
+    because the card is past its minimum width there and nothing wraps. Nothing
+    fails: `npm test` is 937 passing, and `CARD_STATES` in `test/page.test.js`
+    models the card the way the stylesheet does, one declared height per row, so
+    the model and the stylesheet agree about a height neither of them measures.
+  - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
+  - From: UI/UX Override - the card's clip falls through a line
+- [x] Slow the orbiting camera's spin, and make the rate something a pilot sets
+  - **Issue**: The drone-style orbit sweeps fast enough to be hard to read the
+    world from, and the rate is a constant in the camera code rather than
+    anything a pilot can reach.
+  - **Goal**: Slow the default sweep, then expose the rate in the **Settings**
+    panel beside the other camera options, so the new default is a starting
+    point rather than a second hardcoded number. One change: the value and the
+    control that owns it, in the same pass - splitting them means editing
+    `js/camera.js` twice for one decision.
+  - From: User Overrides
+- [x] `space` levels the flight off at `V/S: 0 ft/min`
+  - **Issue**: Holding an altitude means trimming the vertical speed to zero by
+    hand, which is a fiddle in the middle of everything else a landing asks
+    for.
+  - **Goal**: A `space` keypress sets vertical speed to zero and leaves pitch
+    where the pilot put it, so the aircraft holds its altitude until the next
+    input. Register it where the other keys are bound rather than as a special
+    case, and say so in the controls list the **Controls** entry shows.
+  - From: User Overrides
+- [x] Low Altitude warns before the flight has started
+  - **Issue**: The low altitude alert fires while the aircraft is still on the
+    runway at the start of a flight. It is true and useless: altitude is low
+    because nothing has taken off yet, and the first thing a pilot sees is a
+    warning about the state the simulator just put them in.
+  - **Goal**: Gate the alert on the flight having left the ground, so it only
+    speaks about an altitude the pilot flew to. Takeoff is the condition, not a
+    timer - a flight that never leaves the runway should never raise it.
+  - From: User Overrides
+- [x] A takeoff that runs off the runway drives across the terrain
+  - **Issue**: Running past the end of the runway does not end the attempt. The
+    aircraft keeps going over the environment as though it were taxiing, so a
+    failed takeoff has no outcome and the flight continues in a state the
+    simulator has no rules for.
+  - **Goal**: Leaving the runway surface while still on the ground registers a
+    crash, through the same path any other crash takes, so the attempt ends and
+    is recorded like one. Bound it to the runway area rather than to a distance
+    from the start, so an overrun to either side counts the same as one off the
+    end.
+  - From: User Overrides
+- [x] Placing elements can overlap the runway
+  - **Issue**: Elements placed in the **Element Editor** sometimes land on or
+    through the rendered runway, leaving the strip a flight starts from
+    obstructed or visually broken.
+  - **Goal**: Treat the runway as reserved ground that placement cannot enter:
+    an element that would intersect it is refused or moved clear, and the
+    editor says which. The runway is the one surface a flight depends on
+    existing, so it is the one the editor may not edit around.
+  - From: User Overrides
+- [x] Clicking left of a value raises it
+  - **Issue**: In the **Element Editor** and the **Settings** panel, clicking
+    the left side of a value increases it. Every control of this shape reads
+    left as down, so the click does the opposite of what it looks like, in two
+    panels at once.
+  - **Goal**: Left decreases and right increases, everywhere this control is
+    used. One fix at the control rather than per panel, since both panels are
+    wrong in the same direction and for the same reason.
+  - From: User Overrides
