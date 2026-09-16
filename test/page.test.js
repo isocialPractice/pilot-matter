@@ -16,6 +16,13 @@ import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 import { TOUCH_PADS, TOUCH_CELLS, TOUCH_LEFT, TOUCH_RIGHT } from '../js/touch-controls.js';
+import {
+    GAME_MODES, GATE_ARROWS, missNotice, runStatus, runObjective,
+    createRunState, startRun, currentStage, stageProgress, recordGate,
+    recordLanding, advanceStage
+} from '../js/game-modes.js';
+import { formatStageClock, formatGatePointer } from '../js/hud.js';
+import { stageReport } from '../js/best-times.js';
 
 const indexHtml = readFileSync(
     fileURLToPath(new URL('../index.html', import.meta.url)),
@@ -108,7 +115,7 @@ const CARD_STATES = [
         reading: 'in ordinary flight',
         selectors: ['#game-mode', '#game-mode.floated'],
         rows: [
-            { height: '--card-name',      shown: ['#game-mode-name'] },
+            { height: '--card-name',      shown: ['#game-mode-name', '#game-mode.floated #game-mode-name'] },
             { height: '--card-objective', shown: ['#game-mode-objective'] },
             { height: '--card-status',    shown: ['#game-mode.floated #game-mode-status'] },
             { height: '--card-clock',     shown: ['#game-mode.floated #game-mode-clock'] },
@@ -122,7 +129,7 @@ const CARD_STATES = [
         reading: 'with a landing read off it',
         selectors: ['#game-mode', '#game-mode.floated', '#game-mode.floated.reporting'],
         rows: [
-            { height: '--card-name',      shown: ['#game-mode-name'] },
+            { height: '--card-name',      shown: ['#game-mode-name', '#game-mode.floated #game-mode-name'] },
             { height: '--card-objective', shown: ['#game-mode-objective'] },
             { height: '--card-status',    shown: [
                 '#game-mode.floated #game-mode-status',
@@ -140,6 +147,31 @@ const CARD_STATES = [
         ]
     }
 ];
+
+// The longest line each row of the card may be asked to write, in characters.
+//
+// The `--card-*` heights are what a browser laid those rows out at, and a row
+// asked for a longer line than the one it was measured with can wrap further
+// than the height declared for it - which puts the bound back part way down a
+// row, by the door a new game mode walks through.
+//
+// A stylesheet cannot measure text and neither can this suite. What a suite
+// can do is count characters, which is the half of the question a monospaced
+// card makes answerable. The figures come from `.tmp/ui-ux/t4-rowheights.log`
+// and what can be derived from it at the card's 260 pixel minimum, where a row
+// has 218 pixels to be written in:
+//
+//   name       20   `FLYING THROUGH LOOPS`, measured wrapping to two lines
+//   objective  32   22 characters wrapped to two lines, and two lines of the
+//                   widest type consistent with that measurement hold 32
+//   status     44   measured wrapping to two lines
+//   clock      29   measured on one line at 27, and two characters longer once
+//                   a stage passes ten minutes, which is why the narrow card
+//                   declares the clock wrapped as well
+//   pointer    30   measured wrapping to two lines
+const CARD_LINE_CEILINGS = {
+    name: 20, objective: 32, status: 44, clock: 29, pointer: 30
+};
 
 // Every menu drawn into the page: the two cards, the panels they open, and the
 // three lists one panel is split across.
@@ -913,6 +945,145 @@ test('the card stops between its rows rather than part way down one', () => {
             assert.ok(bound >= rows,
                 `at ${size} ${state.reading} the card is bounded to ${bound}px and the `
               + `${drawn.length} rows it still carries come to ${rows}px`);
+        }
+    }
+});
+
+/**
+ * And the rows are written inside what they were measured at.
+ *
+ * The bound above is only as good as the claim that a declared row height is
+ * the height that row draws at, and that claim was made against the lines the
+ * card was carrying on the day it was measured. A mode with a longer name, or
+ * an objective that runs a few characters further, wraps a row past the height
+ * declared for it - and the clip lands part way down a row again, with nothing
+ * in the stylesheet or the check above able to see it.
+ *
+ * So the lengths are held here, and every line the card can be asked for is
+ * counted against them: the modes and their stages as declared, each gate of
+ * each course, the notice a missed gate puts up, the report a finished stage
+ * puts up, the clock, and the pointer at the widest reading each can write.
+ */
+test("the card's rows are written inside the lines they were measured at", () => {
+    const lines = { name: [], objective: [], status: [], clock: [], pointer: [] };
+
+    // The clock at the widest a stage can write it - a stage past ten minutes,
+    // which is two characters wider than one under it - and the empty shape a
+    // stage nobody has flown out leaves.
+    lines.clock.push(formatStageClock(5999.9, 5999.9), formatStageClock(0, null));
+    lines.objective.push(stageReport({ time: 599.9, best: true }),
+                         stageReport({ time: 599.9, best: false }));
+
+    for (const mode of GAME_MODES) {
+        lines.name.push(mode.label);
+        lines.objective.push(mode.goal);
+
+        const state = createRunState();
+        startRun(state, mode.id);
+        lines.objective.push(runObjective(state));
+
+        // Walk the whole run: every stage, and inside each of them every gate
+        // the course counts, because the stage number and the loop number are
+        // both written into the status line and both grow as the run goes on.
+        for (let stage = 0; stage < mode.stages.length; stage++) {
+            const { total } = stageProgress(state);
+
+            for (let gate = 0; gate <= total; gate++) {
+                lines.status.push(`${currentStage(state).label}  ·  ${runStatus(state)}`);
+                lines.objective.push(missNotice(state));
+                lines.pointer.push(formatGatePointer({
+                    arrow: GATE_ARROWS[GATE_ARROWS.length - 1],
+                    index: Math.max(0, total - 1),
+                    bearing: 359,
+                    distance: 10000
+                }));
+                if (gate < total) recordGate(state, gate);
+            }
+
+            recordLanding(state);
+            advanceStage(state);
+        }
+
+        // And the line a finished run leaves on the card.
+        lines.status.push(runStatus(state));
+    }
+
+    for (const [row, ceiling] of Object.entries(CARD_LINE_CEILINGS)) {
+        const longest = lines[row].reduce((worst, line) => line.length > worst.length ? line : worst, '');
+        assert.ok(longest.length <= ceiling,
+            `the card's ${row} row was measured at ${ceiling} characters and is asked for `
+          + `${longest.length}: \`${longest}\``);
+    }
+});
+
+/**
+ * And the card is as wide as the row heights were measured at, wherever a
+ * bound is written out of them.
+ *
+ * The two checks above rest on one thing neither of them states: that a row
+ * has 218 pixels to be written in, which is the card at its 260 pixel minimum.
+ * Both the `--card-*` heights and the line ceilings were measured there. Give
+ * a row less room than that and it wraps further than the height declared for
+ * it, and a bound summed from those heights lands part way down a row again -
+ * with the checks above still passing, because neither of them looks at how
+ * wide the card is.
+ *
+ * The card is not always 260. `@media (max-height: 540px) and (min-width:
+ * 500px)` hangs it in the lane between the pad clusters instead, drops
+ * `min-width` to 0 and caps it at `calc(100vw - 344px)`: 156 pixels at 500
+ * across, 224 at 568. That is well under what the rows were measured at, and
+ * the reason nothing is sliced there is that the same rule bounds the card by
+ * the room it has - `calc(100vh - 218px)` - rather than by adding its rows up.
+ * The two arrangements are safe for opposite reasons, and what keeps them safe
+ * is that they never mix.
+ *
+ * So: a bound summed from rows may only be used where the card is still at
+ * least as wide as those rows were measured at. A lane rule given a row-summed
+ * bound, or a row-summed screen that stopped asking for 260, fails here rather
+ * than in a browser.
+ */
+test('the card is as wide as its rows were measured at wherever a bound is summed from them', () => {
+    // The width the `--card-*` heights and the line ceilings above were both
+    // read at, which is the card's own minimum.
+    const MEASURED_AT = 260;
+
+    // A bound written as a sum of the card's own rows, rather than as a count
+    // of pixels or as the room left on the screen. The three forms are what
+    // `length` already tells apart; this asks which of them was used.
+    const summedFromRows = value =>
+        /^calc\(\s*var\(--card-[\w-]+\)(\s*\+\s*var\(--card-[\w-]+\))*\s*\)$/
+            .test((value ?? '').replace(/\s+/g, ' '));
+
+    // The screens the two arrangements meet across: the ones every other check
+    // measures, and enough of the lane band to cover where the cap binds
+    // hardest. 500x400 is the narrowest the lane rule reaches, where the card
+    // comes to 156 and a row has 114 pixels rather than 218.
+    const screens = [
+        ...MEASURED_SCREENS,
+        { width: 500, height: 400 },
+        { width: 540, height: 400 },
+        { width: 600, height: 380 },
+        { width: 660, height: 500 },
+        { width: 480, height: 400 },
+        { width: 640, height: 545 }
+    ];
+
+    for (const screen of screens) {
+        for (const state of CARD_STATES) {
+            const size = `${screen.width}x${screen.height}`;
+            const box = resolved(indexHtml, state.selectors, screen);
+            if (!summedFromRows(box.get('max-height'))) continue;
+
+            const floor = box.get('min-width');
+            assert.ok(floor?.endsWith('px'),
+                `at ${size} ${state.reading} the card is bounded by adding its rows up, so it `
+              + `should declare a width to hold them in - it declares \`${floor}\``);
+
+            assert.ok(Number(floor.slice(0, -2)) >= MEASURED_AT,
+                `at ${size} ${state.reading} the card is bounded by adding its rows up, and `
+              + `those rows were measured on a card ${MEASURED_AT}px wide - but the card is `
+              + `held to ${floor} here, so a row has less room than it was measured with and `
+              + `wraps past the height the bound is summed from`);
         }
     }
 });
