@@ -23,42 +23,43 @@ its context survives being archived.
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
 
-### User Overrides
+### Code Review Override - the comments the level off left behind
 
-#### Resolve Issues
-
-- [ ] Level Off 1 - the vertical speed reads zero while the aircraft still sits
-      nose-up
-  - **Issue**: `space` sets `V/S` to zero and nothing else moves. Altitude does
-    hold, so the number is telling the truth, but pitch stays wherever the
-    pilot left it: the horizon stays tilted, the attitude indicator keeps
-    showing a climb, and the aircraft reads as still going up while the
-    instrument says it is not. The two disagree on screen at the moment a pilot
-    is trusting one of them. Seen in
-    [level-off.gif](.support/level-off.gif).
-  - **This is the earlier decision, not a missed case.** The item completed at
-    `1.17.0-alpha` set vertical speed and deliberately left pitch alone, so
-    every part of it worked as written. What it did not account for is that
-    levelling off is something a pilot watches happen, and half of what they
-    watch is the attitude.
-  - **Goal**: One keypress brings the aircraft to level flight, and both the
-    model and the instruments arrive there together. Pitch eases to level over
-    a short interval rather than snapping, so the movement reads as the
-    aircraft settling rather than as a jump, and the attitude indicator follows
-    the model rather than being driven separately.
-  - **Done when all three agree at rest**: `V/S` at `0 ft/min`, pitch within a
-    degree of level, and the attitude horizon centred - checked after the ease
-    has finished, not on the frame the key goes down. State the interval used
-    so the next reader can change it without guessing at it.
-  - **Where it lives**: the level-off path is in `js/aircraft.js` and the
-    indicator is drawn in `js/attitude.js` from `#attitude-ball`,
-    `#attitude-horizon` and `#attitude-ladder`. Keep the indicator reading the
-    model's pitch rather than easing on its own - two easings of one value is
-    how they come to disagree by a frame.
-  - **Leave roll alone.** Nothing here asks for it, a wing-level is a separate
-    decision, and rolling the aircraft on a keypress nobody pressed for it is
-    the kind of surprise this item exists to remove.
-  - From: User Overrides
+- [ ] The level off is still described as leaving the nose where the pilot put
+      it, in the module it is bound in and in the test that covers the binding
+  - **Issue**: `1.17.1-alpha` eased the nose to level and five documents were
+    rewritten to say so, but the two comments nearest the binding were not.
+    `js/input-map.js` line 34 tells a reader that `Space` "is an instruction to
+    trim the climb out and leave the nose exactly where the pilot put it", and
+    the doc comment above `test('space levels the flight off')` in
+    `test/input-map.test.js` line 73 says it "leaves the nose where the pilot
+    put it". Both now state the opposite of what the code does, and
+    `js/input-map.js` is the file a reader opens to find what `Space` is bound
+    to. `CHANGELOG.md` line 49 carries the same sentence and is correct there -
+    it is the record of what `1.17.0-alpha` shipped - so leave that one alone.
+  - **Goal**: Rewrite both comments around the nose easing to level, keeping
+    what each comment is there for: the binding comment explains why the key
+    sits beside reset rather than among the control surfaces, and the test
+    comment explains what one press saves the pilot. Name `LEVEL_OFF_SECONDS`
+    rather than writing the interval out as a number, so neither comment can
+    go stale the next time it moves.
+  - From: Code Review Override - the comments the level off left behind
+- [ ] `.tmp/` is kept out of the repository by a personal global gitignore
+      rather than by the repository's own
+  - **Issue**: `git check-ignore -v .tmp/ui-ux/t6-probe.mjs` answers
+    `C:\Users\<user>\.gitignore_global:11:.*`, so the 250-odd screenshots, logs
+    and scratch `.mjs` files the UI/UX tester writes under `.tmp/ui-ux/` are
+    excluded by a rule that lives on one machine rather than by the project.
+    `.gitignore` already carries `test-results/` and `user-scripts/` under the
+    heading "Verification output written by the UI/UX tester, which is a record
+    of one run on one machine rather than anything the project ships", which is
+    a description of `.tmp/` as well. On a clone without that global rule -
+    another machine, or CI - the folder is untracked and visible, and a
+    `git add -A` sweeps all of it into the repository.
+  - **Goal**: Add `.tmp/` to `.gitignore` beside `test-results/` and
+    `user-scripts/`, and confirm with `git check-ignore -v` that the answer now
+    comes from the repository's own file rather than from a global one.
+  - From: Code Review Override - the comments the level off left behind
 
 ## Game UI/UX
 
@@ -305,21 +306,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 110 earlier items in `TODO-archive.md`, newest last.
+> 111 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Card Clip**: The objective card clips through the middle of a line on 320x460
-  - **Issue**: the card is bounded in pixels taken off the screen and its rows
-    are whatever height the type comes to, so on the shortest screen a browser
-    leaves the two do not line up and the clip lands part way down a row. In
-    ordinary flight `FINAL  ·  STAGE 1 OF 4` runs 280 to 292 against a clip
-    ending at 287, so five pixels of it are cut and the rest is drawn sliced
-    through the glyphs; with the breakdown up the same happens to
-    `DOWN THE STRIP`, four pixels cut. Clipping there is right and intended -
-    there are 108 pixels between the chart and the pads - but clipping between
-    rows and clipping through one are not the same thing, and a half-drawn line
-    reads as a rendering fault. The other five screens are clean.
-  - **Goal**: Resolve to [card-clipped-through-a-line.prompt.md](.claude/prompts/card-clipped-through-a-line.prompt.md)
-  - From: UI/UX Override - the card's clip falls through a line
 - [x] The readouts stand down on screens the card was never bounded against
   - **Issue**: `#game-mode.floated.reporting ~ #hud.floated` in `index.html` is
     written outside every media query, so it fires wherever the pads are out.
@@ -432,4 +420,36 @@ how the simulator got here rather than as a list still to be worked.
   - **Goal**: Left decreases and right increases, everywhere this control is
     used. One fix at the control rather than per panel, since both panels are
     wrong in the same direction and for the same reason.
+  - From: User Overrides
+- [x] Level Off 1 - the vertical speed reads zero while the aircraft still sits
+      nose-up
+  - **Issue**: `space` sets `V/S` to zero and nothing else moves. Altitude does
+    hold, so the number is telling the truth, but pitch stays wherever the
+    pilot left it: the horizon stays tilted, the attitude indicator keeps
+    showing a climb, and the aircraft reads as still going up while the
+    instrument says it is not. The two disagree on screen at the moment a pilot
+    is trusting one of them. Seen in
+    [level-off.gif](.support/level-off.gif).
+  - **This is the earlier decision, not a missed case.** The item completed at
+    `1.17.0-alpha` set vertical speed and deliberately left pitch alone, so
+    every part of it worked as written. What it did not account for is that
+    levelling off is something a pilot watches happen, and half of what they
+    watch is the attitude.
+  - **Goal**: One keypress brings the aircraft to level flight, and both the
+    model and the instruments arrive there together. Pitch eases to level over
+    a short interval rather than snapping, so the movement reads as the
+    aircraft settling rather than as a jump, and the attitude indicator follows
+    the model rather than being driven separately.
+  - **Done when all three agree at rest**: `V/S` at `0 ft/min`, pitch within a
+    degree of level, and the attitude horizon centred - checked after the ease
+    has finished, not on the frame the key goes down. State the interval used
+    so the next reader can change it without guessing at it.
+  - **Where it lives**: the level-off path is in `js/aircraft.js` and the
+    indicator is drawn in `js/attitude.js` from `#attitude-ball`,
+    `#attitude-horizon` and `#attitude-ladder`. Keep the indicator reading the
+    model's pitch rather than easing on its own - two easings of one value is
+    how they come to disagree by a frame.
+  - **Leave roll alone.** Nothing here asks for it, a wing-level is a separate
+    decision, and rolling the aircraft on a keypress nobody pressed for it is
+    the kind of surprise this item exists to remove.
   - From: User Overrides
