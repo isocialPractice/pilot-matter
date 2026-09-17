@@ -24,7 +24,10 @@ import {
     isStalled,
     sinkRate,
     controlRates,
-    pitchForClimb
+    pitchForClimb,
+    LEVEL_OFF_SECONDS,
+    levelOffProgress,
+    pitchLevellingOff
 } from '../js/flight-model.js';
 import { createFlightState, INITIAL_THROTTLE } from '../js/flight-state.js';
 import { throttleToPercent } from '../js/hud.js';
@@ -264,4 +267,121 @@ test('a climb is a lower pitch angle, and the control that climbs lowers it', ()
         'so the control that raises the nose is the one that lowers the angle');
     assert.equal(binding('pitchDown'), '+',
         'and the one that drops the nose is the one that raises it');
+});
+
+
+// --- The nose settling to level -------------------------------------------
+
+/**
+ * A level off is watched as much as it is read. The vertical speed going to
+ * zero is only half of it; the other half is the aeroplane settling, and an
+ * attitude that snapped to level on the frame the key went down would read as
+ * a rendering fault rather than as an aircraft levelling off.
+ */
+test('a level off runs from the press to level over the stated interval', () => {
+    assert.ok(LEVEL_OFF_SECONDS > 0, 'the ease has to take some time to be an ease');
+
+    assert.equal(levelOffProgress(0), 0, 'nothing has moved on the frame the key goes down');
+    assert.equal(levelOffProgress(LEVEL_OFF_SECONDS), 1, 'and it is over when the interval is');
+    assert.equal(levelOffProgress(LEVEL_OFF_SECONDS * 4), 1,
+        'a frame that arrives late finds it finished rather than overshot');
+    assert.equal(levelOffProgress(-1), 0, 'and a clock that ran backwards does not undo it');
+});
+
+test('the nose leaves its attitude gently and arrives at level gently', () => {
+    const half = LEVEL_OFF_SECONDS / 2;
+    const step = LEVEL_OFF_SECONDS / 20;
+
+    assert.equal(levelOffProgress(half), 0.5, 'half way through the interval is half way to level');
+    assert.ok(levelOffProgress(step) < step / LEVEL_OFF_SECONDS,
+        'the first frames move the nose less than a straight line would');
+    assert.ok(1 - levelOffProgress(LEVEL_OFF_SECONDS - step) < step / LEVEL_OFF_SECONDS,
+        'and the last frames settle onto level rather than stopping dead at it');
+
+    let previous = -1;
+    for (let elapsed = 0; elapsed <= LEVEL_OFF_SECONDS; elapsed += step) {
+        const now = levelOffProgress(elapsed);
+        assert.ok(now >= previous, `the ease went backwards at ${elapsed}s`);
+        previous = now;
+    }
+});
+
+test('the ease is exact at both ends, so nothing is left a fraction nose-up', () => {
+    const climb = pitchForClimb(20, CRUISE_SPEED);
+    assert.ok(climb < 0, 'the aircraft starts in a climb');
+
+    assert.equal(pitchLevellingOff(climb, 0), climb,
+        'the nose starts where the pilot left it');
+    assert.equal(pitchLevellingOff(climb, LEVEL_OFF_SECONDS), 0,
+        'and finishes at a flat zero rather than near one');
+    assert.equal(pitchLevellingOff(climb, LEVEL_OFF_SECONDS * 2), 0,
+        'and stays there once it is there');
+
+    // Within a degree of level well before the interval is out, which is the
+    // reading the item asks for once the ease has finished and then some.
+    const degree = Math.PI / 180;
+    assert.ok(Math.abs(pitchLevellingOff(climb, LEVEL_OFF_SECONDS)) < degree);
+
+    const dive = pitchForClimb(-20, CRUISE_SPEED);
+    assert.ok(dive > 0, 'and a descent is levelled off the same way from the other side');
+    assert.equal(pitchLevellingOff(dive, LEVEL_OFF_SECONDS), 0);
+});
+
+test('an interval of nothing is a level off that has already happened', () => {
+    assert.equal(levelOffProgress(0, 0), 1, 'rather than a division by zero');
+    assert.equal(pitchLevellingOff(0.4, 0, 0), 0);
+    assert.equal(levelOffProgress(0, -1), 1, 'and an interval that runs backwards is not one');
+});
+
+// The ease belongs to the model, and the attitude indicator reads the model's
+// own pitch. One value eased once is what keeps the horizon and the dial from
+// disagreeing by a frame, which is what happens when each eases its own copy.
+test('the aircraft eases the model pitch rather than keeping a second copy', () => {
+    assert.ok(aircraftSource.includes('pitchLevellingOff(this.levelling.from, this.levelling.elapsed)'),
+        'js/aircraft.js should ease its own rotation through the shared helper');
+    assert.ok(/levelOff\(\)\s*\{[^}]*this\.levelling = \{ from: this\.rotation\.x, elapsed: 0 \}/
+        .test(aircraftSource),
+        'starting from the attitude the pilot actually left it in');
+    assert.ok(/endLevelOff\(\)\s*\{[\s\S]*?this\.holdingAltitude = false;[\s\S]*?this\.levelling = null;/
+        .test(aircraftSource),
+        'and let go of the altitude and the nose together when it is handed back');
+    assert.ok(aircraftSource.includes('if (wantsVerticalChange(this.input)) this.endLevelOff();'),
+        'which is what a call for a different vertical state does');
+});
+
+// Nothing here asks for the wings to be levelled, and a wing-level is a
+// decision of its own. Rolling the aircraft on a keypress nobody pressed for
+// it is the kind of surprise this item exists to remove.
+test('levelling off moves the nose and nothing else', () => {
+    const between = (open, close) => {
+        const from = aircraftSource.indexOf(open);
+        const to   = aircraftSource.indexOf(close, from + 1);
+        return from < 0 || to < 0 ? '' : aircraftSource.slice(from, to);
+    };
+
+    const levelling = between('if (this.levelling) {', '// Roll');
+    assert.ok(levelling, 'the ease should run as a block of its own in the frame loop');
+    assert.ok(levelling.includes('this.rotation.x ='), 'writing the pitch');
+    assert.ok(!/rotation\.[yz]/.test(levelling),
+        'and leaving the roll and the heading exactly where the pilot left them');
+
+    const levelOff = between('    levelOff() {', 'Hands the aircraft back');
+    assert.ok(levelOff, 'and the press itself should be a method of its own');
+    assert.ok(!/rotation\.[yz]/.test(levelOff), 'which does not touch them either');
+});
+
+// Where the handback sits in the frame loop is the whole of whether taking the
+// pitch back is answered now or a frame from now. Read after the ease instead
+// of before it, the ease would write the nose one more time on the frame the
+// pilot pulled, and the pull they felt would be the one they made a frame ago.
+// Both lines are in `update`, so only their order says which happens.
+test('the pilot taking the pitch back is answered on that frame, not the next one', () => {
+    const handback = aircraftSource.indexOf('if (wantsVerticalChange(this.input)) this.endLevelOff();');
+    const ease     = aircraftSource.indexOf('if (this.levelling) {');
+
+    assert.ok(handback >= 0, 'the frame loop should read the call for a different vertical state');
+    assert.ok(ease >= 0, 'and run the ease as a block of its own');
+    assert.ok(handback < ease,
+        'and read the handback first, so a frame that hands the aircraft back does not '
+      + 'also ease the nose it has just given away');
 });
