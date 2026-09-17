@@ -37,6 +37,13 @@ export const PITCH_RATE = 1.2;
 export const ROLL_RATE  = 2.0;
 export const YAW_RATE   = 0.8;
 
+// How long the nose takes to settle to level when a flight is levelled off,
+// in seconds. Long enough that the movement reads as the aircraft settling
+// rather than as a jump, short enough that the aircraft is level by the time
+// a pilot has looked back at the instrument. This is the one copy of the
+// interval; change it here and both the model and the dial change with it.
+export const LEVEL_OFF_SECONDS = 0.6;
+
 // What those rates are multiplied by, which the settings panel moves. The
 // range it offers is deliberately narrow: this is how hard the controls bite,
 // not a different aircraft.
@@ -163,4 +170,35 @@ export function climbForward(verticalSpeed, speed, options = {}) {
  */
 export function pitchForClimb(verticalSpeed, speed, options = {}) {
     return -Math.asin(climbForward(verticalSpeed, speed, options));
+}
+
+/**
+ * How far through a level off the nose is at a moment in it, from 0 at the
+ * press to 1 once it has settled. Smoothstep, so the nose leaves the attitude
+ * the pilot left it in gently and arrives at level gently rather than starting
+ * and stopping dead.
+ */
+export function levelOffProgress(elapsed, duration = LEVEL_OFF_SECONDS) {
+    if (!(duration > 0)) return 1;
+    const t = clamp(elapsed / duration, 0, 1);
+    return t * t * (3 - 2 * t);
+}
+
+/**
+ * The pitch the nose is at part way through a level off, easing from wherever
+ * the pilot left it to level over `duration` seconds.
+ *
+ * Exact at both ends: the attitude it started at on the frame the key went
+ * down, and a flat zero once the ease has run. Anything reading the attitude
+ * reads the model's own pitch, so easing it here is what carries the artificial
+ * horizon down with the nose - one value eased once, rather than the model and
+ * the dial each easing their own and disagreeing by a frame.
+ */
+export function pitchLevellingOff(startPitch, elapsed, duration = LEVEL_OFF_SECONDS) {
+    const remaining = 1 - levelOffProgress(elapsed, duration);
+
+    // Level is a flat zero rather than the negative one scaling a nose-down
+    // attitude by nothing leaves behind. The two fly identically; only one of
+    // them reads as level to anything comparing the number.
+    return remaining === 0 ? 0 : startPitch * remaining;
 }

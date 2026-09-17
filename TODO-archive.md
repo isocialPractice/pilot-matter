@@ -927,3 +927,19 @@ still be found by name.
     this release fixed rather than that one again.
   - **Goal**: Resolve to [card-over-floated-readouts.prompt.md](.claude/prompts/card-over-floated-readouts.prompt.md)
   - From: UI/UX Override - the band the card and the readouts were both given
+
+## Archived 09-17-26
+
+- [x] **Card Clip**: The objective card clips through the middle of a line on 320x460
+  - **Issue**: the card is bounded in pixels taken off the screen and its rows
+    are whatever height the type comes to, so on the shortest screen a browser
+    leaves the two do not line up and the clip lands part way down a row. In
+    ordinary flight `FINAL  ·  STAGE 1 OF 4` runs 280 to 292 against a clip
+    ending at 287, so five pixels of it are cut and the rest is drawn sliced
+    through the glyphs; with the breakdown up the same happens to
+    `DOWN THE STRIP`, four pixels cut. Clipping there is right and intended -
+    there are 108 pixels between the chart and the pads - but clipping between
+    rows and clipping through one are not the same thing, and a half-drawn line
+    reads as a rendering fault. The other five screens are clean.
+  - **Goal**: Resolve to [card-clipped-through-a-line.prompt.md](.claude/prompts/card-clipped-through-a-line.prompt.md)
+  - From: UI/UX Override - the card's clip falls through a line

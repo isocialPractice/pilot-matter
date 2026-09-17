@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1-alpha] - 2026-09-17
+
+The level off brings the nose with it, so the instrument and the horizon stop
+disagreeing about whether the aircraft is still climbing.
+
+### Fixed
+
+- **Levelling off settles the attitude as well as the climb.** `Space` set the
+  vertical speed to zero and deliberately left the nose alone, which is what the
+  item asked for and what shipped - but levelling off is something a pilot
+  watches happen, and half of what they watch is the attitude. The dial read
+  `0 ft/min` over a horizon still tilted and an artificial horizon still showing
+  a climb, so the aircraft read as going up at the moment the instrument said it
+  was not. The nose now eases from wherever the pilot left it down to level over
+  **0.6 seconds**, on a curve that leaves the old attitude gently and arrives at
+  level gently, so the movement reads as the aeroplane settling rather than as a
+  jump. The altitude is held from the frame the key goes down and the attitude
+  arrives a moment later, which is the order a pilot flies it in: the climb
+  stops, and the aeroplane settles. At rest all three agree - `V/S` at zero,
+  pitch at a flat level, and the artificial horizon centred. The interval is
+  `LEVEL_OFF_SECONDS` in `js/flight-model.js`, beside the pure `levelOffProgress`
+  and `pitchLevellingOff` the ease is worked out by, and it is the only copy of
+  it: the artificial horizon reads the model's own pitch, so easing that pitch
+  is the whole of what carries the horizon down with the nose. Nothing eases a
+  second copy, which is how the two would come to disagree by a frame. Roll is
+  left alone - a wing-level is a decision of its own, and rolling the aircraft
+  on a keypress nobody pressed for it would be a surprise rather than a
+  convenience. A call for a different vertical state hands both halves back at
+  once, so a pilot who takes the pitch back part way through is flying it
+  themselves from that frame
+
 ## [1.17.0-alpha] - 2026-09-16
 
 A level off on the stick, an orbit sweep a pilot sets, and five things the

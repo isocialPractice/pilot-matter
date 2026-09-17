@@ -5,8 +5,9 @@ import {
 } from './input-map.js';
 import { createFlightState } from './flight-state.js';
 import {
-    MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY,
-    updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled, controlRates
+    MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY, LEVEL_OFF_SECONDS,
+    updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled, controlRates,
+    pitchLevellingOff
 } from './flight-model.js';
 import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED,
@@ -209,6 +210,11 @@ export class Aircraft {
         // holds until they ask for a different vertical state.
         this.holdingAltitude = false;
 
+        // The nose on its way down to level, as the attitude it started from
+        // and how far into the ease it is. Null whenever it is not moving,
+        // which is every frame outside the LEVEL_OFF_SECONDS after a press.
+        this.levelling = null;
+
         // Nothing is told about the reset the constructor runs: there is no
         // model to place and no flight to have been interrupted yet, so a host
         // hears about the resets that happened to a flight rather than about
@@ -258,6 +264,13 @@ export class Aircraft {
         this.throttle = updateThrottle(this.throttle, this.input, dt);
         this.speed = convergeSpeed(this.speed, targetSpeed(this.throttle, this.maxSpeed), dt);
 
+        // The next call for a different vertical state hands the aircraft back,
+        // both the altitude being held and the nose still on its way to level.
+        // Roll and yaw are not that call: an altitude held through a turn is
+        // what holding one is for. Read before the nose is moved, so a pilot
+        // taking the pitch back this frame flies it themselves this frame.
+        if (wantsVerticalChange(this.input)) this.endLevelOff();
+
         // Pitch: W = nose up, S = nose down, which is what the pads, the
         // control list and the documentation all say it is.
         //
@@ -269,6 +282,21 @@ export class Aircraft {
         if (this.input.pitchUp)   this.rotation.x -= this.rates.pitch * dt;
         if (this.input.pitchDown) this.rotation.x += this.rates.pitch * dt;
         this.rotation.x = THREE.MathUtils.clamp(this.rotation.x, -Math.PI / 2.2, Math.PI / 2.2);
+
+        // The nose settling to level, which is the other half of a level off.
+        // The vertical speed goes to zero on the press and the attitude follows
+        // it there over LEVEL_OFF_SECONDS, so the horizon outside and the dial
+        // inside arrive at level together instead of the instrument reading
+        // level above a nose the pilot can still see is climbing.
+        //
+        // Only the pitch moves. Roll is a decision of its own, and rolling the
+        // aircraft on a keypress nobody pressed for it is the surprise this
+        // avoids.
+        if (this.levelling) {
+            this.levelling.elapsed += dt;
+            this.rotation.x = pitchLevellingOff(this.levelling.from, this.levelling.elapsed);
+            if (this.levelling.elapsed >= LEVEL_OFF_SECONDS) this.levelling = null;
+        }
 
         // Roll
         if (this.input.rollLeft)  this.rotation.z += this.rates.roll * dt;
@@ -300,17 +328,12 @@ export class Aircraft {
             cruiseSpeed: this.cruiseSpeed
         }) * dt;
 
-        // The level off, which is the whole of what a vertical speed trimmed to
-        // zero means: the altitude the aircraft was at is the altitude it keeps,
-        // and the nose stays exactly where the pilot put it. Holding one by hand
-        // is a fiddle in the middle of everything else a landing asks for, and
-        // this is the trim wheel for it.
+        // The altitude half of the level off: the altitude the aircraft was at
+        // is the altitude it keeps, from the frame the key goes down, while the
+        // nose eases to level behind it. Holding one by hand is a fiddle in the
+        // middle of everything else a landing asks for, and this is the trim
+        // wheel for it.
         //
-        // The next call for a different vertical state hands the aircraft back.
-        // Roll and yaw are not that call: an altitude held through a turn is
-        // what holding one is for.
-        if (wantsVerticalChange(this.input)) this.holdingAltitude = false;
-
         // Only in the air. On the ground the altitude is the ground's, and the
         // hold would be pinning the aircraft to a strip it is trying to leave.
         if (this.holdingAltitude && this.airborne) this.position.y = startY;
@@ -379,10 +402,17 @@ export class Aircraft {
     }
 
     /**
-     * Trims the climb out and leaves the nose where it is, which is what the
-     * pilot is asking for when they hold an altitude by hand: the vertical
-     * speed reads zero from the next frame and the aircraft keeps the altitude
-     * it was at until the pilot calls for a different one.
+     * Brings the aircraft to level flight, which is what the pilot is asking
+     * for when they hold an altitude by hand: the vertical speed reads zero
+     * from the next frame, the aircraft keeps the altitude it was at, and the
+     * nose eases from wherever they left it down to level over
+     * LEVEL_OFF_SECONDS.
+     *
+     * The altitude is held from the press and the attitude arrives a moment
+     * later, which is the order a pilot flies it in - the climb stops, and the
+     * aeroplane settles. Snapping the nose instead would put the whole change
+     * on one frame, and a model that jumps reads as a rendering fault rather
+     * than as an aircraft levelling off.
      *
      * Refused while the controls are locked, because a wreck is not being
      * flown. Returns true when the hold is now in force.
@@ -390,12 +420,28 @@ export class Aircraft {
     levelOff() {
         if (controlsLocked(this.crash)) return false;
         this.holdingAltitude = true;
+        this.levelling = { from: this.rotation.x, elapsed: 0 };
         return true;
+    }
+
+    /**
+     * Hands the aircraft back: the altitude stops being held and the nose stops
+     * easing, wherever in the ease it had got to. Both end together, because
+     * they are two halves of one thing the pilot has just called off.
+     */
+    endLevelOff() {
+        this.holdingAltitude = false;
+        this.levelling = null;
     }
 
     /** True while the flight is holding the altitude the pilot levelled it at. */
     isHoldingAltitude() {
         return this.holdingAltitude === true;
+    }
+
+    /** True while the nose is still on its way down to level. */
+    isLevellingOff() {
+        return this.levelling != null;
     }
 
     /**
@@ -408,7 +454,7 @@ export class Aircraft {
         this.speed = 0;
         this.throttle = 0;
         this.verticalSpeed = 0;
-        this.holdingAltitude = false;
+        this.endLevelOff();
         this.group.position.copy(this.position);
         this.group.rotation.copy(this.rotation);
     }

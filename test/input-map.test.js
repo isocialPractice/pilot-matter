@@ -130,6 +130,8 @@ test('the aircraft holds the altitude it was levelled at', () => {
         'and read it off the binding rather than a key written into the frame loop');
     assert.ok(aircraftSource.includes('wantsVerticalChange(this.input)'),
         'and let go of it where the pilot calls for a different vertical state');
+    assert.ok(/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/.test(aircraftSource),
+        'the one press brings the nose to level as well as trimming the climb out');
     assert.ok(/this\.holdingAltitude && this\.airborne\)\s*this\.position\.y = startY/
         .test(aircraftSource),
         'the altitude held is the one the aircraft was at, and only in the air');

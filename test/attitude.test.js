@@ -18,6 +18,9 @@ import {
     bankMarkPoint
 } from '../js/attitude.js';
 import { headingDegrees } from '../js/hud.js';
+import {
+    CRUISE_SPEED, LEVEL_OFF_SECONDS, pitchForClimb, pitchLevellingOff
+} from '../js/flight-model.js';
 
 const close = (actual, expected, within = 1e-9) =>
     assert.ok(Math.abs(actual - expected) < within, `${actual} is not ${expected}`);
@@ -320,4 +323,57 @@ test('the face turns to the attitude being flown', () => {
         'the ball rolls against the bank, so the horizon stays where the real one is');
     assert.equal(groups['#attitude-horizon'].getAttribute('transform'),
         `translate(0 ${horizonOffset(10).toFixed(2)})`);
+});
+
+
+// --- Levelling off, read off the dial -------------------------------------
+
+/**
+ * The reading the level off is judged by. The vertical speed is trimmed to
+ * zero on the press, so the only thing left that can disagree with it is the
+ * attitude: an instrument showing a climb above a horizon that is already
+ * level, or the other way about, is the two halves of the same manoeuvre
+ * contradicting each other at the moment a pilot is trusting one of them.
+ *
+ * The indicator reads the model's own pitch, so easing that pitch is the whole
+ * of what carries the horizon down with the nose. This walks the same ease the
+ * aircraft runs and reads the face at each step.
+ */
+test('the horizon comes down with the nose and both arrive at level', () => {
+    const { groups, root } = fakeFace();
+    const indicator = new AttitudeIndicator(root);
+    const bank = toRadians(15);
+
+    const readAt = (pitch) => {
+        const { forwardY, rightY, upY } = attitudeFromEuler({ x: pitch, z: bank });
+        const degrees = pitchFromForward(forwardY);
+        indicator.update(degrees, bankFromWing(rightY, upY));
+        return {
+            degrees,
+            ball:    groups['#attitude-ball'].getAttribute('transform'),
+            horizon: groups['#attitude-horizon'].getAttribute('transform')
+        };
+    };
+
+    const climb = pitchForClimb(20, CRUISE_SPEED);
+    const start = readAt(pitchLevellingOff(climb, 0));
+    assert.ok(start.degrees > 1, 'the aircraft is nose-up when the key goes down');
+    assert.equal(start.horizon, `translate(0 ${horizonOffset(start.degrees).toFixed(2)})`,
+        'and the instrument is showing the climb');
+
+    let previous = start.degrees;
+    for (const step of [0.25, 0.5, 0.75]) {
+        const during = readAt(pitchLevellingOff(climb, LEVEL_OFF_SECONDS * step));
+        assert.ok(during.degrees < previous, `the nose should still be coming down at ${step}`);
+        assert.equal(during.horizon, `translate(0 ${horizonOffset(during.degrees).toFixed(2)})`,
+            'and the horizon should be wherever that pitch puts it, not a frame behind');
+        assert.equal(during.ball, start.ball, 'while the bank is left exactly as it was');
+        previous = during.degrees;
+    }
+
+    const rest = readAt(pitchLevellingOff(climb, LEVEL_OFF_SECONDS));
+    assert.equal(rest.degrees, 0, 'the nose is level once the ease has run');
+    assert.ok(Math.abs(rest.degrees) < 1, 'well inside the degree the item asks for');
+    assert.equal(rest.horizon, 'translate(0 0.00)', 'and the horizon is centred on the face');
+    assert.equal(rest.ball, start.ball, 'the level off never touched the roll');
 });

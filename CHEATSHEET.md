@@ -15,7 +15,7 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `D` `→` | Roll right |
 | `Q` / `E` | Yaw left / right |
 | `Shift` / `Ctrl` | Throttle up / down |
-| `Space` | Level off: vertical speed to zero, nose left where it is |
+| `Space` | Level off: vertical speed to zero, nose eased to level over 0.6s |
 | `C` | Cycle camera: chase, cockpit, orbit |
 | `P` | Pause, and the pause menu |
 | `O` | Settings panel, and close it |
