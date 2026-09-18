@@ -281,7 +281,7 @@ change. Completing items in this section applies a minor version update.
     change it. Anything that is really a flight-model constant belongs under
     **Simulator Configuration** instead.
 
-## Interactive Build Mode
+## Pause: Interactive Build Mode
 
 The twelve-tool editor laid over the world, where ground is shaped by pointing
 at it rather than by stepping numbers in a list. The plan for it is already
