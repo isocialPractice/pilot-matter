@@ -23,43 +23,62 @@ its context survives being archived.
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
 
-### Code Review Override - the comments the level off left behind
+### Code Review Override - the ignore file that never reaches a clone
 
-- [ ] The level off is still described as leaving the nose where the pilot put
-      it, in the module it is bound in and in the test that covers the binding
-  - **Issue**: `1.17.1-alpha` eased the nose to level and five documents were
-    rewritten to say so, but the two comments nearest the binding were not.
-    `js/input-map.js` line 34 tells a reader that `Space` "is an instruction to
-    trim the climb out and leave the nose exactly where the pilot put it", and
-    the doc comment above `test('space levels the flight off')` in
-    `test/input-map.test.js` line 73 says it "leaves the nose where the pilot
-    put it". Both now state the opposite of what the code does, and
-    `js/input-map.js` is the file a reader opens to find what `Space` is bound
-    to. `CHANGELOG.md` line 49 carries the same sentence and is correct there -
-    it is the record of what `1.17.0-alpha` shipped - so leave that one alone.
-  - **Goal**: Rewrite both comments around the nose easing to level, keeping
-    what each comment is there for: the binding comment explains why the key
-    sits beside reset rather than among the control surfaces, and the test
-    comment explains what one press saves the pilot. Name `LEVEL_OFF_SECONDS`
-    rather than writing the interval out as a number, so neither comment can
-    go stale the next time it moves.
-  - From: Code Review Override - the comments the level off left behind
-- [ ] `.tmp/` is kept out of the repository by a personal global gitignore
-      rather than by the repository's own
-  - **Issue**: `git check-ignore -v .tmp/ui-ux/t6-probe.mjs` answers
-    `C:\Users\<user>\.gitignore_global:11:.*`, so the 250-odd screenshots, logs
-    and scratch `.mjs` files the UI/UX tester writes under `.tmp/ui-ux/` are
-    excluded by a rule that lives on one machine rather than by the project.
-    `.gitignore` already carries `test-results/` and `user-scripts/` under the
-    heading "Verification output written by the UI/UX tester, which is a record
-    of one run on one machine rather than anything the project ships", which is
-    a description of `.tmp/` as well. On a clone without that global rule -
-    another machine, or CI - the folder is untracked and visible, and a
-    `git add -A` sweeps all of it into the repository.
-  - **Goal**: Add `.tmp/` to `.gitignore` beside `test-results/` and
-    `user-scripts/`, and confirm with `git check-ignore -v` that the answer now
-    comes from the repository's own file rather than from a global one.
-  - From: Code Review Override - the comments the level off left behind
+#### Found Issues
+
+- [ ] `.gitignore` is not in the repository, so none of the rules in it reach a
+      clone
+  - **Issue**: The file exists in the working copy and nothing tracks it.
+    `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
+    it "exists on disk, but not in 'HEAD'", and `git check-ignore -v .gitignore`
+    answers with a `.gitignore` rule in a personal global ignore file, so it has
+    never been staged and cannot be by an ordinary `git add`. Nothing in the
+    repository therefore carries `test-results/`, `user-scripts/`, or the
+    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all, which
+    is the same exposure that item set out to close, one level further out. It
+    reaches the deploy too - `actions/checkout` in
+    `.github/workflows/workflow.yml` fetches a tree without the file, and the
+    workflow runs `npm test` against it, so the guard added in
+    `test/site.test.js` skips itself there rather than failing the deploy for a
+    thing the deploy cannot fix.
+  - **Goal**: Get `.gitignore` tracked, so its rules travel with the repository
+    instead of living on one machine. Staging it needs `git add -f`, because
+    what excludes it is the user's own global ignore configuration rather than
+    anything this repository owns - so the call is the user's, either
+    force-adding the file once or narrowing that global rule. Do not force-add
+    it from a run. Once it is tracked, drop the stand-down branch at the top of
+    the `test/site.test.js` check so the guard applies on every tree, and say in
+    that run's changelog entry that the rules now reach a clone.
+  - From: Code Review Override - the ignore file that never reaches a clone
+- [ ] The `1.17.2-alpha` changelog entry claims the ignore rules reach the
+      project, and calls the half that does not something the repository cannot
+      close
+  - **Issue**: The entry ships in a tree that carries no `.gitignore`.
+    `git add -An` lists the seven tracked files this turn changed and skips
+    `.gitignore`, so the commit and the `v1.17.2-alpha` tag carry the entry
+    without the file it describes. Its bolded lead, "`.tmp/` is ignored by the
+    project rather than by one machine", is therefore not true of the release,
+    and the same paragraph disclaims it further down - "which is every clone,
+    the file being untracked" - so the bullet contradicts its own heading under
+    a `### Fixed` list. The closing sentence, "That is the half of this the
+    repository cannot close on its own", is wrong rather than overstated:
+    `.nojekyll` is tracked here under the same global `.*` rule that hides
+    `.gitignore`, so a dotfile in this repository can be force-added and one
+    already has been. The run declined to, which is a decision about whose
+    configuration is being worked around rather than a limit on the repository.
+    `TODO.md` puts it correctly - "the call is the user's" - and only
+    `CHANGELOG.md` puts it as an impossibility.
+  - **Goal**: Reword the `1.17.2-alpha` entry's second `### Fixed` bullet so
+    its heading claims only what the release contains: the rule is written into
+    the repository's own `.gitignore`, which does not yet travel with the
+    repository. Replace "cannot close on its own" with what is true, that
+    force-adding the file is a call left to the user rather than one a run
+    takes. Do not restate it as a fix that landed, and do not touch the first
+    bullet or any earlier version's entry. If the release is already tagged
+    when this is worked, correct it under an `Unreleased` heading rather than
+    editing the tagged entry.
+  - From: Code Review Override - the ignore file that never reaches a clone
 
 ## Game UI/UX
 
@@ -306,42 +325,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 111 earlier items in `TODO-archive.md`, newest last.
+> 113 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The readouts stand down on screens the card was never bounded against
-  - **Issue**: `#game-mode.floated.reporting ~ #hud.floated` in `index.html` is
-    written outside every media query, so it fires wherever the pads are out.
-    The bound it pays for is not: `#game-mode.floated` is given a
-    `max-height` by `(max-width: 640px)`, by `(min-width: 641px) and
-    (max-width: 679px)`, and by `(max-height: 540px) and (min-width: 500px)`,
-    and by nothing at all above 679 pixels of width on a screen taller than
-    540. On a tablet flown from the glass at 1024x768 the card sits at
-    x 382..642 and the readouts at x 20..228, y 180..385, so the two never
-    meet - and the whole stack, `AIRSPEED` through `CAMERA`, goes invisible
-    for as long as a breakdown is up and comes back with nothing gained. The
-    rule's own comment says "on a screen this size", which is a size the rule
-    never names. The card is also unclipped there: no `max-height` and no
-    `overflow`, so the bound the CHANGELOG describes as everywhere is not.
-  - **Goal**: Give the stand-down the same screens the bound has - scoped to
-    the widths where the card is actually bounded against the stack - or bound
-    the card above 679 pixels of width so the trade is paid for wherever it is
-    taken. Pin whichever it is in `test/page.test.js` beside the six sizes.
-  - From: Code Review Override - the stand-down past the bound it pays for
-- [x] No screen wider than the card's narrow case is measured
-  - **Issue**: `MEASURED_SCREENS` in `test/page.test.js` is 393x852, 320x568,
-    393x578, 320x460, 852x330 and 568x320. Four are 640 or narrower and the
-    other two are 540 or shorter, so every one of them resolves through either
-    `(max-width: 640px)` or `(max-height: 540px) and (min-width: 500px)`. The
-    `(min-width: 641px) and (max-width: 679px)` block this turn added - the
-    421 and the 196 it declares - is read by no check at all, and neither is
-    the case above 679 where the card carries no bound. A wrong number in that
-    block, or the bound dropped from it, fails nothing.
-  - **Goal**: Add a screen in the 641..679 band on a height above 540 and one
-    wider than 679 to `MEASURED_SCREENS`, so the two arrangements this turn
-    wrote are measured the way the other six are. Note that the band check
-    reads a missing `max-height` as unmeasurable rather than as clear, so the
-    wider screen wants the bound question settled first.
-  - From: Code Review Override - the stand-down past the bound it pays for
 - [x] Card Clip 1: the card still clips through the middle of a line, in the
   other mode
   - **Issue**: The bounds are sums of the row heights declared on `#game-mode`,
@@ -453,3 +438,38 @@ how the simulator got here rather than as a list still to be worked.
     decision, and rolling the aircraft on a keypress nobody pressed for it is
     the kind of surprise this item exists to remove.
   - From: User Overrides
+- [x] The level off is still described as leaving the nose where the pilot put
+      it, in the module it is bound in and in the test that covers the binding
+  - **Issue**: `1.17.1-alpha` eased the nose to level and five documents were
+    rewritten to say so, but the two comments nearest the binding were not.
+    `js/input-map.js` line 34 tells a reader that `Space` "is an instruction to
+    trim the climb out and leave the nose exactly where the pilot put it", and
+    the doc comment above `test('space levels the flight off')` in
+    `test/input-map.test.js` line 73 says it "leaves the nose where the pilot
+    put it". Both now state the opposite of what the code does, and
+    `js/input-map.js` is the file a reader opens to find what `Space` is bound
+    to. `CHANGELOG.md` line 49 carries the same sentence and is correct there -
+    it is the record of what `1.17.0-alpha` shipped - so leave that one alone.
+  - **Goal**: Rewrite both comments around the nose easing to level, keeping
+    what each comment is there for: the binding comment explains why the key
+    sits beside reset rather than among the control surfaces, and the test
+    comment explains what one press saves the pilot. Name `LEVEL_OFF_SECONDS`
+    rather than writing the interval out as a number, so neither comment can
+    go stale the next time it moves.
+  - From: Code Review Override - the comments the level off left behind
+- [x] `.tmp/` is kept out of the repository by a personal global gitignore
+      rather than by the repository's own
+  - **Issue**: `git check-ignore -v .tmp/ui-ux/t6-probe.mjs` answers
+    `C:\Users\<user>\.gitignore_global:11:.*`, so the 250-odd screenshots, logs
+    and scratch `.mjs` files the UI/UX tester writes under `.tmp/ui-ux/` are
+    excluded by a rule that lives on one machine rather than by the project.
+    `.gitignore` already carries `test-results/` and `user-scripts/` under the
+    heading "Verification output written by the UI/UX tester, which is a record
+    of one run on one machine rather than anything the project ships", which is
+    a description of `.tmp/` as well. On a clone without that global rule -
+    another machine, or CI - the folder is untracked and visible, and a
+    `git add -A` sweeps all of it into the repository.
+  - **Goal**: Add `.tmp/` to `.gitignore` beside `test-results/` and
+    `user-scripts/`, and confirm with `git check-ignore -v` that the answer now
+    comes from the repository's own file rather than from a global one.
+  - From: Code Review Override - the comments the level off left behind
