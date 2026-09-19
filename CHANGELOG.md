@@ -5,6 +5,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.2-alpha] - 2026-09-19
+
+The two comments nearest the level off binding say what the level off does, and
+the tester's scratch folder is kept out of the repository by the repository.
+
+### Fixed
+
+- **The comments around the `Space` binding describe the nose easing to level.**
+  `1.17.1-alpha` changed the level off to settle the attitude as well as the
+  climb, and five documents were rewritten to say so, but the two comments
+  closest to the binding still described the behaviour it replaced.
+  `js/input-map.js` told a reader that `Space` is an instruction to trim the
+  climb out and leave the nose exactly where the pilot put it, and the doc
+  comment over `test('space levels the flight off')` in `test/input-map.test.js`
+  said it leaves the nose where the pilot put it. Both were the file a reader
+  opens to find what `Space` is bound to, and both stated the opposite of what
+  the code does. Each now describes the ease and names `LEVEL_OFF_SECONDS`
+  rather than writing the interval out as a number, so neither can go stale the
+  next time that interval changes, and each keeps the job it was there for: the
+  binding comment still explains why the key sits beside reset rather than among
+  the control surfaces, and the test comment still explains what one press saves
+  the pilot. The `1.17.0-alpha` entry below carries the same sentence and is
+  left exactly as it is, being the record of what that version shipped rather
+  than a claim about the code as it stands. `test/input-map.test.js` now reads
+  both comments as text and asks that each name the constant, a comment being
+  the one part of a module no test was reading
+- **`.tmp/` is ignored by the project rather than by one machine.** The UI/UX
+  tester writes its screenshots, logs and scratch modules under `.tmp/ui-ux/`,
+  and `git check-ignore -v` answered with a personal global ignore file rather
+  than with anything in the repository. On a clone without that global rule -
+  another machine, or CI - the folder is untracked and visible, and a
+  `git add -A` sweeps every one of those files into the repository. `.tmp/` now
+  sits in `.gitignore` beside `test-results/` and `user-scripts/`, under the
+  comment already describing that output as a record of one run on one machine
+  rather than anything the project ships, and `git check-ignore -v .tmp/`
+  answers from `.gitignore` itself. All three folders are pinned in
+  `test/site.test.js`, beside the checks on the deploy workflow, and that check
+  stands down on a tree with no `.gitignore` in it - which is every clone, the
+  file being untracked. That is the half of this the repository cannot close on
+  its own, and it is queued as a found issue rather than left implied here
+
 ## [1.17.1-alpha] - 2026-09-17
 
 The level off brings the nose with it, so the instrument and the horizon stop

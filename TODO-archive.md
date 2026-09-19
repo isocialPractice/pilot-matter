@@ -943,3 +943,40 @@ still be found by name.
     reads as a rendering fault. The other five screens are clean.
   - **Goal**: Resolve to [card-clipped-through-a-line.prompt.md](.claude/prompts/card-clipped-through-a-line.prompt.md)
   - From: UI/UX Override - the card's clip falls through a line
+
+## Archived 09-19-26
+
+- [x] The readouts stand down on screens the card was never bounded against
+  - **Issue**: `#game-mode.floated.reporting ~ #hud.floated` in `index.html` is
+    written outside every media query, so it fires wherever the pads are out.
+    The bound it pays for is not: `#game-mode.floated` is given a
+    `max-height` by `(max-width: 640px)`, by `(min-width: 641px) and
+    (max-width: 679px)`, and by `(max-height: 540px) and (min-width: 500px)`,
+    and by nothing at all above 679 pixels of width on a screen taller than
+    540. On a tablet flown from the glass at 1024x768 the card sits at
+    x 382..642 and the readouts at x 20..228, y 180..385, so the two never
+    meet - and the whole stack, `AIRSPEED` through `CAMERA`, goes invisible
+    for as long as a breakdown is up and comes back with nothing gained. The
+    rule's own comment says "on a screen this size", which is a size the rule
+    never names. The card is also unclipped there: no `max-height` and no
+    `overflow`, so the bound the CHANGELOG describes as everywhere is not.
+  - **Goal**: Give the stand-down the same screens the bound has - scoped to
+    the widths where the card is actually bounded against the stack - or bound
+    the card above 679 pixels of width so the trade is paid for wherever it is
+    taken. Pin whichever it is in `test/page.test.js` beside the six sizes.
+  - From: Code Review Override - the stand-down past the bound it pays for
+- [x] No screen wider than the card's narrow case is measured
+  - **Issue**: `MEASURED_SCREENS` in `test/page.test.js` is 393x852, 320x568,
+    393x578, 320x460, 852x330 and 568x320. Four are 640 or narrower and the
+    other two are 540 or shorter, so every one of them resolves through either
+    `(max-width: 640px)` or `(max-height: 540px) and (min-width: 500px)`. The
+    `(min-width: 641px) and (max-width: 679px)` block this turn added - the
+    421 and the 196 it declares - is read by no check at all, and neither is
+    the case above 679 where the card carries no bound. A wrong number in that
+    block, or the bound dropped from it, fails nothing.
+  - **Goal**: Add a screen in the 641..679 band on a height above 540 and one
+    wider than 679 to `MEASURED_SCREENS`, so the two arrangements this turn
+    wrote are measured the way the other six are. Note that the band check
+    reads a missing `max-height` as unmeasurable rather than as clear, so the
+    wider screen wants the bound question settled first.
+  - From: Code Review Override - the stand-down past the bound it pays for

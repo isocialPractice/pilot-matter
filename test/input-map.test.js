@@ -7,6 +7,7 @@ import {
     wantsVerticalChange, LEVEL_OFF_KEYS, VERTICAL_CONTROLS, CONTROL_NAMES
 } from '../js/input-map.js';
 import { MENU_SELECT_KEYS } from '../js/menu.js';
+import { LEVEL_OFF_SECONDS } from '../js/flight-model.js';
 
 // js/aircraft.js imports Three.js, so what it does with these keys is read off
 // its source rather than by loading it.
@@ -14,6 +15,34 @@ const aircraftSource = readFileSync(
     fileURLToPath(new URL('../js/aircraft.js', import.meta.url)),
     'utf8'
 );
+
+// The two comments that go stale together, read as text: the one above the
+// binding, and the one above the test that covers it, in this file.
+const inputMapSource = readFileSync(
+    fileURLToPath(new URL('../js/input-map.js', import.meta.url)),
+    'utf8'
+);
+const ownSource = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+
+/**
+ * The comment block sitting directly above `anchor` in `source`, as one string.
+ * Walks back from the anchor while the lines are comment lines, which covers
+ * both shapes read here - the run of `//` lines above a binding, and the doc
+ * block above a test.
+ */
+function commentAbove(source, anchor) {
+    const lines = source.split('\n');
+    const at = lines.findIndex(line => line.includes(anchor));
+    assert.ok(at > 0, `${anchor} should be in the source being read`);
+
+    const comment = [];
+    for (let index = at - 1; index >= 0; index--) {
+        const line = lines[index].trim();
+        if (line === '' || !/^(\/\/|\/\*|\*)/.test(line)) break;
+        comment.unshift(line);
+    }
+    return comment.join('\n');
+}
 
 test('createInputState starts with every control released', () => {
     const input = createInputState();
@@ -70,7 +99,10 @@ test('unmapped keys return null and leave the state untouched', () => {
 /**
  * Holding an altitude used to mean trimming the vertical speed to zero by hand,
  * which is a fiddle in the middle of everything else a landing asks for. Space
- * does it in one press, and leaves the nose where the pilot put it.
+ * does it in one press: the vertical speed goes to zero on the frame the key
+ * goes down, and the nose eases from wherever the pilot left it to level over
+ * LEVEL_OFF_SECONDS, so the pilot is not left flying the attitude back by hand
+ * after the instrument has already said the climb is over.
  */
 test('space levels the flight off', () => {
     assert.equal(isLevelOffKey('Space'), true);
@@ -135,4 +167,25 @@ test('the aircraft holds the altitude it was levelled at', () => {
     assert.ok(/this\.holdingAltitude && this\.airborne\)\s*this\.position\.y = startY/
         .test(aircraftSource),
         'the altitude held is the one the aircraft was at, and only in the air');
+});
+
+/**
+ * The comments nearest the binding spent a version describing the level off as
+ * leaving the nose alone, which is what it did until the nose was eased to
+ * level, and nothing caught it - a comment being the one part of a module no
+ * test reads. This one reads them, and asks that each name the interval rather
+ * than write it out, so the number moving cannot strand either of them.
+ */
+test('the level off is described where it is bound as the ease it is', () => {
+    const comments = [
+        ['js/input-map.js', commentAbove(inputMapSource, 'export const LEVEL_OFF_KEYS')],
+        ['this file',       commentAbove(ownSource, "test('space levels the flight off'")]
+    ];
+
+    for (const [where, comment] of comments) {
+        assert.ok(comment.includes('LEVEL_OFF_SECONDS'),
+            `the level off comment in ${where} should name the interval the nose eases over`);
+        assert.ok(!comment.includes(String(LEVEL_OFF_SECONDS)),
+            `and name it rather than writing ${LEVEL_OFF_SECONDS} out, which goes stale when the interval moves`);
+    }
 });

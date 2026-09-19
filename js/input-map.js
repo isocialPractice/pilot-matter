@@ -31,8 +31,10 @@ export const RESET_KEYS = ['KeyR'];
 
 // Levelling off is not a control surface either, and is bound here beside
 // reset for the same reason: it is an instruction to trim the climb out and
-// leave the nose exactly where the pilot put it, rather than a surface held
-// while a key is down.
+// ease the nose down to level over LEVEL_OFF_SECONDS, rather than a surface
+// held while a key is down. The interval is in js/flight-model.js; nothing
+// about the ease is configured here, because a binding is what the key means
+// rather than how long it takes.
 //
 // It also has to stay out of the input state because space is the key a menu
 // is chosen with. A menu takes its own keys before the flight behind it reads
