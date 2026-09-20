@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+The `1.17.2-alpha` entry's account of the ignore rules is corrected to claim
+only what that release carries.
+
+### Fixed
+
+- **The second `1.17.2-alpha` bullet is headed as a rule the project applies,
+  and the release carries no file that would apply it.** Its heading, "`.tmp/`
+  is ignored by the project rather than by one machine", reads as a rule that
+  travels with the repository, and the same paragraph takes it back four
+  sentences later - "which is every clone, the file being untracked". What that
+  release actually contains is the rule written into this repository's own
+  `.gitignore`, beside `test-results/` and `user-scripts/`, in a file that is
+  itself untracked and so reaches no clone: `git ls-files .gitignore` comes back
+  empty, and `git check-ignore -v .gitignore` answers with a personal global
+  ignore file rather than with anything the repository owns. The entry's closing
+  sentence, that this is "the half of this the repository cannot close on its
+  own", was wrong rather than overstated. Force-adding the file is a call left
+  to the user rather than one a run takes, because what excludes it is the
+  user's own global configuration rather than a limit on this repository -
+  `.nojekyll` is tracked here under the same global `.*` rule that hides
+  `.gitignore`, so a dotfile in this repository can be force-added and one
+  already has been. `TODO.md` put it that way from the start, and only the
+  changelog put it as an impossibility. Nothing about the rule itself has
+  changed, and the tagged `1.17.2-alpha` entry is left exactly as it shipped,
+  being the record of that release rather than a claim about the code as it
+  stands
+
 ## [1.17.2-alpha] - 2026-09-19
 
 The two comments nearest the level off binding say what the level off does, and
