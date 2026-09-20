@@ -22,63 +22,32 @@ its context survives being archived.
 - [ ] **Search and Rescue**: find a marker placed somewhere in the world given
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
-
-### Code Review Override - the ignore file that never reaches a clone
-
-#### Found Issues
-
-- [ ] `.gitignore` is not in the repository, so none of the rules in it reach a
-      clone
+- [ ] **User todo**: force-add `.gitignore`, or narrow the global rule that
+  hides it, so the repository's own ignore rules reach a clone
   - **Issue**: The file exists in the working copy and nothing tracks it.
     `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
     it "exists on disk, but not in 'HEAD'", and `git check-ignore -v .gitignore`
     answers with a `.gitignore` rule in a personal global ignore file, so it has
     never been staged and cannot be by an ordinary `git add`. Nothing in the
     repository therefore carries `test-results/`, `user-scripts/`, or the
-    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all, which
-    is the same exposure that item set out to close, one level further out. It
+    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all. It
     reaches the deploy too - `actions/checkout` in
     `.github/workflows/workflow.yml` fetches a tree without the file, and the
-    workflow runs `npm test` against it, so the guard added in
-    `test/site.test.js` skips itself there rather than failing the deploy for a
-    thing the deploy cannot fix.
-  - **Goal**: Get `.gitignore` tracked, so its rules travel with the repository
-    instead of living on one machine. Staging it needs `git add -f`, because
-    what excludes it is the user's own global ignore configuration rather than
-    anything this repository owns - so the call is the user's, either
-    force-adding the file once or narrowing that global rule. Do not force-add
-    it from a run. Once it is tracked, drop the stand-down branch at the top of
-    the `test/site.test.js` check so the guard applies on every tree, and say in
-    that run's changelog entry that the rules now reach a clone.
-  - From: Code Review Override - the ignore file that never reaches a clone
-- [ ] The `1.17.2-alpha` changelog entry claims the ignore rules reach the
-      project, and calls the half that does not something the repository cannot
-      close
-  - **Issue**: The entry ships in a tree that carries no `.gitignore`.
-    `git add -An` lists the seven tracked files this turn changed and skips
-    `.gitignore`, so the commit and the `v1.17.2-alpha` tag carry the entry
-    without the file it describes. Its bolded lead, "`.tmp/` is ignored by the
-    project rather than by one machine", is therefore not true of the release,
-    and the same paragraph disclaims it further down - "which is every clone,
-    the file being untracked" - so the bullet contradicts its own heading under
-    a `### Fixed` list. The closing sentence, "That is the half of this the
-    repository cannot close on its own", is wrong rather than overstated:
-    `.nojekyll` is tracked here under the same global `.*` rule that hides
-    `.gitignore`, so a dotfile in this repository can be force-added and one
-    already has been. The run declined to, which is a decision about whose
-    configuration is being worked around rather than a limit on the repository.
-    `TODO.md` puts it correctly - "the call is the user's" - and only
-    `CHANGELOG.md` puts it as an impossibility.
-  - **Goal**: Reword the `1.17.2-alpha` entry's second `### Fixed` bullet so
-    its heading claims only what the release contains: the rule is written into
-    the repository's own `.gitignore`, which does not yet travel with the
-    repository. Replace "cannot close on its own" with what is true, that
-    force-adding the file is a call left to the user rather than one a run
-    takes. Do not restate it as a fix that landed, and do not touch the first
-    bullet or any earlier version's entry. If the release is already tagged
-    when this is worked, correct it under an `Unreleased` heading rather than
-    editing the tagged entry.
-  - From: Code Review Override - the ignore file that never reaches a clone
+    workflow runs `npm test` against it, so the guard in `test/site.test.js`
+    skips itself there rather than failing the deploy for a thing the deploy
+    cannot fix.
+  - **Goal**: Either force-add the file once with `git add -f .gitignore`, or
+    narrow the rule excluding it in the global ignore file so this repository's
+    copy stops being caught by it. Both are the user's call, which is why this
+    is a user item and no run attempts it: what excludes the file is the user's
+    own global configuration rather than anything this repository owns.
+    `.nojekyll` is tracked here under that same global rule, so force-adding a
+    dotfile is a route this repository has already taken once.
+  - Once it is tracked, the other half is ordinary work a run can take: drop the
+    stand-down branch at the top of the `test/site.test.js` check so the guard
+    applies on every tree, and say in that run's changelog entry that the rules
+    now reach a clone. Queue that only after the file is tracked - until then it
+    has nothing to apply to.
 
 ## Game UI/UX
 
@@ -325,30 +294,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 113 earlier items in `TODO-archive.md`, newest last.
+> 114 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Card Clip 1: the card still clips through the middle of a line, in the
-  other mode
-  - **Issue**: The bounds are sums of the row heights declared on `#game-mode`,
-    and each of those is a single line of that row's type. The card is
-    `min-width: 260px` with `20px` of side padding and a `1px` border, so a row
-    has 218 pixels to be written across at the card's narrowest and a longer one
-    wraps to two lines. `RUNWAY LANDING` fits: its name, objective, status and
-    clock lay out at 14, 20, 15 and 15 pixels, which is what they declare, and
-    all six screens are clean in both readings. `FLYING THROUGH LOOPS` does not:
-    the same four lay out at 28, 36, 27 and 15, and the pointer at 37 against
-    the 19 it declares. So in ordinary flight, pads out, no landing and no gate
-    involved, `FLY THROUGH EVERY LOOP` runs 277 to 309 against a clip ending at
-    287 on 320x460 and is cut by 22 pixels - most of the row, on the shortest
-    screen a browser leaves, which is the screen the completed item is named
-    for. `THREE GATES  ·  STAGE 1 OF 4  ·  LOOP 1 OF 3` is cut by 1 on 320x568
-    and the `TIME` line by 6 on 393x578. 393x852, 852x330 and 568x320 are clean,
-    because the card is past its minimum width there and nothing wraps. Nothing
-    fails: `npm test` is 937 passing, and `CARD_STATES` in `test/page.test.js`
-    models the card the way the stylesheet does, one declared height per row, so
-    the model and the stylesheet agree about a height neither of them measures.
-  - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
-  - From: UI/UX Override - the card's clip falls through a line
 - [x] Slow the orbiting camera's spin, and make the rate something a pilot sets
   - **Issue**: The drone-style orbit sweeps fast enough to be hard to read the
     world from, and the rate is a constant in the camera code rather than
@@ -473,3 +420,31 @@ how the simulator got here rather than as a list still to be worked.
     `user-scripts/`, and confirm with `git check-ignore -v` that the answer now
     comes from the repository's own file rather than from a global one.
   - From: Code Review Override - the comments the level off left behind
+- [x] The `1.17.2-alpha` changelog entry claims the ignore rules reach the
+      project, and calls the half that does not something the repository cannot
+      close
+  - **Issue**: The entry ships in a tree that carries no `.gitignore`.
+    `git add -An` lists the seven tracked files this turn changed and skips
+    `.gitignore`, so the commit and the `v1.17.2-alpha` tag carry the entry
+    without the file it describes. Its bolded lead, "`.tmp/` is ignored by the
+    project rather than by one machine", is therefore not true of the release,
+    and the same paragraph disclaims it further down - "which is every clone,
+    the file being untracked" - so the bullet contradicts its own heading under
+    a `### Fixed` list. The closing sentence, "That is the half of this the
+    repository cannot close on its own", is wrong rather than overstated:
+    `.nojekyll` is tracked here under the same global `.*` rule that hides
+    `.gitignore`, so a dotfile in this repository can be force-added and one
+    already has been. The run declined to, which is a decision about whose
+    configuration is being worked around rather than a limit on the repository.
+    `TODO.md` puts it correctly - "the call is the user's" - and only
+    `CHANGELOG.md` puts it as an impossibility.
+  - **Goal**: Reword the `1.17.2-alpha` entry's second `### Fixed` bullet so
+    its heading claims only what the release contains: the rule is written into
+    the repository's own `.gitignore`, which does not yet travel with the
+    repository. Replace "cannot close on its own" with what is true, that
+    force-adding the file is a call left to the user rather than one a run
+    takes. Do not restate it as a fix that landed, and do not touch the first
+    bullet or any earlier version's entry. If the release is already tagged
+    when this is worked, correct it under an `Unreleased` heading rather than
+    editing the tagged entry.
+  - From: Code Review Override - the ignore file that never reaches a clone

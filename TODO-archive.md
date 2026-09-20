@@ -980,3 +980,28 @@ still be found by name.
     reads a missing `max-height` as unmeasurable rather than as clear, so the
     wider screen wants the bound question settled first.
   - From: Code Review Override - the stand-down past the bound it pays for
+
+## Archived 09-20-26
+
+- [x] Card Clip 1: the card still clips through the middle of a line, in the
+  other mode
+  - **Issue**: The bounds are sums of the row heights declared on `#game-mode`,
+    and each of those is a single line of that row's type. The card is
+    `min-width: 260px` with `20px` of side padding and a `1px` border, so a row
+    has 218 pixels to be written across at the card's narrowest and a longer one
+    wraps to two lines. `RUNWAY LANDING` fits: its name, objective, status and
+    clock lay out at 14, 20, 15 and 15 pixels, which is what they declare, and
+    all six screens are clean in both readings. `FLYING THROUGH LOOPS` does not:
+    the same four lay out at 28, 36, 27 and 15, and the pointer at 37 against
+    the 19 it declares. So in ordinary flight, pads out, no landing and no gate
+    involved, `FLY THROUGH EVERY LOOP` runs 277 to 309 against a clip ending at
+    287 on 320x460 and is cut by 22 pixels - most of the row, on the shortest
+    screen a browser leaves, which is the screen the completed item is named
+    for. `THREE GATES  ·  STAGE 1 OF 4  ·  LOOP 1 OF 3` is cut by 1 on 320x568
+    and the `TIME` line by 6 on 393x578. 393x852, 852x330 and 568x320 are clean,
+    because the card is past its minimum width there and nothing wraps. Nothing
+    fails: `npm test` is 937 passing, and `CARD_STATES` in `test/page.test.js`
+    models the card the way the stylesheet does, one declared height per row, so
+    the model and the stylesheet agree about a height neither of them measures.
+  - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
+  - From: UI/UX Override - the card's clip falls through a line
