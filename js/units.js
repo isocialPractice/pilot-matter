@@ -143,7 +143,7 @@ export function bearingToDirection(degrees) {
  * between two places is a measurement rather than a reading off a dial, so
  * what is drawn is rounded where it is drawn and what is computed keeps the
  * whole of it. A caller writing this straight onto the glass wants a
- * `Math.round` around it, the way `formatGatePointer` has one.
+ * `Math.round` around it, the way `formatRunPointer` has one.
  *
  * A direction of nothing at all reads as north, because `Math.atan2(0, 0)` is
  * 0 and the wrap below leaves it there.

@@ -735,6 +735,12 @@ const RUNWAY_ACROSS = 3;
 // going - instead of silently getting none.
 const RUNWAY_BAND_PENALTY = 4;
 
+// And what a unit inside another strip's stand-off costs. Steeper than the
+// band's, because a second strip landing on the first is a world the mode
+// cannot be played in at all, while a strip a little outside its height band is
+// only a harder approach.
+const RUNWAY_CROWDING_PENALTY = 12;
+
 // Where the paint goes, as fractions of the half width and the half length: a
 // stripe down each shoulder, and a bar across each threshold.
 const RUNWAY_SHOULDER  = 0.78;
@@ -786,6 +792,11 @@ const runway = {
         // How far the graded ground reaches past the paved strip, in strip
         // widths, easing back into the ground it was cut into.
         apron: scalar(0, 3, 1.1),
+        // How far this strip has to stand off any strip already laid in the
+        // same world, in world units. Zero is no rule at all, which is the
+        // case every world with one strip in it is, and is why a world that
+        // never asks for a second strip is laid exactly as it always was.
+        separation: scalar(0, 12000, 0),
         color: gradient([0.32, 0.32, 0.34], [0.11, 0.11, 0.13]),
         mark:  gradient([0.95, 0.95, 0.92], [0.70, 0.72, 0.70])
     },
@@ -796,7 +807,12 @@ const runway = {
         const site   = chooseRunwaySite(field, config, length, width, random);
         if (!site) return null;
 
-        const strip = { ...site, ...clearRunwayGround(field, site.elevation), length, width };
+        // The strips of a world are an ordered list, and a mode that asks a
+        // pilot to land at one and then at the next needs to be able to say
+        // which is which. The number is the order they were laid in, which is
+        // the order the placements ask for them.
+        const index = field.runways.length;
+        const strip = { ...site, ...clearRunwayGround(field, site.elevation), length, width, index };
         gradeRunway(field, strip, config);
         field.runways.push(strip);
         return strip;
@@ -1427,7 +1443,10 @@ function paintBand(field, [low, high], color) {
  * A site outside the band the strip may be built in is charged for the part of
  * it that lies outside rather than thrown away, so the search always comes back
  * with somewhere: a world with no ground inside the band gets the best ground it
- * has instead of getting no runway at all.
+ * has instead of getting no runway at all. A site too near a strip already laid
+ * is charged the same way and for the same reason - a world that asks for two
+ * strips gets two however tight the ground is, rather than getting one and a
+ * failure.
  */
 function chooseRunwaySite(field, config, length, width, random) {
     const reach = field.size / 2 - length / 2 - field.step * 2;
@@ -1447,13 +1466,37 @@ function chooseRunwaySite(field, config, length, width, random) {
 
         const ground  = measureRunwayGround(field, site, length, width);
         const outside = Math.max(0, floor - ground.low) + Math.max(0, ground.high - ceiling);
-        const score   = ground.spread + outside * RUNWAY_BAND_PENALTY;
+        const crowded = crowding(field.runways, site, config.separation ?? 0);
+        const score   = ground.spread
+            + outside * RUNWAY_BAND_PENALTY
+            + crowded * RUNWAY_CROWDING_PENALTY;
 
         if (best && score >= best.score) continue;
         best = { ...site, elevation: ground.mean, spread: ground.spread, score };
     }
 
     return best;
+}
+
+/**
+ * How far inside its stand-off a candidate site falls, taking the worst of the
+ * strips already laid. Zero once it is clear of all of them, which is every
+ * site in a world that asked for no separation at all.
+ *
+ * Measured centre to centre, which is the reading a separation is easiest to
+ * mean: a pilot asking for strips two miles apart is asking about the flight
+ * between them rather than about the gap between their thresholds.
+ */
+function crowding(runways, site, separation) {
+    if (!(separation > 0)) return 0;
+
+    let worst = 0;
+    for (const strip of runways ?? []) {
+        const gap = Math.hypot(site.x - strip.x, site.z - strip.z);
+        worst = Math.max(worst, separation - gap);
+    }
+
+    return worst;
 }
 
 /** How level the ground under a candidate strip is, and what height it sits at. */

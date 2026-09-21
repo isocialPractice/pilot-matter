@@ -150,8 +150,8 @@ Everything above is stored in `localStorage` and reopens with the next session.
 | `DUNE SEA` | `dune-sea` | Dunes, outcrops, one desert river, palm groves |
 | `LAKESIDE` | `lakeside` | A town on a lake, forested hills, snow peaks |
 
-Two more are built for the modes and kept out of the panel: `OPEN COUNTRY` and
-`LOOP VALLEY`.
+Three more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
+`LOOP VALLEY` and `BACK COUNTRY`.
 
 ## Elements
 
@@ -194,9 +194,18 @@ available while a game mode is being played: a mode brings its own ground.
 |------|--------|-----------|
 | `RUNWAY LANDING` | 4 | Land on the strip. Harder: further out, off the line, shorter strip, higher country, less help |
 | `FLYING THROUGH LOOPS` | 4 | Fly the gates in order. Harder: more gates, tighter, closer, bending more, laid further over |
+| `DEAD STICK` | 4 | Glide to the strip, engine out. Harder: less height, further out, off the line, less help |
+| `CARGO RUN` | 3 | Land at each strip in turn. Harder: strips further apart, less budget, a third stop |
+| `SEARCH AND RESCUE` | 3 | Find the marker and set down beside it. Harder: further out, rougher ground, a tighter ring |
 
 Gate colours: green is the one the course is waiting on, amber is still to
 come, dim is behind you. A crash restarts the stage.
+
+With no engine - a dead stick, or a cargo run out of budget - the nose sets
+the airspeed instead of the lever: nose down buys speed with height, nose up
+gives it back, and a level glide reaches about twelve times the height it
+spends. A cargo run writes what is left of its budget where the time to beat
+goes, and only an open throttle spends it.
 
 Gates are laid over from the second stage on, and closed up one way across as
 they are - a round hoop is the same hoop at every angle, so a gate that has to

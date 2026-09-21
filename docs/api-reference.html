@@ -790,28 +790,35 @@ const pilot = createPilot({
 
 <h2 id="game-modes">Game modes</h2>
 
-<p>The bundled game is played in modes, and the rules behind them are pure: the stages, the run state, the course a set of loops is laid out as, and the test for whether a gate was flown through. A host can play them against its own renderer, or read them as a worked example of a game built on the two APIs.</p>
+<p>The bundled game is played in modes, and the rules behind them are pure: the stages, the run state, the course a set of loops is laid out as, the test for whether a gate was flown through, the budget a route is flown against, and the marker a search is flown to. A host can play them against its own renderer, or read them as a worked example of a game built on the two APIs.</p>
 
 <div class="table-wrap">
 <table>
     <thead><tr><th>Export</th><th>Is</th></tr></thead>
     <tbody>
         <tr><td><code>GAME_MODES</code>, <code>GAME_MODE_IDS</code></td><td>The modes there are</td></tr>
-        <tr><td><code>RUNWAY_LANDING</code>, <code>LOOP_COURSE</code></td><td>The two of them by name</td></tr>
-        <tr><td><code>LAND_OBJECTIVE</code>, <code>LOOP_OBJECTIVE</code></td><td>What a mode is asking for</td></tr>
+        <tr><td><code>RUNWAY_LANDING</code>, <code>LOOP_COURSE</code>, <code>DEAD_STICK</code>, <code>CARGO_RUN</code>, <code>SEARCH_RESCUE</code></td><td>The five of them by name</td></tr>
+        <tr><td><code>LAND_OBJECTIVE</code>, <code>LOOP_OBJECTIVE</code>, <code>CARGO_OBJECTIVE</code>, <code>SEARCH_OBJECTIVE</code></td><td>What a mode is asking for</td></tr>
         <tr><td><code>getGameMode(id)</code>, <code>isGameModeId(id)</code></td><td>Looking one up</td></tr>
         <tr><td><code>createRunState(modeId)</code>, <code>startRun(state, id)</code>, <code>endRun(state)</code></td><td>A run, started and stopped</td></tr>
         <tr><td><code>runningMode(state)</code>, <code>currentStage(state)</code>, <code>advanceStage(state)</code>, <code>restartStage(state)</code></td><td>Where it is up to</td></tr>
-        <tr><td><code>recordLanding(state)</code>, <code>recordGate(state, index)</code>, <code>recordCrash(state)</code></td><td>Telling it what happened</td></tr>
-        <tr><td><code>stageProgress(state)</code>, <code>isStageComplete(state)</code>, <code>nextGate(state)</code></td><td>How far through it is</td></tr>
+        <tr><td><code>recordLanding(state, runway)</code>, <code>recordGate(state, index)</code>, <code>recordRescue(state, marker, report)</code>, <code>recordCrash(state)</code></td><td>Telling it what happened</td></tr>
+        <tr><td><code>stageProgress(state)</code>, <code>isStageComplete(state)</code>, <code>nextGate(state)</code>, <code>nextStrip(state)</code></td><td>How far through it is</td></tr>
+        <tr><td><code>progressNoun(state)</code>, <code>stripIndex(runway)</code></td><td>What it counts in, and which strip a landing was made on</td></tr>
         <tr><td><code>runObjective(state)</code>, <code>runStatus(state)</code></td><td>What to write on the screen</td></tr>
+        <tr><td><code>runPointer(state, world, position, heading)</code></td><td>Where the thing it is waiting on lies</td></tr>
+        <tr><td><code>gatePointer(...)</code>, <code>stripPointer(...)</code>, <code>searchBriefing(state)</code></td><td>The three that answers with</td></tr>
         <tr><td><code>stageWorld(state)</code></td><td>The world the stage is flown over</td></tr>
         <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
         <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
         <tr><td><code>gatePassed(ring, from, to)</code>, <code>gateMissed(ring, from, to)</code>, <code>gateOffset(ring, point)</code></td><td>Whether a step went through one, or past it</td></tr>
         <tr><td><code>gateCrossing(ring, from, to)</code></td><td>The one crossing both of those are read off</td></tr>
-        <tr><td><code>gateAspect(ring)</code>, <code>gateAxes(ring)</code></td><td>The shape of a gate's opening, and the two directions across it</td></tr>
+        <tr><td><code>gateAspect(ring)</code>, <code>gateAxes(ring)</code></td><td>The shape of a gate opening, and the two directions across it</td></tr>
         <tr><td><code>flyStep(state, course, from, to)</code></td><td>Both of those put to the gate the course is waiting on</td></tr>
+        <tr><td><code>ENGINE_LIVE</code>, <code>ENGINE_DEAD</code>, <code>runEngine(state)</code>, <code>engineLive(state)</code></td><td>Whether the run still has an engine</td></tr>
+        <tr><td><code>stageBudget(state)</code>, <code>burnFuel(state, throttle, dt)</code>, <code>fuelRemaining(state)</code></td><td>The budget a route spends on its throttle</td></tr>
+        <tr><td><code>stageStrips(state)</code></td><td>How many strips a route stops at</td></tr>
+        <tr><td><code>stageMarker(state)</code>, <code>RESCUE_RADIUS</code>, <code>RESCUE_STOP_SPEED</code></td><td>The marker a search is flown to, and what counts as beside it</td></tr>
         <tr><td><code>approachThreshold(runway)</code></td><td>The end of a strip a landing stage is flown onto</td></tr>
         <tr><td><code>approachGuidance(state, runway)</code></td><td>What is drawn on the ground to help the pilot find it</td></tr>
         <tr><td><code>CENTRELINE_REACH</code>, <code>CENTRELINE_MARKS</code></td><td>How far the lead-in runs back, and in how many marks</td></tr>
@@ -843,6 +850,60 @@ function frame(dt) {
 <p>A gate is <code>{index, x, y, z, radius, aspect, bank, dirX, dirZ}</code>. <code>dirX</code> and <code>dirZ</code> are the way the course runs through it; <code>radius</code> is its half width; <code>aspect</code> is how tall it is against that width; and <code>bank</code> is how far over it was laid, as a turn about the way the course runs. Those last two are what make a gate an attitude to match rather than a place to be: a circle turned about its own axis is the same circle, so a gate that has to be flown at the angle it was laid at has to be narrower one way across than the other. <code>gateAxes</code> gives the span and the rise a crossing is measured on, which is what a host draws the hoop about so that the opening it draws and the opening <code>gateCrossing</code> tests are one opening.</p>
 
 <p>A landing stage may be given help finding its strip, and <code>approachGuidance</code> is what to draw: an extended centreline running back down the approach as a list of <code>marks</code>, and a bar across the <code>threshold</code>, with the <code>heading</code>, <code>width</code> and <code>elevation</code> of the strip they belong to. Which of the two a stage is given is declared on the stage, and by the last of them there is neither. It answers null where there is nothing to draw, which is what leaves the ground clear.</p>
+
+<h3 id="flying-without-an-engine">Flying without an engine</h3>
+
+<p><code>runEngine</code> answers whether the run still has one. Two things take it away and both come back through that one call, because the aircraft flies the same way either way: a mode declared without one, and a route that has spent the last of its budget. A host reads it every frame and holds the lever closed when it comes back <code>ENGINE_DEAD</code>; the airspeed then follows the attitude rather than the throttle, which is what makes reaching anywhere a glide to be planned rather than a descent to be flown.</p>
+
+<pre><code>import { createRunState, DEAD_STICK, engineLive } from 'pilot-matter';
+
+const run = createRunState(DEAD_STICK);
+
+function frame(dt) {
+    pilot.setEngine(engineLive(run));
+    pilot.update(dt);
+}</code></pre>
+
+<h3 id="a-route-and-the-budget-it-is-flown-on">A route, and the budget it is flown on</h3>
+
+<p>A route stops at several strips in the order they were laid, so a landing is reported with the strip it was made on. Only the strip the route is up to counts, which is the same rule a course of loops is flown under: <code>nextStrip</code> says which one that is, and <code>recordLanding</code> answers false for any other. <code>stageWorld</code> gives a route stage an <code>elements</code> list describing the strips rather than asking for one and being given it, because a world lays a single strip on its own.</p>
+
+<p><code>burnFuel</code> is the budget, spent a frame at a time. The burn is the lever setting itself, so a wide open throttle costs a second of budget per second and a closed one costs nothing at all - which is what makes the route worth planning rather than merely flying. <code>fuelRemaining</code> is what is left as a share of the whole, for writing on an instrument, and answers null for a run with no budget to read.</p>
+
+<pre><code>import { createRunState, CARGO_RUN, burnFuel, recordLanding, nextStrip } from 'pilot-matter';
+
+const run = createRunState(CARGO_RUN);
+
+function frame(dt) {
+    burnFuel(run, pilot.telemetry().throttle, dt);
+    pilot.update(dt);
+}
+
+function onLanding(runway) {
+    if (recordLanding(run, runway)) say(`down at strip ${nextStrip(run)}`);
+}</code></pre>
+
+<h3 id="a-search-and-the-marker-it-is-flown-to">A search, and the marker it is flown to</h3>
+
+<p><code>stageMarker</code> is where the marker stands, as <code>{x, z, bearing, distance, radius}</code>. The bearing and the distance are measured from where the stage opens rather than from the aircraft, because they are the whole of the briefing the pilot is given: <code>searchBriefing</code> is that briefing as a line to write, and it stays where it was however far the flight has got, which a needle following the marker round would not.</p>
+
+<p><code>recordRescue</code> is the set-down. It is handed where the aircraft has come to rest and answers true once: on the ground, stopped, inside the circle, and not a wreck.</p>
+
+<pre><code>import { createRunState, SEARCH_RESCUE, stageMarker, recordRescue } from 'pilot-matter';
+
+const run = createRunState(SEARCH_RESCUE);
+const marker = stageMarker(run);
+
+function frame(dt) {
+    pilot.update(dt);
+
+    const { position, airspeed } = pilot.telemetry();
+    const found = recordRescue(run, marker, {
+        x: position.x, z: position.z, speed: airspeed, airborne: pilot.isAirborne()
+    });
+
+    if (found) say('found');
+}</code></pre>
 
 <h2 id="worlds-and-elements">Worlds and elements</h2>
 

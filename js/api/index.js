@@ -84,17 +84,24 @@ export {
 } from '../tilt-controls.js';
 
 // The modes the bundled game is played in, and the pure rules behind them: the
-// stages, the run state, the course geometry, the gate tests, and the step a
-// course is flown a frame at a time with.
+// stages, the run state, the course geometry, the gate tests, the step a course
+// is flown a frame at a time with, the budget a route is flown against, and the
+// marker a search is flown to.
 export {
     GAME_MODES, GAME_MODE_IDS, RUNWAY_LANDING, LOOP_COURSE,
-    LAND_OBJECTIVE, LOOP_OBJECTIVE,
+    DEAD_STICK, CARGO_RUN, SEARCH_RESCUE,
+    LAND_OBJECTIVE, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE,
+    ENGINE_LIVE, ENGINE_DEAD,
     getGameMode, isGameModeId,
     createRunState, startRun, endRun, runningMode, currentStage, advanceStage,
-    restartStage, recordLanding, recordGate, recordCrash, nextGate,
-    stageProgress, isStageComplete, runObjective, runStatus,
+    restartStage, recordLanding, recordGate, recordCrash, recordRescue,
+    nextGate, nextStrip, stripIndex,
+    stageProgress, progressNoun, isStageComplete, runObjective, runStatus,
     stageWorld, stageStart, buildCourse,
+    stageBudget, stageStrips, burnFuel, fuelRemaining, runEngine, engineLive,
+    stageMarker, RESCUE_RADIUS, RESCUE_STOP_SPEED,
     gateOffset, gateAspect, gateAxes, gateCrossing, gatePassed, gateMissed, flyStep,
+    gatePointer, runPointer, stripPointer, searchBriefing,
     approachThreshold, approachGuidance, CENTRELINE_REACH, CENTRELINE_MARKS
 } from '../game-modes.js';
 

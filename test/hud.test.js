@@ -20,7 +20,7 @@ import {
     showsLowAltitude,
     DISTANCE_STEP,
     formatGateDistance,
-    formatGatePointer,
+    formatRunPointer,
     formatStageClock,
     formatLandingReport,
     LANDING_PART_LABELS,
@@ -260,7 +260,7 @@ test('a distance settles on a step rather than running every frame', () => {
 });
 
 test('a gate off the screen is pointed at with the turn, the bearing, and the range', () => {
-    const line = formatGatePointer(
+    const line = formatRunPointer(
         { index: 2, bearing: 7, relative: -120, arrow: '←', distance: 4000 },
         'feet'
     );
@@ -272,14 +272,56 @@ test('a gate off the screen is pointed at with the turn, the bearing, and the ra
     assert.ok(line.includes('ft'), 'on a scale the pilot can read');
 });
 
+// A strip and a marker go in the same row a loop does, so the row has to be
+// able to say what it is pointing at rather than assuming.
+test('whatever the run is waiting on is named by the pointer that laid it', () => {
+    const line = formatRunPointer(
+        { index: 1, label: 'STRIP 2', bearing: 73, relative: 40, arrow: '→', distance: 4000 },
+        'feet'
+    );
+
+    assert.ok(line.includes('STRIP 2'), 'the strip the route is up to');
+    assert.ok(!line.includes('LOOP'), 'and nothing about a loop, which this is not');
+});
+
+// A briefing is a bearing the pilot was given rather than a needle following
+// the marker round, so it is written without the glyph that would make it one.
+test('a pointer with no arrow is written without one, and without its gap', () => {
+    const line = formatRunPointer(
+        { index: 0, label: 'MARKER ON', bearing: 287, relative: 0, arrow: '', distance: 6800 },
+        'feet'
+    );
+
+    assert.ok(line.startsWith('MARKER ON'), 'the briefing opens the line it is the whole of');
+    assert.ok(line.includes('287'), 'on the bearing it was given at');
+});
+
 test('a gate the pilot can see is not written about at all', () => {
-    assert.equal(formatGatePointer(null), '');
+    assert.equal(formatRunPointer(null), '');
 });
 
 test('the clock carries the time flown and the time to beat', () => {
     const line = formatStageClock(42.13, 38.4);
     assert.ok(line.includes('0:42.1'));
     assert.ok(line.includes('0:38.4'));
+});
+
+// A route is raced against its budget rather than against a time, and the clock
+// row is the only row on the card that is written every frame - so the fuel
+// takes the half of it the time to beat would otherwise have.
+test('a stage flown against a budget puts the fuel where the time to beat goes', () => {
+    const line = formatStageClock(42.13, 38.4, 0.683);
+
+    assert.ok(line.includes('0:42.1'), 'the time flown stays where it was');
+    assert.ok(line.includes('68%'), 'and what is left of the budget is written as a share of it');
+    assert.ok(!line.includes('BEST'), 'in place of the time to beat rather than beside it');
+});
+
+test('a budget is written from full to empty and never past either end', () => {
+    assert.ok(formatStageClock(0, null, 1).includes('100%'));
+    assert.ok(formatStageClock(0, null, 0).includes('0%'));
+    assert.ok(formatStageClock(0, null, 1.4).includes('100%'), 'a reading over full is full');
+    assert.ok(formatStageClock(0, null, -0.2).includes('0%'), 'and one under empty is empty');
 });
 
 // A stage nobody has flown out leaves the shape of a time rather than a number

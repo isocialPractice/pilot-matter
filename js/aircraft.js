@@ -6,7 +6,8 @@ import {
 import { createFlightState } from './flight-state.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY, LEVEL_OFF_SECONDS,
-    updateThrottle, targetSpeed, convergeSpeed, sinkRate, isStalled, controlRates,
+    GLIDE_ACCEL, GLIDE_DECEL,
+    updateThrottle, targetSpeed, convergeSpeed, glideSpeed, sinkRate, isStalled, controlRates,
     pitchLevellingOff
 } from './flight-model.js';
 import {
@@ -45,6 +46,11 @@ export class Aircraft {
         // them over, which is what leaves a host flying its own terrain with the
         // rule it has always had: every arrival is an arrival on open ground.
         this.runways = options.runways ?? [];
+
+        // Whether there is an engine pulling. Live unless something says
+        // otherwise, which is every flight but the ones a game mode has taken
+        // the engine away from.
+        this.engine = options.engine !== false;
 
         this.setSensitivity(flight.sensitivity ?? CONTROL_SENSITIVITY);
 
@@ -101,6 +107,24 @@ export class Aircraft {
     setRunways(runways = []) {
         this.runways = runways ?? [];
         return this.runways;
+    }
+
+    /**
+     * Whether the engine is pulling. A dead engine pins the lever closed and
+     * leaves airspeed to the nose, which is what a glide is: height spent to
+     * buy speed, with nothing to buy it back.
+     *
+     * Set by whatever owns the flight rather than decided here, because the
+     * aircraft does not know why it has no engine - a mode that took it away at
+     * the start, or a budget that ran out halfway down a leg.
+     *
+     * Survives a reset on purpose. A stage that opens with a dead stick opens
+     * with one every time it is flown, and a reset is that stage starting
+     * again rather than a new aircraft.
+     */
+    setEngine(live = true) {
+        this.engine = live !== false;
+        return this.engine;
     }
 
     /** The strip the aircraft is over, or null when it is over open ground. */
@@ -260,9 +284,24 @@ export class Aircraft {
         const startY = this.position.y;
 
         // Shift and Ctrl move the throttle lever, and speed chases the
-        // setting rather than jumping with the key
-        this.throttle = updateThrottle(this.throttle, this.input, dt);
-        this.speed = convergeSpeed(this.speed, targetSpeed(this.throttle, this.maxSpeed), dt);
+        // setting rather than jumping with the key.
+        //
+        // With no engine the lever is dead and the nose has the speed instead:
+        // it settles on whatever the attitude is asking for, from a dive that
+        // buys speed to a nose-up that spends it. Slower to settle either way
+        // than the engine is, because what is being moved is the aircraft's own
+        // momentum. The keys are still read - the lever simply has nothing on
+        // the end of it - so nothing about the input has to know.
+        if (this.engine) {
+            this.throttle = updateThrottle(this.throttle, this.input, dt);
+            this.speed = convergeSpeed(this.speed, targetSpeed(this.throttle, this.maxSpeed), dt);
+        } else {
+            this.throttle = 0;
+            this.speed = convergeSpeed(
+                this.speed, glideSpeed(this.rotation.x, { maxSpeed: this.maxSpeed }),
+                dt, GLIDE_ACCEL, GLIDE_DECEL
+            );
+        }
 
         // The next call for a different vertical state hands the aircraft back,
         // both the altitude being held and the nose still on its way to level.
@@ -465,6 +504,7 @@ export class Aircraft {
     getSpeed()     { return this.speed; }
     getAltitude()  { return this.position.y; }
     getThrottle()  { return this.throttle; }
+    hasEngine()    { return this.engine; }
     getHeading()   { return this.rotation.y; }
     getVerticalSpeed() { return this.verticalSpeed; }
     getHeightAboveTerrain() { return this.position.y - this.terrainHeight; }

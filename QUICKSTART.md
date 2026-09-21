@@ -64,6 +64,9 @@ than ending the run.
 |------|-----------|
 | `RUNWAY LANDING` | Put the aircraft down on the strip |
 | `FLYING THROUGH LOOPS` | Fly the course of loops in order |
+| `DEAD STICK` | Glide to the strip with the engine out |
+| `CARGO RUN` | Land at each strip in turn on the fuel the run is given |
+| `SEARCH AND RESCUE` | Find the marker on the bearing given, and set down beside it |
 
 ## Where to go next
 

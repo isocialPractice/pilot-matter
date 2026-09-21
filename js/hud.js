@@ -112,15 +112,26 @@ export function formatGateDistance(distance, unit = DEFAULT_ALTITUDE_UNIT) {
 }
 
 /**
- * The line the objective card points a gate out with: which way to turn, the
- * bearing to fly, and how far there is to go. A gate the pilot can see is not
- * pointed at, so nothing here is written for one.
+ * The line the objective card points the run's own objective out with: what it
+ * is, which way to turn for it, the bearing to fly, and how far there is to go.
+ * One line for a loop, a strip, or a marker, because the pilot reads one row.
+ *
+ * A pointer with no arrow is a briefing rather than a needle - a bearing and a
+ * distance the pilot was given and has to fly for themselves - and is written
+ * without the leading glyph and the space that would be left behind it.
+ *
+ * The label is the pointer's own, so what is being pointed at is named by
+ * whatever laid it. A pointer that names nothing is a loop, which is what every
+ * pointer was before there was anything else to point at.
  */
-export function formatGatePointer(pointer, unit = DEFAULT_ALTITUDE_UNIT) {
+export function formatRunPointer(pointer, unit = DEFAULT_ALTITUDE_UNIT) {
     if (!pointer) return '';
 
+    const label    = pointer.label ?? `LOOP ${pointer.index + 1}`;
+    const head     = pointer.arrow ? `${pointer.arrow} ${label}` : label;
     const distance = formatGateDistance(pointer.distance, unit);
-    return `${pointer.arrow} LOOP ${pointer.index + 1}  ·  `
+
+    return `${head}  ·  `
         + `${formatHeading(Math.round(pointer.bearing))}°  ·  `
         + `${distance} ${altitudeUnit(unit).label}`;
 }
@@ -130,9 +141,19 @@ export function formatGatePointer(pointer, unit = DEFAULT_ALTITUDE_UNIT) {
  * is to beat. A stage nobody has finished yet has no time to beat and says so
  * with the empty shape of one, so the line does not change width the first
  * time a course is flown out.
+ *
+ * A stage flown against a budget puts what is left of it where the time to beat
+ * goes, because this is the one row on the card that is written every frame and
+ * the fuel is the one number on a route that moves. It is what the pilot is
+ * racing while the leg is under way; the time to beat is what they read off the
+ * stage report at the end of it, by which point the budget no longer matters.
  */
-export function formatStageClock(elapsed, best) {
-    return `TIME ${formatStageTime(elapsed)}  ·  BEST ${formatStageTime(best)}`;
+export function formatStageClock(elapsed, best, fuel = null) {
+    const second = Number.isFinite(fuel)
+        ? `FUEL ${Math.round(Math.min(Math.max(fuel, 0), 1) * 100)}%`
+        : `BEST ${formatStageTime(best)}`;
+
+    return `TIME ${formatStageTime(elapsed)}  ·  ${second}`;
 }
 
 /**
@@ -304,8 +325,8 @@ export class HUD {
      * every frame, because a clock is the one thing on the card that does
      * move.
      */
-    setClock(elapsed, best) {
-        this.modeClockElement.textContent = formatStageClock(elapsed, best);
+    setClock(elapsed, best, fuel = null) {
+        this.modeClockElement.textContent = formatStageClock(elapsed, best, fuel);
     }
 
     /**
@@ -332,13 +353,14 @@ export class HUD {
     }
 
     /**
-     * Points out the gate the course is waiting on while it is off the screen,
-     * and writes nothing at all while it is in front of the aircraft: a pilot
-     * looking at the gate does not need telling where it is, and a line that
-     * never goes away is a line nobody reads.
+     * Points out whatever the run is waiting on - the gate, the strip, or the
+     * marker - and writes nothing at all when there is nothing outstanding or
+     * when the mode has decided the pilot does not need telling. Which of those
+     * is which belongs to the mode; what is here is the writing of the line it
+     * hands over.
      */
-    setGatePointer(pointer) {
-        const text = formatGatePointer(pointer, this.altitudeUnit);
+    setRunPointer(pointer) {
+        const text = formatRunPointer(pointer, this.altitudeUnit);
         this.modePointerElement.textContent = text;
 
         // Marked on the card rather than written onto the row, for the same

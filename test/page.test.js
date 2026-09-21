@@ -19,9 +19,10 @@ import { TOUCH_PADS, TOUCH_CELLS, TOUCH_LEFT, TOUCH_RIGHT } from '../js/touch-co
 import {
     GAME_MODES, GATE_ARROWS, missNotice, runStatus, runObjective,
     createRunState, startRun, currentStage, stageProgress, recordGate,
-    recordLanding, advanceStage
+    recordLanding, advanceStage, searchBriefing,
+    nextStrip, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE
 } from '../js/game-modes.js';
-import { formatStageClock, formatGatePointer } from '../js/hud.js';
+import { formatStageClock, formatRunPointer } from '../js/hud.js';
 import { stageReport } from '../js/best-times.js';
 
 const indexHtml = readFileSync(
@@ -169,6 +170,28 @@ const CARD_STATES = [
 //                   a stage passes ten minutes, which is why the narrow card
 //                   declares the clock wrapped as well
 //   pointer    30   measured wrapping to two lines
+/**
+ * What the pointer row names on a mode, at the widest that name gets. The row
+ * is one row for every mode, so the longest thing any of them can put in it is
+ * what the row has to hold.
+ */
+function pointerLabel(mode, state, total) {
+    if (mode.objective === LOOP_OBJECTIVE)  return `LOOP ${Math.max(1, total)}`;
+    if (mode.objective === CARGO_OBJECTIVE) return `LEG ${Math.max(1, total)}`;
+    if (mode.objective === SEARCH_OBJECTIVE) return searchBriefing(state)?.label ?? '';
+    return '';
+}
+
+/** Counts one step of a stage off, by whatever a stage of this mode counts. */
+function countOff(mode, state, step) {
+    if (mode.objective === LOOP_OBJECTIVE)  return recordGate(state, step);
+    // A route counts a landing at the strip it is up to, so the landing is
+    // reported with that strip under it rather than with nothing.
+    if (mode.objective === CARGO_OBJECTIVE) return recordLanding(state, { index: nextStrip(state) });
+    if (mode.objective === SEARCH_OBJECTIVE) return true;
+    return recordLanding(state);
+}
+
 const CARD_LINE_CEILINGS = {
     name: 20, objective: 32, status: 44, clock: 29, pointer: 30
 };
@@ -969,8 +992,10 @@ test("the card's rows are written inside the lines they were measured at", () =>
 
     // The clock at the widest a stage can write it - a stage past ten minutes,
     // which is two characters wider than one under it - and the empty shape a
-    // stage nobody has flown out leaves.
-    lines.clock.push(formatStageClock(5999.9, 5999.9), formatStageClock(0, null));
+    // stage nobody has flown out leaves. Then the same clock on a route, which
+    // writes the budget where the time to beat goes.
+    lines.clock.push(formatStageClock(5999.9, 5999.9), formatStageClock(0, null),
+                     formatStageClock(5999.9, null, 1), formatStageClock(5999.9, null, 0));
     lines.objective.push(stageReport({ time: 599.9, best: true }),
                          stageReport({ time: 599.9, best: false }));
 
@@ -982,22 +1007,30 @@ test("the card's rows are written inside the lines they were measured at", () =>
         startRun(state, mode.id);
         lines.objective.push(runObjective(state));
 
-        // Walk the whole run: every stage, and inside each of them every gate
-        // the course counts, because the stage number and the loop number are
-        // both written into the status line and both grow as the run goes on.
+        // Walk the whole run: every stage, and inside each of them every step
+        // the stage counts off, because the stage number and the step number
+        // are both written into the status line and both grow as the run goes
+        // on. A course counts gates and a route counts legs; the rest count one
+        // thing once.
         for (let stage = 0; stage < mode.stages.length; stage++) {
             const { total } = stageProgress(state);
 
-            for (let gate = 0; gate <= total; gate++) {
+            for (let step = 0; step <= total; step++) {
                 lines.status.push(`${currentStage(state).label}  ·  ${runStatus(state)}`);
                 lines.objective.push(missNotice(state));
-                lines.pointer.push(formatGatePointer({
-                    arrow: GATE_ARROWS[GATE_ARROWS.length - 1],
+                lines.pointer.push(formatRunPointer({
+                    // The arrow a mode's pointer carries, which a briefing does
+                    // not: it is a bearing the pilot was given rather than a
+                    // needle, and measuring it with a glyph it never writes
+                    // would be measuring a row nothing puts on the screen.
+                    arrow: mode.objective === SEARCH_OBJECTIVE
+                        ? '' : GATE_ARROWS[GATE_ARROWS.length - 1],
+                    label: pointerLabel(mode, state, total),
                     index: Math.max(0, total - 1),
                     bearing: 359,
                     distance: 10000
                 }));
-                if (gate < total) recordGate(state, gate);
+                if (step < total) countOff(mode, state, step);
             }
 
             recordLanding(state);

@@ -174,14 +174,35 @@ const loopValley = {
 };
 
 /**
+ * Broken country with no strip anywhere in it, which is what a search is flown
+ * over: forest to lose a marker in, rising ground to hide it behind, and water
+ * that is not ground to set down on. There is nowhere prepared to arrive, so
+ * the flat piece the pilot finds is the flat piece they found.
+ */
+const backCountry = {
+    id: 'back-country',
+    label: 'BACK COUNTRY',
+    description: 'Rough, wooded ground with no strip in it, for a search flown by the compass',
+    seed: 1414213,
+    base: { maxHeight: 420, scale: 3.0 },
+    elements: [
+        { type: 'mountain', config: { count: 7, height: [180, 420], radius: [800, 1700], girth: 0.5 } },
+        { type: 'forest',   config: { count: 5, density: 0.55, size: [900, 2200] } },
+        { type: 'grass',    config: { band: [6, 300] } },
+        { type: 'water',    config: { level: 4 } }
+    ]
+};
+
+/**
  * The worlds a game mode opens over. They are kept out of `ENVIRONMENTS`
  * because they are not worlds to choose between: a mode brings its own ground
  * with it, and offering it in the settings panel would be offering half a game.
  */
-export const MODE_ENVIRONMENTS = [openCountry, loopValley];
+export const MODE_ENVIRONMENTS = [openCountry, loopValley, backCountry];
 
 export const OPEN_COUNTRY_ID = openCountry.id;
 export const LOOP_VALLEY_ID  = loopValley.id;
+export const BACK_COUNTRY_ID = backCountry.id;
 
 const LISTED = new Map(ENVIRONMENTS.map(environment => [environment.id, environment]));
 const BY_ID  = new Map(

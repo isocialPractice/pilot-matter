@@ -97,16 +97,17 @@
 ├── js/
 │   ├── main.js         # Scene setup, render loop, keys, and overlay state
 │   ├── aircraft.js     # 3D model, and the frame loop the flight model drives
-│   ├── flight-model.js # Pure throttle, speed convergence, lift and stall math
+│   ├── flight-model.js # Pure throttle, speed convergence, the engineless glide, lift and stall math
 │   ├── config.js       # Pure simulator start state, and the fields it is set through
 │   ├── flight-state.js # Pure configured start in the units the model flies in
 │   ├── units.js        # Pure conversions between world units and readings
 │   ├── crash.js        # Pure ground rules: impact, landing, and the crash countdown
-│   ├── game-modes.js   # Pure modes, stages, run state, course, the gate test, and the stage clock
+│   ├── game-modes.js   # Pure modes, stages, run state, course, the gate test, the fuel budget, the rescue marker, and the stage clock
 │   ├── best-times.js   # Pure board of the best each stage has been flown in, and its storage
 │   ├── landing-score.js # Pure reading of what a landing was, and the rollout it is held for
 │   ├── rings.js        # A loop course as the hoops it is drawn with
 │   ├── guidance.js     # An approach&#39;s threshold bar and extended centreline, as the marks they are drawn with
+│   ├── marker.js       # A search&#39;s marker as the mast, head and ground ring it is drawn with
 │   ├── world-edge.js   # Pure crossing that carries a bounded world round at its edges
 │   ├── world-tiles.js  # Pure grid the endless ground is laid on, and what is drawn of it
 │   ├── world-record.js # Pure record of the world a terrain built, and the ask it is compared against

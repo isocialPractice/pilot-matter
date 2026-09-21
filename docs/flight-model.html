@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>How the flight model works - Pilot Matter</title>
-    <meta name="description" content="Throttle, lift, stall, the configured start, and what a runway does to an arrival.">
+    <meta name="description" content="Throttle, the glide with no engine, lift, stall, the configured start, and what a runway does to an arrival.">
     <link rel="icon" href="../favicon.png">
     <link rel="stylesheet" href="assets/site.css">
     <script src="assets/site.js"></script>
@@ -98,6 +98,7 @@
     <h2>On this page</h2>
     <ul>
         <li><a href="#the-throttle-is-a-setting-not-a-shove">The throttle is a setting, not a shove</a></li>
+        <li><a href="#with-no-engine-the-nose-sets-the-speed">With no engine, the nose sets the speed</a></li>
         <li><a href="#lift-is-read-off-airspeed">Lift is read off airspeed</a></li>
         <li><a href="#below-the-stall-speed-the-wing-gives-up">Below the stall speed the wing gives up</a></li>
         <li><a href="#the-start-is-a-condition-not-a-set-of-numbers">The start is a condition, not a set of numbers</a></li>
@@ -112,6 +113,16 @@
 <p><kbd>Shift</kbd> and <kbd>Ctrl</kbd> move a lever between 0 and 100%, at a rate that takes two seconds to sweep the whole travel. The lever picks a target speed - 100% asks for 200 units/s, 50% asks for 100 - and airspeed then converges on that target rather than jumping to it. The engine pulls harder than drag pushes back, so speed builds faster than it bleeds off.</p>
 
 <p>This is why the HUD throttle reads the setting you asked for while the airspeed needle is still catching up, and why a closed throttle is a request for a dead stop rather than a request to coast.</p>
+
+<h2 id="with-no-engine-the-nose-sets-the-speed">With no engine, the nose sets the speed</h2>
+
+<p>Two of the <a href="controls/game-modes.html">game modes</a> can leave the aircraft with nothing pulling: a dead stick opens that way, and a cargo run that spends the last of its budget arrives there. The lever still moves - there is simply nothing on the end of it - and the throttle readout sits at <code>0%</code>.</p>
+
+<p>The airspeed then comes off the attitude instead. A level nose settles at 80 units/s, and every radian of nose-down adds 180 to that, so putting the nose down buys speed with the height you had left to spend and holding it up gives the speed back. It is floored at a standstill and capped where the engine's own top speed is, so a dive is fast rather than unbounded. The convergence is slower than the engine's either way, because what is being moved is the aircraft's own momentum rather than a throttle: a nose dropped for speed pays for it over a second or two.</p>
+
+<p>The pair of numbers is chosen so that a glide is always a descent. The nose-up angle that bleeds the speed to nothing is about 25 degrees, and short of that the sink the slow wing is already losing outruns the climb the nose is asking for - so there is no attitude that holds height on no engine, which is the one way a dead stick could quietly stop being one. The suite sweeps the whole attitude range rather than sampling it, because a hole in that guarantee is not something anyone would find by flying.</p>
+
+<p>What comes out is a glide worth planning. A level nose reaches about twelve times the height it spends; a little nose-up does better than that, and better again is close enough to the stall to be a knife edge. A dive reaches less, and steeply. Finding the attitude that reaches furthest is the whole of Dead Stick.</p>
 
 <h2 id="lift-is-read-off-airspeed">Lift is read off airspeed</h2>
 

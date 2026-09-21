@@ -11,6 +11,8 @@ import {
     THROTTLE_RATE,
     SPEED_ACCEL,
     SPEED_DECEL,
+    GLIDE_SPEED,
+    GLIDE_PITCH_SPEED,
     PITCH_RATE,
     ROLL_RATE,
     YAW_RATE,
@@ -20,6 +22,8 @@ import {
     updateThrottle,
     targetSpeed,
     convergeSpeed,
+    glideSpeed,
+    glideDescent,
     liftFactor,
     isStalled,
     sinkRate,
@@ -384,4 +388,74 @@ test('the pilot taking the pitch back is answered on that frame, not the next on
     assert.ok(handback < ease,
         'and read the handback first, so a frame that hands the aircraft back does not '
       + 'also ease the nose it has just given away');
+});
+
+// --- The glide ------------------------------------------------------------
+
+// The lever picks the speed under power. With no engine the nose does, because
+// there is nothing else left to pick it: a dive buys airspeed with height and a
+// nose-up spends it back.
+test('a glide takes its airspeed from the nose', () => {
+    assert.equal(glideSpeed(0), GLIDE_SPEED, 'level is the speed a glide settles at');
+    assert.ok(glideSpeed(0.1) > GLIDE_SPEED, 'nose down buys speed');
+    assert.ok(glideSpeed(-0.1) < GLIDE_SPEED, 'and nose up spends it');
+
+    // The same sign the model carries its attitude in, which is the sign
+    // `pitchForClimb` negates: a positive rotation about +X is nose down.
+    assert.ok(Math.abs(glideSpeed(0.1) - (GLIDE_SPEED + 0.1 * GLIDE_PITCH_SPEED)) < 1e-9);
+});
+
+test('a glide is floored at a standstill and capped where the engine is', () => {
+    assert.equal(glideSpeed(-Math.PI / 2), 0, 'a nose straight up leaves no speed, not a negative one');
+    assert.equal(glideSpeed(Math.PI / 2), MAX_SPEED, 'and a dive is fast rather than unbounded');
+    assert.equal(glideSpeed(Math.PI / 2, { maxSpeed: 90 }), 90, 'to whatever cap it is given');
+});
+
+/**
+ * The one thing a dead stick has to be, swept rather than sampled.
+ *
+ * A glide that came out level or climbing at some attitude would be an aircraft
+ * holding height on no engine and holding it forever, which is the dead stick
+ * quietly stopping being one. It is not a thing anyone would find by flying -
+ * it needs the whole attitude range looked at, which is what this does.
+ *
+ * The range is the one the aircraft clamps its pitch to, because that is every
+ * attitude a pilot can actually put the nose at.
+ */
+test('a glide descends at every attitude the aircraft can be held in', () => {
+    const limit = Math.PI / 2.2;
+
+    for (let pitch = -limit; pitch <= limit; pitch += 0.002) {
+        assert.ok(glideDescent(pitch) > 0,
+            `a glide at ${pitch.toFixed(3)} rad descends at `
+          + `${glideDescent(pitch).toFixed(3)} units per second`);
+    }
+});
+
+// And the descent is a glide rather than a fall: level flight goes a long way
+// for the height it spends, which is what makes reaching a strip a thing to
+// plan rather than a thing to hope for.
+test('a level glide trades its height for a long way over the ground', () => {
+    const ratio = glideSpeed(0) / glideDescent(0);
+
+    assert.ok(ratio > 8, `a level glide reaches ${ratio.toFixed(1)} times the height it spends`);
+    assert.ok(ratio < 20, 'and not so far that the height stops mattering');
+});
+
+// A dive is steeper than level, which is the trade the whole mode is flown on:
+// speed is bought with the ground you had left to cover.
+test('the steeper the nose, the less the glide reaches', () => {
+    const reach = pitch => glideSpeed(pitch) * Math.cos(pitch) / glideDescent(pitch);
+
+    assert.ok(reach(0.3) < reach(0.15), 'a steep dive covers less ground than a shallow one');
+    assert.ok(reach(0.15) < reach(0), 'and a shallow dive less than level flight');
+});
+
+// The aircraft flies the glide the module describes rather than a second copy
+// of it, which is what keeps the sweep above about the thing being flown.
+test('the aircraft flies the glide from the model rather than from a lever', () => {
+    assert.ok(/glideSpeed\(this\.rotation\.x/.test(aircraftSource),
+        'js/aircraft.js should take a dead engine\'s speed from the attitude');
+    assert.ok(/this\.throttle = 0;/.test(aircraftSource),
+        'and hold the lever closed while there is nothing on the end of it');
 });

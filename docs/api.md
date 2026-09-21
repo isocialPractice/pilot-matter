@@ -789,28 +789,36 @@ const pilot = createPilot({
 ## Game modes
 
 The bundled game is played in modes, and the rules behind them are pure: the
-stages, the run state, the course a set of loops is laid out as, and the test for
-whether a gate was flown through. A host can play them against its own renderer,
-or read them as a worked example of a game built on the two APIs.
+stages, the run state, the course a set of loops is laid out as, the test for
+whether a gate was flown through, the budget a route is flown against, and the
+marker a search is flown to. A host can play them against its own renderer, or
+read them as a worked example of a game built on the two APIs.
 
 | Export | Is |
 |--------|-----|
 | `GAME_MODES`, `GAME_MODE_IDS` | The modes there are |
-| `RUNWAY_LANDING`, `LOOP_COURSE` | The two of them by name |
-| `LAND_OBJECTIVE`, `LOOP_OBJECTIVE` | What a mode is asking for |
+| `RUNWAY_LANDING`, `LOOP_COURSE`, `DEAD_STICK`, `CARGO_RUN`, `SEARCH_RESCUE` | The five of them by name |
+| `LAND_OBJECTIVE`, `LOOP_OBJECTIVE`, `CARGO_OBJECTIVE`, `SEARCH_OBJECTIVE` | What a mode is asking for |
 | `getGameMode(id)`, `isGameModeId(id)` | Looking one up |
 | `createRunState(modeId)`, `startRun(state, id)`, `endRun(state)` | A run, started and stopped |
 | `runningMode(state)`, `currentStage(state)`, `advanceStage(state)`, `restartStage(state)` | Where it is up to |
-| `recordLanding(state)`, `recordGate(state, index)`, `recordCrash(state)` | Telling it what happened |
-| `stageProgress(state)`, `isStageComplete(state)`, `nextGate(state)` | How far through it is |
+| `recordLanding(state, runway)`, `recordGate(state, index)`, `recordRescue(state, marker, report)`, `recordCrash(state)` | Telling it what happened |
+| `stageProgress(state)`, `isStageComplete(state)`, `nextGate(state)`, `nextStrip(state)` | How far through it is |
+| `progressNoun(state)`, `stripIndex(runway)` | What it counts in, and which strip a landing was made on |
 | `runObjective(state)`, `runStatus(state)` | What to write on the screen |
+| `runPointer(state, world, position, heading)` | Where the thing it is waiting on lies |
+| `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | The three that answers with |
 | `stageWorld(state)` | The world the stage is flown over |
 | `stageStart(state, world)` | Where in it the flight opens |
 | `buildCourse(stage, options)` | The loops a course stage is flown through |
 | `gatePassed(ring, from, to)`, `gateMissed(ring, from, to)`, `gateOffset(ring, point)` | Whether a step went through one, or past it |
 | `gateCrossing(ring, from, to)` | The one crossing both of those are read off |
-| `gateAspect(ring)`, `gateAxes(ring)` | The shape of a gate's opening, and the two directions across it |
+| `gateAspect(ring)`, `gateAxes(ring)` | The shape of a gate opening, and the two directions across it |
 | `flyStep(state, course, from, to)` | Both of those put to the gate the course is waiting on |
+| `ENGINE_LIVE`, `ENGINE_DEAD`, `runEngine(state)`, `engineLive(state)` | Whether the run still has an engine |
+| `stageBudget(state)`, `burnFuel(state, throttle, dt)`, `fuelRemaining(state)` | The budget a route spends on its throttle |
+| `stageStrips(state)` | How many strips a route stops at |
+| `stageMarker(state)`, `RESCUE_RADIUS`, `RESCUE_STOP_SPEED` | The marker a search is flown to, and what counts as beside it |
 | `approachThreshold(runway)` | The end of a strip a landing stage is flown onto |
 | `approachGuidance(state, runway)` | What is drawn on the ground to help the pilot find it |
 | `CENTRELINE_REACH`, `CENTRELINE_MARKS` | How far the lead-in runs back, and in how many marks |
@@ -862,6 +870,88 @@ what to draw: an extended centreline running back down the approach as a list of
 `elevation` of the strip they belong to. Which of the two a stage is given is
 declared on the stage, and by the last of them there is neither. It answers null
 where there is nothing to draw, which is what leaves the ground clear.
+
+### Flying without an engine
+
+`runEngine` answers whether the run still has one. Two things take it away and
+both come back through that one call, because the aircraft flies the same way
+either way: a mode declared without one, and a route that has spent the last of
+its budget. A host reads it every frame and holds the lever closed when it comes
+back `ENGINE_DEAD`; the airspeed then follows the attitude rather than the
+throttle, which is what makes reaching anywhere a glide to be planned rather than
+a descent to be flown.
+
+```javascript
+import { createRunState, DEAD_STICK, engineLive } from 'pilot-matter';
+
+const run = createRunState(DEAD_STICK);
+
+function frame(dt) {
+    pilot.setEngine(engineLive(run));
+    pilot.update(dt);
+}
+```
+
+### A route, and the budget it is flown on
+
+A route stops at several strips in the order they were laid, so a landing is
+reported with the strip it was made on. Only the strip the route is up to counts,
+which is the same rule a course of loops is flown under: `nextStrip` says which
+one that is, and `recordLanding` answers false for any other. `stageWorld` gives
+a route stage an `elements` list describing the strips rather than asking for one
+and being given it, because a world lays a single strip on its own.
+
+`burnFuel` is the budget, spent a frame at a time. The burn is the lever setting
+itself, so a wide open throttle costs a second of budget per second and a closed
+one costs nothing at all - which is what makes the route worth planning rather
+than merely flying. `fuelRemaining` is what is left as a share of the whole, for
+writing on an instrument, and answers null for a run with no budget to read.
+
+```javascript
+import { createRunState, CARGO_RUN, burnFuel, recordLanding, nextStrip } from 'pilot-matter';
+
+const run = createRunState(CARGO_RUN);
+
+function frame(dt) {
+    burnFuel(run, pilot.telemetry().throttle, dt);
+    pilot.update(dt);
+}
+
+function onLanding(runway) {
+    if (recordLanding(run, runway)) say(`down at strip ${nextStrip(run)}`);
+}
+```
+
+### A search, and the marker it is flown to
+
+`stageMarker` is where the marker stands, as `{x, z, bearing, distance, radius}`.
+The bearing and the distance are measured from where the stage opens rather than
+from the aircraft, because they are the whole of the briefing the pilot is given:
+`searchBriefing` is that briefing as a line to write, and it stays where it was
+however far the flight has got, which a needle following the marker round would
+not.
+
+`recordRescue` is the set-down. It is handed where the aircraft has come to rest
+and answers true once: on the ground, stopped, inside the circle, and not a
+wreck.
+
+```javascript
+import { createRunState, SEARCH_RESCUE, stageMarker, recordRescue } from 'pilot-matter';
+
+const run = createRunState(SEARCH_RESCUE);
+const marker = stageMarker(run);
+
+function frame(dt) {
+    pilot.update(dt);
+
+    const { position, airspeed } = pilot.telemetry();
+    const found = recordRescue(run, marker, {
+        x: position.x, z: position.z, speed: airspeed, airborne: pilot.isAirborne()
+    });
+
+    if (found) say('found');
+}
+```
 
 ## Worlds and elements
 

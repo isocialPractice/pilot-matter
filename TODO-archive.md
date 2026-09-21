@@ -1005,3 +1005,34 @@ still be found by name.
     the model and the stylesheet agree about a height neither of them measures.
   - **Goal**: Resolve to [card-rows-wrap-past-their-declared-heights.prompt.md](.claude/prompts/card-rows-wrap-past-their-declared-heights.prompt.md)
   - From: UI/UX Override - the card's clip falls through a line
+
+## Archived 09-21-26
+
+- [x] Slow the orbiting camera's spin, and make the rate something a pilot sets
+  - **Issue**: The drone-style orbit sweeps fast enough to be hard to read the
+    world from, and the rate is a constant in the camera code rather than
+    anything a pilot can reach.
+  - **Goal**: Slow the default sweep, then expose the rate in the **Settings**
+    panel beside the other camera options, so the new default is a starting
+    point rather than a second hardcoded number. One change: the value and the
+    control that owns it, in the same pass - splitting them means editing
+    `js/camera.js` twice for one decision.
+  - From: User Overrides
+- [x] **Level Off**: `space` levels the flight off at `V/S: 0 ft/min`
+  - **Issue**: Holding an altitude means trimming the vertical speed to zero by
+    hand, which is a fiddle in the middle of everything else a landing asks
+    for.
+  - **Goal**: A `space` keypress sets vertical speed to zero and leaves pitch
+    where the pilot put it, so the aircraft holds its altitude until the next
+    input. Register it where the other keys are bound rather than as a special
+    case, and say so in the controls list the **Controls** entry shows.
+  - From: User Overrides
+- [x] Low Altitude warns before the flight has started
+  - **Issue**: The low altitude alert fires while the aircraft is still on the
+    runway at the start of a flight. It is true and useless: altitude is low
+    because nothing has taken off yet, and the first thing a pilot sees is a
+    warning about the state the simulator just put them in.
+  - **Goal**: Gate the alert on the flight having left the ground, so it only
+    speaks about an altitude the pilot flew to. Takeoff is the condition, not a
+    timer - a flight that never leaves the runway should never raise it.
+  - From: User Overrides

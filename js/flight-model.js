@@ -30,6 +30,26 @@ export const THROTTLE_RATE = 0.5;
 export const SPEED_ACCEL = 60;
 export const SPEED_DECEL = 40;
 
+// A glide is the same wing with nothing pulling it: airspeed is bought with
+// height instead of with the engine, so the nose sets the speed rather than the
+// lever. GLIDE_SPEED is what a level nose settles at, and GLIDE_PITCH_SPEED is
+// how much a radian of nose-down adds to it.
+//
+// The pair is chosen so that the nose-up angle which bleeds the speed to
+// nothing is about 25 degrees, which is what makes a glide always a descent:
+// past that the wing has no speed left to climb on, and short of it the sink
+// the slow wing is already losing outruns the climb the nose is asking for.
+// `glideDescent` is that guarantee written down, and the suite sweeps it.
+export const GLIDE_SPEED       = 80;
+export const GLIDE_PITCH_SPEED = 180;
+
+// How quickly a glide settles on the speed its nose is asking for. Slower than
+// the engine either way, because what is being moved is the aircraft's own
+// momentum rather than a throttle: a nose dropped for speed pays for it over a
+// second or two, which is the trade a glide is planned around.
+export const GLIDE_ACCEL = 26;
+export const GLIDE_DECEL = 20;
+
 // How fast a held control key turns the aircraft, in radians per second. Roll
 // is the quickest because it is the control a turn is flown with, and yaw is
 // the slowest because it is the one used to trim rather than to manoeuvre.
@@ -107,6 +127,48 @@ export function convergeSpeed(speed, target, dt, accel = SPEED_ACCEL, decel = SP
     if (gap === 0) return target;
     const step = (gap > 0 ? accel : decel) * dt;
     return Math.abs(gap) <= step ? target : speed + Math.sign(gap) * step;
+}
+
+/**
+ * The airspeed a glide settles at for an attitude, with nothing driving it but
+ * the nose.
+ *
+ * `pitch` is the attitude in the form the aircraft carries it - the X part of
+ * its YXZ rotation - so a positive angle is nose-down and buys speed, and a
+ * negative one is nose-up and spends it. Read the sign off `pitchForClimb`,
+ * which negates for the same reason: the model flies nose-first along +Z.
+ *
+ * Floored at a standstill and capped at the same top speed the engine has, so a
+ * dive is fast rather than unbounded.
+ */
+export function glideSpeed(pitch, options = {}) {
+    const {
+        glideSpeed: level = GLIDE_SPEED,
+        pitchSpeed        = GLIDE_PITCH_SPEED,
+        maxSpeed          = MAX_SPEED
+    } = options;
+
+    return clamp(level + numberOr(pitch, 0) * pitchSpeed, 0, maxSpeed);
+}
+
+/**
+ * How fast a settled glide loses height at an attitude, in units per second,
+ * counted positive downward.
+ *
+ * Both halves of the descent, added the way the aircraft adds them: the height
+ * the nose itself is pointing away, which is the airspeed through the vertical
+ * part of the nose direction, and the sink the wing is losing on top of that at
+ * the speed it has settled to.
+ *
+ * It exists to be asserted about. A glide that came out positive at some
+ * attitude would be an aircraft climbing on no engine and holding the climb
+ * forever, which is the one way a dead stick can stop being a dead stick, and
+ * it is not a thing anyone would see by flying - it needs the whole attitude
+ * range swept, which is what the suite does with this.
+ */
+export function glideDescent(pitch, options = {}) {
+    const speed = glideSpeed(pitch, options);
+    return speed * Math.sin(numberOr(pitch, 0)) + sinkRate(speed, options);
 }
 
 /**
