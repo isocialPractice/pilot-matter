@@ -89,6 +89,54 @@ its context survives being archived.
     `min-width: 260px` at `left: 50%` is what keeps it on a 320 screen at all.
   - From: UI/UX Override - the three new game modes
 
+### Code Review Override - what the new modes were written down as
+
+#### Found Issues
+
+- [ ] The Game modes API page mis-describes the row it added and mis-reports
+      the strip in the example under it
+  - **Issue**: Two defects in the section `1.18.0-alpha` added, in
+    `docs/api.md` and the `docs/api-reference.html` generated beside it. The
+    table row at `docs/api.md:810` and `docs/api-reference.html:810` reads
+    "The three that answers with", which is not a sentence and does not say
+    what the three answer with - the row above it, `runPointer`, is the one
+    that has the description. And the route example at `docs/api.md:921` and
+    `docs/api-reference.html:883` says `down at strip` followed by
+    `nextStrip(run)`, inside `if (recordLanding(run, runway))` - which names
+    the wrong strip every time, because `recordLanding` increments
+    `state.leg` before it returns, so `nextStrip` is already pointing at the
+    next stop. A two-strip route logs "down at strip 1" for the arrival at
+    strip 0, and "down at strip -1" for the one that finishes it.
+  - **Goal**: Give the pointer row a description that says what the three
+    answer with - they are the three `runPointer` dispatches to, one per
+    objective - and read the strip in the example before the landing is
+    recorded rather than after it, or name it from the `runway` argument the
+    handler was already given. Both files carry the same text and both need
+    it; `docs/api-reference.html` is the published page.
+  - From: Code Review Override - what the new modes were written down as
+- [ ] The glide guarantee is written down without the qualifier that makes it
+      true
+  - **Issue**: `CHANGELOG.md:35` says "there is no attitude in the range the
+    aircraft clamps its pitch to that holds height on no engine", and
+    `docs/flight-model.html:123` says "there is no attitude that holds height
+    on no engine, which is the one way a dead stick could quietly stop being
+    one". Both are true of `glideDescent(pitch)`, which the suite sweeps, and
+    both are false of the aircraft the release ships: **Glide Climb 1** above
+    measures 151 ft of climb from a settled glide and 2150 ft entered from a
+    dive. `glideDescent` describes the settled pair, and `js/aircraft.js`
+    converges airspeed at `GLIDE_ACCEL` and `GLIDE_DECEL` while the nose moves
+    at the control rate, so the aircraft spends seconds at an attitude its
+    speed has not caught up with - which is the gap neither sentence allows
+    for. A reader of either is told the mode cannot do the thing it does.
+  - **Goal**: Work this with **Glide Climb 1** rather than apart from it, since
+    the two answers are one decision. If the glide is made a descent in the
+    unsettled case too, both sentences become true and neither needs touching -
+    say so. If it is not, qualify both to the settled glide the pure pair
+    describes, and say what the aircraft does on the way to it. Do not leave
+    them as they are: this is the shape of the `1.17.2-alpha` entry that was
+    reopened for claiming what its release did not carry.
+  - From: Code Review Override - what the new modes were written down as
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
