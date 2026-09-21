@@ -29,10 +29,11 @@ import { headingDegrees } from './units.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
-    stageWorld, stageStart, buildCourse, gatePointer, approachGuidance,
-    tickRun, missNotice,
+    stageWorld, stageStart, buildCourse, runPointer, approachGuidance,
+    tickRun, missNotice, isStageComplete,
+    nextStrip, burnFuel, fuelRemaining, engineLive, stageMarker, recordRescue,
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey,
-    FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE
+    FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE, CARGO_OBJECTIVE
 } from './game-modes.js';
 import {
     scoreLanding, createRolloutState, beginRollout, clearRollout, updateRollout
@@ -47,6 +48,7 @@ import {
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { ApproachGuidance } from './guidance.js';
+import { RescueMarker } from './marker.js';
 import { TILE_REACH } from './world-tiles.js';
 import {
     createLoadingState, advanceLoading, loadingComplete, LoadingScreen
@@ -131,6 +133,10 @@ class FlightSimulator {
         // the settings panel's rather than a mode's.
         this.run    = createRunState();
         this.course = [];
+        this.runways = [];
+        // Where the marker of a search stands, held rather than asked for every
+        // frame: it is laid with the stage and does not move inside one.
+        this.marker = null;
 
         // The board a finished stage is measured against, which outlives the
         // session it was flown in.
@@ -147,6 +153,7 @@ class FlightSimulator {
         });
         this.loops   = new LoopCourse(this.scene);
         this.guidance = new ApproachGuidance(this.scene);
+        this.beacon   = new RescueMarker(this.scene);
         // The square the world covers, held rather than asked for every frame:
         // it only changes when the world does.
         this.bounds  = this.terrain.getBounds();
@@ -344,7 +351,18 @@ class FlightSimulator {
         this.aircraft.setStart(flight);
 
         if (rebuilt || (changed && titleShowing(this.titleState))) this.aircraft.reset();
+        this.syncEngine();
         this.syncObjective();
+    }
+
+    /**
+     * Tells the aircraft whether it has an engine. Two modes take one away - a
+     * dead stick from the first frame, a route the moment its budget runs out -
+     * and the run works out which, because the aircraft has no business knowing
+     * why the lever stopped doing anything.
+     */
+    syncEngine() {
+        this.aircraft.setEngine(engineLive(this.run));
     }
 
     /**
@@ -373,8 +391,11 @@ class FlightSimulator {
         }
 
         // The aircraft is told where the strips are rather than going looking,
-        // because it does not know what it is flying over.
-        this.aircraft.setRunways(this.terrain.getRunways());
+        // because it does not know what it is flying over. Held here as well,
+        // because a route reads them every frame to point at the one it is up
+        // to, and they only change when the world does.
+        this.runways = this.terrain.getRunways();
+        this.aircraft.setRunways(this.runways);
 
         // And the editor is told which elements the strip was cut clear of, so
         // a range moved until it reached the runway reads as refused on its own
@@ -402,12 +423,47 @@ class FlightSimulator {
         // And the help a landing stage is given, drawn out over the ground it
         // is laid on rather than at the strip's own height, because the lead-in
         // leaves the graded strip behind after the first mark or two.
-        this.guidance.setGuidance(
-            approachGuidance(this.run, this.terrain.getRunway()),
-            (x, z) => this.terrain.getTerrainHeightAt(x, z)
-        );
+        this.drawGuidance();
+
+        // The marker a search is flown to, if this stage has one. Laid on the
+        // ground the same way the lead-in is, because it stands in open country
+        // rather than on anything graded.
+        this.marker = stageMarker(this.run);
+        this.beacon.setMarker(this.marker, (x, z) => this.terrain.getTerrainHeightAt(x, z));
 
         return rebuilt;
+    }
+
+    /**
+     * Draws the help for the strip the run is landing at next.
+     *
+     * A route moves between strips inside one stage, so this is drawn again
+     * when a leg lands rather than only when the stage is laid out: the lead-in
+     * belongs to the approach being flown, and a run that left it on the first
+     * strip would be pointing the pilot back at the one they have left.
+     */
+    drawGuidance() {
+        this.guidance.setGuidance(
+            approachGuidance(this.run, this.legStrip()),
+            (x, z) => this.terrain.getTerrainHeightAt(x, z)
+        );
+    }
+
+    /**
+     * The strip the run is landing at next: the one a route is up to, or the
+     * only one there is. Null once a route is flown out, which is the guidance
+     * coming off the ground the moment there is nothing left to approach.
+     *
+     * A route is asked separately from what it is up to, because `nextStrip`
+     * answers -1 both for a route with nothing left and for every run that is
+     * not a route at all. Reading the two as one is how the lead-in comes back
+     * up at the first strip the moment the last one is landed at.
+     */
+    legStrip() {
+        if (runningMode(this.run)?.objective !== CARGO_OBJECTIVE) return this.terrain.getRunway();
+
+        const leg = nextStrip(this.run);
+        return leg >= 0 ? (this.runways?.[leg] ?? null) : null;
     }
 
     /** The condition the next flight opens in, in the units the model works in. */
@@ -915,6 +971,12 @@ class FlightSimulator {
 
         if (!isRunning(this.run) || this.run.complete) return;
         restartStage(this.run);
+
+        // The budget goes back with the stage, so the engine a run had spent
+        // comes back with it. Read from the run rather than assumed, because a
+        // dead stick is still a dead stick on its second attempt.
+        this.syncEngine();
+        this.drawGuidance();
         this.syncObjective();
     }
 
@@ -926,9 +988,17 @@ class FlightSimulator {
      * aircraft has rolled to a stop.
      */
     onLanding(runway, contact) {
-        if (recordLanding(this.run)) {
+        // The strip goes with the landing, because a route cares which one it
+        // was made on: the objective is the order of the strips as much as the
+        // arrivals on them, so a landing back at the one already behind the
+        // pilot is somewhere to be rather than progress.
+        if (recordLanding(this.run, runway)) {
             this.landing = scoreLanding(runway, contact);
             beginRollout(this.rollout);
+
+            // The next leg is a different approach, so the help moves to the
+            // strip it is flown to.
+            this.drawGuidance();
         }
         this.syncObjective();
     }
@@ -942,7 +1012,13 @@ class FlightSimulator {
         if (!updateRollout(this.rollout, dt, this.aircraft.getSpeed())) return;
 
         this.hud.setLandingReport(this.landing);
-        this.finishStage();
+
+        // A route is several landings and only the last of them ends anything.
+        // The breakdown goes up either way - each arrival is worth reading -
+        // but a leg with strips still to reach leaves the stage running, and
+        // the pilot takes off again with the clock and the budget where they
+        // left them.
+        if (isStageComplete(this.run)) this.finishStage();
         this.syncObjective();
     }
 
@@ -1025,22 +1101,61 @@ class FlightSimulator {
     trackStage(dt) {
         tickRun(this.run, dt);
 
+        // What the frame cost the budget, and what that leaves the engine. Only
+        // an open throttle spends, so a leg glided with the lever closed is a
+        // leg flown for nothing - which is the whole of what makes a route
+        // worth planning rather than merely flying.
+        burnFuel(this.run, this.aircraft.getThrottle(), dt);
+        this.syncEngine();
+
         if (this.missHold > 0) {
             this.missHold = Math.max(0, this.missHold - dt);
             if (this.missHold === 0) this.syncObjective();
         }
 
+        // The breakdown of a leg belongs to the ground it was read on. Once the
+        // aircraft is up again it describes a landing the pilot has left
+        // behind, so it comes off at the takeoff rather than at the next
+        // arrival, which on a route is a long way further on.
+        if (this.landing && this.aircraft.isAirborne()) this.clearLanding();
+
         this.hud.setClock(
             this.run.elapsed,
-            isRunning(this.run) ? bestTime(this.bestTimes, this.run.modeId, this.run.stageIndex) : null
+            isRunning(this.run) ? bestTime(this.bestTimes, this.run.modeId, this.run.stageIndex) : null,
+            fuelRemaining(this.run)
         );
 
-        this.hud.setGatePointer(gatePointer(
+        this.hud.setRunPointer(runPointer(
             this.run,
-            this.course,
+            { course: this.course, runways: this.runways },
             this.aircraft.getPosition(),
             headingDegrees(this.aircraft.getHeading())
         ));
+    }
+
+    /**
+     * Puts where the aircraft has come to rest to a search. Everything a
+     * set-down has to be is decided in `js/game-modes.js`, which holds the rule;
+     * what is here is reading the aircraft off and acting on the answer.
+     *
+     * Costs nothing outside a search, which has no marker to be beside.
+     */
+    trackRescue() {
+        if (!this.marker) return;
+
+        const position = this.aircraft.getPosition();
+        const found = recordRescue(this.run, this.marker, {
+            x: position.x,
+            z: position.z,
+            speed: this.aircraft.getSpeed(),
+            airborne: this.aircraft.isAirborne(),
+            crashed: this.aircraft.isCrashed()
+        });
+
+        if (!found) return;
+
+        this.finishStage();
+        this.syncObjective();
     }
 
     /** Counts down the beat a finished stage is held for, then lays out the next. */
@@ -1198,6 +1313,7 @@ class FlightSimulator {
         this.trackCourse();
         this.trackStage(dt);
         this.trackLanding(dt);
+        this.trackRescue();
         this.advanceRun(dt);
 
         this.camera2.update(dt);

@@ -14,21 +14,42 @@
  */
 
 import { createRandom, runwayThresholds, DEFAULT_SIZE } from './environment/elements.js';
-import { OPEN_COUNTRY_ID, LOOP_VALLEY_ID } from './environment/presets.js';
+import {
+    OPEN_COUNTRY_ID, LOOP_VALLEY_ID, BACK_COUNTRY_ID,
+    getEnvironment, environmentElements
+} from './environment/presets.js';
 import {
     START_FLYING, startDefaults, snapStartValue, startField
 } from './config.js';
 import {
-    FEET_PER_UNIT, bearingToDirection as bearingDirection, directionToBearing
+    FEET_PER_UNIT, KNOTS_PER_UNIT,
+    bearingToDirection as bearingDirection, directionToBearing
 } from './units.js';
+import { GLIDE_SPEED } from './flight-model.js';
 
 export const RUNWAY_LANDING = 'runway-landing';
 export const LOOP_COURSE    = 'loop-course';
+export const DEAD_STICK     = 'dead-stick';
+export const CARGO_RUN      = 'cargo-run';
+export const SEARCH_RESCUE  = 'search-rescue';
 
 // What a stage asks for. A landing is one thing done once; a course is a count
-// of gates flown in the order they were laid.
-export const LAND_OBJECTIVE = 'landing';
-export const LOOP_OBJECTIVE = 'loops';
+// of gates flown in the order they were laid; a cargo run is a count of strips
+// landed at in the order they were laid; a search is a marker found and set
+// down beside.
+export const LAND_OBJECTIVE   = 'landing';
+export const LOOP_OBJECTIVE   = 'loops';
+export const CARGO_OBJECTIVE  = 'cargo';
+export const SEARCH_OBJECTIVE = 'search';
+
+/**
+ * Whether there is an engine pulling. A mode may take it away at the start, as
+ * a dead stick does, or a run may lose it partway down a leg by spending the
+ * last of its budget - and the aircraft flies the same way in both cases,
+ * which is why the two arrive at one answer here rather than at two flags.
+ */
+export const ENGINE_LIVE = 'live';
+export const ENGINE_DEAD = 'dead';
 
 /**
  * A bearing as the direction over the ground it names, and the reverse.
@@ -154,7 +175,165 @@ const loopCourse = {
     ]
 };
 
-export const GAME_MODES = [runwayLanding, loopCourse];
+/**
+ * A landing with nothing to go around on. The engine quits before the pilot
+ * ever has it, the lever is dead for the whole flight, and the strip is far
+ * enough off that reaching it is a glide to be planned rather than a descent to
+ * be flown.
+ *
+ * The height comes down and the distance goes up as the stages go on, so what
+ * is being asked for moves from a glide that is comfortably inside the aircraft
+ * to one that is only inside it if the nose is held where the glide is best.
+ * Level is roughly twelve to one and a little nose-up is better than that -
+ * finding it is the mode.
+ *
+ * The help goes the way it goes in a powered landing, for the same reason, and
+ * it goes sooner: a pilot with one approach in hand is being asked to read the
+ * ground, not to be told where it is.
+ */
+const deadStick = {
+    id: DEAD_STICK,
+    label: 'DEAD STICK',
+    description: 'The engine is out - glide to the strip and put it down',
+    objective: LAND_OBJECTIVE,
+    engine: ENGINE_DEAD,
+    goal: 'GLIDE TO THE RUNWAY',
+    environment: OPEN_COUNTRY_ID,
+    seed: 27644437,
+    stages: [
+        {
+            label: 'HIGH KEY',
+            note: 'the strip ahead and well below, with height in hand',
+            base: { maxHeight: 200, scale: 2.0 },
+            runway: { length: [3000, 3400], width: [300, 340] },
+            approach: { distance: 8000, bearing: 6, heading: 0, altitudeFeet: 4200 },
+            guidance: { centreline: true, threshold: true }
+        },
+        {
+            label: 'OFF THE LINE',
+            note: 'the strip off to one side, so the turn is part of the glide',
+            base: { maxHeight: 300, scale: 2.6 },
+            runway: { length: [2600, 3000], width: [260, 300] },
+            approach: { distance: 10000, bearing: 40, heading: 30, altitudeFeet: 4000 },
+            guidance: { centreline: false, threshold: true }
+        },
+        {
+            label: 'ABEAM',
+            note: 'the strip off your wing and the height no longer generous',
+            base: { maxHeight: 420, scale: 3.2 },
+            runway: { length: [2200, 2600], width: [240, 280] },
+            approach: { distance: 11500, bearing: 95, heading: 80, altitudeFeet: 3600 }
+        },
+        {
+            label: 'BEHIND YOU',
+            note: 'a short strip over your shoulder, at the end of the glide you have',
+            base: { maxHeight: 560, scale: 4.0 },
+            runway: { length: [1800, 2200], width: [220, 260] },
+            approach: { distance: 12500, bearing: 150, heading: 150, altitudeFeet: 3200 }
+        }
+    ]
+};
+
+/**
+ * Landings strung together into a route. Land at one strip, then at the next,
+ * against a budget that only spends while the engine is open - so the way the
+ * route is flown counts for as much as the arrivals at the end of it, and a
+ * long glide with the lever closed is worth more than a fast run with it open.
+ *
+ * Running the budget out does not end the stage. It takes the engine, and the
+ * rest of the route is flown as a dead stick, which is either the end of it or
+ * the best landing the pilot ever makes.
+ *
+ * `strips` is how many strips the world carries and how many have to be landed
+ * at, in the order they were laid; `separation` is how far apart they stand, so
+ * a later stage is a longer route rather than a busier field.
+ */
+const cargoRun = {
+    id: CARGO_RUN,
+    label: 'CARGO RUN',
+    description: 'Land at each strip in turn on the fuel the run is given',
+    objective: CARGO_OBJECTIVE,
+    goal: 'LAND AT EVERY STRIP',
+    environment: OPEN_COUNTRY_ID,
+    seed: 16777619,
+    stages: [
+        {
+            label: 'SHORT HAUL',
+            note: 'two strips, close together, and more fuel than the run needs',
+            base: { maxHeight: 200, scale: 2.0 },
+            strips: 2,
+            separation: 6000,
+            budget: 130,
+            runway: { length: [2800, 3200], width: [280, 320] },
+            approach: { distance: 3000, bearing: 8, heading: 0, altitudeFeet: 1400 },
+            guidance: { centreline: true, threshold: true }
+        },
+        {
+            label: 'LONG HAUL',
+            note: 'the same two strips further apart, on a budget that notices',
+            base: { maxHeight: 300, scale: 2.6 },
+            strips: 2,
+            separation: 9500,
+            budget: 120,
+            runway: { length: [2400, 2800], width: [260, 300] },
+            approach: { distance: 3400, bearing: 20, heading: 15, altitudeFeet: 1600 },
+            guidance: { centreline: false, threshold: true }
+        },
+        {
+            label: 'THREE STOPS',
+            note: 'three strips in broken country, and fuel for about two of them',
+            base: { maxHeight: 460, scale: 3.4 },
+            strips: 3,
+            separation: 6500,
+            budget: 160,
+            runway: { length: [2000, 2400], width: [240, 280] },
+            approach: { distance: 3800, bearing: 35, heading: 30, altitudeFeet: 1900 }
+        }
+    ]
+};
+
+/**
+ * A marker put down somewhere in country with no strip in it, and a bearing and
+ * a distance from the start to find it by. That briefing is the whole of what
+ * the pilot is given: it is read off the start rather than off the aircraft, so
+ * it does not follow them round as they fly, and nothing points at the marker
+ * once they have left the line they were given.
+ *
+ * Then get down beside it, on whatever flat ground is there - the mode is over
+ * the one world with nothing prepared to arrive on, because a search that ended
+ * at a runway would be a search with the answer written on it.
+ */
+const searchRescue = {
+    id: SEARCH_RESCUE,
+    label: 'SEARCH AND RESCUE',
+    description: 'Find the marker on the bearing given, and set down beside it',
+    objective: SEARCH_OBJECTIVE,
+    goal: 'SET DOWN BESIDE THE MARKER',
+    environment: BACK_COUNTRY_ID,
+    seed: 43112609,
+    stages: [
+        {
+            label: 'CLOSE IN',
+            note: 'a short leg out, and room either side of the marker to land',
+            base: { maxHeight: 320, scale: 2.6 },
+            search: { bearing: 45, distance: 3600, heading: 45, altitudeFeet: 2400, radius: 420 }
+        },
+        {
+            label: 'OUT A WAY',
+            note: 'further out, off the heading you open on, and a tighter circle',
+            base: { maxHeight: 420, scale: 3.0 },
+            search: { bearing: 128, distance: 5200, heading: 95, altitudeFeet: 2800, radius: 330 }
+        },
+        {
+            label: 'LONG LEG',
+            note: 'the far side of the country, and the marker small when you get there',
+            base: { maxHeight: 540, scale: 3.6 },
+            search: { bearing: 287, distance: 6800, heading: 320, altitudeFeet: 3200, radius: 260 }
+        }
+    ]
+};
+
+export const GAME_MODES = [runwayLanding, loopCourse, deadStick, cargoRun, searchRescue];
 
 export const GAME_MODE_IDS = GAME_MODES.map(mode => mode.id);
 
@@ -180,7 +359,13 @@ export function getGameMode(id) {
 export function createRunState(modeId = null) {
     const state = {
         modeId: null, stageIndex: 0, gate: 0, missed: 0,
-        elapsed: 0, landed: false, complete: false
+        elapsed: 0, landed: false, complete: false,
+        // The strips of a route already landed at, the budget left to spend on
+        // the rest of it, and whether the marker has been reached. All three
+        // are carried by every run rather than only by the runs that use them,
+        // for the reason free flight is a run of nothing: everything reading a
+        // run reads one shape.
+        leg: 0, fuel: 0, found: false
     };
     if (isGameModeId(modeId)) startRun(state, modeId);
     return state;
@@ -236,7 +421,25 @@ export function restartStage(state) {
     state.missed = 0;
     state.elapsed = 0;
     state.landed = false;
+    state.leg = 0;
+    state.found = false;
+
+    // The budget goes back with the stage, which is what makes a run out of
+    // fuel something to fly again rather than something to sit in.
+    state.fuel = stageBudget(state);
     return state;
+}
+
+/** The fuel a stage is given, in seconds of a wide open throttle. */
+export function stageBudget(state) {
+    const budget = currentStage(state)?.budget;
+    return Number.isFinite(budget) && budget > 0 ? budget : 0;
+}
+
+/** How many strips a cargo stage lays down, which is how many it asks for. */
+export function stageStrips(state) {
+    const strips = currentStage(state)?.strips;
+    return Number.isFinite(strips) && strips > 0 ? Math.round(strips) : 0;
 }
 
 /**
@@ -251,7 +454,24 @@ export function stageProgress(state) {
         return { done: state.gate, total: currentStage(state)?.rings.count ?? 0 };
     }
 
+    if (mode.objective === CARGO_OBJECTIVE) {
+        return { done: state.leg, total: stageStrips(state) };
+    }
+
+    if (mode.objective === SEARCH_OBJECTIVE) {
+        return { done: state.found ? 1 : 0, total: 1 };
+    }
+
     return { done: state.landed ? 1 : 0, total: 1 };
+}
+
+/**
+ * What the thing being counted off is called, for the one line the run is
+ * reported in. A course counts loops and a route counts legs; everything else
+ * counts one thing once and never reaches the plural.
+ */
+export function progressNoun(state) {
+    return runningMode(state)?.objective === CARGO_OBJECTIVE ? 'LEG' : 'LOOP';
 }
 
 export function isStageComplete(state) {
@@ -278,15 +498,51 @@ export function advanceStage(state) {
 }
 
 /**
- * Reports a landing to the run. Returns true when it completed the stage, which
- * is the caller's cue to lay out the next one.
+ * Reports a landing to the run, and the strip it was made on where the run
+ * cares which one. Returns true when the landing counted for something, which
+ * is the caller's cue to score it; whether it also finished the stage is
+ * `isStageComplete`, because a route is several landings and only the last of
+ * them ends anything.
+ *
+ * A route counts only the strip it is up to, exactly as a course counts only
+ * the gate it is waiting on and for the same reason: the objective is the order
+ * as much as the arrivals, so going back to one already behind you, or skipping
+ * ahead to one further on, is somewhere to be rather than progress.
  */
-export function recordLanding(state) {
+export function recordLanding(state, runway = null) {
     const mode = runningMode(state);
-    if (!mode || mode.objective !== LAND_OBJECTIVE || state.landed || state.complete) return false;
+    if (!mode || state.complete) return false;
+
+    if (mode.objective === CARGO_OBJECTIVE) {
+        // The strip is read first and refused on its own, because a route
+        // already flown out is waiting on nothing and answers -1 as well: the
+        // two read as one would count an arrival on open ground as a leg.
+        const strip = stripIndex(runway);
+        if (strip < 0 || nextStrip(state) !== strip) return false;
+        state.leg += 1;
+        return true;
+    }
+
+    if (mode.objective !== LAND_OBJECTIVE || state.landed) return false;
 
     state.landed = true;
     return true;
+}
+
+/** The strip a route is up to, or -1 once the route is flown out. */
+export function nextStrip(state) {
+    const { done, total } = stageProgress(state);
+    return runningMode(state)?.objective === CARGO_OBJECTIVE && done < total ? done : -1;
+}
+
+/**
+ * Which strip of a world a strip is, as the generator numbered them. A landing
+ * reported with no strip under it - an arrival on open ground - answers to no
+ * number, which is what keeps it from counting toward a route.
+ */
+export function stripIndex(runway) {
+    const index = runway?.index;
+    return Number.isInteger(index) ? index : -1;
 }
 
 /**
@@ -380,6 +636,126 @@ export function tickRun(state, dt = 0) {
     return state.elapsed;
 }
 
+// --- The engine, and what is left to run it on -----------------------------
+
+/**
+ * Whether the run has an engine pulling.
+ *
+ * Two ways to have none and one answer to both: a mode that took it away
+ * before the pilot ever had it, and a route that has spent the last of its
+ * budget. The aircraft flies identically in either case - the lever is dead and
+ * the nose has the airspeed - so the reason belongs here rather than in the
+ * flying.
+ *
+ * Free flight always has one. Nothing outside a mode has a budget to run out
+ * of, and nothing outside a mode should be able to lose an engine by accident.
+ */
+export function runEngine(state) {
+    const mode = runningMode(state);
+    if (!mode) return ENGINE_LIVE;
+    if (mode.engine === ENGINE_DEAD) return ENGINE_DEAD;
+    if (mode.objective === CARGO_OBJECTIVE && stageBudget(state) > 0 && state.fuel <= 0) {
+        return ENGINE_DEAD;
+    }
+    return ENGINE_LIVE;
+}
+
+export function engineLive(state) {
+    return runEngine(state) === ENGINE_LIVE;
+}
+
+/**
+ * Spends a frame of the budget, and returns what is left of it.
+ *
+ * Only an open throttle spends: the burn is the lever setting itself, so a wide
+ * open throttle costs a second of budget per second and a closed one costs
+ * nothing at all. That is the whole of what makes the route worth planning -
+ * height traded for a glide is fuel not spent, and a run flown that way reaches
+ * a strip the same budget flown flat out does not.
+ *
+ * A stage already flown out stops spending, so the beat it is held on screen
+ * for is not charged to it.
+ */
+export function burnFuel(state, throttle = 0, dt = 0) {
+    const mode = runningMode(state);
+    if (!mode || mode.objective !== CARGO_OBJECTIVE) return state.fuel;
+    if (state.complete || isStageComplete(state)) return state.fuel;
+
+    const open = clamp(Number(throttle) || 0, 0, 1);
+    state.fuel = Math.max(0, state.fuel - open * Math.max(0, Number(dt) || 0));
+    return state.fuel;
+}
+
+/**
+ * How much of the budget is left, from 1 at the start of a stage to 0 with the
+ * engine gone. Null where there is no budget to read, which is every run but a
+ * route, and is what leaves the instruments with nothing to write.
+ */
+export function fuelRemaining(state) {
+    const budget = stageBudget(state);
+    return budget > 0 ? clamp(state.fuel / budget, 0, 1) : null;
+}
+
+// --- The marker a search is flown to --------------------------------------
+
+/**
+ * Where the marker is, and how close beside it counts as beside it.
+ *
+ * Read off the stage rather than scattered by the generator, because the
+ * bearing and the distance are the whole of the briefing: a marker put down
+ * somewhere random would be a marker nobody could be told how to find. The
+ * search opens at the middle of the world, so the bearing and the distance from
+ * there are the bearing and the distance from the start.
+ */
+export function stageMarker(state) {
+    const mode  = runningMode(state);
+    const stage = currentStage(state);
+    if (!mode || mode.objective !== SEARCH_OBJECTIVE || !stage?.search) return null;
+
+    const { bearing, distance, radius = RESCUE_RADIUS } = stage.search;
+    const out = bearingDirection(bearing);
+
+    return { x: out.x * distance, z: out.z * distance, bearing, distance, radius };
+}
+
+/** How close beside a marker counts, for a stage that names no circle of its own. */
+export const RESCUE_RADIUS = 340;
+
+/**
+ * How slow counts as down rather than still rolling, in world units per second.
+ * A set-down is the aircraft stopped beside the marker, and a rollout through
+ * the circle at flying speed is a pass over it.
+ */
+export const RESCUE_STOP_SPEED = 6;
+
+/**
+ * Reports where the aircraft has come to rest to a search. Returns true when
+ * that was the rescue, which finishes the stage.
+ *
+ * Four things at once, and all four have to hold on the same frame: there is a
+ * marker outstanding, the aircraft is on the ground, it has stopped, and it is
+ * inside the circle. The aircraft being intact is the fifth - a wreck beside the
+ * marker is not a rescue, and the crash puts the stage back to its beginning
+ * before this is ever reached.
+ */
+export function recordRescue(state, marker, report = {}) {
+    const mode = runningMode(state);
+    if (!mode || mode.objective !== SEARCH_OBJECTIVE || state.complete || state.found) return false;
+    if (!marker || report.airborne !== false || report.crashed === true) return false;
+    if (Math.abs(Number(report.speed) || 0) > RESCUE_STOP_SPEED) return false;
+
+    // Where it came to rest, which is the one reading with no sensible stand-in
+    // for a report that does not carry it: a missing place measures NaN, and
+    // NaN is not greater than the radius, so a report of nowhere would pass the
+    // circle it was never inside.
+    const x = Number(report.x), z = Number(report.z);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+    if (Math.hypot(x - marker.x, z - marker.z) > marker.radius) return false;
+
+    state.found = true;
+    return true;
+}
+
 /** Reports a crash to the run, which puts the stage back to its beginning. */
 export function recordCrash(state) {
     if (!isRunning(state) || state.complete) return false;
@@ -403,7 +779,9 @@ export function runStatus(state) {
 
     const stage = `STAGE ${stageNumber(state)} OF ${stageCount(state)}`;
     const { done, total } = stageProgress(state);
-    return total > 1 ? `${stage}  ·  LOOP ${Math.min(done + 1, total)} OF ${total}` : stage;
+    return total > 1
+        ? `${stage}  ·  ${progressNoun(state)} ${Math.min(done + 1, total)} OF ${total}`
+        : stage;
 }
 
 /**
@@ -508,6 +886,90 @@ export function gatePointer(state, course, position, heading) {
     };
 }
 
+/**
+ * Where the thing the run is waiting on lies, for a pilot who cannot see it -
+ * whichever thing that is. One line for every mode, because the pilot reads one
+ * row, and the differences between the modes are differences about what goes in
+ * it rather than about how many rows there are.
+ *
+ * A gate is suppressed while it is in front of the aircraft, because a gate on
+ * the screen is a bright hoop already pointing at itself. A strip is not: it is
+ * a grey mark on grey country, several miles off, and a pilot looking straight
+ * at one has no way of knowing it. So a route's pointer stays up.
+ *
+ * A search gets no pointer at all. What it gets is its briefing, which is the
+ * bearing and the distance from the start and never moves - a needle swinging
+ * round to the marker would be the mode answering its own question.
+ */
+export function runPointer(state, world = {}, position, heading) {
+    const mode = runningMode(state);
+    if (!mode || !position) return null;
+
+    if (mode.objective === LOOP_OBJECTIVE) {
+        const pointer = gatePointer(state, world.course, position, heading);
+        return pointer ? { ...pointer, label: `LOOP ${pointer.index + 1}` } : null;
+    }
+
+    if (mode.objective === CARGO_OBJECTIVE) return stripPointer(state, world.runways, position, heading);
+    if (mode.objective === SEARCH_OBJECTIVE) return searchBriefing(state);
+
+    return null;
+}
+
+/**
+ * The strip a route is up to: which one it is, where it lies, and how far off
+ * the nose that is. Null once the route is flown out, and null for a strip the
+ * world has not laid - a stage asking for three strips over ground that could
+ * only take two points at the two it has rather than at nothing.
+ */
+export function stripPointer(state, runways, position, heading) {
+    const index = nextStrip(state);
+    const strip = index >= 0 ? runways?.[index] : null;
+    if (!strip) return null;
+
+    const bearing  = gateBearing(strip, position);
+    const relative = relativeBearing(bearing, heading);
+
+    return {
+        index,
+        // Named for the leg rather than for the strip, which is the same thing
+        // said in the word the status row is already counting in - and said in
+        // the room the row has. The row is measured at thirty characters and a
+        // pointer at its widest fills them; `STRIP 3` would be one past.
+        label: `LEG ${index + 1}`,
+        bearing,
+        relative,
+        arrow: gateArrow(relative),
+        distance: gateDistance(strip, position)
+    };
+}
+
+/**
+ * The one thing a search is given: a bearing and a distance, from the start
+ * rather than from the aircraft.
+ *
+ * It carries no arrow, because there is nothing to point at - the pilot flies
+ * the bearing they were given and finds what is at the end of it. Null once the
+ * marker is found, which is the row going away the moment it has nothing left
+ * to say.
+ */
+export function searchBriefing(state) {
+    const marker = stageMarker(state);
+    if (!marker || state.found) return null;
+
+    return {
+        index: 0,
+        // One word, for the room: with no arrow in front of it the line still
+        // has to fit the row, and `MARKER ON` would be a character past it.
+        // What the bearing is for is plain from the row it is written in.
+        label: 'MARKER',
+        bearing: marker.bearing,
+        relative: 0,
+        arrow: '',
+        distance: marker.distance
+    };
+}
+
 // --- The panel the modes are chosen from -----------------------------------
 
 export const GAME_MODES_TITLE = 'GAME MODES';
@@ -563,12 +1025,53 @@ export function stageWorld(state) {
     const stage = currentStage(state);
     if (!mode || !stage) return null;
 
+    const strips = mode.objective === CARGO_OBJECTIVE ? stageStrips(state) : 0;
+
     return {
         environment: mode.environment,
         seed: stageSeed(mode.seed, state.stageIndex),
         base: stage.base ?? null,
-        runway: mode.objective === LAND_OBJECTIVE ? (stage.runway ?? true) : false
+        runway: landsOnStrips(mode) && strips === 0 ? (stage.runway ?? true) : false,
+        // A route needs more strips than the one a world lays on its own, so it
+        // describes the world outright rather than asking for a strip and being
+        // given one. Every other mode leaves this alone and takes the ground the
+        // preset describes, which is how it has always been laid.
+        elements: strips > 0 ? routeElements(mode, stage, strips) : null
     };
+}
+
+/** True for a mode whose objective is arriving on a prepared strip. */
+function landsOnStrips(mode) {
+    return mode.objective === LAND_OBJECTIVE || mode.objective === CARGO_OBJECTIVE;
+}
+
+/**
+ * The world a route is flown over: everything the preset describes, and then a
+ * strip per stop.
+ *
+ * Each is laid with the stage's own stand-off, so the second strip is put down
+ * clear of the first rather than wherever the flattest ground happened to be -
+ * which, over open country chosen for being flat, is quite often the same
+ * place. The first carries the stand-off too and is unaffected by it: there is
+ * nothing laid yet for it to stand off from.
+ */
+function routeElements(mode, stage, strips) {
+    const environment = getEnvironment(mode.environment);
+
+    // Configured from the preset where it says something about the strip it
+    // wants, and from the stage over the top of that - the same two layers
+    // `environmentElements` puts a single strip together from, so a route's
+    // strips are the world's strips rather than a second kind of strip.
+    const config = {
+        ...environment.runway,
+        ...stage.runway,
+        separation: stage.separation ?? 0
+    };
+
+    return [
+        ...environmentElements(environment),
+        ...Array.from({ length: strips }, () => ({ type: 'runway', config }))
+    ];
 }
 
 /**
@@ -594,9 +1097,7 @@ export function stageStart(state, world = {}) {
     const stage = currentStage(state);
     if (!mode || !stage) return null;
 
-    const opening = mode.objective === LAND_OBJECTIVE
-        ? approachOpening(stage, world.runway)
-        : courseOpening(stage, world.rings);
+    const opening = stageOpening(mode, stage, world);
 
     // An opening stands where its bearing and its distance put it, however far
     // out that is. The ground is an endless grid of tiles rather than one
@@ -609,7 +1110,7 @@ export function stageStart(state, world = {}) {
         start: {
             ...startDefaults(),
             startMode: START_FLYING,
-            runway: mode.objective === LAND_OBJECTIVE,
+            runway: landsOnStrips(mode),
             airspeedKnots:    snapStartValue('airspeedKnots', opening.airspeedKnots),
             altitudeFeet:     snapStartValue('altitudeFeet', opening.altitudeFeet),
             verticalSpeedFpm: snapStartValue('verticalSpeedFpm', 0),
@@ -625,6 +1126,52 @@ export function stageStart(state, world = {}) {
 // these objectives is flown out of.
 const OPENING_KNOTS    = 105;
 const OPENING_THROTTLE = 55;
+
+// What a stage with no engine opens on instead: the speed a level glide settles
+// at, and a lever that is already where a dead one is going to stay. Opening at
+// the powered speed would spend the first seconds of the glide converging on
+// this anyway, which is height spent on nothing.
+const GLIDE_KNOTS = GLIDE_SPEED * KNOTS_PER_UNIT;
+
+/**
+ * Where a stage opens, by what it is asking for: out on the approach to the
+ * first strip, back down the line of the first gate, or at the middle of the
+ * world a search is briefed from.
+ *
+ * A stage with no engine opens gliding rather than under power, whatever its
+ * objective, because a dead lever is dead from the first frame.
+ */
+function stageOpening(mode, stage, world) {
+    const opening = openingFor(mode, stage, world);
+    if (mode.engine !== ENGINE_DEAD) return opening;
+
+    return { ...opening, airspeedKnots: GLIDE_KNOTS, throttlePercent: 0 };
+}
+
+function openingFor(mode, stage, world) {
+    if (mode.objective === SEARCH_OBJECTIVE) return searchOpening(stage);
+    if (landsOnStrips(mode)) return approachOpening(stage, world.runway);
+    return courseOpening(stage, world.rings);
+}
+
+/**
+ * Where a search opens: the middle of the world, pointing wherever the stage
+ * puts the nose. The middle is not a decorative choice - the briefing is a
+ * bearing and a distance from the start, so the start has to be the place the
+ * marker was measured from, and `stageMarker` measures from the origin.
+ */
+function searchOpening(stage) {
+    const { heading = 0, altitudeFeet = startField('altitudeFeet').default } = stage.search ?? {};
+
+    return {
+        x: 0,
+        z: 0,
+        headingDegrees: heading,
+        altitudeFeet,
+        airspeedKnots: OPENING_KNOTS,
+        throttlePercent: OPENING_THROTTLE
+    };
+}
 
 /**
  * The end of the strip a landing stage is flown onto. A runway has two of them
@@ -660,7 +1207,7 @@ export function approachGuidance(state, runway) {
     const stage = currentStage(state);
     const shown = stage?.guidance;
 
-    if (!runway || mode?.objective !== LAND_OBJECTIVE || !shown) return null;
+    if (!runway || !mode || !landsOnStrips(mode) || !shown) return null;
     if (!shown.centreline && !shown.threshold) return null;
 
     const threshold = approachThreshold(runway);

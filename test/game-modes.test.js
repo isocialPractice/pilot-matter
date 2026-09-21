@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import {
     RUNWAY_LANDING,
     LOOP_COURSE,
+    DEAD_STICK,
+    CARGO_RUN,
+    SEARCH_RESCUE,
     LAND_OBJECTIVE,
     LOOP_OBJECTIVE,
+    CARGO_OBJECTIVE,
+    SEARCH_OBJECTIVE,
+    ENGINE_LIVE,
+    ENGINE_DEAD,
     GAME_MODES,
     GAME_MODE_IDS,
     FREE_FLIGHT_ID,
@@ -62,7 +69,23 @@ import {
     directionToBearing,
     wrapDegrees,
     wrapRadians,
-    blendBearing
+    blendBearing,
+    runEngine,
+    engineLive,
+    stageBudget,
+    stageStrips,
+    burnFuel,
+    fuelRemaining,
+    nextStrip,
+    stripIndex,
+    progressNoun,
+    stageMarker,
+    recordRescue,
+    searchBriefing,
+    stripPointer,
+    runPointer,
+    RESCUE_RADIUS,
+    RESCUE_STOP_SPEED
 } from '../js/game-modes.js';
 import { isStartValue, START_FIELD_IDS, START_FLYING, startField } from '../js/config.js';
 import {
@@ -71,7 +94,10 @@ import {
 import {
     sampleHeight, runwayThresholds, runwayDirection, runwayOffsets
 } from '../js/environment/elements.js';
-import { FEET_PER_UNIT, headingToYaw } from '../js/units.js';
+import { FEET_PER_UNIT, KNOTS_PER_UNIT, headingToYaw } from '../js/units.js';
+import {
+    glideSpeed, glideDescent, convergeSpeed, sinkRate, GLIDE_ACCEL, GLIDE_DECEL
+} from '../js/flight-model.js';
 
 const WORLD_SIZE = 16000;
 
@@ -89,7 +115,11 @@ const HEADING_SNAP = startField('headingDegrees').step / 2;
 function worldFor(state, segments = 100) {
     const world = stageWorld(state);
     const field = buildEnvironment(getEnvironment(world.environment), {
-        segments, seed: world.seed, base: world.base, runway: world.runway
+        segments, seed: world.seed, base: world.base,
+        // A route describes its world outright rather than asking for a strip
+        // and being given one, so the description goes through when there is
+        // one. Everything else leaves it null and is laid from the preset.
+        runway: world.runway, elements: world.elements ?? undefined
     });
 
     const rings = runningMode(state).objective === LOOP_OBJECTIVE
@@ -104,14 +134,17 @@ function worldFor(state, segments = 100) {
 
 // --- The modes -------------------------------------------------------------
 
-test('there are two modes, and each is a world, an objective, and stages', () => {
-    assert.deepEqual(GAME_MODE_IDS, [RUNWAY_LANDING, LOOP_COURSE]);
+test('every mode is a world, an objective, and stages', () => {
+    assert.deepEqual(GAME_MODE_IDS,
+        [RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, CARGO_RUN, SEARCH_RESCUE]);
+
+    const objectives = [LAND_OBJECTIVE, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE];
 
     for (const mode of GAME_MODES) {
         assert.ok(mode.label.length > 0, `${mode.id} needs a label to be listed by`);
         assert.ok(mode.description.length > 0, `${mode.id} needs a line saying what it is`);
         assert.ok(mode.goal.length > 0, `${mode.id} needs an objective the HUD can write`);
-        assert.ok([LAND_OBJECTIVE, LOOP_OBJECTIVE].includes(mode.objective));
+        assert.ok(objectives.includes(mode.objective));
         assert.ok(mode.stages.length > 1, `${mode.id} should get harder, so it needs stages`);
 
         for (const stage of mode.stages) {
@@ -1187,4 +1220,453 @@ test('there is nothing to draw where there is nothing to find', () => {
         'a world with no strip in it');
     assert.equal(approachGuidance(createRunState(LOOP_COURSE), strip), null, 'a course stage');
     assert.equal(approachGuidance(createRunState(), strip), null, 'and a free flight');
+});
+
+// --- The engine, and the budget that keeps it turning ----------------------
+
+// A dead stick is the mode's own condition rather than something that happens
+// during it: the lever is dead from the first frame and stays dead, so the
+// whole flight is the glide.
+test('a dead stick has no engine from the moment the stage is laid out', () => {
+    const state = createRunState(DEAD_STICK);
+
+    assert.equal(runEngine(state), ENGINE_DEAD);
+    assert.equal(engineLive(state), false);
+
+    // Through every stage of it, and through a restart, because a stage flown
+    // a second time is the same stage.
+    do {
+        assert.equal(runEngine(state), ENGINE_DEAD, `stage ${stageNumber(state)}`);
+        restartStage(state);
+        assert.equal(runEngine(state), ENGINE_DEAD, 'and after it is put back to the start');
+    } while (advanceStage(state));
+});
+
+test('a dead stick opens gliding, with the lever already where it will stay', () => {
+    const state = createRunState(DEAD_STICK);
+    const { runway } = worldFor(state);
+    const { start } = stageStart(state, { runway });
+
+    assert.equal(start.throttlePercent, 0, 'nothing to open the lever for');
+    assert.ok(start.airspeedKnots > 0, 'but flying, because a glide is still flying');
+    assert.ok(isStartValue('airspeedKnots', start.airspeedKnots),
+        'at a speed the configuration can hold');
+});
+
+// Everything else keeps its engine, including free flight - which has no budget
+// to run out of and should never be able to lose one by accident.
+test('every other run has an engine', () => {
+    assert.equal(runEngine(createRunState()), ENGINE_LIVE, 'free flight');
+
+    for (const id of [RUNWAY_LANDING, LOOP_COURSE, SEARCH_RESCUE]) {
+        assert.equal(runEngine(createRunState(id)), ENGINE_LIVE, id);
+    }
+});
+
+test('a route opens with its budget full and spends it on the throttle alone', () => {
+    const state = createRunState(CARGO_RUN);
+    const budget = stageBudget(state);
+
+    assert.ok(budget > 0, 'a route is flown against something');
+    assert.equal(state.fuel, budget, 'and opens with all of it');
+    assert.equal(fuelRemaining(state), 1);
+
+    // A closed lever costs nothing, which is what makes a glide worth flying.
+    burnFuel(state, 0, 10);
+    assert.equal(state.fuel, budget, 'a closed throttle spends nothing');
+
+    // And the burn is the lever setting, so half open costs half a second a
+    // second rather than all of it or none.
+    burnFuel(state, 0.5, 10);
+    assert.equal(state.fuel, budget - 5);
+
+    burnFuel(state, 1, 5);
+    assert.equal(state.fuel, budget - 10, 'and wide open costs a second a second');
+    assert.ok(Math.abs(fuelRemaining(state) - (budget - 10) / budget) < 1e-9);
+});
+
+test('a budget spent out takes the engine and leaves the run flying', () => {
+    const state = createRunState(CARGO_RUN);
+
+    assert.equal(engineLive(state), true);
+    burnFuel(state, 1, stageBudget(state) * 2);
+
+    assert.equal(state.fuel, 0, 'a budget stops at empty rather than going under it');
+    assert.equal(runEngine(state), ENGINE_DEAD, 'and the engine goes with the last of it');
+    assert.equal(state.complete, false, 'the stage is still there to be flown out');
+
+    // Which is the thing a restart puts back, because a run out of fuel is
+    // something to fly again rather than something to sit in.
+    restartStage(state);
+    assert.equal(fuelRemaining(state), 1);
+    assert.equal(engineLive(state), true);
+});
+
+// Nothing without a budget has one to read, which is what leaves the clock row
+// of every other mode writing the time to beat.
+test('a run with no budget has no fuel to report', () => {
+    for (const id of [null, RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, SEARCH_RESCUE]) {
+        assert.equal(fuelRemaining(createRunState(id)), null, `${id}`);
+    }
+});
+
+// --- A route ---------------------------------------------------------------
+
+test('a route lays a strip per stop, and stands them apart', () => {
+    const state = createRunState(CARGO_RUN);
+
+    do {
+        const stage = currentStage(state);
+        const { field } = worldFor(state, 140);
+
+        assert.equal(field.runways.length, stageStrips(state),
+            `${stage.label} asks for ${stageStrips(state)} strips`);
+        assert.deepEqual(field.runways.map(strip => strip.index),
+            field.runways.map((_, at) => at), 'numbered in the order they were laid');
+
+        for (let a = 0; a < field.runways.length; a++) {
+            for (let b = a + 1; b < field.runways.length; b++) {
+                const gap = Math.hypot(field.runways[a].x - field.runways[b].x,
+                                       field.runways[a].z - field.runways[b].z);
+                assert.ok(gap >= stage.separation * 0.9,
+                    `${stage.label} put two strips ${Math.round(gap)} apart, `
+                  + `asking for ${stage.separation}`);
+            }
+        }
+    } while (advanceStage(state));
+});
+
+// A route is an order as much as a set of arrivals, which is the same rule a
+// course of loops is flown under and is written the same way.
+test('a route counts the strip it is up to and nothing else', () => {
+    const state = createRunState(CARGO_RUN);
+    const total = stageStrips(state);
+
+    assert.equal(nextStrip(state), 0);
+    assert.equal(recordLanding(state, { index: 1 }), false, 'the strip further on is not yet');
+    assert.equal(recordLanding(state, null), false, 'and open ground is no strip at all');
+    assert.equal(state.leg, 0);
+
+    assert.equal(recordLanding(state, { index: 0 }), true);
+    assert.equal(state.leg, 1);
+    assert.equal(nextStrip(state), 1);
+    assert.equal(isStageComplete(state), total <= 1);
+
+    assert.equal(recordLanding(state, { index: 0 }), false, 'and the one behind is not again');
+    assert.equal(state.leg, 1);
+
+    for (let leg = 1; leg < total; leg++) assert.equal(recordLanding(state, { index: leg }), true);
+
+    assert.equal(isStageComplete(state), true);
+    assert.equal(nextStrip(state), -1, 'and a route flown out is waiting on nothing');
+});
+
+// A route that has run out of strips is waiting on nothing, and an arrival on
+// open ground is no strip at all - two absences that must not read as a match.
+test('a route flown out counts nothing more, least of all a field landing', () => {
+    const state = createRunState(CARGO_RUN);
+    const total = stageStrips(state);
+
+    for (let leg = 0; leg < total; leg++) assert.equal(recordLanding(state, { index: leg }), true);
+
+    assert.equal(nextStrip(state), -1, 'the route is waiting on nothing');
+    assert.equal(stripIndex(null), -1, 'and open ground answers to nothing');
+
+    assert.equal(recordLanding(state, null), false, 'so putting down in a field is not a leg');
+    assert.equal(recordLanding(state, {}), false, 'nor is a strip laid before they were numbered');
+    assert.equal(state.leg, total, 'and the route is still the length it was flown');
+});
+
+test('a strip with no number is no strip a route can count', () => {
+    assert.equal(stripIndex(null), -1);
+    assert.equal(stripIndex({}), -1, 'a strip a world laid before it numbered them');
+    assert.equal(stripIndex({ index: 0 }), 0, 'and zero is a number, not an absence of one');
+});
+
+test('a route says how far down it the pilot is, in the word it counts in', () => {
+    const state = createRunState(CARGO_RUN);
+
+    assert.equal(progressNoun(state), 'LEG');
+    assert.ok(runStatus(state).includes(`LEG 1 OF ${stageStrips(state)}`));
+
+    recordLanding(state, { index: 0 });
+    assert.ok(runStatus(state).includes('LEG 2 OF'));
+    assert.equal(progressNoun(createRunState(LOOP_COURSE)), 'LOOP');
+});
+
+// Every other mode takes the ground its preset describes. Only a route needs
+// more strips than a world lays on its own, so only a route describes one.
+test('only a route describes its own world', () => {
+    for (const id of [RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, SEARCH_RESCUE]) {
+        assert.equal(stageWorld(createRunState(id)).elements, null, id);
+    }
+
+    assert.ok(Array.isArray(stageWorld(createRunState(CARGO_RUN)).elements));
+});
+
+// --- A search --------------------------------------------------------------
+
+test('the marker stands where the briefing says it does, from the start', () => {
+    const state = createRunState(SEARCH_RESCUE);
+
+    do {
+        const marker = stageMarker(state);
+        const { start, position } = stageStart(state, {});
+
+        assert.equal(position.x, 0, 'a search opens where its bearings were measured from');
+        assert.equal(position.z, 0);
+        assert.equal(start.runway, false, 'over country with nothing prepared to arrive on');
+
+        // The bearing and the distance the pilot is given are the bearing and
+        // the distance to the marker, read on the card the compass is written
+        // on rather than on one of its own.
+        assert.ok(Math.abs(directionToBearing(marker.x, marker.z) - marker.bearing) < 1e-6);
+        assert.ok(Math.abs(Math.hypot(marker.x, marker.z) - marker.distance) < 1e-6);
+        assert.ok(marker.radius > 0, 'and beside it is a distance rather than a point');
+    } while (advanceStage(state));
+});
+
+test('nothing but a search has a marker to find', () => {
+    for (const id of [null, RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, CARGO_RUN]) {
+        assert.equal(stageMarker(createRunState(id)), null, `${id}`);
+    }
+});
+
+test('a search is flown out by setting down beside the marker', () => {
+    const state = createRunState(SEARCH_RESCUE);
+    const marker = stageMarker(state);
+    const down = { x: marker.x, z: marker.z, speed: 0, airborne: false, crashed: false };
+
+    assert.equal(isStageComplete(state), false);
+    assert.equal(recordRescue(state, marker, down), true);
+    assert.equal(isStageComplete(state), true);
+    assert.equal(recordRescue(state, marker, down), false, 'and found once is found');
+});
+
+test('a search is not flown out by anything short of being down beside it', () => {
+    const state = createRunState(SEARCH_RESCUE);
+    const marker = stageMarker(state);
+    const down = { x: marker.x, z: marker.z, speed: 0, airborne: false, crashed: false };
+
+    const refused = {
+        'still flying over it': { ...down, airborne: true },
+        'rolling through it':   { ...down, speed: RESCUE_STOP_SPEED + 1 },
+        'rolling backwards':    { ...down, speed: -(RESCUE_STOP_SPEED + 1) },
+        'a wreck beside it':    { ...down, crashed: true },
+        'stopped outside it':   { ...down, x: marker.x + marker.radius + 1 }
+    };
+
+    for (const [what, report] of Object.entries(refused)) {
+        assert.equal(recordRescue(state, marker, report), false, what);
+        assert.equal(state.found, false, what);
+    }
+
+    assert.equal(recordRescue(state, null, down), false, 'and nothing to be beside is not beside it');
+    assert.equal(state.found, false);
+
+    // The edge of the circle is inside it, because beside it is a circle the
+    // pilot is told the size of rather than one they have to beat.
+    assert.equal(recordRescue(state, marker, { ...down, x: marker.x + marker.radius }), true);
+});
+
+// A distance that is not a number is not a distance inside the circle either,
+// and `NaN > radius` is false - so the place is read before it is measured.
+test('a set-down that does not say where it was is not a rescue', () => {
+    const state = createRunState(SEARCH_RESCUE);
+    const marker = stageMarker(state);
+    const stopped = { speed: 0, airborne: false, crashed: false };
+
+    assert.equal(recordRescue(state, marker, stopped), false, 'a report carrying no place');
+    assert.equal(recordRescue(state, marker, { ...stopped, x: marker.x }), false, 'or only half of one');
+    assert.equal(recordRescue(state, marker, { ...stopped, x: NaN, z: NaN }), false, 'or nowhere at all');
+    assert.equal(state.found, false);
+
+    // And the same report with the place in it is the rescue it always was.
+    assert.equal(recordRescue(state, marker, { ...stopped, x: marker.x, z: marker.z }), true);
+});
+
+test('a stage naming no circle of its own is given the one every search has', () => {
+    assert.ok(RESCUE_RADIUS > 0);
+    assert.ok(RESCUE_STOP_SPEED > 0);
+});
+
+// --- Where the run is pointed ----------------------------------------------
+
+test('the pointer names whatever the run is waiting on', () => {
+    const route = createRunState(CARGO_RUN);
+    const strips = [{ x: 4000, z: 0, index: 0 }, { x: 0, z: 4000, index: 1 }];
+    const here = { x: 0, z: 0, y: 500 };
+
+    const leg = runPointer(route, { runways: strips }, here, 0);
+    assert.equal(leg.label, 'LEG 1');
+    assert.equal(leg.index, 0);
+    assert.ok(Math.abs(leg.distance - 4000) < 1e-6);
+
+    recordLanding(route, { index: 0 });
+    assert.equal(runPointer(route, { runways: strips }, here, 0).label, 'LEG 2',
+        'which moves on with the route');
+
+    // A strip is a grey mark on grey country rather than a lit hoop, so a strip
+    // straight ahead is still pointed at - unlike a gate, which is not.
+    const onTheNose = runPointer(route, { runways: strips }, here, 0);
+    assert.ok(onTheNose, 'a strip on the nose is still worth pointing at');
+    assert.ok(Math.abs(onTheNose.relative) < GATE_IN_VIEW, 'even though a gate there would not be');
+});
+
+test('a search is given its briefing rather than a needle that follows the marker', () => {
+    const state = createRunState(SEARCH_RESCUE);
+    const marker = stageMarker(state);
+
+    const briefing = searchBriefing(state);
+    assert.equal(briefing.arrow, '', 'a bearing given rather than a direction pointed');
+    assert.equal(briefing.bearing, marker.bearing);
+    assert.equal(briefing.distance, marker.distance);
+
+    // Read off the start, so flying half of it does not change what it says.
+    const flown = { x: marker.x / 2, z: marker.z / 2, y: 600 };
+    assert.deepEqual(runPointer(state, {}, flown, 180), briefing,
+        'the briefing is the same briefing wherever the aircraft has got to');
+
+    recordRescue(state, marker, { x: marker.x, z: marker.z, speed: 0, airborne: false });
+    assert.equal(runPointer(state, {}, flown, 180), null, 'and goes away once it is answered');
+});
+
+test('a route with no strip laid for the leg points at nothing rather than guessing', () => {
+    const state = createRunState(CARGO_RUN);
+
+    assert.equal(stripPointer(state, [], { x: 0, z: 0, y: 0 }, 0), null);
+    assert.equal(runPointer(createRunState(), {}, { x: 0, z: 0, y: 0 }, 0), null,
+        'and so does free flight');
+});
+
+// --- The glide a dead stick has to be flown on -----------------------------
+
+/**
+ * A glide flown the way `js/aircraft.js` flies one, to the height a strip sits
+ * at: converge the airspeed on what the nose is asking for, carry the aircraft
+ * forward along that nose, and take the sink off underneath it.
+ *
+ * The aircraft itself needs a renderer and cannot be run here, so this is the
+ * same three lines written out. What it is for is the one thing about these
+ * stages that no rule in the module can state: whether the strip a stage opens
+ * you out from is a strip you can actually reach.
+ *
+ * Returns how far it went over the ground before it ran out of height.
+ */
+function glideReach(altitude, speed, pitch, dt = 0.05, limit = 40000) {
+    let height = altitude;
+    let airspeed = speed;
+    let flown = 0;
+
+    for (let step = 0; step < limit && height > 0; step++) {
+        airspeed = convergeSpeed(airspeed, glideSpeed(pitch), dt, GLIDE_ACCEL, GLIDE_DECEL);
+        height -= (Math.sin(pitch) * airspeed + sinkRate(airspeed)) * dt;
+        flown += Math.cos(pitch) * airspeed * dt;
+    }
+
+    return flown;
+}
+
+/** The attitude a glide reaches furthest at, which is the one worth finding. */
+function bestGlidePitch() {
+    let best = { pitch: 0, reach: 0 };
+
+    for (let pitch = -0.4; pitch <= 0.4; pitch += 0.005) {
+        const reach = glideSpeed(pitch) * Math.cos(pitch) / glideDescent(pitch);
+        if (reach > best.reach) best = { pitch, reach };
+    }
+
+    return best.pitch;
+}
+
+/** Where a dead stick stage opens, how high, and how far off the strip it is. */
+function deadStickOpening(state) {
+    const { field, runway } = worldFor(state);
+    const { start, position } = stageStart(state, { runway });
+
+    return {
+        runway,
+        field,
+        range: Math.hypot(position.x - runway.x, position.z - runway.z),
+        // The height there is to spend is the height over the strip rather than
+        // over the sea, because the strip is what the glide has to reach.
+        height: start.altitudeFeet / FEET_PER_UNIT - runway.elevation,
+        speed: start.airspeedKnots / KNOTS_PER_UNIT
+    };
+}
+
+// The stages are tuned rather than derived, so nothing in the module says a
+// stage is flyable. This does: every one of them is inside the glide the
+// aircraft actually has, from the height and the speed it opens at.
+test('every dead stick stage opens somewhere the strip can be reached from', () => {
+    const state = createRunState(DEAD_STICK);
+    const pitch = bestGlidePitch();
+
+    do {
+        const { range, height, speed } = deadStickOpening(state);
+        const reach = glideReach(height, speed, pitch);
+
+        assert.ok(reach > range,
+            `${currentStage(state).label} opens ${Math.round(range)} out with `
+          + `${Math.round(reach)} of glide in hand`);
+    } while (advanceStage(state));
+});
+
+// And the last of them is not reachable by pointing the nose at the strip and
+// waiting, which is what makes the mode a glide to be planned rather than a
+// descent to be flown. A stage anyone could fall into would not be one.
+test('the last dead stick stage wants the glide found rather than the nose pointed', () => {
+    const state = createRunState(DEAD_STICK);
+    while (advanceStage(state));
+
+    const { range, height, speed } = deadStickOpening(state);
+
+    assert.ok(glideReach(height, speed, 0) < range,
+        `${currentStage(state).label} should be past what a level nose reaches`);
+    assert.ok(glideReach(height, speed, bestGlidePitch()) > range,
+        'and inside what the glide reaches when it is flown well');
+});
+
+// The first of them is the other way round, because a mode whose first stage
+// asks for the technique is a mode nobody gets past.
+test('the first dead stick stage is inside a level glide', () => {
+    const { range, height, speed } = deadStickOpening(createRunState(DEAD_STICK));
+
+    assert.ok(glideReach(height, speed, 0) > range,
+        'the opening stage should be reachable with the nose simply held level');
+});
+
+// --- The budget a route has to be flown on ---------------------------------
+
+// Same question, asked of a route: the budget has to cover the ground, and has
+// to not cover it so comfortably that the throttle stops being a decision.
+test('every route stage is given enough budget to fly it, and not much more', () => {
+    const state = createRunState(CARGO_RUN);
+
+    // A route flown carelessly: cruise the whole way with the lever open far
+    // enough to hold it, which is the most expensive way round.
+    const CRUISE = 120;
+    const CARELESS_THROTTLE = 0.6;
+
+    do {
+        const { field } = worldFor(state, 140);
+        const { position } = stageStart(state, { runway: field.runways[0] });
+
+        let at = position;
+        let route = 0;
+        for (const strip of field.runways) {
+            route += Math.hypot(at.x - strip.x, at.z - strip.z);
+            at = strip;
+        }
+
+        const careless = route / CRUISE * CARELESS_THROTTLE;
+        const budget = stageBudget(state);
+
+        assert.ok(budget > careless,
+            `${currentStage(state).label} is a ${Math.round(route)} unit route on a `
+          + `budget of ${budget}, which a careless run spends ${Math.round(careless)} of`);
+        assert.ok(budget < careless * 3,
+            `${currentStage(state).label} has so much budget that the throttle `
+          + 'stops being a decision');
+    } while (advanceStage(state));
 });

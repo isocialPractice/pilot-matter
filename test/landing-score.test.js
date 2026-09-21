@@ -293,3 +293,20 @@ test('the landing is scored from the two the handler was given', () => {
     assert.ok(handler[2].includes(`scoreLanding(${strip}, ${contact})`),
         'the breakdown is written from the landing that was reported, not from nothing');
 });
+
+// The same seam, one strip further on. `approachGuidance` is tested in full in
+// `test/game-modes.test.js`, but which strip it is handed is `legStrip` in
+// `js/main.js`, and `nextStrip` answers -1 both for a route with nothing left
+// to land at and for every run that is not a route - so a `legStrip` that falls
+// through on -1 alone puts the lead-in back up at the first strip of a route
+// the moment the last one is landed at, with no pure test able to see it.
+test('the strip the lead-in is drawn to asks whether the run is a route', () => {
+    const method = mainSource.match(/^ {4}legStrip\(\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(method, 'js/main.js should still choose the strip the guidance is drawn to');
+
+    const [body] = [method[1]];
+    assert.ok(/CARGO_OBJECTIVE/.test(body),
+        'legStrip should ask what the mode is, since -1 means two different things');
+    assert.ok(!/nextStrip[\s\S]*getRunway\(\)/.test(body),
+        'a route with nothing left to approach should draw nothing, not the strip it started at');
+});

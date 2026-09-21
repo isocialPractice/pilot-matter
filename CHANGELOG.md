@@ -5,10 +5,106 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.18.0-alpha] - 2026-09-21
 
-The `1.17.2-alpha` entry's account of the ignore rules is corrected to claim
-only what that release carries.
+Three modes join the two: a landing flown with no engine, a route of landings
+flown against a budget, and a marker found on a bearing and set down beside. The
+`1.17.2-alpha` entry's account of the ignore rules is corrected in the same
+release, to claim only what that version carries.
+
+### Added
+
+- **`DEAD STICK`: the engine quits and the throttle is dead for the rest of the
+  flight.** Four stages over open country, opening high with the strip far
+  enough off that reaching it is a glide to be planned rather than a descent to
+  be flown. The lever still moves and there is nothing on the end of it, so the
+  airspeed comes off the attitude instead: a level nose settles at 80 units/s
+  and every radian of nose-down adds 180 to that, floored at a standstill and
+  capped where the engine's own top speed is. `HIGH KEY` opens comfortably
+  inside a level glide with the threshold bar and the lead-in both drawn;
+  `OFF THE LINE` puts the strip to one side so the turn is part of the glide;
+  `ABEAM` and `BEHIND YOU` are given neither, open lower and further out, and
+  want the nose held where the glide is best rather than merely pointed at the
+  runway. A level glide reaches about twelve times the height it spends and a
+  little nose-up reaches further, which is the thing the mode is about finding
+- **A glide that is always a descent, and a test that sweeps for it rather than
+  samples.** `glideSpeed` and `glideDescent` in `js/flight-model.js` are the
+  pure pair, and the two constants behind them are chosen so that the nose-up
+  angle which bleeds the speed to nothing is about 25 degrees: short of that the
+  sink the slow wing is already losing outruns the climb the nose is asking for,
+  and there is no attitude in the range the aircraft clamps its pitch to that
+  holds height on no engine. That is the one way a dead stick could quietly stop
+  being one, and it is not a hole anyone would find by flying - so the suite
+  walks the whole attitude range in two-thousandth-radian steps rather than
+  checking a handful of angles
+- **`CARGO RUN`: land at one strip, then at the next, against a budget that only
+  spends while the engine is open.** Three stages over open country, each laying
+  a strip per stop rather than the single strip every other mode is flown over.
+  The burn is the lever setting itself, so a wide open throttle costs a second
+  of budget per second, half open costs half of that, and a closed throttle
+  costs nothing at all - which is what makes the route worth planning rather
+  than merely flying. What is left is written where the time to beat goes on the
+  one card row that is drawn every frame, because on a route that is the number
+  being raced. Spend the last of it and the engine stops while the stage carries
+  on, so the rest of the route is flown as a dead stick. Only the strip the
+  route is up to counts, which is the rule a course of loops is already flown
+  under: landing back at the strip behind you is somewhere to be rather than
+  progress. `SHORT HAUL` gives two strips six thousand units apart and more
+  budget than the run needs, `LONG HAUL` moves them to nine and a half thousand
+  on less, and `THREE STOPS` adds a third strip in broken country on fuel for
+  about two of them
+- **`SEARCH AND RESCUE`: a marker found on a bearing and a distance, and set
+  down beside.** Three stages over `BACK COUNTRY`, a new mode world of rough
+  wooded ground with no strip anywhere in it. The briefing is the whole of what
+  the pilot is given, and it is read off where the stage opens rather than off
+  the aircraft - so it says the same thing however far the flight has gone and
+  whichever way it has turned, and nothing swings round to the marker on the way
+  in. The marker is a mast with a lit head, tall enough to stand clear of the
+  trees, with a ring laid on the ground at the distance that counts as beside
+  it; the ring follows the country rather than lying flat across it, so what it
+  shows is the ground being landed on. The stage is flown out when the aircraft
+  is on the ground, stopped, inside the ring and in one piece - rolling through
+  at flying speed is a pass over it, and a wreck beside the marker is not a
+  rescue. A set-down that does not say where it was made is refused rather than
+  measured, because a place that is not a number is not a distance outside the
+  ring either. `CLOSE IN`, `OUT A WAY` and `LONG LEG` each put the marker further
+  out, off the heading the stage opens on, in rougher country, inside a tighter
+  ring
+- **A strip can be asked to stand clear of the strips already laid.** The runway
+  element takes a `separation` in world units, and a candidate site inside
+  another strip's stand-off is charged for how far inside it falls - the same
+  way a site outside its height band is charged for the part of it that lies
+  outside. So a world asking for three strips gets three however tight the
+  ground is, rather than getting one and a failure, and the strips of a world
+  now carry the number they were laid in, which is what lets a route say which
+  one a landing was made on. A world that asks for no separation is laid exactly
+  as it always was
+
+### Changed
+
+- **The card's pointer row points at whatever the run is waiting on, not only at
+  a gate.** One row, one formatter, and the mode decides what goes in it: a loop
+  as before, the strip a route is up to, or a search's briefing. A gate is still
+  suppressed while it is in front of the aircraft, because a lit hoop on the
+  screen is already pointing at itself - but a strip is not suppressed, being a
+  grey mark on grey country several miles off that a pilot can be looking
+  straight at without knowing it. A briefing carries no arrow at all, and is
+  written without the glyph and the space that would be left behind it. The
+  labels are `LEG n` and `MARKER` rather than `STRIP n` and `MARKER ON` because
+  the row is measured at thirty characters and both of the longer forms ran one
+  past it
+- **A landing is reported with the strip it was made on.** `recordLanding` takes
+  the runway as a second argument, which a route needs and every other mode
+  ignores, and answers whether the landing counted rather than whether it
+  finished the stage - `isStageComplete` is the question a route makes worth
+  asking separately. Only a numbered strip counts: a route already flown out is
+  waiting on nothing and an arrival on open ground is no strip at all, and the
+  two are refused apart rather than read as one. The help on the approach is
+  drawn again when a leg lands rather than only when a stage is laid out, so the
+  lead-in moves to the strip being flown to instead of pointing back at the one
+  behind, and comes off the ground entirely once the last strip is landed at. A landing breakdown
+  now comes off the card at the takeoff rather than at the next arrival, which
+  on a route is a long way further on
 
 ### Fixed
 
