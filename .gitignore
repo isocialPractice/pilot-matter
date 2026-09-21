@@ -1,0 +1,5 @@
+# Verification output written by the UI/UX tester, which is a record of one run
+# on one machine rather than anything the project ships.
+.tmp/
+test-results/
+user-scripts/

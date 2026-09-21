@@ -21,7 +21,7 @@ its context survives being archived.
 - [ ] **Photo Survey**: photograph a list of named landmarks, each counting
   only when it is caught from inside a height, range, and heading window
   - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **User todo**: force-add `.gitignore`, or narrow the global rule that
+- [x] **User todo**: force-add `.gitignore`, or narrow the global rule that
   hides it, so the repository's own ignore rules reach a clone
   - **Issue**: The file exists in the working copy and nothing tracks it.
     `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
