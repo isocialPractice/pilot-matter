@@ -11,16 +11,15 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Dead Stick**: the engine quits at altitude and the throttle is dead
-  for the rest of the flight, with the runway far enough off that reaching it
-  is a glide to be planned rather than a descent to be flown
+- [ ] **Traffic Pattern**: a full circuit flown to a pattern - takeoff, climb
+  out, downwind, base, and final - judged on holding each leg's altitude and
+  heading rather than only on the landing at the end of it
   - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Cargo Run**: land at one strip, then at the next, against a budget
-  that only spends while the engine is open, so the route flown matters as
-  much as the landings made
+- [ ] **Canyon Run**: fly the length of a canyon under a ceiling and between
+  its walls, with the ceiling coming down and the cut narrowing stage by stage
   - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Search and Rescue**: find a marker placed somewhere in the world given
-  only a bearing and a distance from the start, then get down beside it
+- [ ] **Photo Survey**: photograph a list of named landmarks, each counting
+  only when it is caught from inside a height, range, and heading window
   - From: Game Modes UI/UX `->` New Game Modes
 - [ ] **User todo**: force-add `.gitignore`, or narrow the global rule that
   hides it, so the repository's own ignore rules reach a clone
@@ -49,6 +48,47 @@ its context survives being archived.
     now reach a clone. Queue that only after the file is tracked - until then it
     has nothing to apply to.
 
+### UI/UX Override - the three new game modes
+
+#### Resolve Issues
+
+- [ ] Glide Climb 1
+  - **Issue**: A dead stick gains height when the nose is held up. From the
+    settled glide at 4153 ft and 130 kt, holding `W` and touching nothing else
+    puts the aircraft at 4302 ft - 151 ft of climb on no engine, with V/S
+    reading positive for nine frames at up to +6520 ft/min. Entered from a dive
+    it is far larger: nose down for two seconds, then nose up, climbs 2150 ft
+    at up to +29600 ft/min and finishes 297 ft above where the dive began.
+    `glideDescent(pitch)` itself is sound - swept across the whole attitude
+    range in the browser it never comes out negative - but it describes the
+    settled pair, and `js/aircraft.js` converges airspeed at `GLIDE_ACCEL` and
+    `GLIDE_DECEL` while the nose moves at the control rate, so the aircraft
+    spends seconds at an attitude its speed has not caught up with. At the
+    speed a settled glide holds, any nose-up past about -0.19 radians climbs.
+  - **Goal**: Resolve to [glide-climb.prompt.md](.claude/prompts/glide-climb.prompt.md)
+  - From: Game Modes UI/UX `->` New Game Modes
+
+#### Found Issues
+
+- [ ] The objective card's pointer row wraps to two lines at 260 pixels
+  - **Issue**: On a phone held upright the card is drawn at its `min-width` of
+    260 and the pointer row has 218 pixels to write in, which `↑ LEG 1  ·
+    234°  ·  8560 ft` and `MARKER  ·  045°  ·  11810 ft` both run past. Both
+    wrap to two lines, 30 pixels against the 37 the stylesheet declares for
+    them. Nothing is clipped and nothing is written off the side - measured at
+    320x800 and 393x852, and the row is one line at 852x330 where the card has
+    369 - so the card is doing what `index.html` says it does, and this
+    predates the three new modes: a `LOOP` pointer is the same length. The
+    verification request asks for a row that is neither clipped nor wrapped at
+    260, and the stylesheet deliberately budgets for the wrap, so the two
+    disagree about what correct is.
+  - **Goal**: Decide which of the two holds. Either accept the wrap and say so
+    where the row is specified, or shorten what the row writes at that width -
+    dropping the bearing's leading zero, the distance's unit, or the label to
+    its number - so it fits 218 pixels on one line. Do not widen the card:
+    `min-width: 260px` at `left: 50%` is what keeps it on a 320 screen at all.
+  - From: UI/UX Override - the three new game modes
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -63,19 +103,11 @@ minor version update.
 
 ### New Game Modes
 
-- [ ] **Dead Stick**: the engine quits at altitude and the throttle is dead
-  for the rest of the flight, with the runway far enough off that reaching it
-  is a glide to be planned rather than a descent to be flown
 - [ ] **Traffic Pattern**: a full circuit flown to a pattern - takeoff, climb
   out, downwind, base, and final - judged on holding each leg's altitude and
   heading rather than only on the landing at the end of it
-- [ ] **Cargo Run**: land at one strip, then at the next, against a budget
-  that only spends while the engine is open, so the route flown matters as
-  much as the landings made
 - [ ] **Canyon Run**: fly the length of a canyon under a ceiling and between
   its walls, with the ceiling coming down and the cut narrowing stage by stage
-- [ ] **Search and Rescue**: find a marker placed somewhere in the world given
-  only a bearing and a distance from the start, then get down beside it
 - [ ] **Photo Survey**: photograph a list of named landmarks, each counting
   only when it is caught from inside a height, range, and heading window
 
@@ -294,36 +326,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 114 earlier items in `TODO-archive.md`, newest last.
+> 117 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Slow the orbiting camera's spin, and make the rate something a pilot sets
-  - **Issue**: The drone-style orbit sweeps fast enough to be hard to read the
-    world from, and the rate is a constant in the camera code rather than
-    anything a pilot can reach.
-  - **Goal**: Slow the default sweep, then expose the rate in the **Settings**
-    panel beside the other camera options, so the new default is a starting
-    point rather than a second hardcoded number. One change: the value and the
-    control that owns it, in the same pass - splitting them means editing
-    `js/camera.js` twice for one decision.
-  - From: User Overrides
-- [x] **Level Off**: `space` levels the flight off at `V/S: 0 ft/min`
-  - **Issue**: Holding an altitude means trimming the vertical speed to zero by
-    hand, which is a fiddle in the middle of everything else a landing asks
-    for.
-  - **Goal**: A `space` keypress sets vertical speed to zero and leaves pitch
-    where the pilot put it, so the aircraft holds its altitude until the next
-    input. Register it where the other keys are bound rather than as a special
-    case, and say so in the controls list the **Controls** entry shows.
-  - From: User Overrides
-- [x] Low Altitude warns before the flight has started
-  - **Issue**: The low altitude alert fires while the aircraft is still on the
-    runway at the start of a flight. It is true and useless: altitude is low
-    because nothing has taken off yet, and the first thing a pilot sees is a
-    warning about the state the simulator just put them in.
-  - **Goal**: Gate the alert on the flight having left the ground, so it only
-    speaks about an altitude the pilot flew to. Takeoff is the condition, not a
-    timer - a flight that never leaves the runway should never raise it.
-  - From: User Overrides
 - [x] A takeoff that runs off the runway drives across the terrain
   - **Issue**: Running past the end of the runway does not end the attempt. The
     aircraft keeps going over the environment as though it were taxiing, so a
@@ -448,3 +452,14 @@ how the simulator got here rather than as a list still to be worked.
     when this is worked, correct it under an `Unreleased` heading rather than
     editing the tagged entry.
   - From: Code Review Override - the ignore file that never reaches a clone
+- [x] **Glide Climb**: **Dead Stick**: the engine quits at altitude and the
+  throttle is dead for the rest of the flight, with the runway far enough off
+  that reaching it is a glide to be planned rather than a descent to be flown
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Cargo Run**: land at one strip, then at the next, against a budget
+  that only spends while the engine is open, so the route flown matters as
+  much as the landings made
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Search and Rescue**: find a marker placed somewhere in the world given
+  only a bearing and a distance from the start, then get down beside it
+  - From: Game Modes UI/UX `->` New Game Modes
