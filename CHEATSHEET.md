@@ -203,8 +203,8 @@ come, dim is behind you. A crash restarts the stage.
 
 With no engine - a dead stick, or a cargo run out of budget - the nose sets
 the airspeed instead of the lever: nose down buys speed with height, nose up
-gives it back, and a level glide reaches about twelve times the height it
-spends. A cargo run writes what is left of its budget where the time to beat
+spends that speed for a slower descent, and a level glide reaches about twelve
+times the height it spends. A cargo run writes what is left of its budget where the time to beat
 goes, and only an open throttle spends it.
 
 Gates are laid over from the second stage on, and closed up one way across as

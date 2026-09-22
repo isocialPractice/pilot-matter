@@ -24,6 +24,11 @@ import {
     convergeSpeed,
     glideSpeed,
     glideDescent,
+    glidePitch,
+    glideDescentAt,
+    descentRate,
+    GLIDE_ACCEL,
+    GLIDE_DECEL,
     liftFactor,
     isStalled,
     sinkRate,
@@ -458,4 +463,151 @@ test('the aircraft flies the glide from the model rather than from a lever', () 
         'js/aircraft.js should take a dead engine\'s speed from the attitude');
     assert.ok(/this\.throttle = 0;/.test(aircraftSource),
         'and hold the lever closed while there is nothing on the end of it');
+    assert.ok(/glideDescentAt\(this\.rotation\.x, this\.speed/.test(aircraftSource),
+        'and take that engine\'s vertical from the pair the aircraft is in');
+});
+
+// --- The glide the aircraft is actually in ---
+
+// `glideSpeed` read the other way round, which is what says whether the nose a
+// pilot is holding is one their airspeed can pay for.
+test('the settled attitude of an airspeed is the attitude that asks for it', () => {
+    for (let pitch = -0.4; pitch <= 0.6; pitch += 0.01) {
+        assert.ok(Math.abs(glidePitch(glideSpeed(pitch)) - pitch) < 1e-9,
+            `a glide settled at ${pitch.toFixed(2)} rad is the attitude its speed belongs to`);
+    }
+
+    assert.equal(glidePitch(GLIDE_SPEED), 0, 'the level glide speed is the level nose');
+    assert.ok(glidePitch(GLIDE_SPEED + 10) > 0, 'faster than it is a nose down');
+    assert.ok(glidePitch(GLIDE_SPEED - 10) < 0, 'and slower is a nose up');
+});
+
+/**
+ * The sweep above, held over the pairs the aircraft is actually in rather than
+ * over the one pair it settles to.
+ *
+ * `glideDescent` describes the settled pair: the descent at an attitude once
+ * the airspeed is the one that attitude asks for. The aircraft is rarely on it.
+ * The nose moves at the control rate and the speed follows at GLIDE_ACCEL and
+ * GLIDE_DECEL, which are slower, so a pull leaves the aircraft carrying the
+ * speed of the attitude it left at the angle of the one it arrived at, and that
+ * pair is not on the curve the settled sweep walks.
+ *
+ * Which is how a dead stick came to climb 151 ft out of a settled glide and
+ * 2150 ft out of a dive while the settled sweep passed. So this sweeps the
+ * whole plane: every attitude the nose can be clamped to, against every
+ * airspeed from a standstill to the top of the range.
+ */
+test('no attitude and airspeed the aircraft can be in comes out climbing', () => {
+    const limit = Math.PI / 2.2;
+
+    for (let pitch = -limit; pitch <= limit; pitch += 0.01) {
+        for (let speed = 0; speed <= MAX_SPEED; speed += 1) {
+            assert.ok(glideDescentAt(pitch, speed) >= 0,
+                `a glide at ${pitch.toFixed(3)} rad and ${speed} units climbs at `
+              + `${(-glideDescentAt(pitch, speed)).toFixed(3)} units per second`);
+        }
+    }
+});
+
+// And below cruise speed it is a descent rather than a hold. At and above it
+// the wing cancels gravity outright, which is the lift model rather than the
+// glide giving way, and is a speed no dead stick keeps for long.
+test('under cruise speed a glide is always losing height, at every attitude', () => {
+    const limit = Math.PI / 2.2;
+
+    for (let pitch = -limit; pitch <= limit; pitch += 0.01) {
+        for (let speed = 0; speed < CRUISE_SPEED; speed += 1) {
+            assert.ok(glideDescentAt(pitch, speed) > 0,
+                `a glide at ${pitch.toFixed(3)} rad and ${speed} units holds height`);
+        }
+    }
+});
+
+// The floor is on the nose rather than on the descent, so the glide the mode is
+// flown on is the one `glideDescent` describes, attitude for attitude. A bound
+// that moved the settled curve would be a different aeroplane rather than the
+// same one stopped from climbing.
+test('a settled glide is the same descent it always was', () => {
+    const limit = Math.PI / 2.2;
+
+    for (let pitch = -limit; pitch <= limit; pitch += 0.002) {
+        assert.ok(Math.abs(glideDescentAt(pitch, glideSpeed(pitch)) - glideDescent(pitch)) < 1e-9,
+            `a settled glide at ${pitch.toFixed(3)} rad should descend at `
+          + `${glideDescent(pitch).toFixed(3)} and comes out at `
+          + `${glideDescentAt(pitch, glideSpeed(pitch)).toFixed(3)}`);
+    }
+});
+
+// And it only ever bites on a nose held up. A pull cannot be answered with a
+// sink faster than the level nose at that speed is already losing, which is
+// what keeps an engine dying at cruise from dropping the aircraft out of the
+// sky on the frame the tank empties.
+test('the floor slows a climb rather than adding a drop', () => {
+    const limit = Math.PI / 2.2;
+
+    for (let pitch = -limit; pitch <= limit; pitch += 0.01) {
+        for (let speed = 0; speed <= MAX_SPEED; speed += 5) {
+            const held = glideDescentAt(pitch, speed);
+
+            assert.ok(held >= descentRate(pitch, speed) - 1e-9,
+                'a glide never comes down slower than the pair it is in');
+            assert.ok(held <= descentRate(Math.max(pitch, 0), speed) + 1e-9,
+                `a glide at ${pitch.toFixed(3)} rad and ${speed} units drops faster `
+              + 'than a level nose at the same speed');
+        }
+    }
+});
+
+/**
+ * The manoeuvre that found it, flown the way the aircraft flies it.
+ *
+ * The aircraft is not constructible here - it wants a scene - so this steps the
+ * same calls its frame makes in the same order: the speed converging on what
+ * the nose is asking for, the nose moving at the control rate, and the vertical
+ * coming off the pair those two are in. Nose up is the negative direction,
+ * which is the sign `pitchForClimb` negates and the sign js/aircraft.js moves
+ * the rotation in for W.
+ *
+ * Height is counted from where the run opens, so anything above zero is height
+ * the aircraft was given rather than height it was flown down from.
+ */
+function glideFor(seconds, { pitch, speed, pitchInput = 0, dt = 1 / 60 }) {
+    const limit = Math.PI / 2.2;
+    let height  = 0;
+    let highest = 0;
+
+    for (let t = 0; t < seconds; t += dt) {
+        speed   = convergeSpeed(speed, glideSpeed(pitch), dt, GLIDE_ACCEL, GLIDE_DECEL);
+        pitch   = Math.min(Math.max(pitch + pitchInput * PITCH_RATE * dt, -limit), limit);
+        height -= glideDescentAt(pitch, speed) * dt;
+        highest = Math.max(highest, height);
+    }
+
+    return { height, highest, speed, pitch };
+}
+
+// Reported from the browser: settled at 4153 ft and 130 kt, the nose held up
+// and nothing else touched, and the aircraft gains 151 ft with the vertical
+// speed reading positive for nine frames at up to +6520 ft/min.
+test('a dead stick does not gain height when the nose is held up', () => {
+    const settled = glidePitch(65);
+    const flown   = glideFor(5, { pitch: settled, speed: 65, pitchInput: -1 });
+
+    assert.ok(flown.highest <= 0,
+        `holding the nose up gained ${flown.highest.toFixed(1)} units of height`);
+    assert.ok(flown.height < 0, 'and the aircraft is lower than it started');
+});
+
+// And the larger one: nose down for two seconds, then nose up. That entry
+// climbed 2150 ft and finished 297 ft above where the dive began.
+test('and does not zoom back above where a dive began', () => {
+    const dive = glideFor(2, { pitch: 0, speed: GLIDE_SPEED, pitchInput: 1 });
+    const zoom = glideFor(4, { pitch: dive.pitch, speed: dive.speed, pitchInput: -1 });
+
+    assert.ok(dive.highest <= 0, 'the dive itself never gains height');
+    assert.ok(zoom.highest <= 0,
+        `the zoom out of it gained ${zoom.highest.toFixed(1)} units`);
+    assert.ok(dive.height + zoom.height < dive.height,
+        'and the whole manoeuvre finishes below the bottom of the dive');
 });

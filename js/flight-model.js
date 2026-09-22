@@ -36,10 +36,20 @@ export const SPEED_DECEL = 40;
 // how much a radian of nose-down adds to it.
 //
 // The pair is chosen so that the nose-up angle which bleeds the speed to
-// nothing is about 25 degrees, which is what makes a glide always a descent:
-// past that the wing has no speed left to climb on, and short of it the sink
-// the slow wing is already losing outruns the climb the nose is asking for.
-// `glideDescent` is that guarantee written down, and the suite sweeps it.
+// nothing is about 25 degrees, which is what makes a settled glide always a
+// descent: past that the wing has no speed left to climb on, and short of it
+// the sink the slow wing is already losing outruns the climb the nose is asking
+// for. `glideDescent` is that guarantee written down, and the suite sweeps it.
+//
+// What the pair describes is a glide that has settled: the descent at an
+// attitude once the airspeed is the one that attitude asks for. The aircraft
+// is not always on it. The nose moves at the control rate and the speed
+// follows at GLIDE_ACCEL and GLIDE_DECEL below, which are far slower, so for a
+// second or two after a pull the aircraft carries the speed of the attitude it
+// left at the angle of the one it arrived at - and that pair is not on the
+// curve the sweep walks. `glideDescentAt` is the same guarantee held over
+// every pair the aircraft can actually be in, which is where it has to hold
+// for the mode to mean anything.
 export const GLIDE_SPEED       = 80;
 export const GLIDE_PITCH_SPEED = 180;
 
@@ -152,23 +162,89 @@ export function glideSpeed(pitch, options = {}) {
 }
 
 /**
- * How fast a settled glide loses height at an attitude, in units per second,
- * counted positive downward.
+ * The attitude a glide has settled to at an airspeed, which is `glideSpeed`
+ * read the other way round: the nose that asks for this speed.
  *
- * Both halves of the descent, added the way the aircraft adds them: the height
- * the nose itself is pointing away, which is the airspeed through the vertical
- * part of the nose direction, and the sink the wing is losing on top of that at
- * the speed it has settled to.
+ * Not clamped to the range a pilot can hold the nose in, because it is not an
+ * attitude anybody is being put at - it is the answer to "what nose does this
+ * speed belong to", which is what says whether the nose the pilot is holding
+ * is one their airspeed can pay for.
+ */
+export function glidePitch(speed, options = {}) {
+    const {
+        glideSpeed: level = GLIDE_SPEED,
+        pitchSpeed        = GLIDE_PITCH_SPEED
+    } = options;
+
+    if (!(pitchSpeed > 0)) return 0;
+    return (Math.max(numberOr(speed, 0), 0) - level) / pitchSpeed;
+}
+
+/**
+ * How fast the aircraft loses height at an attitude and an airspeed, in units
+ * per second, counted positive downward.
+ *
+ * Both halves of it, added the way the aircraft adds them: the height the nose
+ * itself is pointing away, which is the airspeed through the vertical part of
+ * the nose direction, and the sink the wing is losing on top of that at the
+ * speed it is doing. The pair is taken as given rather than derived from each
+ * other - this is the aircraft's vertical at whatever state it is in, engine or
+ * no engine.
+ */
+export function descentRate(pitch, speed, options = {}) {
+    const airspeed = Math.max(numberOr(speed, 0), 0);
+    return airspeed * Math.sin(numberOr(pitch, 0)) + sinkRate(airspeed, options);
+}
+
+/**
+ * How fast a settled glide loses height at an attitude, in units per second,
+ * counted positive downward. The descent at `pitch` once the airspeed is the
+ * one that attitude asks for.
  *
  * It exists to be asserted about. A glide that came out positive at some
  * attitude would be an aircraft climbing on no engine and holding the climb
  * forever, which is the one way a dead stick can stop being a dead stick, and
  * it is not a thing anyone would see by flying - it needs the whole attitude
  * range swept, which is what the suite does with this.
+ *
+ * What it does not cover is the aircraft on its way to that attitude, which is
+ * where the climb was actually found. `glideDescentAt` is this guarantee held
+ * over every pair instead of over the settled one.
  */
 export function glideDescent(pitch, options = {}) {
-    const speed = glideSpeed(pitch, options);
-    return speed * Math.sin(numberOr(pitch, 0)) + sinkRate(speed, options);
+    return descentRate(pitch, glideSpeed(pitch, options), options);
+}
+
+/**
+ * The same descent for a glide that has not settled: the vertical at an
+ * attitude the airspeed has not caught up with, which is where a dead stick
+ * spends a second or two after every pull.
+ *
+ * The nose moves at the control rate and the airspeed follows at GLIDE_ACCEL
+ * and GLIDE_DECEL, so the two are routinely out of step, and `glideDescent`
+ * says nothing about the pairs in between. Flown straight, those pairs climb:
+ * at the 65 units a settled glide holds, any nose-up past about -0.19 radians
+ * comes out with the aircraft gaining height on no engine, which the mode is
+ * built on not happening.
+ *
+ * So the nose counts for no more height than the airspeed can pay for. The
+ * floor is the attitude this speed has settled to, taken no further than level:
+ * a speed above the level glide's has settled to a nose-down attitude, and a
+ * dead stick is not shoved into a dive the pilot never put it in. Being a
+ * floor on the attitude rather than on the descent, it only ever bites on a
+ * nose held up - and it can never ask for a faster descent than the level nose
+ * at that speed is already losing, so nothing lurches.
+ *
+ * Two things follow, and the suite holds both. A settled pair is unchanged at
+ * every attitude, so the glide the mode is flown on is exactly the one
+ * `glideDescent` describes. And no pair the aircraft can be in comes out
+ * climbing: below cruise speed the descent is strictly positive, and at or
+ * above it a level nose holds height for as long as the speed lasts, which is
+ * the wing cancelling gravity rather than the glide giving way.
+ */
+export function glideDescentAt(pitch, speed, options = {}) {
+    const paidFor = Math.min(glidePitch(speed, options), 0);
+    return descentRate(Math.max(numberOr(pitch, 0), paidFor), speed, options);
 }
 
 /**

@@ -399,7 +399,15 @@
 
         /* Which way the gate the course is waiting on lies, when it is not on
            the screen to be looked at. Amber, like the objective above it,
-           because it is the same instruction read at a different range. */
+           because it is the same instruction read at a different range.
+
+           Two lines on a narrow card, on purpose. At the card's 260 pixel
+           minimum this row has 218 pixels to write in and runs past them, so
+           `--card-pointer` above declares the height it wraps to rather than
+           the row being shortened to fit: a bearing is three digits wherever
+           it is read and a distance without its unit is a number. Wrapped is
+           not clipped - the bound is summed from the wrapped height, so both
+           lines are drawn whole. */
         #game-mode-pointer {
             display: none;
             margin-top: 4px;

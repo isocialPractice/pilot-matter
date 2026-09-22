@@ -1036,3 +1036,67 @@ still be found by name.
     speaks about an altitude the pilot flew to. Takeoff is the condition, not a
     timer - a flight that never leaves the runway should never raise it.
   - From: User Overrides
+
+## Archived 09-22-26
+
+- [x] A takeoff that runs off the runway drives across the terrain
+  - **Issue**: Running past the end of the runway does not end the attempt. The
+    aircraft keeps going over the environment as though it were taxiing, so a
+    failed takeoff has no outcome and the flight continues in a state the
+    simulator has no rules for.
+  - **Goal**: Leaving the runway surface while still on the ground registers a
+    crash, through the same path any other crash takes, so the attempt ends and
+    is recorded like one. Bound it to the runway area rather than to a distance
+    from the start, so an overrun to either side counts the same as one off the
+    end.
+  - From: User Overrides
+- [x] Placing elements can overlap the runway
+  - **Issue**: Elements placed in the **Element Editor** sometimes land on or
+    through the rendered runway, leaving the strip a flight starts from
+    obstructed or visually broken.
+  - **Goal**: Treat the runway as reserved ground that placement cannot enter:
+    an element that would intersect it is refused or moved clear, and the
+    editor says which. The runway is the one surface a flight depends on
+    existing, so it is the one the editor may not edit around.
+  - From: User Overrides
+- [x] Clicking left of a value raises it
+  - **Issue**: In the **Element Editor** and the **Settings** panel, clicking
+    the left side of a value increases it. Every control of this shape reads
+    left as down, so the click does the opposite of what it looks like, in two
+    panels at once.
+  - **Goal**: Left decreases and right increases, everywhere this control is
+    used. One fix at the control rather than per panel, since both panels are
+    wrong in the same direction and for the same reason.
+  - From: User Overrides
+- [x] Level Off 1 - the vertical speed reads zero while the aircraft still sits
+      nose-up
+  - **Issue**: `space` sets `V/S` to zero and nothing else moves. Altitude does
+    hold, so the number is telling the truth, but pitch stays wherever the
+    pilot left it: the horizon stays tilted, the attitude indicator keeps
+    showing a climb, and the aircraft reads as still going up while the
+    instrument says it is not. The two disagree on screen at the moment a pilot
+    is trusting one of them. Seen in
+    [level-off.gif](.support/level-off.gif).
+  - **This is the earlier decision, not a missed case.** The item completed at
+    `1.17.0-alpha` set vertical speed and deliberately left pitch alone, so
+    every part of it worked as written. What it did not account for is that
+    levelling off is something a pilot watches happen, and half of what they
+    watch is the attitude.
+  - **Goal**: One keypress brings the aircraft to level flight, and both the
+    model and the instruments arrive there together. Pitch eases to level over
+    a short interval rather than snapping, so the movement reads as the
+    aircraft settling rather than as a jump, and the attitude indicator follows
+    the model rather than being driven separately.
+  - **Done when all three agree at rest**: `V/S` at `0 ft/min`, pitch within a
+    degree of level, and the attitude horizon centred - checked after the ease
+    has finished, not on the frame the key goes down. State the interval used
+    so the next reader can change it without guessing at it.
+  - **Where it lives**: the level-off path is in `js/aircraft.js` and the
+    indicator is drawn in `js/attitude.js` from `#attitude-ball`,
+    `#attitude-horizon` and `#attitude-ladder`. Keep the indicator reading the
+    model's pitch rather than easing on its own - two easings of one value is
+    how they come to disagree by a frame.
+  - **Leave roll alone.** Nothing here asks for it, a wing-level is a separate
+    decision, and rolling the aircraft on a keypress nobody pressed for it is
+    the kind of surprise this item exists to remove.
+  - From: User Overrides

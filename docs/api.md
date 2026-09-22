@@ -807,7 +807,7 @@ read them as a worked example of a game built on the two APIs.
 | `progressNoun(state)`, `stripIndex(runway)` | What it counts in, and which strip a landing was made on |
 | `runObjective(state)`, `runStatus(state)` | What to write on the screen |
 | `runPointer(state, world, position, heading)` | Where the thing it is waiting on lies |
-| `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | The three that answers with |
+| `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | The three `runPointer` dispatches to, one per objective |
 | `stageWorld(state)` | The world the stage is flown over |
 | `stageStart(state, world)` | Where in it the flight opens |
 | `buildCourse(stage, options)` | The loops a course stage is flown through |
@@ -897,7 +897,10 @@ function frame(dt) {
 A route stops at several strips in the order they were laid, so a landing is
 reported with the strip it was made on. Only the strip the route is up to counts,
 which is the same rule a course of loops is flown under: `nextStrip` says which
-one that is, and `recordLanding` answers false for any other. `stageWorld` gives
+one that is, and `recordLanding` answers false for any other. It says which one
+is next, though, and a landing it accepts moves the route on before it returns,
+so the strip a landing was made on is read off the strip itself with
+`stripIndex` rather than off the run afterwards. `stageWorld` gives
 a route stage an `elements` list describing the strips rather than asking for one
 and being given it, because a world lays a single strip on its own.
 
@@ -908,7 +911,7 @@ than merely flying. `fuelRemaining` is what is left as a share of the whole, for
 writing on an instrument, and answers null for a run with no budget to read.
 
 ```javascript
-import { createRunState, CARGO_RUN, burnFuel, recordLanding, nextStrip } from 'pilot-matter';
+import { createRunState, CARGO_RUN, burnFuel, recordLanding, stripIndex } from 'pilot-matter';
 
 const run = createRunState(CARGO_RUN);
 
@@ -918,7 +921,7 @@ function frame(dt) {
 }
 
 function onLanding(runway) {
-    if (recordLanding(run, runway)) say(`down at strip ${nextStrip(run)}`);
+    if (recordLanding(run, runway)) say(`down at strip ${stripIndex(runway)}`);
 }
 ```
 

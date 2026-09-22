@@ -5,6 +5,88 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1-alpha] - 2026-09-22
+
+The dead stick stops climbing. `1.18.0-alpha` guaranteed that a glide is always
+a descent and swept the whole attitude range for it, and the guarantee held over
+the settled pair while the aircraft flew every pair in between - so holding the
+nose up gained height on no engine. The guarantee now covers the pairs the
+aircraft is actually in, and every page that wrote it down without the qualifier
+that made it true is corrected, including the `1.18.0-alpha` entry above.
+
+### Fixed
+
+- **A dead stick no longer gains height when the nose is held up.** From a
+  settled glide at 130 kt, holding the nose up climbed 151 ft with the vertical
+  speed reading positive for nine frames at up to +6520 ft/min; entered from a
+  dive it climbed 2150 ft and finished 297 ft above where the dive began.
+  `glideDescent` was sound and the sweep asserting it was not wrong - both
+  describe the settled pair, the descent at an attitude once the airspeed is the
+  one that attitude asks for. The nose moves at the control rate and the
+  airspeed follows at `GLIDE_ACCEL` and `GLIDE_DECEL`, so the aircraft spends a
+  second or two after every pull carrying the speed of the attitude it left at
+  the angle of the one it arrived at, and that pair is not on the curve the
+  sweep walks. At the 65 units a settled glide holds, any nose-up past about
+  -0.19 radians came out climbing
+- **The nose is now counted for no more height than the airspeed can pay for.**
+  `glideDescentAt` in `js/flight-model.js` is the descent at any attitude and
+  airspeed, with the attitude taken as no higher than the one that airspeed has
+  settled to - and never as pointing down when the pilot has not pointed it
+  down, so a speed above the level glide's is not answered with a dive nobody
+  asked for. Being a floor on the attitude rather than on the descent, it bites
+  only on a nose held up and can never ask for a faster sink than the level nose
+  at that speed is already losing, so an engine dying at cruise does not drop
+  the aircraft on the frame the tank empties. `js/aircraft.js` takes its whole
+  vertical from it while the engine is dead, and from `descentRate` - the same
+  sum without the floor - while the engine is live, rather than adding the
+  nose's half and the wing's half in two places a bound cannot see across
+- **The sweep now walks the plane rather than the curve.** The suite swept
+  `glideDescent(pitch)` across the attitude range, which passed against the
+  build that failed in the browser: every attitude, at the one airspeed that
+  attitude settles to. It now sweeps every attitude the nose can be clamped to
+  against every airspeed from a standstill to the top of the range, asserts that
+  none of them climbs and that below cruise speed every one of them is losing
+  height, and flies the two reported manoeuvres a frame at a time through the
+  same calls the aircraft's frame makes. A settled glide is asserted unchanged
+  at every attitude, so the glide the mode is flown on is still exactly the one
+  `glideDescent` describes
+- **Every account of that guarantee is qualified to what was true of it.**
+  The `1.18.0-alpha` entry above, `docs/flight-model.html` and
+  `docs/controls/game-modes.html` each said there was no attitude that holds
+  height on no engine, which was true of the pure pair and false of the
+  aircraft that shipped. Each now says what the settled sweep covers, what the
+  aircraft does on its way to a settled attitude, and the one case that does
+  hold height - at or above cruise speed a level nose holds it while the speed
+  lasts, which is the wing cancelling gravity rather than the glide giving way.
+  `CHEATSHEET.md` and `docs/cheatsheet.html` said a nose-up gives the height
+  back, and now say it spends the speed for a slower descent, which is what it
+  buys
+- **The Game modes API page describes the row it added and reads the right
+  strip in the example under it.** The `gatePointer`, `stripPointer` and
+  `searchBriefing` row read "The three that answers with", which is not a
+  sentence and does not say what the three answer with; it now names them as
+  the three `runPointer` dispatches to, one per objective. The route example
+  logged `nextStrip(run)` after `recordLanding(run, runway)`, which names the
+  wrong strip every time because a landing it accepts moves the route on before
+  it returns - a two-strip route logged "down at strip 1" for the arrival at
+  strip 0 and "down at strip -1" for the one that finished it. It reads the
+  strip off the `runway` the handler was already given, with `stripIndex`, and
+  the prose above it now says which of the two answers which question
+
+### Changed
+
+- **The objective card's pointer row is two lines on a narrow card, and says
+  so where the row is written.** At the card's 260 pixel minimum the row has 218
+  pixels to write in, which `↑ LEG 1  ·  234°  ·  8560 ft` runs past, so it
+  wraps. Nothing is clipped and nothing is written off the side: `--card-pointer`
+  declares the wrapped height and the bound is summed from it, and the suite
+  holds the line to the 30 characters that height was measured at. The wrap is
+  the decision rather than an oversight - a bearing is three digits wherever it
+  is read, a distance without its unit is a number, and widening the card is
+  what would take it off a 320 pixel screen - and `formatRunPointer` in
+  `js/hud.js` and the `#game-mode-pointer` rule now record it, because the row's
+  own specification said nothing about the width it is written at
+
 ## [1.18.0-alpha] - 2026-09-21
 
 Three modes join the two: a landing flown with no engine, a route of landings
@@ -27,16 +109,19 @@ release, to claim only what that version carries.
   want the nose held where the glide is best rather than merely pointed at the
   runway. A level glide reaches about twelve times the height it spends and a
   little nose-up reaches further, which is the thing the mode is about finding
-- **A glide that is always a descent, and a test that sweeps for it rather than
-  samples.** `glideSpeed` and `glideDescent` in `js/flight-model.js` are the
-  pure pair, and the two constants behind them are chosen so that the nose-up
-  angle which bleeds the speed to nothing is about 25 degrees: short of that the
-  sink the slow wing is already losing outruns the climb the nose is asking for,
-  and there is no attitude in the range the aircraft clamps its pitch to that
-  holds height on no engine. That is the one way a dead stick could quietly stop
-  being one, and it is not a hole anyone would find by flying - so the suite
-  walks the whole attitude range in two-thousandth-radian steps rather than
-  checking a handful of angles
+- **A settled glide that is always a descent, and a test that sweeps for it
+  rather than samples.** `glideSpeed` and `glideDescent` in `js/flight-model.js`
+  are the pure pair, and the two constants behind them are chosen so that the
+  nose-up angle which bleeds the speed to nothing is about 25 degrees: short of
+  that the sink the slow wing is already losing outruns the climb the nose is
+  asking for, and there is no attitude in the range the aircraft clamps its
+  pitch to that a settled glide holds height at. That is the one way a dead
+  stick could quietly stop being one, and it is not a hole anyone would find by
+  flying - so the suite walks the whole attitude range in two-thousandth-radian
+  steps rather than checking a handful of angles. What the pair describes is the
+  glide once the airspeed has caught up with the attitude, and this version
+  bounds nothing off that pair: the aircraft carrying the speed of one attitude
+  at the angle of another still climbs, which `1.18.1-alpha` corrects
 - **`CARGO RUN`: land at one strip, then at the next, against a budget that only
   spends while the engine is open.** Three stages over open country, each laying
   a strip per stop rather than the single strip every other mode is flown over.

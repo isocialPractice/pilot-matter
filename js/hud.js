@@ -123,6 +123,21 @@ export function formatGateDistance(distance, unit = DEFAULT_ALTITUDE_UNIT) {
  * The label is the pointer's own, so what is being pointed at is named by
  * whatever laid it. A pointer that names nothing is a loop, which is what every
  * pointer was before there was anything else to point at.
+ *
+ * One row, and on a narrow card that row is two lines. A phone held upright
+ * draws the card at its 260 pixel minimum, which leaves a row 218 pixels to be
+ * written in, and the longest line this composes runs past that and wraps. The
+ * card carries the wrap rather than the row dodging it: `--card-pointer` in
+ * index.html is declared at the wrapped height under `@media (max-width:
+ * 659px)`, and the suite holds this line to the 30 characters that height was
+ * measured at. The row is not clipped there and nothing is written off the
+ * side - it is two lines of the card's own height, budgeted for.
+ *
+ * The alternative was writing less at that width: the bearing without its
+ * leading zero, the distance without its unit, or the label as a bare number.
+ * A bearing is three digits wherever it is read and a distance without a unit
+ * is a number, so the row keeps what it says and the card keeps the room. Four
+ * of its five rows wrap at 260 for the same reason.
  */
 export function formatRunPointer(pointer, unit = DEFAULT_ALTITUDE_UNIT) {
     if (!pointer) return '';

@@ -7,8 +7,8 @@ import { createFlightState } from './flight-state.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY, LEVEL_OFF_SECONDS,
     GLIDE_ACCEL, GLIDE_DECEL,
-    updateThrottle, targetSpeed, convergeSpeed, glideSpeed, sinkRate, isStalled, controlRates,
-    pitchLevellingOff
+    updateThrottle, targetSpeed, convergeSpeed, glideSpeed, isStalled, controlRates,
+    descentRate, glideDescentAt, pitchLevellingOff
 } from './flight-model.js';
 import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED,
@@ -125,6 +125,22 @@ export class Aircraft {
     setEngine(live = true) {
         this.engine = live !== false;
         return this.engine;
+    }
+
+    /**
+     * The air this aircraft is flying in, as the flight model takes it. The
+     * model's functions are pure and default to the bundled aircraft's figures,
+     * so a host flying its own has to hand them over on every call - and a call
+     * that quietly went with a default would be a different aeroplane for one
+     * line of one frame.
+     */
+    airOptions() {
+        return {
+            gravity:     this.gravity,
+            minSpeed:    this.minSpeed,
+            cruiseSpeed: this.cruiseSpeed,
+            maxSpeed:    this.maxSpeed
+        };
     }
 
     /** The strip the aircraft is over, or null when it is over open ground. */
@@ -354,18 +370,30 @@ export class Aircraft {
         // Banking roll causes yaw (coordinated turn)
         this.rotation.y -= Math.sin(this.rotation.z) * 1.2 * dt;
 
-        // Move forward in the direction the aircraft faces
+        // Move forward in the direction the aircraft faces, over the ground.
+        // The vertical comes off the flight model below rather than out of the
+        // same step: the height the nose is spending and the sink the wing is
+        // losing are one quantity with no engine, and a bound written over
+        // half of a sum cannot see the other half of it.
         const quat = new THREE.Quaternion().setFromEuler(this.rotation);
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
-        this.position.addScaledVector(forward, this.speed * dt);
+        this.position.x += forward.x * this.speed * dt;
+        this.position.z += forward.z * this.speed * dt;
 
-        // Lift is read off airspeed: a stalled wing drops hard, cruise speed
-        // cancels gravity and holds altitude in level flight
-        this.position.y -= sinkRate(this.speed, {
-            gravity: this.gravity,
-            minSpeed: this.minSpeed,
-            cruiseSpeed: this.cruiseSpeed
-        }) * dt;
+        // The height the nose is pointing away, and the lift read off airspeed
+        // on top of it: a stalled wing drops hard, cruise speed cancels gravity
+        // and level flight holds altitude.
+        //
+        // With no engine it is the glide's own vertical, which is that sum with
+        // the nose counted for no more height than the airspeed has to pay
+        // with. The nose moves far quicker than the speed follows it, so a pull
+        // otherwise buys height at an attitude the aircraft has not slowed to -
+        // 151 ft from a settled glide and 2150 ft out of a dive, on no engine.
+        // `glideDescentAt` in js/flight-model.js is where that is worked out
+        // and where the reasoning for it is; here it is simply flown.
+        this.position.y -= (this.engine
+            ? descentRate(this.rotation.x, this.speed, this.airOptions())
+            : glideDescentAt(this.rotation.x, this.speed, this.airOptions())) * dt;
 
         // The altitude half of the level off: the altitude the aircraft was at
         // is the altitude it keeps, from the frame the key goes down, while the
