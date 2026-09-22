@@ -1100,3 +1100,22 @@ still be found by name.
     decision, and rolling the aircraft on a keypress nobody pressed for it is
     the kind of surprise this item exists to remove.
   - From: User Overrides
+- [x] The level off is still described as leaving the nose where the pilot put
+      it, in the module it is bound in and in the test that covers the binding
+  - **Issue**: `1.17.1-alpha` eased the nose to level and five documents were
+    rewritten to say so, but the two comments nearest the binding were not.
+    `js/input-map.js` line 34 tells a reader that `Space` "is an instruction to
+    trim the climb out and leave the nose exactly where the pilot put it", and
+    the doc comment above `test('space levels the flight off')` in
+    `test/input-map.test.js` line 73 says it "leaves the nose where the pilot
+    put it". Both now state the opposite of what the code does, and
+    `js/input-map.js` is the file a reader opens to find what `Space` is bound
+    to. `CHANGELOG.md` line 49 carries the same sentence and is correct there -
+    it is the record of what `1.17.0-alpha` shipped - so leave that one alone.
+  - **Goal**: Rewrite both comments around the nose easing to level, keeping
+    what each comment is there for: the binding comment explains why the key
+    sits beside reset rather than among the control surfaces, and the test
+    comment explains what one press saves the pilot. Name `LEVEL_OFF_SECONDS`
+    rather than writing the interval out as a number, so neither comment can
+    go stale the next time it moves.
+  - From: Code Review Override - the comments the level off left behind

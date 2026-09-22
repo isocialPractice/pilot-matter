@@ -21,32 +21,6 @@ its context survives being archived.
 - [ ] **Photo Survey**: photograph a list of named landmarks, each counting
   only when it is caught from inside a height, range, and heading window
   - From: Game Modes UI/UX `->` New Game Modes
-- [x] **User todo**: force-add `.gitignore`, or narrow the global rule that
-  hides it, so the repository's own ignore rules reach a clone
-  - **Issue**: The file exists in the working copy and nothing tracks it.
-    `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
-    it "exists on disk, but not in 'HEAD'", and `git check-ignore -v .gitignore`
-    answers with a `.gitignore` rule in a personal global ignore file, so it has
-    never been staged and cannot be by an ordinary `git add`. Nothing in the
-    repository therefore carries `test-results/`, `user-scripts/`, or the
-    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all. It
-    reaches the deploy too - `actions/checkout` in
-    `.github/workflows/workflow.yml` fetches a tree without the file, and the
-    workflow runs `npm test` against it, so the guard in `test/site.test.js`
-    skips itself there rather than failing the deploy for a thing the deploy
-    cannot fix.
-  - **Goal**: Either force-add the file once with `git add -f .gitignore`, or
-    narrow the rule excluding it in the global ignore file so this repository's
-    copy stops being caught by it. Both are the user's call, which is why this
-    is a user item and no run attempts it: what excludes the file is the user's
-    own global configuration rather than anything this repository owns.
-    `.nojekyll` is tracked here under that same global rule, so force-adding a
-    dotfile is a route this repository has already taken once.
-  - Once it is tracked, the other half is ordinary work a run can take: drop the
-    stand-down branch at the top of the `test/site.test.js` check so the guard
-    applies on every tree, and say in that run's changelog entry that the rules
-    now reach a clone. Queue that only after the file is tracked - until then it
-    has nothing to apply to.
 - [ ] Drop the stand-down branch at the top of the ignore-rules check in
   `test/site.test.js` so the guard applies on every tree, now that the user has
   tracked `.gitignore`, and say in that run's changelog entry that the rules
@@ -371,27 +345,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 121 earlier items in `TODO-archive.md`, newest last.
+> 122 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The level off is still described as leaving the nose where the pilot put
-      it, in the module it is bound in and in the test that covers the binding
-  - **Issue**: `1.17.1-alpha` eased the nose to level and five documents were
-    rewritten to say so, but the two comments nearest the binding were not.
-    `js/input-map.js` line 34 tells a reader that `Space` "is an instruction to
-    trim the climb out and leave the nose exactly where the pilot put it", and
-    the doc comment above `test('space levels the flight off')` in
-    `test/input-map.test.js` line 73 says it "leaves the nose where the pilot
-    put it". Both now state the opposite of what the code does, and
-    `js/input-map.js` is the file a reader opens to find what `Space` is bound
-    to. `CHANGELOG.md` line 49 carries the same sentence and is correct there -
-    it is the record of what `1.17.0-alpha` shipped - so leave that one alone.
-  - **Goal**: Rewrite both comments around the nose easing to level, keeping
-    what each comment is there for: the binding comment explains why the key
-    sits beside reset rather than among the control surfaces, and the test
-    comment explains what one press saves the pilot. Name `LEVEL_OFF_SECONDS`
-    rather than writing the interval out as a number, so neither comment can
-    go stale the next time it moves.
-  - From: Code Review Override - the comments the level off left behind
 - [x] `.tmp/` is kept out of the repository by a personal global gitignore
       rather than by the repository's own
   - **Issue**: `git check-ignore -v .tmp/ui-ux/t6-probe.mjs` answers
@@ -524,3 +479,30 @@ how the simulator got here rather than as a list still to be worked.
     them as they are: this is the shape of the `1.17.2-alpha` entry that was
     reopened for claiming what its release did not carry.
   - From: Code Review Override - what the new modes were written down as
+- [x] **User todo**: force-add `.gitignore`, or narrow the global rule that
+  hides it, so the repository's own ignore rules reach a clone
+  - **Issue**: The file exists in the working copy and nothing tracks it.
+    `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
+    it "exists on disk, but not in 'HEAD'", and `git check-ignore -v .gitignore`
+    answers with a `.gitignore` rule in a personal global ignore file, so it has
+    never been staged and cannot be by an ordinary `git add`. Nothing in the
+    repository therefore carries `test-results/`, `user-scripts/`, or the
+    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all. It
+    reaches the deploy too - `actions/checkout` in
+    `.github/workflows/workflow.yml` fetches a tree without the file, and the
+    workflow runs `npm test` against it, so the guard in `test/site.test.js`
+    skips itself there rather than failing the deploy for a thing the deploy
+    cannot fix.
+  - **Goal**: Either force-add the file once with `git add -f .gitignore`, or
+    narrow the rule excluding it in the global ignore file so this repository's
+    copy stops being caught by it. Both are the user's call, which is why this
+    is a user item and no run attempts it: what excludes the file is the user's
+    own global configuration rather than anything this repository owns.
+    `.nojekyll` is tracked here under that same global rule, so force-adding a
+    dotfile is a route this repository has already taken once.
+  - Once it is tracked, the other half is ordinary work a run can take: drop the
+    stand-down branch at the top of the `test/site.test.js` check so the guard
+    applies on every tree, and say in that run's changelog entry that the rules
+    now reach a clone. Queue that only after the file is tracked - until then it
+    has nothing to apply to.
+  - From: Current
