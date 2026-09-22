@@ -47,95 +47,84 @@ its context survives being archived.
     applies on every tree, and say in that run's changelog entry that the rules
     now reach a clone. Queue that only after the file is tracked - until then it
     has nothing to apply to.
+- [ ] Drop the stand-down branch at the top of the ignore-rules check in
+  `test/site.test.js` so the guard applies on every tree, now that the user has
+  tracked `.gitignore`, and say in that run's changelog entry that the rules
+  reach a clone
+  - From: Documentation & Polish
 
-### UI/UX Override - the three new game modes
+### Code Review Override - the dead stick's vertical, and what was written about it
+
+- [ ] The cheatsheet's glide paragraph was edited without being rewrapped
+  - **Issue**: `CHEATSHEET.md:207` runs to 96 characters inside a paragraph
+    whose other lines wrap at about 75. The sentence `1.18.1-alpha` replaced
+    was rewritten in place and the text after it was left where it sat, so one
+    line of the paragraph is a third longer than the lines above and below it.
+    Nothing reads wrong - `docs/cheatsheet.html` carries the same prose as one
+    line per paragraph, which is why the suite did not notice.
+  - **Goal**: Rewrap the paragraph at `CHEATSHEET.md:203-208` to the width the
+    rest of the file uses, changing line breaks and nothing else.
+  - From: Code Review Override - the dead stick's vertical, and what was written about it
 
 #### Resolve Issues
 
-- [ ] Glide Climb 1
-  - **Issue**: A dead stick gains height when the nose is held up. From the
-    settled glide at 4153 ft and 130 kt, holding `W` and touching nothing else
-    puts the aircraft at 4302 ft - 151 ft of climb on no engine, with V/S
-    reading positive for nine frames at up to +6520 ft/min. Entered from a dive
-    it is far larger: nose down for two seconds, then nose up, climbs 2150 ft
-    at up to +29600 ft/min and finishes 297 ft above where the dive began.
-    `glideDescent(pitch)` itself is sound - swept across the whole attitude
-    range in the browser it never comes out negative - but it describes the
-    settled pair, and `js/aircraft.js` converges airspeed at `GLIDE_ACCEL` and
-    `GLIDE_DECEL` while the nose moves at the control rate, so the aircraft
-    spends seconds at an attitude its speed has not caught up with. At the
-    speed a settled glide holds, any nose-up past about -0.19 radians climbs.
-  - **Goal**: Resolve to [glide-climb.prompt.md](.claude/prompts/glide-climb.prompt.md)
+- [ ] Glide Climb 2
+  - **Issue**: A dead stick still does not always come down. `Space` is the
+    level off, and `levelOff` in `js/aircraft.js:487` does not read
+    `this.engine`, so pressing it once on a dead engine sets `holdingAltitude`
+    and `js/aircraft.js:406` writes `this.position.y = startY` on every frame
+    after it - which throws away the `glideDescentAt` the line above it just
+    worked out. Start `DEAD STICK`, press `Space` while airborne, and touch
+    nothing else: the altitude never falls, `V/S` reads `0 ft/min` because it
+    is measured from the same two altitudes, and the stage never ends. Only
+    `pitchUp`, `pitchDown`, `throttleUp` and `throttleDown` end the hold
+    (`VERTICAL_CONTROLS` in `js/input-map.js:26`), so roll and yaw steer the
+    aircraft to the strip at a fixed height with nothing pulling it.
+    **The hold predates this release and is not what `1.18.1-alpha` broke.**
+    What `1.18.1-alpha` did is declare the case closed: `js/flight-model.js`
+    now says "no pair the aircraft can be in comes out climbing",
+    `docs/controls/game-modes.html:189` says "the one thing that holds height
+    is speed rather than attitude", and `CHANGELOG.md:58` names "the one case
+    that does hold height". The trim hold is a second case, and all three
+    sentences say there is not one.
+  - **Goal**: Decide what the level off means with no engine, then make the
+    three sentences above say it. Refusing the hold in `levelOff` while
+    `this.engine` is false is the smaller of the two answers and keeps the
+    mode's promise; letting it stand and qualifying the prose is the other,
+    and needs saying why a glide can be trimmed to hold height. Whichever is
+    taken, `js/aircraft.js` is not testable in Node - there is no `three` to
+    import - so the check belongs where `glideDescentAt` is checked: a pure
+    function the frame calls, swept the way the plane is swept now, rather
+    than another regex over the source. Record the fix under an `Unreleased`
+    heading in `CHANGELOG.md`, since `1.18.1-alpha` is cut.
   - From: Game Modes UI/UX `->` New Game Modes
-
-#### Found Issues
-
-- [ ] The objective card's pointer row wraps to two lines at 260 pixels
-  - **Issue**: On a phone held upright the card is drawn at its `min-width` of
-    260 and the pointer row has 218 pixels to write in, which `↑ LEG 1  ·
-    234°  ·  8560 ft` and `MARKER  ·  045°  ·  11810 ft` both run past. Both
-    wrap to two lines, 30 pixels against the 37 the stylesheet declares for
-    them. Nothing is clipped and nothing is written off the side - measured at
-    320x800 and 393x852, and the row is one line at 852x330 where the card has
-    369 - so the card is doing what `index.html` says it does, and this
-    predates the three new modes: a `LOOP` pointer is the same length. The
-    verification request asks for a row that is neither clipped nor wrapped at
-    260, and the stylesheet deliberately budgets for the wrap, so the two
-    disagree about what correct is.
-  - **Goal**: Decide which of the two holds. Either accept the wrap and say so
-    where the row is specified, or shorten what the row writes at that width -
-    dropping the bearing's leading zero, the distance's unit, or the label to
-    its number - so it fits 218 pixels on one line. Do not widen the card:
-    `min-width: 260px` at `left: 50%` is what keeps it on a 320 screen at all.
+- [ ] Pointer Wrap 1
+  - **Issue**: The comment the item left behind names a mechanism the
+    stylesheet does not have. `index.html:408` says "Wrapped is not clipped -
+    the bound is summed from the wrapped height, so both lines are drawn
+    whole", and `CHANGELOG.md:82` repeats it as "`--card-pointer` declares the
+    wrapped height and the bound is summed from it". Nothing sums
+    `--card-pointer`. The four bounds written as row sums - `index.html:1054`,
+    `1073`, `1095` and `1099`, which are what `summedFromRows` in
+    `test/page.test.js:1086` matches - add `--card-edges`, `--card-name`,
+    `--card-objective` and `--card-score`, and the two media queries holding
+    them, `(max-height: 551px)` and `(max-height: 479px)`, are both narrower
+    and shorter than `@media (max-width: 640px) and (max-height: 745px)` - so
+    `index.html:1153` applies there too and has already taken the pointer row
+    off with `display: none`. Where the wrapped row is drawn - pads out, width
+    at or under 640, height 746 or more - the card is bounded by the room it has,
+    `calc(100vh - ...)`, which `index.html:1138` calls out as the opposite
+    kind of bound. The row survives because nothing adds it up, not because
+    something does.
+  - **Goal**: Say what actually keeps the two lines whole: the card is bounded
+    by the room under the readouts rather than by a sum of its rows, and below
+    746 pixels of height the row comes off altogether rather than wrapping in
+    a card too short for it - which `index.html:1138` already explains and the
+    new comment should point at instead of restating. Correct
+    `index.html:408`, and correct `CHANGELOG.md:82` in place, since the
+    sentence describes `1.18.1-alpha`'s own reasoning rather than claiming a
+    fix the tag does not carry. `js/hud.js:127` is sound and needs nothing.
   - From: UI/UX Override - the three new game modes
-
-### Code Review Override - what the new modes were written down as
-
-#### Found Issues
-
-- [ ] The Game modes API page mis-describes the row it added and mis-reports
-      the strip in the example under it
-  - **Issue**: Two defects in the section `1.18.0-alpha` added, in
-    `docs/api.md` and the `docs/api-reference.html` generated beside it. The
-    table row at `docs/api.md:810` and `docs/api-reference.html:810` reads
-    "The three that answers with", which is not a sentence and does not say
-    what the three answer with - the row above it, `runPointer`, is the one
-    that has the description. And the route example at `docs/api.md:921` and
-    `docs/api-reference.html:883` says `down at strip` followed by
-    `nextStrip(run)`, inside `if (recordLanding(run, runway))` - which names
-    the wrong strip every time, because `recordLanding` increments
-    `state.leg` before it returns, so `nextStrip` is already pointing at the
-    next stop. A two-strip route logs "down at strip 1" for the arrival at
-    strip 0, and "down at strip -1" for the one that finishes it.
-  - **Goal**: Give the pointer row a description that says what the three
-    answer with - they are the three `runPointer` dispatches to, one per
-    objective - and read the strip in the example before the landing is
-    recorded rather than after it, or name it from the `runway` argument the
-    handler was already given. Both files carry the same text and both need
-    it; `docs/api-reference.html` is the published page.
-  - From: Code Review Override - what the new modes were written down as
-- [ ] The glide guarantee is written down without the qualifier that makes it
-      true
-  - **Issue**: `CHANGELOG.md:35` says "there is no attitude in the range the
-    aircraft clamps its pitch to that holds height on no engine", and
-    `docs/flight-model.html:123` says "there is no attitude that holds height
-    on no engine, which is the one way a dead stick could quietly stop being
-    one". Both are true of `glideDescent(pitch)`, which the suite sweeps, and
-    both are false of the aircraft the release ships: **Glide Climb 1** above
-    measures 151 ft of climb from a settled glide and 2150 ft entered from a
-    dive. `glideDescent` describes the settled pair, and `js/aircraft.js`
-    converges airspeed at `GLIDE_ACCEL` and `GLIDE_DECEL` while the nose moves
-    at the control rate, so the aircraft spends seconds at an attitude its
-    speed has not caught up with - which is the gap neither sentence allows
-    for. A reader of either is told the mode cannot do the thing it does.
-  - **Goal**: Work this with **Glide Climb 1** rather than apart from it, since
-    the two answers are one decision. If the glide is made a descent in the
-    unsettled case too, both sentences become true and neither needs touching -
-    say so. If it is not, qualify both to the settled glide the pure pair
-    describes, and say what the aircraft does on the way to it. Do not leave
-    them as they are: this is the shape of the `1.17.2-alpha` entry that was
-    reopened for claiming what its release did not carry.
-  - From: Code Review Override - what the new modes were written down as
 
 ## Game UI/UX
 
@@ -369,74 +358,21 @@ applies a minor version update.
 Keep the docs accurate and improve first-run experience. Completing items
 in this section applies a patch version update.
 
+- [ ] Drop the stand-down branch at the top of the ignore-rules check in
+  `test/site.test.js` so the guard applies on every tree. The check skips
+  itself where the repository carries no `.gitignore`, because a personal
+  global rule kept the file out and `actions/checkout` fetched a tree without
+  it. The user has since tracked it - `git ls-files .gitignore` answers - so
+  the branch now guards nothing and hides the check on any tree that loses the
+  file. Say in that run's changelog entry that the rules reach a clone
+
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 117 earlier items in `TODO-archive.md`, newest last.
+> 121 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A takeoff that runs off the runway drives across the terrain
-  - **Issue**: Running past the end of the runway does not end the attempt. The
-    aircraft keeps going over the environment as though it were taxiing, so a
-    failed takeoff has no outcome and the flight continues in a state the
-    simulator has no rules for.
-  - **Goal**: Leaving the runway surface while still on the ground registers a
-    crash, through the same path any other crash takes, so the attempt ends and
-    is recorded like one. Bound it to the runway area rather than to a distance
-    from the start, so an overrun to either side counts the same as one off the
-    end.
-  - From: User Overrides
-- [x] Placing elements can overlap the runway
-  - **Issue**: Elements placed in the **Element Editor** sometimes land on or
-    through the rendered runway, leaving the strip a flight starts from
-    obstructed or visually broken.
-  - **Goal**: Treat the runway as reserved ground that placement cannot enter:
-    an element that would intersect it is refused or moved clear, and the
-    editor says which. The runway is the one surface a flight depends on
-    existing, so it is the one the editor may not edit around.
-  - From: User Overrides
-- [x] Clicking left of a value raises it
-  - **Issue**: In the **Element Editor** and the **Settings** panel, clicking
-    the left side of a value increases it. Every control of this shape reads
-    left as down, so the click does the opposite of what it looks like, in two
-    panels at once.
-  - **Goal**: Left decreases and right increases, everywhere this control is
-    used. One fix at the control rather than per panel, since both panels are
-    wrong in the same direction and for the same reason.
-  - From: User Overrides
-- [x] Level Off 1 - the vertical speed reads zero while the aircraft still sits
-      nose-up
-  - **Issue**: `space` sets `V/S` to zero and nothing else moves. Altitude does
-    hold, so the number is telling the truth, but pitch stays wherever the
-    pilot left it: the horizon stays tilted, the attitude indicator keeps
-    showing a climb, and the aircraft reads as still going up while the
-    instrument says it is not. The two disagree on screen at the moment a pilot
-    is trusting one of them. Seen in
-    [level-off.gif](.support/level-off.gif).
-  - **This is the earlier decision, not a missed case.** The item completed at
-    `1.17.0-alpha` set vertical speed and deliberately left pitch alone, so
-    every part of it worked as written. What it did not account for is that
-    levelling off is something a pilot watches happen, and half of what they
-    watch is the attitude.
-  - **Goal**: One keypress brings the aircraft to level flight, and both the
-    model and the instruments arrive there together. Pitch eases to level over
-    a short interval rather than snapping, so the movement reads as the
-    aircraft settling rather than as a jump, and the attitude indicator follows
-    the model rather than being driven separately.
-  - **Done when all three agree at rest**: `V/S` at `0 ft/min`, pitch within a
-    degree of level, and the attitude horizon centred - checked after the ease
-    has finished, not on the frame the key goes down. State the interval used
-    so the next reader can change it without guessing at it.
-  - **Where it lives**: the level-off path is in `js/aircraft.js` and the
-    indicator is drawn in `js/attitude.js` from `#attitude-ball`,
-    `#attitude-horizon` and `#attitude-ladder`. Keep the indicator reading the
-    model's pitch rather than easing on its own - two easings of one value is
-    how they come to disagree by a frame.
-  - **Leave roll alone.** Nothing here asks for it, a wing-level is a separate
-    decision, and rolling the aircraft on a keypress nobody pressed for it is
-    the kind of surprise this item exists to remove.
-  - From: User Overrides
 - [x] The level off is still described as leaving the nose where the pilot put
       it, in the module it is bound in and in the test that covers the binding
   - **Issue**: `1.17.1-alpha` eased the nose to level and five documents were
@@ -511,3 +447,80 @@ how the simulator got here rather than as a list still to be worked.
 - [x] **Search and Rescue**: find a marker placed somewhere in the world given
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
+- [x] Glide Climb 1
+  - **Issue**: A dead stick gains height when the nose is held up. From the
+    settled glide at 4153 ft and 130 kt, holding `W` and touching nothing else
+    puts the aircraft at 4302 ft - 151 ft of climb on no engine, with V/S
+    reading positive for nine frames at up to +6520 ft/min. Entered from a dive
+    it is far larger: nose down for two seconds, then nose up, climbs 2150 ft
+    at up to +29600 ft/min and finishes 297 ft above where the dive began.
+    `glideDescent(pitch)` itself is sound - swept across the whole attitude
+    range in the browser it never comes out negative - but it describes the
+    settled pair, and `js/aircraft.js` converges airspeed at `GLIDE_ACCEL` and
+    `GLIDE_DECEL` while the nose moves at the control rate, so the aircraft
+    spends seconds at an attitude its speed has not caught up with. At the
+    speed a settled glide holds, any nose-up past about -0.19 radians climbs.
+  - **Goal**: Resolve to [glide-climb.prompt.md](.claude/prompts/glide-climb.prompt.md)
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Pointer Wrap**: The objective card's pointer row wraps to two lines at
+      260 pixels
+  - **Issue**: On a phone held upright the card is drawn at its `min-width` of
+    260 and the pointer row has 218 pixels to write in, which `↑ LEG 1  ·
+    234°  ·  8560 ft` and `MARKER  ·  045°  ·  11810 ft` both run past. Both
+    wrap to two lines, 30 pixels against the 37 the stylesheet declares for
+    them. Nothing is clipped and nothing is written off the side - measured at
+    320x800 and 393x852, and the row is one line at 852x330 where the card has
+    369 - so the card is doing what `index.html` says it does, and this
+    predates the three new modes: a `LOOP` pointer is the same length. The
+    verification request asks for a row that is neither clipped nor wrapped at
+    260, and the stylesheet deliberately budgets for the wrap, so the two
+    disagree about what correct is.
+  - **Goal**: Decide which of the two holds. Either accept the wrap and say so
+    where the row is specified, or shorten what the row writes at that width -
+    dropping the bearing's leading zero, the distance's unit, or the label to
+    its number - so it fits 218 pixels on one line. Do not widen the card:
+    `min-width: 260px` at `left: 50%` is what keeps it on a 320 screen at all.
+  - From: UI/UX Override - the three new game modes
+- [x] The Game modes API page mis-describes the row it added and mis-reports
+      the strip in the example under it
+  - **Issue**: Two defects in the section `1.18.0-alpha` added, in
+    `docs/api.md` and the `docs/api-reference.html` generated beside it. The
+    table row at `docs/api.md:810` and `docs/api-reference.html:810` reads
+    "The three that answers with", which is not a sentence and does not say
+    what the three answer with - the row above it, `runPointer`, is the one
+    that has the description. And the route example at `docs/api.md:921` and
+    `docs/api-reference.html:883` says `down at strip` followed by
+    `nextStrip(run)`, inside `if (recordLanding(run, runway))` - which names
+    the wrong strip every time, because `recordLanding` increments
+    `state.leg` before it returns, so `nextStrip` is already pointing at the
+    next stop. A two-strip route logs "down at strip 1" for the arrival at
+    strip 0, and "down at strip -1" for the one that finishes it.
+  - **Goal**: Give the pointer row a description that says what the three
+    answer with - they are the three `runPointer` dispatches to, one per
+    objective - and read the strip in the example before the landing is
+    recorded rather than after it, or name it from the `runway` argument the
+    handler was already given. Both files carry the same text and both need
+    it; `docs/api-reference.html` is the published page.
+  - From: Code Review Override - what the new modes were written down as
+- [x] The glide guarantee is written down without the qualifier that makes it
+      true
+  - **Issue**: `CHANGELOG.md:35` says "there is no attitude in the range the
+    aircraft clamps its pitch to that holds height on no engine", and
+    `docs/flight-model.html:123` says "there is no attitude that holds height
+    on no engine, which is the one way a dead stick could quietly stop being
+    one". Both are true of `glideDescent(pitch)`, which the suite sweeps, and
+    both are false of the aircraft the release ships: **Glide Climb 1** above
+    measures 151 ft of climb from a settled glide and 2150 ft entered from a
+    dive. `glideDescent` describes the settled pair, and `js/aircraft.js`
+    converges airspeed at `GLIDE_ACCEL` and `GLIDE_DECEL` while the nose moves
+    at the control rate, so the aircraft spends seconds at an attitude its
+    speed has not caught up with - which is the gap neither sentence allows
+    for. A reader of either is told the mode cannot do the thing it does.
+  - **Goal**: Work this with **Glide Climb 1** rather than apart from it, since
+    the two answers are one decision. If the glide is made a descent in the
+    unsettled case too, both sentences become true and neither needs touching -
+    say so. If it is not, qualify both to the settled glide the pure pair
+    describes, and say what the aircraft does on the way to it. Do not leave
+    them as they are: this is the shape of the `1.17.2-alpha` entry that was
+    reopened for claiming what its release did not carry.
+  - From: Code Review Override - what the new modes were written down as
