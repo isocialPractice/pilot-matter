@@ -5,6 +5,73 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+The dead stick's last way of not coming down, which was never the vertical. The
+descent was made honest in `1.18.1-alpha` and the level off wrote an altitude
+straight over it, so a glide could be trimmed to hold height and the stage had
+nothing left to end it. The three accounts that called the case closed are
+corrected along with it, and so is what `1.18.1-alpha` wrote about the objective
+card's pointer row.
+
+### Fixed
+
+- **A dead stick can no longer be trimmed to hold its height.** `Space` is the
+  level off, and it set `holdingAltitude` without reading the engine, so one
+  press on a dead engine pinned the altitude the frame opened at over whatever
+  `glideDescentAt` had just worked out. The altitude never fell, `V/S` read
+  `0 ft/min` because it is measured from the same two altitudes, and only pitch
+  and throttle end a hold - roll and yaw are not a call for a different vertical
+  state - so the strip could be steered to at a fixed height and the stage never
+  ended. The press is now refused with no engine, with the nose left where the
+  pilot put it rather than half a level off being flown, and an engine that dies
+  under a hold already in force hands the aircraft back on the spot
+- **The hold is a function the frame calls rather than a line inside it.**
+  `heldAltitude` in `js/flight-model.js` answers what altitude a frame ends at
+  given the altitude it opened at, the altitude it flew to, and whether the hold
+  is in force, the aircraft airborne and the engine live. `js/aircraft.js` is not
+  constructible in Node - it wants a scene - so a rule written into its frame
+  loop can only be checked by reading the source for it, which is how the
+  original line came to be asserted about and still wrong. This one is swept the
+  way the glide plane is swept: every attitude the nose can be clamped to
+  against every airspeed to the top of the range, each flown one frame under a
+  hold on a dead engine, asserting none of them ends the frame higher than it
+  began. The manoeuvre that found it - settled at 4153 ft and 65 units, `Space`,
+  nothing else touched - is flown through the same calls the frame makes. The
+  guard being in the model rather than in the aircraft is also what gives a host
+  driving the Pilot API the same answer the game gets, whatever it writes the
+  engine flag to
+
+### Changed
+
+- **The three accounts that declared the case closed now say what closed it.**
+  `js/flight-model.js` said no pair the aircraft can be in comes out climbing,
+  `docs/controls/game-modes.html` said the one thing that holds height is speed
+  rather than attitude, and the `1.18.1-alpha` entry below named the one case
+  that does hold height. All three were true of the vertical and silent about
+  the trim, which holds an altitude without going through the vertical at all.
+  Each now names the second case and where it is closed, and the flight model
+  page documents the engine beside the ground rule it already documented
+- **Every list of the keys says the level off needs an engine.** `README.md`,
+  `CHEATSHEET.md`, `docs/cheatsheet.html` and `docs/controls/index.html` each
+  describe `Space` as trimming the climb and holding the altitude, and each now
+  says what that needs, so which page the bindings were read off does not decide
+  whether the dead stick's refusal comes as a surprise
+- **What keeps the pointer row's two lines whole is named correctly.** The
+  comment at `#game-mode-pointer` and the `1.18.1-alpha` entry below both said
+  the bound is summed from the wrapped height, and nothing sums `--card-pointer`.
+  The four bounds written as row sums are the short-screen ones, and each sits
+  inside a media query that has already taken the pointer row off with
+  `display: none`. Where the row is drawn wrapped the card is bounded by the
+  room left under the readouts instead, which is the opposite kind of bound and
+  is room enough for both lines; below 746 pixels of height the row comes off
+  rather than wrapping in a card too short for it. The comment now points at the
+  `(max-height: 745px)` rule that works that height out rather than restating it
+- **A paragraph in `CHEATSHEET.md` is wrapped to the width the rest of it
+  uses.** The glide paragraph was edited in place for `1.18.1-alpha` and the
+  text after the edit was left where it sat, leaving one line at 96 characters
+  in a paragraph wrapping at about 75. Line breaks only; the prose is unchanged
+
 ## [1.18.1-alpha] - 2026-09-22
 
 The dead stick stops climbing. `1.18.0-alpha` guaranteed that a glide is always
@@ -55,9 +122,12 @@ that made it true is corrected, including the `1.18.0-alpha` entry above.
   `docs/controls/game-modes.html` each said there was no attitude that holds
   height on no engine, which was true of the pure pair and false of the
   aircraft that shipped. Each now says what the settled sweep covers, what the
-  aircraft does on its way to a settled attitude, and the one case that does
-  hold height - at or above cruise speed a level nose holds it while the speed
-  lasts, which is the wing cancelling gravity rather than the glide giving way.
+  aircraft does on its way to a settled attitude, and the one case in the
+  vertical that does hold height - at or above cruise speed a level nose holds
+  it while the speed lasts, which is the wing cancelling gravity rather than the
+  glide giving way. That qualifier is narrower than it reads: the level off
+  holds an altitude without going through the vertical at all, and this release
+  neither closed that nor said so. The `Unreleased` section above closes it.
   `CHEATSHEET.md` and `docs/cheatsheet.html` said a nose-up gives the height
   back, and now say it spends the speed for a slower descent, which is what it
   buys
@@ -79,8 +149,11 @@ that made it true is corrected, including the `1.18.0-alpha` entry above.
   so where the row is written.** At the card's 260 pixel minimum the row has 218
   pixels to write in, which `↑ LEG 1  ·  234°  ·  8560 ft` runs past, so it
   wraps. Nothing is clipped and nothing is written off the side: `--card-pointer`
-  declares the wrapped height and the bound is summed from it, and the suite
-  holds the line to the 30 characters that height was measured at. The wrap is
+  declares the wrapped height, the suite holds the line to the 30 characters that
+  height was measured at, and where the row is drawn wrapped the card is bounded
+  by the room left under the readouts rather than by a sum of its rows - the
+  bounds written as row sums are the short-screen ones, and each sits inside a
+  media query that has already taken this row off. The wrap is
   the decision rather than an oversight - a bearing is three digits wherever it
   is read, a distance without its unit is a number, and widening the card is
   what would take it off a 320 pixel screen - and `formatRunPointer` in
