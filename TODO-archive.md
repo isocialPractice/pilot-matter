@@ -1119,3 +1119,54 @@ still be found by name.
     rather than writing the interval out as a number, so neither comment can
     go stale the next time it moves.
   - From: Code Review Override - the comments the level off left behind
+
+## Archived 09-23-26
+
+- [x] `.tmp/` is kept out of the repository by a personal global gitignore
+      rather than by the repository's own
+  - **Issue**: `git check-ignore -v .tmp/ui-ux/t6-probe.mjs` answers
+    `C:\Users\<user>\.gitignore_global:11:.*`, so the 250-odd screenshots, logs
+    and scratch `.mjs` files the UI/UX tester writes under `.tmp/ui-ux/` are
+    excluded by a rule that lives on one machine rather than by the project.
+    `.gitignore` already carries `test-results/` and `user-scripts/` under the
+    heading "Verification output written by the UI/UX tester, which is a record
+    of one run on one machine rather than anything the project ships", which is
+    a description of `.tmp/` as well. On a clone without that global rule -
+    another machine, or CI - the folder is untracked and visible, and a
+    `git add -A` sweeps all of it into the repository.
+  - **Goal**: Add `.tmp/` to `.gitignore` beside `test-results/` and
+    `user-scripts/`, and confirm with `git check-ignore -v` that the answer now
+    comes from the repository's own file rather than from a global one.
+  - From: Code Review Override - the comments the level off left behind
+- [x] The `1.17.2-alpha` changelog entry claims the ignore rules reach the
+      project, and calls the half that does not something the repository cannot
+      close
+  - **Issue**: The entry ships in a tree that carries no `.gitignore`.
+    `git add -An` lists the seven tracked files this turn changed and skips
+    `.gitignore`, so the commit and the `v1.17.2-alpha` tag carry the entry
+    without the file it describes. Its bolded lead, "`.tmp/` is ignored by the
+    project rather than by one machine", is therefore not true of the release,
+    and the same paragraph disclaims it further down - "which is every clone,
+    the file being untracked" - so the bullet contradicts its own heading under
+    a `### Fixed` list. The closing sentence, "That is the half of this the
+    repository cannot close on its own", is wrong rather than overstated:
+    `.nojekyll` is tracked here under the same global `.*` rule that hides
+    `.gitignore`, so a dotfile in this repository can be force-added and one
+    already has been. The run declined to, which is a decision about whose
+    configuration is being worked around rather than a limit on the repository.
+    `TODO.md` puts it correctly - "the call is the user's" - and only
+    `CHANGELOG.md` puts it as an impossibility.
+  - **Goal**: Reword the `1.17.2-alpha` entry's second `### Fixed` bullet so
+    its heading claims only what the release contains: the rule is written into
+    the repository's own `.gitignore`, which does not yet travel with the
+    repository. Replace "cannot close on its own" with what is true, that
+    force-adding the file is a call left to the user rather than one a run
+    takes. Do not restate it as a fix that landed, and do not touch the first
+    bullet or any earlier version's entry. If the release is already tagged
+    when this is worked, correct it under an `Unreleased` heading rather than
+    editing the tagged entry.
+  - From: Code Review Override - the ignore file that never reaches a clone
+- [x] **Glide Climb**: **Dead Stick**: the engine quits at altitude and the
+  throttle is dead for the rest of the flight, with the runway far enough off
+  that reaching it is a glide to be planned rather than a descent to be flown
+  - From: Game Modes UI/UX `->` New Game Modes

@@ -241,6 +241,11 @@ export function glideDescent(pitch, options = {}) {
  * climbing: below cruise speed the descent is strictly positive, and at or
  * above it a level nose holds height for as long as the speed lasts, which is
  * the wing cancelling gravity rather than the glide giving way.
+ *
+ * That is a guarantee about the vertical, and the vertical is not the only way
+ * a dead stick can stop coming down. The level off writes an altitude over the
+ * one this worked out, which is a hold no pair here can rule out; `heldAltitude`
+ * below is where that second case is closed.
  */
 export function glideDescentAt(pitch, speed, options = {}) {
     const paidFor = Math.min(glidePitch(speed, options), 0);
@@ -339,4 +344,38 @@ export function pitchLevellingOff(startPitch, elapsed, duration = LEVEL_OFF_SECO
     // attitude by nothing leaves behind. The two fly identically; only one of
     // them reads as level to anything comparing the number.
     return remaining === 0 ? 0 : startPitch * remaining;
+}
+
+/**
+ * The altitude a frame ends at once the level off has had its say: the altitude
+ * the aircraft opened the frame at while the hold is in force, and the altitude
+ * it flew to otherwise.
+ *
+ * The hold is a trim wheel for the altitude half of a level off, and it works
+ * by pinning the altitude rather than by flying to it - so whatever the frame
+ * worked out for the vertical above it is thrown away for as long as it is in
+ * force. That is exactly what a pilot asks for with an engine, and it is a
+ * second way to hold height without one, which is the thing `glideDescentAt`
+ * exists to rule out. A dead stick trimmed level held its altitude forever: the
+ * vertical speed read zero because it is measured from the same two altitudes,
+ * roll and yaw are not a call for a different vertical state, and the stage had
+ * nothing left to end it.
+ *
+ * So the hold needs an engine, and this is where that is decided. `levelOff` in
+ * js/aircraft.js refuses the press without one and `setEngine` hands the
+ * aircraft back when the engine dies under a hold already in force, but neither
+ * of those is the frame: a host driving the Pilot API owns the engine flag, and
+ * the guarantee has to hold against the state the frame is actually handed
+ * rather than against the two paths that normally set it.
+ *
+ * Airborne for the same reason it always was. On the ground the altitude is the
+ * ground's, and a hold there pins the aircraft to a strip it is trying to
+ * leave.
+ */
+export function heldAltitude(startY, flownY, state = {}) {
+    const holding  = state.holding  === true;
+    const airborne = state.airborne === true;
+    const engine   = state.engine   === true;
+
+    return holding && airborne && engine ? startY : flownY;
 }

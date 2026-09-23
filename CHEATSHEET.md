@@ -15,7 +15,7 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `D` `→` | Roll right |
 | `Q` / `E` | Yaw left / right |
 | `Shift` / `Ctrl` | Throttle up / down |
-| `Space` | Level off: vertical speed to zero, nose eased to level over 0.6s |
+| `Space` | Level off: vertical speed to zero, nose eased to level over 0.6s. Needs an engine |
 | `C` | Cycle camera: chase, cockpit, orbit |
 | `P` | Pause, and the pause menu |
 | `O` | Settings panel, and close it |
@@ -204,8 +204,8 @@ come, dim is behind you. A crash restarts the stage.
 With no engine - a dead stick, or a cargo run out of budget - the nose sets
 the airspeed instead of the lever: nose down buys speed with height, nose up
 spends that speed for a slower descent, and a level glide reaches about twelve
-times the height it spends. A cargo run writes what is left of its budget where the time to beat
-goes, and only an open throttle spends it.
+times the height it spends. A cargo run writes what is left of its budget
+where the time to beat goes, and only an open throttle spends it.
 
 Gates are laid over from the second stage on, and closed up one way across as
 they are - a round hoop is the same hoop at every angle, so a gate that has to

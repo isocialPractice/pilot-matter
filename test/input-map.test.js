@@ -164,9 +164,15 @@ test('the aircraft holds the altitude it was levelled at', () => {
         'and let go of it where the pilot calls for a different vertical state');
     assert.ok(/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/.test(aircraftSource),
         'the one press brings the nose to level as well as trimming the climb out');
-    assert.ok(/this\.holdingAltitude && this\.airborne\)\s*this\.position\.y = startY/
+    assert.ok(/this\.position\.y = heldAltitude\(startY, this\.position\.y, \{/
         .test(aircraftSource),
-        'the altitude held is the one the aircraft was at, and only in the air');
+        'the altitude held is the one the aircraft was at');
+    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[\s\S]*?airborne:\s*this\.airborne/
+        .test(aircraftSource),
+        'and only in the air');
+    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[\s\S]*?engine:\s*this\.engine/
+        .test(aircraftSource),
+        'and only under power, so a glide cannot be trimmed to stop coming down');
 });
 
 /**

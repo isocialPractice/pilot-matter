@@ -91,7 +91,7 @@ Then open `http://localhost:8080` in your browser.
 | `E` | Yaw right |
 | `Shift` | Throttle up (hold to open the lever) |
 | `Ctrl` | Throttle down (hold to close it) |
-| `Space` | Level off: trims the climb to zero, holds the altitude, and eases the nose to level |
+| `Space` | Level off: trims the climb to zero, holds the altitude, and eases the nose to level. Needs an engine |
 | `C` | Cycle camera (chase, cockpit, orbit) |
 | `P` | Pause / resume, and open the pause menu |
 | `O` | Open the settings panel, and close it again |

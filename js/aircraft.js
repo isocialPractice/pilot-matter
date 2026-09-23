@@ -8,7 +8,7 @@ import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY, LEVEL_OFF_SECONDS,
     GLIDE_ACCEL, GLIDE_DECEL,
     updateThrottle, targetSpeed, convergeSpeed, glideSpeed, isStalled, controlRates,
-    descentRate, glideDescentAt, pitchLevellingOff
+    descentRate, glideDescentAt, pitchLevellingOff, heldAltitude
 } from './flight-model.js';
 import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED,
@@ -121,9 +121,16 @@ export class Aircraft {
      * Survives a reset on purpose. A stage that opens with a dead stick opens
      * with one every time it is flown, and a reset is that stage starting
      * again rather than a new aircraft.
+     *
+     * An engine dying under a level off hands the aircraft back, because the
+     * hold needs one: a budget that ran out halfway down a leg leaves a glide,
+     * and a glide comes down. The frame would refuse the hold either way, and
+     * this is what keeps `isHoldingAltitude` from reporting a trim that is no
+     * longer doing anything.
      */
     setEngine(live = true) {
         this.engine = live !== false;
+        if (!this.engine) this.endLevelOff();
         return this.engine;
     }
 
@@ -401,9 +408,16 @@ export class Aircraft {
         // middle of everything else a landing asks for, and this is the trim
         // wheel for it.
         //
-        // Only in the air. On the ground the altitude is the ground's, and the
-        // hold would be pinning the aircraft to a strip it is trying to leave.
-        if (this.holdingAltitude && this.airborne) this.position.y = startY;
+        // In the air and under power. On the ground the altitude is the
+        // ground's, and with no engine the hold is a second way to stop coming
+        // down - which throws away the `glideDescentAt` the line above just
+        // worked out. `heldAltitude` in js/flight-model.js is where both are
+        // decided and where the reasoning for them is.
+        this.position.y = heldAltitude(startY, this.position.y, {
+            holding:  this.holdingAltitude,
+            airborne: this.airborne,
+            engine:   this.engine
+        });
 
         // Ground contact. Off a runway, meeting the terrain gently is flown out
         // of and arriving faster than the impact threshold is a crash. On one, a
@@ -482,10 +496,16 @@ export class Aircraft {
      * than as an aircraft levelling off.
      *
      * Refused while the controls are locked, because a wreck is not being
-     * flown. Returns true when the hold is now in force.
+     * flown, and refused with no engine, because a glide that can be trimmed to
+     * hold height is not a glide - see `heldAltitude` in js/flight-model.js.
+     * The nose is left alone on a refusal rather than eased to level on its
+     * own: half a level off is not what the key was pressed for.
+     *
+     * Returns true when the hold is now in force.
      */
     levelOff() {
         if (controlsLocked(this.crash)) return false;
+        if (!this.engine) return false;
         this.holdingAltitude = true;
         this.levelling = { from: this.rotation.x, elapsed: 0 };
         return true;

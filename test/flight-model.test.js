@@ -36,7 +36,8 @@ import {
     pitchForClimb,
     LEVEL_OFF_SECONDS,
     levelOffProgress,
-    pitchLevellingOff
+    pitchLevellingOff,
+    heldAltitude
 } from '../js/flight-model.js';
 import { createFlightState, INITIAL_THROTTLE } from '../js/flight-state.js';
 import { throttleToPercent } from '../js/hud.js';
@@ -610,4 +611,97 @@ test('and does not zoom back above where a dive began', () => {
         `the zoom out of it gained ${zoom.highest.toFixed(1)} units`);
     assert.ok(dive.height + zoom.height < dive.height,
         'and the whole manoeuvre finishes below the bottom of the dive');
+});
+
+// --- The level off, which is the other way to stop coming down ---
+
+/**
+ * `glideDescentAt` rules out a glide that climbs, and says nothing about a
+ * glide that is simply pinned. The level off pins one: it writes the altitude
+ * the frame opened at over whatever the vertical worked out, so a dead stick
+ * trimmed level held its height forever, read `0 ft/min` because the vertical
+ * speed is measured from the same two altitudes, and left the stage with
+ * nothing to end it - roll and yaw are not a call for a different vertical
+ * state, so the strip could be steered to at a fixed height.
+ *
+ * `heldAltitude` is that decision as a function the frame calls, so it can be
+ * swept the way the plane above is swept rather than read out of the source.
+ */
+test('no pair a dead stick can be in can be trimmed to hold its height', () => {
+    const limit  = Math.PI / 2.2;
+    const dt     = 1 / 60;
+    const startY = 1000;
+
+    for (let pitch = -limit; pitch <= limit; pitch += 0.01) {
+        for (let speed = 0; speed <= MAX_SPEED; speed += 5) {
+            const flown = startY - glideDescentAt(pitch, speed) * dt;
+            const held  = heldAltitude(startY, flown, {
+                holding: true, airborne: true, engine: false
+            });
+
+            assert.equal(held, flown,
+                `a dead stick at ${pitch.toFixed(3)} rad and ${speed} units held `
+              + 'the altitude it was trimmed at');
+            assert.ok(held <= startY,
+                `a trimmed dead stick at ${pitch.toFixed(3)} rad and ${speed} units `
+              + `ended the frame ${(held - startY).toFixed(4)} units higher`);
+        }
+    }
+});
+
+// Under power it is the trim wheel it was written to be, which is the half of
+// this that a landing is flown with.
+test('with an engine the hold is the altitude the aircraft was levelled at', () => {
+    assert.equal(heldAltitude(1000, 994, { holding: true, airborne: true, engine: true }),
+        1000, 'a held altitude is the one the frame opened at');
+    assert.equal(heldAltitude(1000, 994, { holding: false, airborne: true, engine: true }),
+        994, 'and nothing is held when nothing was trimmed');
+});
+
+// On the ground the altitude is the ground's, engine or no engine. A hold there
+// pins the aircraft to a strip it is trying to leave.
+test('the hold does not reach the ground', () => {
+    for (const engine of [true, false]) {
+        assert.equal(heldAltitude(1000, 994, { holding: true, airborne: false, engine }),
+            994, 'a hold on the ground is not a hold');
+    }
+});
+
+// Anything missing is not a hold. A host driving the Pilot API writes this
+// state itself, and a state it has not written is not permission to stop
+// descending.
+test('a hold has to be asked for in full', () => {
+    assert.equal(heldAltitude(1000, 994), 994, 'no state at all holds nothing');
+    assert.equal(heldAltitude(1000, 994, { holding: 1, airborne: 1, engine: 1 }),
+        994, 'and nothing short of true is the answer to any of the three');
+});
+
+/**
+ * The manoeuvre the item was reported from, flown through the same calls the
+ * frame makes: settled in a glide, `Space`, and nothing else touched.
+ *
+ * `glideFor` above flies the vertical alone. This flies the altitude, because
+ * the hold is written over the altitude rather than into the rate.
+ */
+test('space on a dead stick leaves the glide coming down', () => {
+    const dt     = 1 / 60;
+    const settled = glidePitch(65);
+    let pitch = settled, speed = 65, altitude = 4153, highest = 4153;
+
+    for (let t = 0; t < 5; t += dt) {
+        const startY = altitude;
+
+        speed    = convergeSpeed(speed, glideSpeed(pitch), dt, GLIDE_ACCEL, GLIDE_DECEL);
+        pitch    = pitchLevellingOff(settled, t);
+        altitude = startY - glideDescentAt(pitch, speed) * dt;
+
+        // The press is held for the whole run: the pilot trimmed and let go.
+        altitude = heldAltitude(startY, altitude, {
+            holding: true, airborne: true, engine: false
+        });
+        highest = Math.max(highest, altitude);
+    }
+
+    assert.equal(highest, 4153, `the trimmed glide climbed to ${highest.toFixed(1)}`);
+    assert.ok(altitude < 4153, 'and five seconds of it is five seconds of descent');
 });

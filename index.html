@@ -405,9 +405,17 @@
            minimum this row has 218 pixels to write in and runs past them, so
            `--card-pointer` above declares the height it wraps to rather than
            the row being shortened to fit: a bearing is three digits wherever
-           it is read and a distance without its unit is a number. Wrapped is
-           not clipped - the bound is summed from the wrapped height, so both
-           lines are drawn whole. */
+           it is read and a distance without its unit is a number.
+
+           Wrapped is not clipped, and not because anything adds this row up.
+           Nothing sums `--card-pointer`: the bounds written as row sums are
+           the short-screen ones, and every one of them sits inside a media
+           query that has already taken this row off. Where the row is drawn
+           wrapped the card is bounded by the room left under the readouts
+           instead, which is room enough for both lines. Below 746 pixels of
+           height it comes off rather than wrapping in a card too short for
+           it - see the `(max-height: 745px)` rule near the foot of this
+           stylesheet, which is where that height is worked out. */
         #game-mode-pointer {
             display: none;
             margin-top: 4px;

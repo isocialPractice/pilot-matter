@@ -195,6 +195,8 @@
 
 <p>The hold lasts until the pilot calls for a different vertical state, which is any pitch or throttle input. That hands both halves back at once: the altitude stops being held and the nose stops easing, wherever in the 0.6 seconds it had got to, so a pilot who takes the pitch back mid-settle is flying it themselves from that frame. Roll and yaw are not that call - an altitude held through a turn is what holding one is for - so a circuit can be flown on the altitude the level off set. Crashing and resetting end it too. Ground contact that is not a crash only suspends it - on the ground the altitude is the ground's, and a hold pinning an aircraft to a strip it is trying to leave is not a hold anybody asked for - so an arrival flown out of leaves the hold where the pilot left it.</p>
 
+<p>It also needs an <strong>engine</strong>. The hold works by writing the altitude the frame opened at over whatever the vertical worked out, so on a dead stick it is a second way to stop coming down - and a glide that can be trimmed to hold height is a glide that never has to land. With the lever dead the press is refused and the nose is left where the pilot put it, rather than half a level off being flown; an engine that dies under a hold already in force hands the aircraft back on the spot. <code>heldAltitude</code> in <code>js/flight-model.js</code> is where both that rule and the ground rule above it are decided, so a host flying the Pilot API against its own input source gets the same answer as the game does.</p>
+
             <nav class="page-nav" aria-label="Nearby pages">
                 <a href="controls/instruments.html" rel="prev">&#8592; Instruments</a>
                 <a href="terrain.html" rel="next">How the terrain works &#8594;</a>
