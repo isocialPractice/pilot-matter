@@ -27,78 +27,28 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### Code Review Override - the dead stick's vertical, and what was written about it
+### Code Review Override - the field the frame's hold test stopped checking
 
-- [ ] The cheatsheet's glide paragraph was edited without being rewrapped
-  - **Issue**: `CHEATSHEET.md:207` runs to 96 characters inside a paragraph
-    whose other lines wrap at about 75. The sentence `1.18.1-alpha` replaced
-    was rewritten in place and the text after it was left where it sat, so one
-    line of the paragraph is a third longer than the lines above and below it.
-    Nothing reads wrong - `docs/cheatsheet.html` carries the same prose as one
-    line per paragraph, which is why the suite did not notice.
-  - **Goal**: Rewrap the paragraph at `CHEATSHEET.md:203-208` to the width the
-    rest of the file uses, changing line breaks and nothing else.
-  - From: Code Review Override - the dead stick's vertical, and what was written about it
-
-#### Resolve Issues
-
-- [ ] Glide Climb 2
-  - **Issue**: A dead stick still does not always come down. `Space` is the
-    level off, and `levelOff` in `js/aircraft.js:487` does not read
-    `this.engine`, so pressing it once on a dead engine sets `holdingAltitude`
-    and `js/aircraft.js:406` writes `this.position.y = startY` on every frame
-    after it - which throws away the `glideDescentAt` the line above it just
-    worked out. Start `DEAD STICK`, press `Space` while airborne, and touch
-    nothing else: the altitude never falls, `V/S` reads `0 ft/min` because it
-    is measured from the same two altitudes, and the stage never ends. Only
-    `pitchUp`, `pitchDown`, `throttleUp` and `throttleDown` end the hold
-    (`VERTICAL_CONTROLS` in `js/input-map.js:26`), so roll and yaw steer the
-    aircraft to the strip at a fixed height with nothing pulling it.
-    **The hold predates this release and is not what `1.18.1-alpha` broke.**
-    What `1.18.1-alpha` did is declare the case closed: `js/flight-model.js`
-    now says "no pair the aircraft can be in comes out climbing",
-    `docs/controls/game-modes.html:189` says "the one thing that holds height
-    is speed rather than attitude", and `CHANGELOG.md:58` names "the one case
-    that does hold height". The trim hold is a second case, and all three
-    sentences say there is not one.
-  - **Goal**: Decide what the level off means with no engine, then make the
-    three sentences above say it. Refusing the hold in `levelOff` while
-    `this.engine` is false is the smaller of the two answers and keeps the
-    mode's promise; letting it stand and qualifying the prose is the other,
-    and needs saying why a glide can be trimmed to hold height. Whichever is
-    taken, `js/aircraft.js` is not testable in Node - there is no `three` to
-    import - so the check belongs where `glideDescentAt` is checked: a pure
-    function the frame calls, swept the way the plane is swept now, rather
-    than another regex over the source. Record the fix under an `Unreleased`
-    heading in `CHANGELOG.md`, since `1.18.1-alpha` is cut.
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] Pointer Wrap 1
-  - **Issue**: The comment the item left behind names a mechanism the
-    stylesheet does not have. `index.html:408` says "Wrapped is not clipped -
-    the bound is summed from the wrapped height, so both lines are drawn
-    whole", and `CHANGELOG.md:82` repeats it as "`--card-pointer` declares the
-    wrapped height and the bound is summed from it". Nothing sums
-    `--card-pointer`. The four bounds written as row sums - `index.html:1054`,
-    `1073`, `1095` and `1099`, which are what `summedFromRows` in
-    `test/page.test.js:1086` matches - add `--card-edges`, `--card-name`,
-    `--card-objective` and `--card-score`, and the two media queries holding
-    them, `(max-height: 551px)` and `(max-height: 479px)`, are both narrower
-    and shorter than `@media (max-width: 640px) and (max-height: 745px)` - so
-    `index.html:1153` applies there too and has already taken the pointer row
-    off with `display: none`. Where the wrapped row is drawn - pads out, width
-    at or under 640, height 746 or more - the card is bounded by the room it has,
-    `calc(100vh - ...)`, which `index.html:1138` calls out as the opposite
-    kind of bound. The row survives because nothing adds it up, not because
-    something does.
-  - **Goal**: Say what actually keeps the two lines whole: the card is bounded
-    by the room under the readouts rather than by a sum of its rows, and below
-    746 pixels of height the row comes off altogether rather than wrapping in
-    a card too short for it - which `index.html:1138` already explains and the
-    new comment should point at instead of restating. Correct
-    `index.html:408`, and correct `CHANGELOG.md:82` in place, since the
-    sentence describes `1.18.1-alpha`'s own reasoning rather than claiming a
-    fix the tag does not carry. `js/hud.js:127` is sound and needs nothing.
-  - From: UI/UX Override - the three new game modes
+- [ ] The frame's `heldAltitude` call is no longer held to passing the hold
+  itself
+  - **Issue**: The rewrite in `test/input-map.test.js` swapped one tight
+    assertion for three loose ones. `this.holdingAltitude && this.airborne)
+    this.position.y = startY` used to be matched whole; what replaced it,
+    at lines 167, 170 and 173, checks the call shape, `airborne:
+    this.airborne` and `engine: this.engine`, and nothing checks `holding:
+    this.holdingAltitude`. No other test ties the frame's hold flag to the
+    altitude write either - `heldAltitude` is given its state directly by its
+    own unit tests, so it cannot see what the frame passes it. Editing
+    `js/aircraft.js:417` to read `holding: true` leaves all 1033 tests
+    passing and pins every airborne powered aircraft to the altitude it
+    opened the frame at, so free flight can neither climb nor descend.
+    Confirmed by making that edit and running `npm test`.
+  - **Goal**: Add a fourth assertion beside the two it belongs with, matching
+    `holding:\s*this\.holdingAltitude` inside the `heldAltitude` call. While
+    there, bound the three `[\s\S]*?` spans to the call's own braces: each
+    searches to the end of `js/aircraft.js` as written, so a field deleted
+    from the call still matches if the same text appears anywhere below it.
+  - From: Code Review Override - the field the frame's hold test stopped checking
 
 ## Game UI/UX
 
@@ -345,56 +295,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 122 earlier items in `TODO-archive.md`, newest last.
+> 125 earlier items in `TODO-archive.md`, newest last.
 
-- [x] `.tmp/` is kept out of the repository by a personal global gitignore
-      rather than by the repository's own
-  - **Issue**: `git check-ignore -v .tmp/ui-ux/t6-probe.mjs` answers
-    `C:\Users\<user>\.gitignore_global:11:.*`, so the 250-odd screenshots, logs
-    and scratch `.mjs` files the UI/UX tester writes under `.tmp/ui-ux/` are
-    excluded by a rule that lives on one machine rather than by the project.
-    `.gitignore` already carries `test-results/` and `user-scripts/` under the
-    heading "Verification output written by the UI/UX tester, which is a record
-    of one run on one machine rather than anything the project ships", which is
-    a description of `.tmp/` as well. On a clone without that global rule -
-    another machine, or CI - the folder is untracked and visible, and a
-    `git add -A` sweeps all of it into the repository.
-  - **Goal**: Add `.tmp/` to `.gitignore` beside `test-results/` and
-    `user-scripts/`, and confirm with `git check-ignore -v` that the answer now
-    comes from the repository's own file rather than from a global one.
-  - From: Code Review Override - the comments the level off left behind
-- [x] The `1.17.2-alpha` changelog entry claims the ignore rules reach the
-      project, and calls the half that does not something the repository cannot
-      close
-  - **Issue**: The entry ships in a tree that carries no `.gitignore`.
-    `git add -An` lists the seven tracked files this turn changed and skips
-    `.gitignore`, so the commit and the `v1.17.2-alpha` tag carry the entry
-    without the file it describes. Its bolded lead, "`.tmp/` is ignored by the
-    project rather than by one machine", is therefore not true of the release,
-    and the same paragraph disclaims it further down - "which is every clone,
-    the file being untracked" - so the bullet contradicts its own heading under
-    a `### Fixed` list. The closing sentence, "That is the half of this the
-    repository cannot close on its own", is wrong rather than overstated:
-    `.nojekyll` is tracked here under the same global `.*` rule that hides
-    `.gitignore`, so a dotfile in this repository can be force-added and one
-    already has been. The run declined to, which is a decision about whose
-    configuration is being worked around rather than a limit on the repository.
-    `TODO.md` puts it correctly - "the call is the user's" - and only
-    `CHANGELOG.md` puts it as an impossibility.
-  - **Goal**: Reword the `1.17.2-alpha` entry's second `### Fixed` bullet so
-    its heading claims only what the release contains: the rule is written into
-    the repository's own `.gitignore`, which does not yet travel with the
-    repository. Replace "cannot close on its own" with what is true, that
-    force-adding the file is a call left to the user rather than one a run
-    takes. Do not restate it as a fix that landed, and do not touch the first
-    bullet or any earlier version's entry. If the release is already tagged
-    when this is worked, correct it under an `Unreleased` heading rather than
-    editing the tagged entry.
-  - From: Code Review Override - the ignore file that never reaches a clone
-- [x] **Glide Climb**: **Dead Stick**: the engine quits at altitude and the
-  throttle is dead for the rest of the flight, with the runway far enough off
-  that reaching it is a glide to be planned rather than a descent to be flown
-  - From: Game Modes UI/UX `->` New Game Modes
 - [x] **Cargo Run**: land at one strip, then at the next, against a budget
   that only spends while the engine is open, so the route flown matters as
   much as the landings made
@@ -506,3 +408,70 @@ how the simulator got here rather than as a list still to be worked.
     now reach a clone. Queue that only after the file is tracked - until then it
     has nothing to apply to.
   - From: Current
+- [x] The cheatsheet's glide paragraph was edited without being rewrapped
+  - **Issue**: `CHEATSHEET.md:207` runs to 96 characters inside a paragraph
+    whose other lines wrap at about 75. The sentence `1.18.1-alpha` replaced
+    was rewritten in place and the text after it was left where it sat, so one
+    line of the paragraph is a third longer than the lines above and below it.
+    Nothing reads wrong - `docs/cheatsheet.html` carries the same prose as one
+    line per paragraph, which is why the suite did not notice.
+  - **Goal**: Rewrap the paragraph at `CHEATSHEET.md:203-208` to the width the
+    rest of the file uses, changing line breaks and nothing else.
+  - From: Code Review Override - the dead stick's vertical, and what was written about it
+- [x] Glide Climb 2
+  - **Issue**: A dead stick still does not always come down. `Space` is the
+    level off, and `levelOff` in `js/aircraft.js:487` does not read
+    `this.engine`, so pressing it once on a dead engine sets `holdingAltitude`
+    and `js/aircraft.js:406` writes `this.position.y = startY` on every frame
+    after it - which throws away the `glideDescentAt` the line above it just
+    worked out. Start `DEAD STICK`, press `Space` while airborne, and touch
+    nothing else: the altitude never falls, `V/S` reads `0 ft/min` because it
+    is measured from the same two altitudes, and the stage never ends. Only
+    `pitchUp`, `pitchDown`, `throttleUp` and `throttleDown` end the hold
+    (`VERTICAL_CONTROLS` in `js/input-map.js:26`), so roll and yaw steer the
+    aircraft to the strip at a fixed height with nothing pulling it.
+    **The hold predates this release and is not what `1.18.1-alpha` broke.**
+    What `1.18.1-alpha` did is declare the case closed: `js/flight-model.js`
+    now says "no pair the aircraft can be in comes out climbing",
+    `docs/controls/game-modes.html:189` says "the one thing that holds height
+    is speed rather than attitude", and `CHANGELOG.md:58` names "the one case
+    that does hold height". The trim hold is a second case, and all three
+    sentences say there is not one.
+  - **Goal**: Decide what the level off means with no engine, then make the
+    three sentences above say it. Refusing the hold in `levelOff` while
+    `this.engine` is false is the smaller of the two answers and keeps the
+    mode's promise; letting it stand and qualifying the prose is the other,
+    and needs saying why a glide can be trimmed to hold height. Whichever is
+    taken, `js/aircraft.js` is not testable in Node - there is no `three` to
+    import - so the check belongs where `glideDescentAt` is checked: a pure
+    function the frame calls, swept the way the plane is swept now, rather
+    than another regex over the source. Record the fix under an `Unreleased`
+    heading in `CHANGELOG.md`, since `1.18.1-alpha` is cut.
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] Pointer Wrap 1
+  - **Issue**: The comment the item left behind names a mechanism the
+    stylesheet does not have. `index.html:408` says "Wrapped is not clipped -
+    the bound is summed from the wrapped height, so both lines are drawn
+    whole", and `CHANGELOG.md:82` repeats it as "`--card-pointer` declares the
+    wrapped height and the bound is summed from it". Nothing sums
+    `--card-pointer`. The four bounds written as row sums - `index.html:1054`,
+    `1073`, `1095` and `1099`, which are what `summedFromRows` in
+    `test/page.test.js:1086` matches - add `--card-edges`, `--card-name`,
+    `--card-objective` and `--card-score`, and the two media queries holding
+    them, `(max-height: 551px)` and `(max-height: 479px)`, are both narrower
+    and shorter than `@media (max-width: 640px) and (max-height: 745px)` - so
+    `index.html:1153` applies there too and has already taken the pointer row
+    off with `display: none`. Where the wrapped row is drawn - pads out, width
+    at or under 640, height 746 or more - the card is bounded by the room it has,
+    `calc(100vh - ...)`, which `index.html:1138` calls out as the opposite
+    kind of bound. The row survives because nothing adds it up, not because
+    something does.
+  - **Goal**: Say what actually keeps the two lines whole: the card is bounded
+    by the room under the readouts rather than by a sum of its rows, and below
+    746 pixels of height the row comes off altogether rather than wrapping in
+    a card too short for it - which `index.html:1138` already explains and the
+    new comment should point at instead of restating. Correct
+    `index.html:408`, and correct `CHANGELOG.md:82` in place, since the
+    sentence describes `1.18.1-alpha`'s own reasoning rather than claiming a
+    fix the tag does not carry. `js/hud.js:127` is sound and needs nothing.
+  - From: UI/UX Override - the three new game modes
