@@ -27,28 +27,30 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### Code Review Override - the field the frame's hold test stopped checking
+### Code Review Override - the reason written for the bounded span
 
-- [ ] The frame's `heldAltitude` call is no longer held to passing the hold
-  itself
-  - **Issue**: The rewrite in `test/input-map.test.js` swapped one tight
-    assertion for three loose ones. `this.holdingAltitude && this.airborne)
-    this.position.y = startY` used to be matched whole; what replaced it,
-    at lines 167, 170 and 173, checks the call shape, `airborne:
-    this.airborne` and `engine: this.engine`, and nothing checks `holding:
-    this.holdingAltitude`. No other test ties the frame's hold flag to the
-    altitude write either - `heldAltitude` is given its state directly by its
-    own unit tests, so it cannot see what the frame passes it. Editing
-    `js/aircraft.js:417` to read `holding: true` leaves all 1033 tests
-    passing and pins every airborne powered aircraft to the altitude it
-    opened the frame at, so free flight can neither climb nor descend.
-    Confirmed by making that edit and running `npm test`.
-  - **Goal**: Add a fourth assertion beside the two it belongs with, matching
-    `holding:\s*this\.holdingAltitude` inside the `heldAltitude` call. While
-    there, bound the three `[\s\S]*?` spans to the call's own braces: each
-    searches to the end of `js/aircraft.js` as written, so a field deleted
-    from the call still matches if the same text appears anywhere below it.
-  - From: Code Review Override - the field the frame's hold test stopped checking
+#### Found Issues
+
+- [ ] The comment justifying `[^}]*?` states its hazard as present fact
+  - **Issue**: `test/input-map.test.js:161-163` says a span free to reach the
+    end of `js/aircraft.js` "finds the same text somewhere below the call and
+    passes a field that has been deleted from it". It does not, in the source
+    as it stands: `holding:  this.holdingAltitude`, `airborne: this.airborne`
+    and `engine:   this.engine` each occur exactly once in the whole file, so
+    deleting any one of them fails its assertion under `[\s\S]*?` just as it
+    does under `[^}]*?`. The `CHANGELOG.md` entry for the same change states
+    the hazard conditionally - "as soon as the same text appears anywhere
+    below it" - and that is the true version. The bound is worth keeping; only
+    the reason written beside it overstates, and a comment is the one part of
+    a module no test reads.
+  - **Goal**: Reword the comment to the conditional the changelog already
+    uses, so it describes the hazard the bound forecloses rather than one the
+    file currently carries. Keep it a reason rather than shortening it away:
+    this comment is the only account in the repository of why this test uses
+    `[^}]*?` where the other nineteen source-matching spans across `test/`
+    use `[\s\S]*?`, so it is what a later reader weighs before keeping or
+    reverting the divergence.
+  - From: Code Review Override - the reason written for the bounded span
 
 ## Game UI/UX
 
@@ -295,12 +297,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 125 earlier items in `TODO-archive.md`, newest last.
+> 126 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Cargo Run**: land at one strip, then at the next, against a budget
-  that only spends while the engine is open, so the route flown matters as
-  much as the landings made
-  - From: Game Modes UI/UX `->` New Game Modes
 - [x] **Search and Rescue**: find a marker placed somewhere in the world given
   only a bearing and a distance from the start, then get down beside it
   - From: Game Modes UI/UX `->` New Game Modes
@@ -475,3 +473,23 @@ how the simulator got here rather than as a list still to be worked.
     sentence describes `1.18.1-alpha`'s own reasoning rather than claiming a
     fix the tag does not carry. `js/hud.js:127` is sound and needs nothing.
   - From: UI/UX Override - the three new game modes
+- [x] The frame's `heldAltitude` call is no longer held to passing the hold
+  itself
+  - **Issue**: The rewrite in `test/input-map.test.js` swapped one tight
+    assertion for three loose ones. `this.holdingAltitude && this.airborne)
+    this.position.y = startY` used to be matched whole; what replaced it,
+    at lines 167, 170 and 173, checks the call shape, `airborne:
+    this.airborne` and `engine: this.engine`, and nothing checks `holding:
+    this.holdingAltitude`. No other test ties the frame's hold flag to the
+    altitude write either - `heldAltitude` is given its state directly by its
+    own unit tests, so it cannot see what the frame passes it. Editing
+    `js/aircraft.js:417` to read `holding: true` leaves all 1033 tests
+    passing and pins every airborne powered aircraft to the altitude it
+    opened the frame at, so free flight can neither climb nor descend.
+    Confirmed by making that edit and running `npm test`.
+  - **Goal**: Add a fourth assertion beside the two it belongs with, matching
+    `holding:\s*this\.holdingAltitude` inside the `heldAltitude` call. While
+    there, bound the three `[\s\S]*?` spans to the call's own braces: each
+    searches to the end of `js/aircraft.js` as written, so a field deleted
+    from the call still matches if the same text appears anywhere below it.
+  - From: Code Review Override - the field the frame's hold test stopped checking
