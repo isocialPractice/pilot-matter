@@ -1170,3 +1170,10 @@ still be found by name.
   throttle is dead for the rest of the flight, with the runway far enough off
   that reaching it is a glide to be planned rather than a descent to be flown
   - From: Game Modes UI/UX `->` New Game Modes
+
+## Archived 09-24-26
+
+- [x] **Cargo Run**: land at one strip, then at the next, against a budget
+  that only spends while the engine is open, so the route flown matters as
+  much as the landings made
+  - From: Game Modes UI/UX `->` New Game Modes

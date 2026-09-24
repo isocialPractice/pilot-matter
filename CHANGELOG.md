@@ -12,7 +12,9 @@ descent was made honest in `1.18.1-alpha` and the level off wrote an altitude
 straight over it, so a glide could be trimmed to hold height and the stage had
 nothing left to end it. The three accounts that called the case closed are
 corrected along with it, and so is what `1.18.1-alpha` wrote about the objective
-card's pointer row.
+card's pointer row. The test that reads the frame's hold out of the source now
+reads the whole of it, the field it stopped checking being the one the fix
+turns on.
 
 ### Fixed
 
@@ -41,6 +43,19 @@ card's pointer row.
   guard being in the model rather than in the aircraft is also what gives a host
   driving the Pilot API the same answer the game gets, whatever it writes the
   engine flag to
+- **The test reading that call out of the source reads the field the hold turns
+  on.** `js/aircraft.js` is not constructible in Node, so what the frame hands
+  `heldAltitude` can only be checked by matching the source, and the three
+  assertions doing it checked the call's shape, `airborne` and `engine` - not
+  `holding`. Nothing else tied the frame's flag to the altitude write either:
+  `heldAltitude` is handed its state directly by its own unit tests, so it
+  cannot see what the frame passes. Writing `holding: true` into the call left
+  the whole suite green while pinning every airborne powered aircraft to the
+  altitude it opened the frame at, so free flight could neither climb nor
+  descend. A fourth assertion now matches `holding: this.holdingAltitude`, and
+  all three spans are bounded to the call's own braces with `[^}]*?` rather than
+  running to the end of the file with `[\s\S]*?` - an unbounded span passes a
+  field deleted from the call as soon as the same text appears anywhere below it
 
 ### Changed
 

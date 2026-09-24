@@ -155,6 +155,12 @@ test('a turn is not a call for a different altitude', () => {
 
 // The hold is the aircraft's, taken on the press and let go where the pilot
 // asks for something else, rather than held for as long as the key is down.
+//
+// Every field the frame hands `heldAltitude` is asked for by name, and the span
+// in front of each is `[^}]*?` rather than `[\s\S]*?` so it cannot run past the
+// call's own closing brace. A span free to reach the end of js/aircraft.js
+// finds the same text somewhere below the call and passes a field that has been
+// deleted from it.
 test('the aircraft holds the altitude it was levelled at', () => {
     assert.ok(/levelOff\(\)\s*\{/.test(aircraftSource),
         'js/aircraft.js should offer the level off as something it can be asked for');
@@ -167,10 +173,13 @@ test('the aircraft holds the altitude it was levelled at', () => {
     assert.ok(/this\.position\.y = heldAltitude\(startY, this\.position\.y, \{/
         .test(aircraftSource),
         'the altitude held is the one the aircraft was at');
-    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[\s\S]*?airborne:\s*this\.airborne/
+    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[^}]*?holding:\s*this\.holdingAltitude/
+        .test(aircraftSource),
+        'and only while the hold is in force, so the flag the press sets is the one the frame reads');
+    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[^}]*?airborne:\s*this\.airborne/
         .test(aircraftSource),
         'and only in the air');
-    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[\s\S]*?engine:\s*this\.engine/
+    assert.ok(/heldAltitude\(startY, this\.position\.y, \{[^}]*?engine:\s*this\.engine/
         .test(aircraftSource),
         'and only under power, so a glide cannot be trimmed to stop coming down');
 });
