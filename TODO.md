@@ -73,6 +73,55 @@ its context survives being archived.
     `levelOff` refuses without an engine, and one that `setEngine` ends the
     level off when it is handed a dead one.
   - From: UI/UX Override - the chart behind the pointer row
+- [ ] The hold test's own levelling span is unbounded against the reason written
+  above it
+  - **Issue**: `test/input-map.test.js:176` matches
+    `/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/`, the one source-matching
+    span in that test still free to run to the end of the file. The comment at
+    156-168 says the three `heldAltitude` spans below it are bounded with
+    `[^}]*?` "rather than the `[\s\S]*?` the source-matching tests elsewhere in
+    this folder use", and gives the reason as the day a matched text is written
+    a second time below the call. That span is open to the same day and sits
+    four lines under the reason: anchored on `levelOff() {` at
+    `js/aircraft.js:506` it searches to the end of the file for
+    `this.levelling = {`, which occurs once after the anchor today, at line 510
+    inside `levelOff`. Delete line 510 and write `this.levelling = {` anywhere
+    below it and the assertion passes on the second occurrence while `levelOff`
+    no longer brings the nose to level - `endLevelOff` at 519 and the frame loop
+    at 357-360 already assign `this.levelling`, so an edit reseeding the ease is
+    the plausible one. `levelOff` holds no `}` between its opening brace and
+    line 510, so the same bound fits without changing what the assertion matches
+    now. As written the comment's "elsewhere in this folder" also reads as though
+    this file were uniformly bounded, which the span four lines down contradicts
+  - **Goal**: Bound that span the way the three below it are bounded,
+    `/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/`, and widen the comment's
+    second paragraph so it speaks for every source-matching span in the test
+    rather than only the three the frame hands `heldAltitude`. `npm test` should
+    still report 1033 passing
+  - From: UI/UX Override - the chart behind the pointer row
+
+#### Resolve Issues
+
+- [ ] Bounded Span Reason 1
+  - **Issue**: The `CHANGELOG.md` entry written for the reworded comment ends
+    "this is the only account in the repository of why this test bounds its
+    spans where the source-matching tests elsewhere in `test/` do not". The same
+    file contradicts that thirty lines above, where the third `### Fixed` entry
+    under `## Unreleased` already gives the account: "all three spans are
+    bounded to the call's own braces with `[^}]*?` rather than running to the end
+    of the file with `[\s\S]*?` - an unbounded span passes a field deleted from
+    the call as soon as the same text appears anywhere below it". The new entry
+    cites that very sentence as "the conditional the entry above already used",
+    so one entry both points at the earlier account and denies it exists. The
+    comment in `test/input-map.test.js` claims nothing of the kind and is correct
+    as written; only the changelog overstates, which is the class of defect this
+    item existed to remove
+  - **Goal**: Narrow the clause in the `### Changed` entry to what holds - the
+    comment is the only account a reader of the test finds, the changelog being
+    the record of the change rather than something the test carries - or drop the
+    clause and keep the sentence saying why the comment stays a reason. Leave the
+    `### Fixed` entry as it is
+  - From: Code Review Override - the reason written for the bounded span
 
 ## Game UI/UX
 
@@ -512,7 +561,8 @@ how the simulator got here rather than as a list still to be worked.
     searches to the end of `js/aircraft.js` as written, so a field deleted
     from the call still matches if the same text appears anywhere below it.
   - From: Code Review Override - the field the frame's hold test stopped checking
-- [x] The comment justifying `[^}]*?` states its hazard as present fact
+- [x] **Bounded Span Reason**: The comment justifying `[^}]*?` states its
+      hazard as present fact
   - **Issue**: `test/input-map.test.js:161-163` says a span free to reach the
     end of `js/aircraft.js` "finds the same text somewhere below the call and
     passes a field that has been deleted from it". It does not, in the source
