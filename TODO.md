@@ -27,30 +27,52 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### Code Review Override - the reason written for the bounded span
+### UI/UX Override - the chart behind the pointer row
 
 #### Found Issues
 
-- [ ] The comment justifying `[^}]*?` states its hazard as present fact
-  - **Issue**: `test/input-map.test.js:161-163` says a span free to reach the
-    end of `js/aircraft.js` "finds the same text somewhere below the call and
-    passes a field that has been deleted from it". It does not, in the source
-    as it stands: `holding:  this.holdingAltitude`, `airborne: this.airborne`
-    and `engine:   this.engine` each occur exactly once in the whole file, so
-    deleting any one of them fails its assertion under `[\s\S]*?` just as it
-    does under `[^}]*?`. The `CHANGELOG.md` entry for the same change states
-    the hazard conditionally - "as soon as the same text appears anywhere
-    below it" - and that is the true version. The bound is worth keeping; only
-    the reason written beside it overstates, and a comment is the one part of
-    a module no test reads.
-  - **Goal**: Reword the comment to the conditional the changelog already
-    uses, so it describes the hazard the bound forecloses rather than one the
-    file currently carries. Keep it a reason rather than shortening it away:
-    this comment is the only account in the repository of why this test uses
-    `[^}]*?` where the other nineteen source-matching spans across `test/`
-    use `[\s\S]*?`, so it is what a later reader weighs before keeping or
-    reverting the divergence.
-  - From: Code Review Override - the reason written for the bounded span
+- [ ] A short screen drops the objective's bearing with nothing left saying it
+  - **Issue**: Below 746 pixels of height on a narrow screen the objective card
+    drops its pointer row, and the `@media (max-width: 640px) and
+    (max-height: 745px)` rule in `index.html` gives its reason as "the chart in
+    the corner is left to say which way the gate lies - which it is drawing
+    already". The `@media (max-height: 540px) and (min-width: 500px) and
+    (max-width: 771px)` rule below it says the same. Measured in the running
+    app at 393x740, that holds for one of the three modes that write the row
+    and not the other two: `FLYING THROUGH LOOPS` draws three gates and the
+    course polyline with the next gate marked, while `CARGO RUN` and
+    `SEARCH AND RESCUE` draw no gates and an empty course line, leaving the
+    face, the grid, the `N` label and the aircraft marker - none of which says
+    where the objective is. The chart only ever gets a course: `js/main.js`
+    builds one under `mode?.objective === LOOP_OBJECTIVE` and hands every other
+    objective an empty array. So a route loses `LEG 1 · 234° · 8570 ft` and a
+    search loses `MARKER · 045° · 11810 ft` with no replacement, which the
+    comment over `runPointer` in `js/game-modes.js` argues against directly: "A
+    strip is not: it is a grey mark on grey country, several miles off, and a
+    pilot looking straight at one has no way of knowing it. So a route's
+    pointer stays up."
+  - **Goal**: Resolve to [pointer-row-short-screen-fallback.prompt.md](.claude/prompts/pointer-row-short-screen-fallback.prompt.md)
+  - From: UI/UX Override - the chart behind the pointer row
+- [ ] Nothing in the suite pins the two halves of the engine rule in `js/aircraft.js`
+  - **Issue**: `test/flight-model.test.js` sweeps `heldAltitude` and
+    `test/input-map.test.js` pins the three fields the frame hands it, so the
+    rule the frame applies is covered. The two paths that normally set the flag
+    are not. Deleting `if (!this.engine) return false;` from `levelOff` and
+    `if (!this.engine) this.endLevelOff();` from `setEngine` was tried this run:
+    `npm test` reported 1033 of 1033 passing with both gone, the same count as
+    before they were removed. The first puts the level off's own refusal back
+    to what it was before the fix, and the second lets `isHoldingAltitude` keep
+    reporting a trim the frame has already stopped honouring. Both were
+    verified in the browser this run because `js/aircraft.js` imports `three`
+    and cannot be constructed in Node, so a regression in either would reach a
+    release with nothing in the suite to catch it.
+  - **Goal**: Add two assertions to the existing `the aircraft holds the
+    altitude it was levelled at` test in `test/input-map.test.js`, in the
+    `aircraftSource` idiom the rest of that test already uses and with the same
+    `[^}]*?` bound so neither span can run past its own method: one that
+    `levelOff` refuses without an engine, and one that `setEngine` ends the
+    level off when it is handed a dead one.
+  - From: UI/UX Override - the chart behind the pointer row
 
 ## Game UI/UX
 
@@ -297,11 +319,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 126 earlier items in `TODO-archive.md`, newest last.
+> 127 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Search and Rescue**: find a marker placed somewhere in the world given
-  only a bearing and a distance from the start, then get down beside it
-  - From: Game Modes UI/UX `->` New Game Modes
 - [x] Glide Climb 1
   - **Issue**: A dead stick gains height when the nose is held up. From the
     settled glide at 4153 ft and 130 kt, holding `W` and touching nothing else
@@ -493,3 +512,23 @@ how the simulator got here rather than as a list still to be worked.
     searches to the end of `js/aircraft.js` as written, so a field deleted
     from the call still matches if the same text appears anywhere below it.
   - From: Code Review Override - the field the frame's hold test stopped checking
+- [x] The comment justifying `[^}]*?` states its hazard as present fact
+  - **Issue**: `test/input-map.test.js:161-163` says a span free to reach the
+    end of `js/aircraft.js` "finds the same text somewhere below the call and
+    passes a field that has been deleted from it". It does not, in the source
+    as it stands: `holding:  this.holdingAltitude`, `airborne: this.airborne`
+    and `engine:   this.engine` each occur exactly once in the whole file, so
+    deleting any one of them fails its assertion under `[\s\S]*?` just as it
+    does under `[^}]*?`. The `CHANGELOG.md` entry for the same change states
+    the hazard conditionally - "as soon as the same text appears anywhere
+    below it" - and that is the true version. The bound is worth keeping; only
+    the reason written beside it overstates, and a comment is the one part of
+    a module no test reads.
+  - **Goal**: Reword the comment to the conditional the changelog already
+    uses, so it describes the hazard the bound forecloses rather than one the
+    file currently carries. Keep it a reason rather than shortening it away:
+    this comment is the only account in the repository of why this test uses
+    `[^}]*?` where the other nineteen source-matching spans across `test/`
+    use `[\s\S]*?`, so it is what a later reader weighs before keeping or
+    reverting the divergence.
+  - From: Code Review Override - the reason written for the bounded span
