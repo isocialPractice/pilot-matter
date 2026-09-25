@@ -1177,3 +1177,9 @@ still be found by name.
   that only spends while the engine is open, so the route flown matters as
   much as the landings made
   - From: Game Modes UI/UX `->` New Game Modes
+
+## Archived 09-25-26
+
+- [x] **Search and Rescue**: find a marker placed somewhere in the world given
+  only a bearing and a distance from the start, then get down beside it
+  - From: Game Modes UI/UX `->` New Game Modes

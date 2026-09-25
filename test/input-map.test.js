@@ -157,10 +157,15 @@ test('a turn is not a call for a different altitude', () => {
 // asks for something else, rather than held for as long as the key is down.
 //
 // Every field the frame hands `heldAltitude` is asked for by name, and the span
-// in front of each is `[^}]*?` rather than `[\s\S]*?` so it cannot run past the
-// call's own closing brace. A span free to reach the end of js/aircraft.js
-// finds the same text somewhere below the call and passes a field that has been
-// deleted from it.
+// in front of each is `[^}]*?` rather than the `[\s\S]*?` the source-matching
+// tests elsewhere in this folder use, so it cannot run past the call's own
+// closing brace. Today either bound would catch a deleted field, because each
+// of the three texts occurs once in js/aircraft.js. The difference is what
+// happens the day one of them is written a second time anywhere below this
+// call: a span free to reach the end of the file matches that second
+// occurrence and passes a field the call no longer has, while a span stopped
+// at the closing brace still fails. The bound is held against that day rather
+// than against anything the file carries now.
 test('the aircraft holds the altitude it was levelled at', () => {
     assert.ok(/levelOff\(\)\s*\{/.test(aircraftSource),
         'js/aircraft.js should offer the level off as something it can be asked for');

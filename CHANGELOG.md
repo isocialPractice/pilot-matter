@@ -86,6 +86,19 @@ turns on.
   uses.** The glide paragraph was edited in place for `1.18.1-alpha` and the
   text after the edit was left where it sat, leaving one line at 96 characters
   in a paragraph wrapping at about 75. Line breaks only; the prose is unchanged
+- **The reason written beside the bounded span says what the bound forecloses
+  rather than what the file carries.** The comment above the frame's hold test
+  in `test/input-map.test.js` said an unbounded span "finds the same text
+  somewhere below the call and passes a field that has been deleted from it",
+  as present fact. It does not: `holding`, `airborne` and `engine` each occur
+  once in `js/aircraft.js`, so deleting any one of them fails its assertion
+  under `[\s\S]*?` exactly as it does under `[^}]*?`. The hazard is the day one
+  of those texts is written a second time below the call, which is the
+  conditional the entry above already used, and the comment now states it that
+  way. The bound stays; this is the only account in the repository of why this
+  test bounds its spans where the source-matching tests elsewhere in `test/` do
+  not, so it is what a later reader weighs before keeping or reverting the
+  divergence
 
 ## [1.18.1-alpha] - 2026-09-22
 
