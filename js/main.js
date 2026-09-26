@@ -30,7 +30,7 @@ import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
     stageWorld, stageStart, buildCourse, runPointer, approachGuidance,
-    tickRun, missNotice, isStageComplete,
+    tickRun, missNotice, isStageComplete, chartCourse, chartNext,
     nextStrip, burnFuel, fuelRemaining, engineLive, stageMarker, recordRescue,
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey,
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE, CARGO_OBJECTIVE
@@ -415,10 +415,16 @@ class FlightSimulator {
             : [];
         this.loops.setRings(this.course);
 
-        // The whole course is on the chart the moment it is laid, rather than
-        // as it is flown: the first gate should not be the only one the pilot
-        // has ever seen.
-        this.hud.setCourse(this.course);
+        // The whole of what is being flown to is on the chart the moment it is
+        // laid, rather than as it is reached: the first gate should not be the
+        // only one the pilot has ever seen, and a route's strips and a search's
+        // marker are drawn on the same terms. The chart is what a short screen
+        // gives as its reason for taking the card's pointer row off, so a mode
+        // it drew nothing for was a mode with no bearing left anywhere.
+        this.hud.setCourse(chartCourse(this.run, {
+            course: this.course,
+            runways: this.runways
+        }));
 
         // And the help a landing stage is given, drawn out over the ground it
         // is laid on rather than at the strip's own height, because the lead-in
@@ -484,9 +490,11 @@ class FlightSimulator {
      * being asked for is not something that changes inside a stage.
      */
     syncObjective() {
-        const gate = nextGate(this.run);
-        this.loops.setNext(gate);
-        this.hud.setNextGate(gate);
+        // The hoops are lit by the gate a course is up to; the chart is lit by
+        // whichever mark the run is waiting on, which is that same gate for a
+        // course and a strip or a marker for the modes that fly to those.
+        this.loops.setNext(nextGate(this.run));
+        this.hud.setNextMark(chartNext(this.run));
 
         const mode  = runningMode(this.run);
         const stage = currentStage(this.run);

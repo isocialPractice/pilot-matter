@@ -614,14 +614,14 @@ test('the course is drawn under the marker rather than over it', () => {
  * hoops are meshes and their module imports Three.js, so the colours it draws
  * them in are read off its source rather than by loading it.
  */
-test('a gate on the chart is the colour the hoop it stands for is', () => {
+test('a mark on the chart is the colour the hoop it stands for is', () => {
     const rings = readFileSync(fileURLToPath(new URL('../js/rings.js', import.meta.url)), 'utf8');
     const hex = (name) => rings.match(new RegExp(`${name}\\s*=\\s*0x([0-9a-fA-F]{6})`))?.[1];
 
     const readings = [
-        ['.minimap-gate',       'RING_COLOR'],
-        ['.minimap-gate.next',  'RING_NEXT_COLOR'],
-        ['.minimap-gate.flown', 'RING_DONE_COLOR']
+        ['.minimap-mark',       'RING_COLOR'],
+        ['.minimap-mark.next',  'RING_NEXT_COLOR'],
+        ['.minimap-mark.flown', 'RING_DONE_COLOR']
     ];
 
     for (const [selector, name] of readings) {

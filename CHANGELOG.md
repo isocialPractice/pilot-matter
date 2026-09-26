@@ -5,16 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [1.19.0-alpha] - 2026-09-26
 
-The dead stick's last way of not coming down, which was never the vertical. The
-descent was made honest in `1.18.1-alpha` and the level off wrote an altitude
-straight over it, so a glide could be trimmed to hold height and the stage had
-nothing left to end it. The three accounts that called the case closed are
-corrected along with it, and so is what `1.18.1-alpha` wrote about the objective
-card's pointer row. The test that reads the frame's hold out of the source now
-reads the whole of it, the field it stopped checking being the one the fix
-turns on.
+The chart in the corner draws what the run is flying to, whatever the run is.
+It drew a course of loops and nothing else, so on the two other modes that write
+the objective card's pointer row it was a face, a grid and an aircraft - and a
+screen under 746 pixels of height takes that row off and gives the chart as the
+reason. A route and a search lost their bearing and their distance altogether at
+that height. The chart is now handed the strips a route lands at and the marker
+a search is looking for, on the same terms the gates were always drawn on.
+
+This release also carries the dead stick's last way of not coming down, which
+was never the vertical. The descent was made honest in `1.18.1-alpha` and the
+level off wrote an altitude straight over it, so a glide could be trimmed to
+hold height and the stage had nothing left to end it. The three accounts that
+called the case closed are corrected along with it, and so is what
+`1.18.1-alpha` wrote about the objective card's pointer row. The test that reads
+the frame's hold out of the source now reads the whole of it - the field it
+stopped checking being the one the fix turns on, and the two refusals it never
+read at all being the two that make the fix hold.
+
+### Added
+
+- **The chart draws a route's strips and a search's marker, not only a course's
+  gates.** `chartCourse` and `chartNext` in `js/game-modes.js` answer what the
+  chart should draw and which of it the run is waiting on, for any objective:
+  the gates of a loop course, the strips of a route in the order it lands at
+  them, the one marker of a search, and nothing for a landing or a free flight,
+  which have no objective standing off somewhere to be told about. They are the
+  same answer `runPointer` gives the card in words, built beside it so the two
+  cannot drift apart, and both are published from `js/api/index.js` for a host
+  drawing a map of its own
 
 ### Fixed
 
@@ -56,9 +77,48 @@ turns on.
   all three spans are bounded to the call's own braces with `[^}]*?` rather than
   running to the end of the file with `[\s\S]*?` - an unbounded span passes a
   field deleted from the call as soon as the same text appears anywhere below it
+- **Nothing in the suite read the two paths that set the hold's flag.** The
+  frame's use of it was pinned and the refusals that make it correct were not:
+  deleting `if (!this.engine) return false;` from `levelOff` and
+  `if (!this.engine) this.endLevelOff();` from `setEngine` each left 1033 of
+  1033 passing. The first puts the level off's own refusal back to what it was
+  before the fix above, and the second lets `isHoldingAltitude` report a trim
+  the frame has already stopped honouring. `js/aircraft.js` imports three and
+  cannot be constructed in Node, so the hold test in `test/input-map.test.js`
+  now reads both out of the source the way it reads the frame's call, each
+  bounded to its own method
+- **The one unbounded span left in that test is bounded like the rest.** The
+  assertion that a press brings the nose to level matched
+  `/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/`, four lines under the comment
+  explaining why the spans beside it are bounded. Deleting the assignment
+  `levelOff` makes and reseeding the ease in a method below it - the plausible
+  edit - passed under that span and fails under `[^}]*?`, with `levelOff`
+  holding no closing brace between its own and the line matched. The comment's
+  second paragraph now speaks for every source-matching span in the test rather
+  than for the three the frame hands `heldAltitude`, which is what it had come
+  to read as
 
 ### Changed
 
+- **What the objective card's pointer row comes off for is now true of every
+  mode that writes it.** Two media queries in `index.html` take the row off a
+  short screen and give the same reason - the chart in the corner is already
+  saying which way the objective lies. Measured at 393x740, that held for
+  `FLYING THROUGH LOOPS`, which draws three gates and the course line, and not
+  for `CARGO RUN` or `SEARCH AND RESCUE`, which drew no gates and an empty
+  course line: a route lost `LEG 1 · 234° · 8570 ft` and a search lost
+  `MARKER · 045° · 11810 ft` with nothing put in their place. `js/main.js` hands
+  the chart `chartCourse` now rather than the loop course alone, so the reason
+  those comments give is a reason that holds, and both comments say `objective`
+  where they said `gate`
+- **The chart's marks are named for what they are rather than for the first
+  thing they were.** A mark on the face is a gate, a strip or a marker depending
+  on the mode, so `gateClass`, `GATE_STATES` and `GATE_RADIUS` in
+  `js/minimap.js` are `markClass`, `MARK_STATES` and `MARK_RADIUS`, the CSS class
+  is `.minimap-mark`, and `Hud.setNextGate` is `setNextMark`. The hoops in the
+  world are still lit from `nextGate`, which is the one place the word still
+  means only a gate. No reading changes: a mark is drawn in the same three hoop
+  colours and held hollow at the edge of the square the same way
 - **The three accounts that declared the case closed now say what closed it.**
   `js/flight-model.js` said no pair the aircraft can be in comes out climbing,
   `docs/controls/game-modes.html` said the one thing that holds height is speed
@@ -95,10 +155,11 @@ turns on.
   under `[\s\S]*?` exactly as it does under `[^}]*?`. The hazard is the day one
   of those texts is written a second time below the call, which is the
   conditional the entry above already used, and the comment now states it that
-  way. The bound stays; this is the only account in the repository of why this
-  test bounds its spans where the source-matching tests elsewhere in `test/` do
-  not, so it is what a later reader weighs before keeping or reverting the
-  divergence
+  way. The bound stays, and the comment is the only account a reader of the test
+  finds of why it bounds its spans where the source-matching tests elsewhere in
+  `test/` do not - the changelog being the record of the change rather than
+  something the test carries - so the comment is what a later reader weighs
+  before keeping or reverting the divergence
 
 ## [1.18.1-alpha] - 2026-09-22
 

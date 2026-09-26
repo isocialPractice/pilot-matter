@@ -101,7 +101,7 @@ export {
     stageBudget, stageStrips, burnFuel, fuelRemaining, runEngine, engineLive,
     stageMarker, RESCUE_RADIUS, RESCUE_STOP_SPEED,
     gateOffset, gateAspect, gateAxes, gateCrossing, gatePassed, gateMissed, flyStep,
-    gatePointer, runPointer, stripPointer, searchBriefing,
+    gatePointer, runPointer, stripPointer, searchBriefing, chartCourse, chartNext,
     approachThreshold, approachGuidance, CENTRELINE_REACH, CENTRELINE_MARKS
 } from '../game-modes.js';
 

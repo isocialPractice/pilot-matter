@@ -323,15 +323,17 @@ export class HUD {
 
     /**
      * Puts a course on the chart in the corner, so the whole of it is on screen
-     * before the first gate is flown at. Called when a stage is laid out rather
-     * than as it is flown.
+     * before the first mark is flown at. Called when a stage is laid out rather
+     * than as it is flown. What the marks are is the mode's business - gates,
+     * strips, or the one marker a search is given - and the chart draws them all
+     * the same way.
      */
-    setCourse(rings) {
-        return this.minimap.setCourse(rings);
+    setCourse(course) {
+        return this.minimap.setCourse(course);
     }
 
-    /** Marks the gate the course is waiting on, on the chart and in the world. */
-    setNextGate(index) {
+    /** Marks the one the run is waiting on, so the chart and the card agree. */
+    setNextMark(index) {
         return this.minimap.setNext(index);
     }
 

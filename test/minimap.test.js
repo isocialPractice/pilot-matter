@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     MINIMAP_SIZE,
     DEFAULT_BOUNDS,
@@ -10,7 +11,7 @@ import {
     minimapHeading,
     coursePoints,
     courseLine,
-    gateClass
+    markClass
 } from '../js/minimap.js';
 import { headingToYaw } from '../js/units.js';
 
@@ -192,21 +193,21 @@ test('a course is one line through its gates, in the order they are flown', () =
     assert.equal(courseLine([]), '', 'and a course with no gates draws nothing');
 });
 
-// The chart and the world should not disagree about which gate is next. The
+// The chart and the world should not disagree about which mark is next. The
 // three readings here are the three the hoops themselves are coloured in;
 // js/rings.js imports Three.js, so that the two agree about the colours is
 // checked against its source in test/page.test.js rather than here.
-test('a gate is drawn from how far the course has got, in three readings', () => {
-    assert.deepEqual([0, 1, 2].map(at => gateClass(at, 1)), ['flown', 'next', 'ahead']);
-    assert.deepEqual([0, 1, 2].map(at => gateClass(at, -1)), ['flown', 'flown', 'flown'],
+test('a mark is drawn from how far the course has got, in three readings', () => {
+    assert.deepEqual([0, 1, 2].map(at => markClass(at, 1)), ['flown', 'next', 'ahead']);
+    assert.deepEqual([0, 1, 2].map(at => markClass(at, -1)), ['flown', 'flown', 'flown'],
         'a course with nothing left to fly is drawn entirely as flown');
-    assert.equal(gateClass(0, 0), 'next');
+    assert.equal(markClass(0, 0), 'next');
 });
 
 // --- The chart the course is drawn onto ------------------------------------
 
 // Enough of a document for the chart to draw into, with no browser to draw it
-// in. The gates are SVG circles, which have to be made in the SVG namespace to
+// in. The marks are SVG circles, which have to be made in the SVG namespace to
 // be circles at all rather than well-formed tags rendering as nothing.
 function fakeChart() {
     const element = (id = '') => ({
@@ -250,7 +251,7 @@ function fakeChart() {
     return root;
 }
 
-test('a course is laid on the chart as a gate for every loop of it', () => {
+test('a course is laid on the chart as a mark for every leg of it', () => {
     const root = fakeChart();
     const map = new Minimap(root, BOUNDS);
 
@@ -258,14 +259,14 @@ test('a course is laid on the chart as a gate for every loop of it', () => {
 
     const course = root.parts.get('#minimap-course');
     assert.equal(course.children.length, 3);
-    assert.ok(course.children.every(gate => gate.namespace === 'http://www.w3.org/2000/svg'),
-        'a gate made outside the SVG namespace is a tag that draws nothing');
-    assert.deepEqual(course.children.map(gate => gate.getAttribute('cx')), ['0.00', '-25.00', '25.00']);
+    assert.ok(course.children.every(mark => mark.namespace === 'http://www.w3.org/2000/svg'),
+        'a mark made outside the SVG namespace is a tag that draws nothing');
+    assert.deepEqual(course.children.map(mark => mark.getAttribute('cx')), ['0.00', '-25.00', '25.00']);
     assert.equal(root.parts.get('#minimap-course-line').getAttribute('points'),
         courseLine(coursePoints(BOUNDS, COURSE)));
 });
 
-// A stage is a different course, not the same one somewhere else, so the gates
+// A stage is a different course, not the same one somewhere else, so the marks
 // are built again rather than moved - and the last stage's are taken down.
 test('a second course replaces the first rather than joining it', () => {
     const root = fakeChart();
@@ -279,15 +280,15 @@ test('a second course replaces the first rather than joining it', () => {
     assert.equal(root.parts.get('#minimap-course').children.length, 0);
 });
 
-test('the gate the course is waiting on is marked, on the chart as in the world', () => {
+test('the mark the course is waiting on is lit, on the chart as in the world', () => {
     const root = fakeChart();
     const map = new Minimap(root, BOUNDS);
 
     map.setCourse(COURSE);
     map.setNext(1);
 
-    const gates = root.parts.get('#minimap-course').children;
-    assert.deepEqual(gates.map(gate => [...gate.classes].filter(name => name !== 'minimap-gate')),
+    const marks = root.parts.get('#minimap-course').children;
+    assert.deepEqual(marks.map(mark => [...mark.classes].filter(name => name !== 'minimap-mark')),
         [['flown'], ['next'], ['ahead']]);
 });
 
@@ -306,4 +307,48 @@ test('a chart fitted to new ground draws the course against that ground', () => 
         'the whole course is behind the aircraft now');
     assert.ok(gates.some(gate => gate.classes.has('next')),
         'and the gate being waited on is still marked as the one being waited on');
+});
+
+// --- The seam between the run and the chart --------------------------------
+
+/**
+ * Everything above is the chart drawing what it is handed. What it is handed is
+ * decided in `js/main.js`, which imports three and cannot be loaded here, so
+ * the seam is read out of the source the way `test/landing-score.test.js` reads
+ * the landing.
+ *
+ * It is worth reading because it has already been wrong. The chart was handed
+ * the loop course and an empty array for everything else, so of the three modes
+ * that write the objective card's pointer row only one was drawn for - and a
+ * screen under 746 pixels of height takes that row off and gives the chart as
+ * the reason. A route and a search lost their bearing altogether, with the whole
+ * suite green, because nothing in Node can see which array crosses that call.
+ *
+ * Each span is bounded to the call it is anchored on rather than running to the
+ * end of the file, for the reason the hold test in `test/input-map.test.js`
+ * gives: an unbounded span matches the same text written a second time anywhere
+ * below, and passes a call that no longer makes it.
+ */
+const mainSource = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+
+test('the chart is handed what the run is flying to, whatever kind of run it is', () => {
+    assert.ok(/this\.hud\.setCourse\([^;]*?chartCourse\(this\.run,/.test(mainSource),
+        'js/main.js should hand the chart the run\'s own marks rather than only a loop course');
+    assert.ok(/chartCourse\(this\.run,[^;]*?runways:\s*this\.runways/.test(mainSource),
+        'and hand over the strips, which is the only place a route\'s marks can come from');
+    assert.ok(/chartCourse\(this\.run,[^;]*?course:\s*this\.course/.test(mainSource),
+        'and the gates, so a loop course is drawn as it always was');
+});
+
+test('the chart lights the mark the run is waiting on, and the hoops their gate', () => {
+    const method = mainSource.match(/^ {4}syncObjective\(\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(method, 'js/main.js should still write the objective card in one place');
+
+    const [body] = [method[1]];
+    assert.ok(/this\.hud\.setNextMark\(chartNext\(this\.run\)\)/.test(body),
+        'the chart is lit from what the run is waiting on, which is not always a gate');
+    assert.ok(!/setNextMark\(nextGate\(/.test(body),
+        'a route and a search count legs and markers, and nextGate answers -1 for both');
+    assert.ok(/this\.loops\.setNext\(nextGate\(this\.run\)\)/.test(body),
+        'while the hoops in the world are still lit by the gate a course is up to');
 });

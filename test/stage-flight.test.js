@@ -20,7 +20,7 @@ import {
     bestTime
 } from '../js/best-times.js';
 import { formatStageClock } from '../js/hud.js';
-import { gateClass } from '../js/minimap.js';
+import { markClass } from '../js/minimap.js';
 
 /**
  * A stage of a course, flown out.
@@ -188,7 +188,7 @@ test('a best time flown in one session is the time to beat in the next', () => {
 test('the mark on the course moves on as each loop is flown', () => {
     const run = createRunState(LOOP_COURSE);
     const course = layCourse(run);
-    const marks = () => course.map((_, at) => gateClass(at, nextGate(run)));
+    const marks = () => course.map((_, at) => markClass(at, nextGate(run)));
 
     assert.deepEqual(marks(), ['next', 'ahead', 'ahead']);
 

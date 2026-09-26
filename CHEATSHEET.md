@@ -225,7 +225,9 @@ are laid off the threshold the stage opens you out from.
 
 The whole course is drawn on the minimap the moment the stage is laid out, in
 the same three colours. A gate past the edge of the square the chart covers is
-held hollow at that edge.
+held hollow at that edge. The other two modes with something to fly to are drawn
+the same way: a route's strips in the order they are landed at, and a search's
+marker on its own.
 
 | Reading | Where | Says |
 |---------|-------|------|

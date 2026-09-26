@@ -84,6 +84,8 @@ import {
     searchBriefing,
     stripPointer,
     runPointer,
+    chartCourse,
+    chartNext,
     RESCUE_RADIUS,
     RESCUE_STOP_SPEED
 } from '../js/game-modes.js';
@@ -1537,6 +1539,88 @@ test('a route with no strip laid for the leg points at nothing rather than guess
     assert.equal(stripPointer(state, [], { x: 0, z: 0, y: 0 }, 0), null);
     assert.equal(runPointer(createRunState(), {}, { x: 0, z: 0, y: 0 }, 0), null,
         'and so does free flight');
+});
+
+// --- What the chart in the corner is given ---------------------------------
+
+/**
+ * The chart is the reason a short screen gives for taking the pointer row off,
+ * so every mode that writes that row has to be a mode the chart draws for.
+ * Under 746 pixels of height the row is gone and the chart is the only thing
+ * left saying where the objective is, which it cannot do for a mode it was
+ * handed nothing about.
+ *
+ * The three modes that write the row are the three asserted here. The two that
+ * do not - a landing and a free flight - are asserted to draw nothing, because
+ * a chart that marked an objective nothing is asking for would be reporting one
+ * the card never mentions.
+ */
+test('every mode that writes the pointer row gives the chart the same thing to draw', () => {
+    const STRIPS = [{ x: 4000, z: 0, index: 0 }, { x: 0, z: 4000, index: 1 }];
+
+    const course = buildCourse(currentStage(createRunState(LOOP_COURSE)), {
+        seed: 1, size: 16000, sampleHeight: () => 0
+    });
+    assert.deepEqual(chartCourse(createRunState(LOOP_COURSE), { course }), course,
+        'a course is its gates, which is what the chart already drew');
+
+    const route = createRunState(CARGO_RUN);
+    assert.deepEqual(chartCourse(route, { runways: STRIPS }), STRIPS,
+        'a route is the strips it lands at, in the order it lands at them');
+
+    const search = createRunState(SEARCH_RESCUE);
+    const marker = stageMarker(search);
+    assert.deepEqual(chartCourse(search, {}), [marker],
+        'and a search is the one marker it is looking for');
+
+    for (const id of [RUNWAY_LANDING, DEAD_STICK]) {
+        assert.deepEqual(chartCourse(createRunState(id), { runways: STRIPS }), [],
+            `${id} has its strip under the nose and writes no pointer row`);
+    }
+    assert.deepEqual(chartCourse(createRunState(), { runways: STRIPS, course }), [],
+        'and a free flight has no objective to be told about at all');
+});
+
+// The strips are handed over by position, because `nextStrip` counts legs flown
+// and the chart lights the mark at that position. A stage asking for two strips
+// over a world that laid three would otherwise mark ground the route never
+// visits, and one that laid fewer than it asked for still lines up.
+test('a route is given the strips its stage asks for and no others', () => {
+    const route = createRunState(CARGO_RUN);
+    const asked = stageStrips(route);
+    const laid = [0, 1, 2, 3].map(index => ({ x: index * 1000, z: 0, index }));
+
+    assert.ok(asked > 0 && asked < laid.length, 'the stage should ask for fewer than were laid');
+    assert.deepEqual(chartCourse(route, { runways: laid }), laid.slice(0, asked));
+    assert.deepEqual(chartCourse(route, { runways: laid.slice(0, 1) }), laid.slice(0, 1),
+        'and a world that could only take one strip is drawn with the one it has');
+    assert.deepEqual(chartCourse(route, {}), [],
+        'and a world not laid yet is drawn with nothing');
+});
+
+// The chart lights the mark the card is naming, so the two cannot disagree
+// about which objective the run is waiting on.
+test('the mark the chart lights is the one the pointer row is naming', () => {
+    const loops = createRunState(LOOP_COURSE);
+    assert.equal(chartNext(loops), nextGate(loops));
+    assert.equal(chartNext(loops), 0, 'a course opens waiting on its first gate');
+
+    const route = createRunState(CARGO_RUN);
+    assert.equal(chartNext(route), 0);
+    recordLanding(route, { index: 0 });
+    assert.equal(chartNext(route), nextStrip(route), 'which moves on with the route');
+    assert.equal(chartNext(route), 1);
+
+    const search = createRunState(SEARCH_RESCUE);
+    assert.equal(chartNext(search), 0, 'a search has one marker and is waiting on it');
+    const marker = stageMarker(search);
+    recordRescue(search, marker, { x: marker.x, z: marker.z, speed: 0, airborne: false });
+    assert.equal(chartNext(search), -1, 'and is waiting on nothing once it is found');
+
+    for (const id of [RUNWAY_LANDING, DEAD_STICK]) {
+        assert.equal(chartNext(createRunState(id)), -1, `${id} lights nothing`);
+    }
+    assert.equal(chartNext(createRunState()), -1, 'and neither does a free flight');
 });
 
 // --- The glide a dead stick has to be flown on -----------------------------

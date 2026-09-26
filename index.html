@@ -200,9 +200,11 @@
         }
 
         /* The course being flown, laid on the chart the moment the stage is, so
-           the whole of it is on screen before the first gate is flown at. The
+           the whole of it is on screen before the first mark is flown at. A mark
+           is a gate on a loop course, a strip on a route, and the marker on a
+           search, because each of those is the thing its mode is flying to. The
            three readings are the hoops' own: amber still to fly, green for the
-           one the course is waiting on, and dim green for one already behind. */
+           one the run is waiting on, and dim green for one already behind. */
         #minimap-course-line {
             fill: none;
             stroke: rgba(255, 176, 0, 0.55);
@@ -210,14 +212,16 @@
             stroke-dasharray: 3 2;
         }
 
-        .minimap-gate       { fill: #ffb000; stroke: #000; stroke-width: 0.4; }
-        .minimap-gate.next  { fill: #00ff44; }
-        .minimap-gate.flown { fill: #2c5c3a; }
+        .minimap-mark       { fill: #ffb000; stroke: #000; stroke-width: 0.4; }
+        .minimap-mark.next  { fill: #00ff44; }
+        .minimap-mark.flown { fill: #2c5c3a; }
 
-        /* A gate past the edge of the square the chart covers is held at that
+        /* A mark past the edge of the square the chart covers is held at that
            edge, the way the aircraft marker is, and hollowed out so it is not
-           read as a gate standing on the ground shown. */
-        .minimap-gate.off-map { fill: none; stroke: #ffb000; stroke-width: 0.9; }
+           read as standing on the ground shown. A route's next strip and a
+           search's marker are usually miles out, so this is the ordinary
+           reading for those two rather than the exception it is on a course. */
+        .minimap-mark.off-map { fill: none; stroke: #ffb000; stroke-width: 0.9; }
 
         /* Off the map, the marker is held at the edge it left through, and says
            so rather than reading as a position inside the world. */
@@ -1150,8 +1154,9 @@
            takes what the card would need, in steps, so the room the card has
            falls as the screen grows rather than rising with it. Under that the
            row comes off, and the chart in the corner is left to say which way
-           the gate lies - which it is drawing already, held at its own edge
-           for a gate past the ground shown.
+           the objective lies - which it is drawing already, for every mode that
+           writes the row, held at its own edge for an objective past the ground
+           shown.
 
            674 was where the five rows fitted at their single line heights. The
            pointer is the row that wraps furthest - 37 pixels against the 22 it
@@ -1168,8 +1173,8 @@
            is a card whose rows wrap in a lane with nothing like the room for
            them. The pointer and the clock come off there for the same reasons
            they come off a phone held upright, and by the same order: the chart
-           is already saying which way the gate lies, and the clock is the row
-           the pilot is not being asked to do anything about. */
+           is already saying which way the objective lies, and the clock is the
+           row the pilot is not being asked to do anything about. */
         @media (max-height: 540px) and (min-width: 500px) and (max-width: 771px) {
             #game-mode.floated.pointing #game-mode-pointer,
             #game-mode.floated #game-mode-clock {

@@ -156,16 +156,23 @@ test('a turn is not a call for a different altitude', () => {
 // The hold is the aircraft's, taken on the press and let go where the pilot
 // asks for something else, rather than held for as long as the key is down.
 //
-// Every field the frame hands `heldAltitude` is asked for by name, and the span
-// in front of each is `[^}]*?` rather than the `[\s\S]*?` the source-matching
-// tests elsewhere in this folder use, so it cannot run past the call's own
-// closing brace. Today either bound would catch a deleted field, because each
-// of the three texts occurs once in js/aircraft.js. The difference is what
-// happens the day one of them is written a second time anywhere below this
-// call: a span free to reach the end of the file matches that second
-// occurrence and passes a field the call no longer has, while a span stopped
-// at the closing brace still fails. The bound is held against that day rather
-// than against anything the file carries now.
+// Three things have to hold and none of them can be run here, because
+// js/aircraft.js imports three and cannot be constructed in Node: the frame
+// asks `heldAltitude` for the right thing, the press is refused with no engine,
+// and an engine dying under a hold hands the aircraft back. So all three are
+// read out of the source, and the two refusals are read because deleting either
+// of them left the whole suite green.
+//
+// Every span in this test that matches the source is bounded with `[^}]*?`
+// rather than the `[\s\S]*?` the source-matching tests elsewhere in this folder
+// use, so none of them can run past the closing brace of the call it is
+// anchored on. Today either bound would catch a deleted line, because each of
+// the texts they look for occurs once in js/aircraft.js. The difference is what
+// happens the day one of them is written a second time anywhere below its own
+// call: a span free to reach the end of the file matches that second occurrence
+// and passes a call that no longer makes it, while a span stopped at the
+// closing brace still fails. The bound is held against that day rather than
+// against anything the file carries now.
 test('the aircraft holds the altitude it was levelled at', () => {
     assert.ok(/levelOff\(\)\s*\{/.test(aircraftSource),
         'js/aircraft.js should offer the level off as something it can be asked for');
@@ -173,8 +180,13 @@ test('the aircraft holds the altitude it was levelled at', () => {
         'and read it off the binding rather than a key written into the frame loop');
     assert.ok(aircraftSource.includes('wantsVerticalChange(this.input)'),
         'and let go of it where the pilot calls for a different vertical state');
-    assert.ok(/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/.test(aircraftSource),
+    assert.ok(/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/.test(aircraftSource),
         'the one press brings the nose to level as well as trimming the climb out');
+    assert.ok(/levelOff\(\)\s*\{[^}]*?if \(!this\.engine\) return false;/.test(aircraftSource),
+        'and is refused with no engine, so a glide cannot be trimmed to stop coming down');
+    assert.ok(/setEngine\([^)]*\)\s*\{[^}]*?if \(!this\.engine\) this\.endLevelOff\(\);/
+        .test(aircraftSource),
+        'and an engine dying under a hold already in force hands the aircraft back');
     assert.ok(/this\.position\.y = heldAltitude\(startY, this\.position\.y, \{/
         .test(aircraftSource),
         'the altitude held is the one the aircraft was at');

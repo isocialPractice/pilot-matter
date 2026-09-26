@@ -65,43 +65,53 @@ export function isOffMap(bounds, x, z) {
 }
 
 /**
- * A course of loops as the points it is drawn at on the face, in the order it
- * is flown, each carrying the gate it stands for and whether that gate lies
- * outside the square the map covers.
+ * A course as the points it is drawn at on the face, in the order it is flown,
+ * each carrying the number the run counts it by and whether it lies outside the
+ * square the map covers.
  *
- * A gate off the square is held at the edge it lies beyond rather than dropped,
+ * What a course is made of depends on the mode - the gates of a loop course,
+ * the strips of a route, the one marker of a search - and none of that reaches
+ * here. A mark is a place in the world with a number on it, which is all the
+ * chart needs to draw one.
+ *
+ * A mark off the square is held at the edge it lies beyond rather than dropped,
  * which is the convention the chart already reads by: the aircraft marker is
  * held the same way, and an edge-pinned mark means "that way, past the end of
  * this square" wherever it appears. Dropping it would leave a course that
  * vanishes the moment the flight crosses onto the next tile, which is exactly
- * when a pilot most wants to know which way the course ran.
+ * when a pilot most wants to know which way the course ran - and for a route or
+ * a search, whose objective is usually miles off the square, it would drop the
+ * only mark there is.
  */
-export function coursePoints(bounds, rings = [], size = MINIMAP_SIZE) {
-    return rings.map((ring, at) => ({
-        ...minimapPoint(bounds, ring.x, ring.z, size),
-        index: ring.index ?? at,
-        offMap: isOffMap(bounds, ring.x, ring.z)
+export function coursePoints(bounds, course = [], size = MINIMAP_SIZE) {
+    return course.map((mark, at) => ({
+        ...minimapPoint(bounds, mark.x, mark.z, size),
+        index: mark.index ?? at,
+        offMap: isOffMap(bounds, mark.x, mark.z)
     }));
 }
 
 /**
- * The polyline a course is drawn as: every gate's point, in order, as the
+ * The polyline a course is drawn as: every mark's point, in order, as the
  * `points` attribute an SVG reads. An empty course is an empty string, which
- * draws nothing.
+ * draws nothing, and so does a course of one mark - a search has nowhere to
+ * draw a line to.
  */
 export function courseLine(points = []) {
     return points.map(point => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
 }
 
 /**
- * How a gate on the chart is drawn, from where the course has got to: the ones
+ * How a mark on the chart is drawn, from where the course has got to: the ones
  * already behind the aircraft, the one it is waiting on, and the ones still to
  * come. The same three readings the hoops themselves are coloured in, so the
- * chart and the world agree about which gate is next.
+ * chart and the world agree about which gate is next - and a route's strips and
+ * a search's marker are read off the same three, so the chart says the same
+ * thing about an objective whatever kind of objective it is.
  */
-export const GATE_STATES = ['flown', 'next', 'ahead'];
+export const MARK_STATES = ['flown', 'next', 'ahead'];
 
-export function gateClass(at, next) {
+export function markClass(at, next) {
     if (next < 0 || at < next) return 'flown';
     return at === next ? 'next' : 'ahead';
 }
@@ -121,12 +131,12 @@ function fraction(value, low, high) {
 }
 
 // The namespace an SVG element has to be created in to be an SVG element: a
-// gate drawn with the ordinary document call is a well-formed tag the browser
+// mark drawn with the ordinary document call is a well-formed tag the browser
 // renders as nothing at all.
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// How big a gate is drawn on the face, in the face's own units.
-export const GATE_RADIUS = 2;
+// How big a mark is drawn on the face, in the face's own units.
+export const MARK_RADIUS = 2;
 
 export class Minimap {
     constructor(root, bounds = DEFAULT_BOUNDS) {
@@ -135,12 +145,12 @@ export class Minimap {
         this.bounds   = bounds;
 
         // The course being flown, drawn under the marker so the aircraft is
-        // never hidden behind a gate. A free flight has no course, and the
+        // never hidden behind a mark. A free flight has no course, and the
         // group stays empty.
-        this.course   = root.querySelector('#minimap-course');
+        this.group    = root.querySelector('#minimap-course');
         this.line     = root.querySelector('#minimap-course-line');
-        this.rings    = [];
-        this.gates    = [];
+        this.course   = [];
+        this.marks    = [];
         this.next     = -1;
     }
 
@@ -161,58 +171,58 @@ export class Minimap {
     /**
      * Puts a course on the chart. Called the moment a stage is laid out rather
      * than as it is flown, so the whole of it is on screen before the pilot has
-     * touched anything: the first gate is not the only one they have seen, and
+     * touched anything: the first mark is not the only one they have seen, and
      * which way the course runs is something to read rather than remember.
      *
      * A stage is a different course, not the same one somewhere else, so the
-     * gates are built again rather than moved.
+     * marks are built again rather than moved.
      */
-    setCourse(rings = []) {
-        this.rings = rings;
-        this.next  = -1;
+    setCourse(course = []) {
+        this.course = course;
+        this.next   = -1;
 
-        for (const gate of this.gates) gate.remove();
-        this.gates = rings.map(() => {
-            const gate = document.createElementNS(SVG_NS, 'circle');
-            gate.setAttribute('class', 'minimap-gate');
-            gate.setAttribute('r', GATE_RADIUS);
-            // Appended after the line, which the markup puts first, so a gate
+        for (const mark of this.marks) mark.remove();
+        this.marks = course.map(() => {
+            const mark = document.createElementNS(SVG_NS, 'circle');
+            mark.setAttribute('class', 'minimap-mark');
+            mark.setAttribute('r', MARK_RADIUS);
+            // Appended after the line, which the markup puts first, so a mark
             // sits on the course rather than under it.
-            this.course?.appendChild(gate);
-            return gate;
+            this.group?.appendChild(mark);
+            return mark;
         });
 
         this.drawCourse();
-        return this.gates.length;
+        return this.marks.length;
     }
 
     /**
-     * Marks the gate the course is waiting on, and everything either side of
-     * it. Called whenever the run moves, the same moment the hoops themselves
-     * are recoloured.
+     * Marks the one the course is waiting on, and everything either side of it.
+     * Called whenever the run moves, the same moment the hoops themselves are
+     * recoloured.
      */
     setNext(index) {
         this.next = index;
-        this.gates.forEach((gate, at) => {
-            const state = gateClass(at, index);
-            for (const name of GATE_STATES) gate.classList.toggle(name, name === state);
+        this.marks.forEach((mark, at) => {
+            const state = markClass(at, index);
+            for (const name of MARK_STATES) mark.classList.toggle(name, name === state);
         });
         return index;
     }
 
     /** Draws the course where the square the map now covers puts it. */
     drawCourse() {
-        if (!this.course) return 0;
+        if (!this.group) return 0;
 
-        const points = coursePoints(this.bounds, this.rings);
+        const points = coursePoints(this.bounds, this.course);
 
         this.line?.setAttribute('points', courseLine(points));
         points.forEach((point, at) => {
-            const gate = this.gates[at];
-            if (!gate) return;
-            gate.setAttribute('cx', point.x.toFixed(2));
-            gate.setAttribute('cy', point.y.toFixed(2));
-            gate.classList.toggle('off-map', point.offMap);
+            const mark = this.marks[at];
+            if (!mark) return;
+            mark.setAttribute('cx', point.x.toFixed(2));
+            mark.setAttribute('cy', point.y.toFixed(2));
+            mark.classList.toggle('off-map', point.offMap);
         });
 
         this.setNext(this.next);
