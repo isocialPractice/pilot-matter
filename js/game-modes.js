@@ -970,6 +970,61 @@ export function searchBriefing(state) {
     };
 }
 
+/**
+ * The marks the chart in the corner draws for a run: where the things it is
+ * flying to lie, in the order they are flown. A course's gates and a route's
+ * strips carry the number the run counts them by; a search's one marker is
+ * counted by nothing, so it carries no number and a chart reads it by its place
+ * in the list, which is what `coursePoints` falls back to.
+ *
+ * The card's pointer row is the same answer in words, and the two are built
+ * side by side here so they cannot drift apart. That matters beyond tidiness:
+ * a short screen takes the row off and gives the chart as the reason, so a mode
+ * whose objective the chart never drew lost its bearing altogether.
+ *
+ * A course is its gates, a route is the strips it lands at, and a search is the
+ * one marker it is looking for. Everything else draws nothing - a landing has
+ * its strip under the nose and a free flight has no objective at all, so
+ * neither has a bearing the chart is keeping from the pilot.
+ */
+export function chartCourse(state, world = {}) {
+    const mode = runningMode(state);
+    if (!mode) return [];
+
+    if (mode.objective === LOOP_OBJECTIVE) return world.course ?? [];
+
+    // Sliced to the strips the stage asks for rather than to the strips the
+    // world carries, and never reordered: `nextStrip` counts legs flown, so the
+    // mark it points at is found by position in this list.
+    if (mode.objective === CARGO_OBJECTIVE) return (world.runways ?? []).slice(0, stageStrips(state));
+
+    if (mode.objective === SEARCH_OBJECTIVE) {
+        const marker = stageMarker(state);
+        return marker ? [marker] : [];
+    }
+
+    return [];
+}
+
+/**
+ * Which of those marks the run is waiting on, so the chart lights the same one
+ * the card is naming. -1 is nothing outstanding, which draws every mark as
+ * flown.
+ *
+ * A search is the one mode that counts nothing: it has a single marker, so the
+ * mark it is waiting on is that marker until it is found and nothing after.
+ */
+export function chartNext(state) {
+    const mode = runningMode(state);
+    if (!mode) return -1;
+
+    if (mode.objective === LOOP_OBJECTIVE)   return nextGate(state);
+    if (mode.objective === CARGO_OBJECTIVE)  return nextStrip(state);
+    if (mode.objective === SEARCH_OBJECTIVE) return state.found ? -1 : 0;
+
+    return -1;
+}
+
 // --- The panel the modes are chosen from -----------------------------------
 
 export const GAME_MODES_TITLE = 'GAME MODES';

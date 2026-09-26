@@ -808,6 +808,7 @@ const pilot = createPilot({
         <tr><td><code>runObjective(state)</code>, <code>runStatus(state)</code></td><td>What to write on the screen</td></tr>
         <tr><td><code>runPointer(state, world, position, heading)</code></td><td>Where the thing it is waiting on lies</td></tr>
         <tr><td><code>gatePointer(...)</code>, <code>stripPointer(...)</code>, <code>searchBriefing(state)</code></td><td>The three <code>runPointer</code> dispatches to, one per objective</td></tr>
+        <tr><td><code>chartCourse(state, world)</code>, <code>chartNext(state)</code></td><td>The same answer as marks on a chart, and which one is next</td></tr>
         <tr><td><code>stageWorld(state)</code></td><td>The world the stage is flown over</td></tr>
         <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
         <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
@@ -904,6 +905,18 @@ function frame(dt) {
 
     if (found) say('found');
 }</code></pre>
+
+<h3 id="what-a-chart-draws-for-a-run">What a chart draws for a run</h3>
+
+<p><code>runPointer</code> is one line of text, and a host with a map instead of a status row wants the same answer as places. <code>chartCourse</code> gives it: the marks the run is flying to, in the order it flies them, each an <code>{x, z}</code> a chart can plot. A course is its gates and a route is the strips it lands at, and both carry the <code>index</code> the run counts them by; a search is the one marker it is looking for, which the run counts by nothing and which carries no index of its own, so a chart reads that one by its place in the list. A landing and a free flight are an empty array, having no objective standing off somewhere to be drawn. <code>chartNext</code> says which of those marks the run is waiting on, or <code>-1</code> for none, so the mark a chart lights is the one the pointer row is naming.</p>
+
+<p>The world it is handed is the same shape <code>runPointer</code> takes - <code>{course, runways}</code> - because the two answer one question and should not be able to disagree about it.</p>
+
+<pre><code>import { createRunState, CARGO_RUN, chartCourse, chartNext } from 'pilot-matter';
+
+const run = createRunState(CARGO_RUN);
+const marks = chartCourse(run, { runways });   // the strips, in landing order
+const lit = chartNext(run);                    // 0 - the leg it is flying now</code></pre>
 
 <h2 id="worlds-and-elements">Worlds and elements</h2>
 

@@ -808,6 +808,7 @@ read them as a worked example of a game built on the two APIs.
 | `runObjective(state)`, `runStatus(state)` | What to write on the screen |
 | `runPointer(state, world, position, heading)` | Where the thing it is waiting on lies |
 | `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | The three `runPointer` dispatches to, one per objective |
+| `chartCourse(state, world)`, `chartNext(state)` | The same answer as marks on a chart, and which one is next |
 | `stageWorld(state)` | The world the stage is flown over |
 | `stageStart(state, world)` | Where in it the flight opens |
 | `buildCourse(stage, options)` | The loops a course stage is flown through |
@@ -954,6 +955,31 @@ function frame(dt) {
 
     if (found) say('found');
 }
+```
+
+### What a chart draws for a run
+
+`runPointer` is one line of text, and a host with a map instead of a status row
+wants the same answer as places. `chartCourse` gives it: the marks the run is
+flying to, in the order it flies them, each an `{x, z}` a chart can plot. A
+course is its gates and a route is the strips it lands at, and both carry the
+`index` the run counts them by; a search is the one marker it is looking for,
+which the run counts by nothing and which carries no index of its own, so a
+chart reads that one by its place in the list. A landing and a free flight are
+an empty array, having no objective standing off somewhere to be drawn.
+`chartNext` says which of those marks the run is waiting on, or `-1` for none,
+so the mark a chart lights is the one the pointer row is naming.
+
+The world it is handed is the same shape `runPointer` takes -
+`{course, runways}` - because the two answer one question and should not be able
+to disagree about it.
+
+```javascript
+import { createRunState, CARGO_RUN, chartCourse, chartNext } from 'pilot-matter';
+
+const run = createRunState(CARGO_RUN);
+const marks = chartCourse(run, { runways });   // the strips, in landing order
+const lit = chartNext(run);                    // 0 - the leg it is flying now
 ```
 
 ## Worlds and elements
