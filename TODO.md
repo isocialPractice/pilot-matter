@@ -27,101 +27,71 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### UI/UX Override - the chart behind the pointer row
+### UI/UX Override - the chart the pointer row hands off to
 
 #### Found Issues
 
-- [ ] A short screen drops the objective's bearing with nothing left saying it
-  - **Issue**: Below 746 pixels of height on a narrow screen the objective card
-    drops its pointer row, and the `@media (max-width: 640px) and
-    (max-height: 745px)` rule in `index.html` gives its reason as "the chart in
-    the corner is left to say which way the gate lies - which it is drawing
-    already". The `@media (max-height: 540px) and (min-width: 500px) and
-    (max-width: 771px)` rule below it says the same. Measured in the running
-    app at 393x740, that holds for one of the three modes that write the row
-    and not the other two: `FLYING THROUGH LOOPS` draws three gates and the
-    course polyline with the next gate marked, while `CARGO RUN` and
-    `SEARCH AND RESCUE` draw no gates and an empty course line, leaving the
-    face, the grid, the `N` label and the aircraft marker - none of which says
-    where the objective is. The chart only ever gets a course: `js/main.js`
-    builds one under `mode?.objective === LOOP_OBJECTIVE` and hands every other
-    objective an empty array. So a route loses `LEG 1 · 234° · 8570 ft` and a
-    search loses `MARKER · 045° · 11810 ft` with no replacement, which the
-    comment over `runPointer` in `js/game-modes.js` argues against directly: "A
-    strip is not: it is a grey mark on grey country, several miles off, and a
-    pilot looking straight at one has no way of knowing it. So a route's
-    pointer stays up."
-  - **Goal**: Resolve to [pointer-row-short-screen-fallback.prompt.md](.claude/prompts/pointer-row-short-screen-fallback.prompt.md)
-  - From: UI/UX Override - the chart behind the pointer row
-- [ ] Nothing in the suite pins the two halves of the engine rule in `js/aircraft.js`
-  - **Issue**: `test/flight-model.test.js` sweeps `heldAltitude` and
-    `test/input-map.test.js` pins the three fields the frame hands it, so the
-    rule the frame applies is covered. The two paths that normally set the flag
-    are not. Deleting `if (!this.engine) return false;` from `levelOff` and
-    `if (!this.engine) this.endLevelOff();` from `setEngine` was tried this run:
-    `npm test` reported 1033 of 1033 passing with both gone, the same count as
-    before they were removed. The first puts the level off's own refusal back
-    to what it was before the fix, and the second lets `isHoldingAltitude` keep
-    reporting a trim the frame has already stopped honouring. Both were
-    verified in the browser this run because `js/aircraft.js` imports `three`
-    and cannot be constructed in Node, so a regression in either would reach a
-    release with nothing in the suite to catch it.
-  - **Goal**: Add two assertions to the existing `the aircraft holds the
-    altitude it was levelled at` test in `test/input-map.test.js`, in the
-    `aircraftSource` idiom the rest of that test already uses and with the same
-    `[^}]*?` bound so neither span can run past its own method: one that
-    `levelOff` refuses without an engine, and one that `setEngine` ends the
-    level off when it is handed a dead one.
-  - From: UI/UX Override - the chart behind the pointer row
-- [ ] The hold test's own levelling span is unbounded against the reason written
-  above it
-  - **Issue**: `test/input-map.test.js:176` matches
-    `/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/`, the one source-matching
-    span in that test still free to run to the end of the file. The comment at
-    156-168 says the three `heldAltitude` spans below it are bounded with
-    `[^}]*?` "rather than the `[\s\S]*?` the source-matching tests elsewhere in
-    this folder use", and gives the reason as the day a matched text is written
-    a second time below the call. That span is open to the same day and sits
-    four lines under the reason: anchored on `levelOff() {` at
-    `js/aircraft.js:506` it searches to the end of the file for
-    `this.levelling = {`, which occurs once after the anchor today, at line 510
-    inside `levelOff`. Delete line 510 and write `this.levelling = {` anywhere
-    below it and the assertion passes on the second occurrence while `levelOff`
-    no longer brings the nose to level - `endLevelOff` at 519 and the frame loop
-    at 357-360 already assign `this.levelling`, so an edit reseeding the ease is
-    the plausible one. `levelOff` holds no `}` between its opening brace and
-    line 510, so the same bound fits without changing what the assertion matches
-    now. As written the comment's "elsewhere in this folder" also reads as though
-    this file were uniformly bounded, which the span four lines down contradicts
-  - **Goal**: Bound that span the way the three below it are bounded,
-    `/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/`, and widen the comment's
-    second paragraph so it speaks for every source-matching span in the test
-    rather than only the three the frame hands `heldAltitude`. `npm test` should
-    still report 1033 passing
-  - From: UI/UX Override - the chart behind the pointer row
-
-#### Resolve Issues
-
-- [ ] Bounded Span Reason 1
-  - **Issue**: The `CHANGELOG.md` entry written for the reworded comment ends
-    "this is the only account in the repository of why this test bounds its
-    spans where the source-matching tests elsewhere in `test/` do not". The same
-    file contradicts that thirty lines above, where the third `### Fixed` entry
-    under `## Unreleased` already gives the account: "all three spans are
-    bounded to the call's own braces with `[^}]*?` rather than running to the end
-    of the file with `[\s\S]*?` - an unbounded span passes a field deleted from
-    the call as soon as the same text appears anywhere below it". The new entry
-    cites that very sentence as "the conditional the entry above already used",
-    so one entry both points at the earlier account and denies it exists. The
-    comment in `test/input-map.test.js` claims nothing of the kind and is correct
-    as written; only the changelog overstates, which is the class of defect this
-    item existed to remove
-  - **Goal**: Narrow the clause in the `### Changed` entry to what holds - the
-    comment is the only account a reader of the test finds, the changelog being
-    the record of the change rather than something the test carries - or drop the
-    clause and keep the sentence saying why the comment stays a reason. Leave the
-    `### Fixed` entry as it is
-  - From: Code Review Override - the reason written for the bounded span
+- [ ] A mark held at the edge of the chart keeps none of its three readings
+  - **Issue**: `.minimap-mark.off-map` in `index.html` carries the same
+    specificity as `.minimap-mark.next` and `.minimap-mark.flown` and is
+    written after both, so it wins outright: a mark held at the edge of the
+    square is drawn `fill: none; stroke: #ffb000; stroke-width: 0.9`
+    whichever of the three readings it carries. `markClass` in `js/minimap.js`
+    still puts the right class on the element; nothing on the glass says which.
+    That cost nothing while the chart drew only a loop course, whose gates are
+    laid inside the tile they are flown over, and costs something now that a
+    route's strips are drawn on the same terms - as the comment above the rule
+    says in as many words. Measured in the running app at 393x740 and 640x745
+    with the pointer row stood down: `CARGO RUN` / `SHORT HAUL` opens at
+    (-8675, 1626), 675 units the wrong side of the tile boundary at x = -8000,
+    with both its strips in the tile east of it, so both are held at the edge
+    at -50,0.87 and -50,-35.18 and both read `fill: none`,
+    `stroke: rgb(255, 176, 0)`, `stroke-width: 0.9px` - the leg being flown and
+    the leg still ahead identical. Hands off that lasts 7.5 seconds, until the
+    aircraft crosses into the tile the strips are in and the marks read green
+    and amber correctly. `LONG HAUL` opens 301 units the wrong side of
+    x = 8000 and does the same for a shorter beat. A search is untouched in
+    substance: it draws one mark, so there is nothing to tell apart.
+  - **Goal**: Resolve to [edge-held-mark-readings.prompt.md](.claude/prompts/edge-held-mark-readings.prompt.md)
+  - From: UI/UX Override - the chart the pointer row hands off to
+- [ ] The pages written for the chart describe a held mark keeping a reading it
+  gives up
+  - **Issue**: Both paragraphs added to `docs/controls/game-modes.html` this run
+    compose "marked green" with "held hollow at the edge", which the stylesheet
+    the item above describes makes mutually exclusive. The route paragraph has a
+    route drawn "with the leg you are flying marked green and the ones behind
+    you dim, with a strip past the edge of the square held hollow at that edge";
+    the search paragraph has the marker "green the way a gate being waited on
+    is, and held hollow at the edge of the square once it lies past the ground
+    the chart covers - which on a long leg is most of the flight". As shipped a
+    held mark is amber whichever reading it carries, so on the very case each
+    paragraph names as the ordinary one - `CARGO RUN` / `SHORT HAUL` for its
+    first 7.5 seconds, a search for most of a long leg - the published page
+    names a colour the glass never shows. `docs/controls/instruments.html` puts
+    the three readings and the hollow edge in consecutive sentences and reads
+    the same way without claiming it outright.
+  - **Goal**: Work this with the item above rather than apart from it, since the
+    two answers are one decision. If the stroke is made to carry the reading as
+    that item's prompt proposes, all three paragraphs are true as written and
+    none needs touching - say so. If the decision goes the other way, qualify
+    each to say a held mark gives its reading up for the hollow edge.
+  - From: UI/UX Override - the chart the pointer row hands off to
+- [ ] The chart test keeps the vocabulary the rename took out of everything
+  around it
+  - **Issue**: `test/minimap.test.js` was moved from gate to mark throughout
+    this run except in `a chart fitted to new ground draws the course against
+    that ground` at 295-310, whose comment still reads "puts every gate
+    somewhere else on the face", whose locals are `gates` and `gate` against the
+    `marks` and `mark` the tests either side of it now use, and whose message
+    still says "the gate being waited on" for a course that may now be a route's
+    strips. Nothing fails; the file says both words for one thing. In the same
+    file the new seam test writes `const [body] = [method[1]];` at 347, an array
+    built and destructured in place to bind the one value `const body =
+    method[1]` binds directly.
+  - **Goal**: Finish the rename in that test - its comment, its locals and its
+    message - and bind `body` directly. `npm test` should still report 1038
+    passing.
+  - From: UI/UX Override - the chart the pointer row hands off to
 
 ## Game UI/UX
 
@@ -368,85 +338,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 127 earlier items in `TODO-archive.md`, newest last.
+> 131 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Glide Climb 1
-  - **Issue**: A dead stick gains height when the nose is held up. From the
-    settled glide at 4153 ft and 130 kt, holding `W` and touching nothing else
-    puts the aircraft at 4302 ft - 151 ft of climb on no engine, with V/S
-    reading positive for nine frames at up to +6520 ft/min. Entered from a dive
-    it is far larger: nose down for two seconds, then nose up, climbs 2150 ft
-    at up to +29600 ft/min and finishes 297 ft above where the dive began.
-    `glideDescent(pitch)` itself is sound - swept across the whole attitude
-    range in the browser it never comes out negative - but it describes the
-    settled pair, and `js/aircraft.js` converges airspeed at `GLIDE_ACCEL` and
-    `GLIDE_DECEL` while the nose moves at the control rate, so the aircraft
-    spends seconds at an attitude its speed has not caught up with. At the
-    speed a settled glide holds, any nose-up past about -0.19 radians climbs.
-  - **Goal**: Resolve to [glide-climb.prompt.md](.claude/prompts/glide-climb.prompt.md)
-  - From: Game Modes UI/UX `->` New Game Modes
-- [x] **Pointer Wrap**: The objective card's pointer row wraps to two lines at
-      260 pixels
-  - **Issue**: On a phone held upright the card is drawn at its `min-width` of
-    260 and the pointer row has 218 pixels to write in, which `↑ LEG 1  ·
-    234°  ·  8560 ft` and `MARKER  ·  045°  ·  11810 ft` both run past. Both
-    wrap to two lines, 30 pixels against the 37 the stylesheet declares for
-    them. Nothing is clipped and nothing is written off the side - measured at
-    320x800 and 393x852, and the row is one line at 852x330 where the card has
-    369 - so the card is doing what `index.html` says it does, and this
-    predates the three new modes: a `LOOP` pointer is the same length. The
-    verification request asks for a row that is neither clipped nor wrapped at
-    260, and the stylesheet deliberately budgets for the wrap, so the two
-    disagree about what correct is.
-  - **Goal**: Decide which of the two holds. Either accept the wrap and say so
-    where the row is specified, or shorten what the row writes at that width -
-    dropping the bearing's leading zero, the distance's unit, or the label to
-    its number - so it fits 218 pixels on one line. Do not widen the card:
-    `min-width: 260px` at `left: 50%` is what keeps it on a 320 screen at all.
-  - From: UI/UX Override - the three new game modes
-- [x] The Game modes API page mis-describes the row it added and mis-reports
-      the strip in the example under it
-  - **Issue**: Two defects in the section `1.18.0-alpha` added, in
-    `docs/api.md` and the `docs/api-reference.html` generated beside it. The
-    table row at `docs/api.md:810` and `docs/api-reference.html:810` reads
-    "The three that answers with", which is not a sentence and does not say
-    what the three answer with - the row above it, `runPointer`, is the one
-    that has the description. And the route example at `docs/api.md:921` and
-    `docs/api-reference.html:883` says `down at strip` followed by
-    `nextStrip(run)`, inside `if (recordLanding(run, runway))` - which names
-    the wrong strip every time, because `recordLanding` increments
-    `state.leg` before it returns, so `nextStrip` is already pointing at the
-    next stop. A two-strip route logs "down at strip 1" for the arrival at
-    strip 0, and "down at strip -1" for the one that finishes it.
-  - **Goal**: Give the pointer row a description that says what the three
-    answer with - they are the three `runPointer` dispatches to, one per
-    objective - and read the strip in the example before the landing is
-    recorded rather than after it, or name it from the `runway` argument the
-    handler was already given. Both files carry the same text and both need
-    it; `docs/api-reference.html` is the published page.
-  - From: Code Review Override - what the new modes were written down as
-- [x] The glide guarantee is written down without the qualifier that makes it
-      true
-  - **Issue**: `CHANGELOG.md:35` says "there is no attitude in the range the
-    aircraft clamps its pitch to that holds height on no engine", and
-    `docs/flight-model.html:123` says "there is no attitude that holds height
-    on no engine, which is the one way a dead stick could quietly stop being
-    one". Both are true of `glideDescent(pitch)`, which the suite sweeps, and
-    both are false of the aircraft the release ships: **Glide Climb 1** above
-    measures 151 ft of climb from a settled glide and 2150 ft entered from a
-    dive. `glideDescent` describes the settled pair, and `js/aircraft.js`
-    converges airspeed at `GLIDE_ACCEL` and `GLIDE_DECEL` while the nose moves
-    at the control rate, so the aircraft spends seconds at an attitude its
-    speed has not caught up with - which is the gap neither sentence allows
-    for. A reader of either is told the mode cannot do the thing it does.
-  - **Goal**: Work this with **Glide Climb 1** rather than apart from it, since
-    the two answers are one decision. If the glide is made a descent in the
-    unsettled case too, both sentences become true and neither needs touching -
-    say so. If it is not, qualify both to the settled glide the pure pair
-    describes, and say what the aircraft does on the way to it. Do not leave
-    them as they are: this is the shape of the `1.17.2-alpha` entry that was
-    reopened for claiming what its release did not carry.
-  - From: Code Review Override - what the new modes were written down as
 - [x] **User todo**: force-add `.gitignore`, or narrow the global rule that
   hides it, so the repository's own ignore rules reach a clone
   - **Issue**: The file exists in the working copy and nothing tracks it.
@@ -581,4 +474,92 @@ how the simulator got here rather than as a list still to be worked.
     `[^}]*?` where the other nineteen source-matching spans across `test/`
     use `[\s\S]*?`, so it is what a later reader weighs before keeping or
     reverting the divergence.
+  - From: Code Review Override - the reason written for the bounded span
+- [x] A short screen drops the objective's bearing with nothing left saying it
+  - **Issue**: Below 746 pixels of height on a narrow screen the objective card
+    drops its pointer row, and the `@media (max-width: 640px) and
+    (max-height: 745px)` rule in `index.html` gives its reason as "the chart in
+    the corner is left to say which way the gate lies - which it is drawing
+    already". The `@media (max-height: 540px) and (min-width: 500px) and
+    (max-width: 771px)` rule below it says the same. Measured in the running
+    app at 393x740, that holds for one of the three modes that write the row
+    and not the other two: `FLYING THROUGH LOOPS` draws three gates and the
+    course polyline with the next gate marked, while `CARGO RUN` and
+    `SEARCH AND RESCUE` draw no gates and an empty course line, leaving the
+    face, the grid, the `N` label and the aircraft marker - none of which says
+    where the objective is. The chart only ever gets a course: `js/main.js`
+    builds one under `mode?.objective === LOOP_OBJECTIVE` and hands every other
+    objective an empty array. So a route loses `LEG 1 · 234° · 8570 ft` and a
+    search loses `MARKER · 045° · 11810 ft` with no replacement, which the
+    comment over `runPointer` in `js/game-modes.js` argues against directly: "A
+    strip is not: it is a grey mark on grey country, several miles off, and a
+    pilot looking straight at one has no way of knowing it. So a route's
+    pointer stays up."
+  - **Goal**: Resolve to [pointer-row-short-screen-fallback.prompt.md](.claude/prompts/pointer-row-short-screen-fallback.prompt.md)
+  - From: UI/UX Override - the chart behind the pointer row
+- [x] Nothing in the suite pins the two halves of the engine rule in `js/aircraft.js`
+  - **Issue**: `test/flight-model.test.js` sweeps `heldAltitude` and
+    `test/input-map.test.js` pins the three fields the frame hands it, so the
+    rule the frame applies is covered. The two paths that normally set the flag
+    are not. Deleting `if (!this.engine) return false;` from `levelOff` and
+    `if (!this.engine) this.endLevelOff();` from `setEngine` was tried this run:
+    `npm test` reported 1033 of 1033 passing with both gone, the same count as
+    before they were removed. The first puts the level off's own refusal back
+    to what it was before the fix, and the second lets `isHoldingAltitude` keep
+    reporting a trim the frame has already stopped honouring. Both were
+    verified in the browser this run because `js/aircraft.js` imports `three`
+    and cannot be constructed in Node, so a regression in either would reach a
+    release with nothing in the suite to catch it.
+  - **Goal**: Add two assertions to the existing `the aircraft holds the
+    altitude it was levelled at` test in `test/input-map.test.js`, in the
+    `aircraftSource` idiom the rest of that test already uses and with the same
+    `[^}]*?` bound so neither span can run past its own method: one that
+    `levelOff` refuses without an engine, and one that `setEngine` ends the
+    level off when it is handed a dead one.
+  - From: UI/UX Override - the chart behind the pointer row
+- [x] The hold test's own levelling span is unbounded against the reason written
+  above it
+  - **Issue**: `test/input-map.test.js:176` matches
+    `/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/`, the one source-matching
+    span in that test still free to run to the end of the file. The comment at
+    156-168 says the three `heldAltitude` spans below it are bounded with
+    `[^}]*?` "rather than the `[\s\S]*?` the source-matching tests elsewhere in
+    this folder use", and gives the reason as the day a matched text is written
+    a second time below the call. That span is open to the same day and sits
+    four lines under the reason: anchored on `levelOff() {` at
+    `js/aircraft.js:506` it searches to the end of the file for
+    `this.levelling = {`, which occurs once after the anchor today, at line 510
+    inside `levelOff`. Delete line 510 and write `this.levelling = {` anywhere
+    below it and the assertion passes on the second occurrence while `levelOff`
+    no longer brings the nose to level - `endLevelOff` at 519 and the frame loop
+    at 357-360 already assign `this.levelling`, so an edit reseeding the ease is
+    the plausible one. `levelOff` holds no `}` between its opening brace and
+    line 510, so the same bound fits without changing what the assertion matches
+    now. As written the comment's "elsewhere in this folder" also reads as though
+    this file were uniformly bounded, which the span four lines down contradicts
+  - **Goal**: Bound that span the way the three below it are bounded,
+    `/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/`, and widen the comment's
+    second paragraph so it speaks for every source-matching span in the test
+    rather than only the three the frame hands `heldAltitude`. `npm test` should
+    still report 1033 passing
+  - From: UI/UX Override - the chart behind the pointer row
+- [x] Bounded Span Reason 1
+  - **Issue**: The `CHANGELOG.md` entry written for the reworded comment ends
+    "this is the only account in the repository of why this test bounds its
+    spans where the source-matching tests elsewhere in `test/` do not". The same
+    file contradicts that thirty lines above, where the third `### Fixed` entry
+    under `## Unreleased` already gives the account: "all three spans are
+    bounded to the call's own braces with `[^}]*?` rather than running to the end
+    of the file with `[\s\S]*?` - an unbounded span passes a field deleted from
+    the call as soon as the same text appears anywhere below it". The new entry
+    cites that very sentence as "the conditional the entry above already used",
+    so one entry both points at the earlier account and denies it exists. The
+    comment in `test/input-map.test.js` claims nothing of the kind and is correct
+    as written; only the changelog overstates, which is the class of defect this
+    item existed to remove
+  - **Goal**: Narrow the clause in the `### Changed` entry to what holds - the
+    comment is the only account a reader of the test finds, the changelog being
+    the record of the change rather than something the test carries - or drop the
+    clause and keep the sentence saying why the comment stays a reason. Leave the
+    `### Fixed` entry as it is
   - From: Code Review Override - the reason written for the bounded span
