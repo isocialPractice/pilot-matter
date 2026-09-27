@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1-alpha] - 2026-09-27
+
+A mark held at the edge of the chart says which leg it is again. `1.19.0-alpha`
+handed the chart a route's strips and a search's marker, and both are ordinarily
+off the square the chart covers rather than inside it - which is where the three
+readings the chart draws in were being thrown away. A route opening a tile
+boundary away from its own strips drew the leg being flown and the leg still
+ahead identically, so the chart the pointer row hands off to on a short screen
+gave a bearing with no leg attached to it.
+
+### Fixed
+
+- **A mark held at the edge of the chart keeps its reading.**
+  `.minimap-mark.off-map` in `index.html` hollows a held mark out, which is what
+  says it stands past the ground the chart covers - and it carried the same
+  specificity as `.minimap-mark.next` and `.minimap-mark.flown` while being
+  written after both, so it won outright and a held mark drew
+  `fill: none; stroke: #ffb000` whichever of the three readings it carried.
+  `markClass` in `js/minimap.js` was setting the class correctly throughout;
+  nothing on the glass was reading it. The stroke now carries what the fill
+  carries inside the square, in `.minimap-mark.next.off-map` and
+  `.minimap-mark.flown.off-map` - three classes to the base rule's two, so they
+  win on specificity with the order untouched, and the hollow fill and wider
+  stroke go on saying what they said. On `CARGO RUN` / `SHORT HAUL`, which opens
+  675 units the wrong side of a tile boundary from both its strips, that was
+  7.5 seconds of a stage with the two legs indistinguishable; a search draws one
+  mark and had nothing to tell apart
+
+### Changed
+
+- **The chart test that fits the course to new ground says mark rather than
+  gate.** `a chart fitted to new ground draws the course against that ground` in
+  `test/minimap.test.js` kept gate where the test immediately above it had been
+  moved to mark: its comment, its `gates` and `gate` locals and its assertion
+  message all still said gate for a course that may now be a route's strips or a
+  search's marker. The four tests above it that cover `coursePoints` and
+  `courseLine` still say gate, in all four names, a comment, a local and an
+  assertion message, so the rename is not finished and the file still says both
+  words for one thing. The seam tests below it are not part of that: they say
+  gate where a gate is what is meant, for `nextGate` and the hoops a loop course
+  lights. The seam test beside it also built and destructured a single-element
+  array to bind one value, which is now bound directly
+
 ## [1.19.0-alpha] - 2026-09-26
 
 The chart in the corner draws what the run is flying to, whatever the run is.
