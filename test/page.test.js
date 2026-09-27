@@ -633,6 +633,33 @@ test('a mark on the chart is the colour the hoop it stands for is', () => {
 });
 
 /**
+ * A mark past the edge of the square is hollowed out, so the fill the reading
+ * above is carried by is gone and the stroke has to carry it instead. That is
+ * the ordinary reading for a route, whose strips are commonly all held at once:
+ * flattened, the leg being flown and the leg still ahead draw identically, and
+ * the chart gives a bearing with no leg attached to it.
+ */
+test('a mark held at the edge of the chart keeps the colour of the hoop it stands for', () => {
+    const rings = readFileSync(fileURLToPath(new URL('../js/rings.js', import.meta.url)), 'utf8');
+    const hex = (name) => rings.match(new RegExp(`${name}\\s*=\\s*0x([0-9a-fA-F]{6})`))?.[1];
+
+    const readings = [
+        ['.minimap-mark.next.off-map',  'RING_NEXT_COLOR'],
+        ['.minimap-mark.flown.off-map', 'RING_DONE_COLOR']
+    ];
+
+    for (const [selector, name] of readings) {
+        const color = hex(name);
+        assert.ok(color, `js/rings.js should name ${name}`);
+        assert.ok(styled(indexHtml, selector, new RegExp(`stroke:\\s*#${color}`, 'i')),
+            `${selector} should be stroked in ${name}, the reading the fill carries inside the square`);
+    }
+
+    assert.ok(styled(indexHtml, '.minimap-mark.off-map', /fill:\s*none/),
+        'a held mark should stay hollow, which is what says it is past the edge');
+});
+
+/**
  * The approach marks are boxes turned about the vertical until they lie across
  * the strip, and which way to turn them is a compass question: the renderer
  * turns a model by `headingToYaw`, and a bearing in plain radians is the mirror

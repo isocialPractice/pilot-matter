@@ -293,7 +293,7 @@ test('the mark the course is waiting on is lit, on the chart as in the world', (
 });
 
 // The chart is fitted to the tile being flown over, so crossing onto the next
-// one puts every gate somewhere else on the face.
+// one puts every mark somewhere else on the face.
 test('a chart fitted to new ground draws the course against that ground', () => {
     const root = fakeChart();
     const map = new Minimap(root, BOUNDS);
@@ -302,11 +302,11 @@ test('a chart fitted to new ground draws the course against that ground', () => 
     map.setNext(1);
     map.setBounds({ minX: 8000, maxX: 24000, minZ: 8000, maxZ: 24000 });
 
-    const gates = root.parts.get('#minimap-course').children;
-    assert.ok(gates.every(gate => gate.classes.has('off-map')),
+    const marks = root.parts.get('#minimap-course').children;
+    assert.ok(marks.every(mark => mark.classes.has('off-map')),
         'the whole course is behind the aircraft now');
-    assert.ok(gates.some(gate => gate.classes.has('next')),
-        'and the gate being waited on is still marked as the one being waited on');
+    assert.ok(marks.some(mark => mark.classes.has('next')),
+        'and the mark being waited on is still marked as the one being waited on');
 });
 
 // --- The seam between the run and the chart --------------------------------
@@ -344,7 +344,7 @@ test('the chart lights the mark the run is waiting on, and the hoops their gate'
     const method = mainSource.match(/^ {4}syncObjective\(\)\s*\{([\s\S]*?)^ {4}\}/m);
     assert.ok(method, 'js/main.js should still write the objective card in one place');
 
-    const [body] = [method[1]];
+    const body = method[1];
     assert.ok(/this\.hud\.setNextMark\(chartNext\(this\.run\)\)/.test(body),
         'the chart is lit from what the run is waiting on, which is not always a gate');
     assert.ok(!/setNextMark\(nextGate\(/.test(body),

@@ -220,8 +220,15 @@
            edge, the way the aircraft marker is, and hollowed out so it is not
            read as standing on the ground shown. A route's next strip and a
            search's marker are usually miles out, so this is the ordinary
-           reading for those two rather than the exception it is on a course. */
-        .minimap-mark.off-map { fill: none; stroke: #ffb000; stroke-width: 0.9; }
+           reading for those two rather than the exception it is on a course.
+           Hollowed out, it keeps its reading: the stroke carries what the fill
+           carried inside the square, because a route's strips are ordinarily
+           all held at once and a pilot who cannot tell them apart has a
+           bearing but no leg. Three classes beat two, so these win on
+           specificity without the order being touched. */
+        .minimap-mark.off-map       { fill: none; stroke: #ffb000; stroke-width: 0.9; }
+        .minimap-mark.next.off-map  { stroke: #00ff44; }
+        .minimap-mark.flown.off-map { stroke: #2c5c3a; }
 
         /* Off the map, the marker is held at the edge it left through, and says
            so rather than reading as a position inside the world. */

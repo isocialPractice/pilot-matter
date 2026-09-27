@@ -1263,3 +1263,73 @@ still be found by name.
     them as they are: this is the shape of the `1.17.2-alpha` entry that was
     reopened for claiming what its release did not carry.
   - From: Code Review Override - what the new modes were written down as
+
+## Archived 09-27-26
+
+- [x] **User todo**: force-add `.gitignore`, or narrow the global rule that
+  hides it, so the repository's own ignore rules reach a clone
+  - **Issue**: The file exists in the working copy and nothing tracks it.
+    `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
+    it "exists on disk, but not in 'HEAD'", and `git check-ignore -v .gitignore`
+    answers with a `.gitignore` rule in a personal global ignore file, so it has
+    never been staged and cannot be by an ordinary `git add`. Nothing in the
+    repository therefore carries `test-results/`, `user-scripts/`, or the
+    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all. It
+    reaches the deploy too - `actions/checkout` in
+    `.github/workflows/workflow.yml` fetches a tree without the file, and the
+    workflow runs `npm test` against it, so the guard in `test/site.test.js`
+    skips itself there rather than failing the deploy for a thing the deploy
+    cannot fix.
+  - **Goal**: Either force-add the file once with `git add -f .gitignore`, or
+    narrow the rule excluding it in the global ignore file so this repository's
+    copy stops being caught by it. Both are the user's call, which is why this
+    is a user item and no run attempts it: what excludes the file is the user's
+    own global configuration rather than anything this repository owns.
+    `.nojekyll` is tracked here under that same global rule, so force-adding a
+    dotfile is a route this repository has already taken once.
+  - Once it is tracked, the other half is ordinary work a run can take: drop the
+    stand-down branch at the top of the `test/site.test.js` check so the guard
+    applies on every tree, and say in that run's changelog entry that the rules
+    now reach a clone. Queue that only after the file is tracked - until then it
+    has nothing to apply to.
+  - From: Current
+- [x] The cheatsheet's glide paragraph was edited without being rewrapped
+  - **Issue**: `CHEATSHEET.md:207` runs to 96 characters inside a paragraph
+    whose other lines wrap at about 75. The sentence `1.18.1-alpha` replaced
+    was rewritten in place and the text after it was left where it sat, so one
+    line of the paragraph is a third longer than the lines above and below it.
+    Nothing reads wrong - `docs/cheatsheet.html` carries the same prose as one
+    line per paragraph, which is why the suite did not notice.
+  - **Goal**: Rewrap the paragraph at `CHEATSHEET.md:203-208` to the width the
+    rest of the file uses, changing line breaks and nothing else.
+  - From: Code Review Override - the dead stick's vertical, and what was written about it
+- [x] Glide Climb 2
+  - **Issue**: A dead stick still does not always come down. `Space` is the
+    level off, and `levelOff` in `js/aircraft.js:487` does not read
+    `this.engine`, so pressing it once on a dead engine sets `holdingAltitude`
+    and `js/aircraft.js:406` writes `this.position.y = startY` on every frame
+    after it - which throws away the `glideDescentAt` the line above it just
+    worked out. Start `DEAD STICK`, press `Space` while airborne, and touch
+    nothing else: the altitude never falls, `V/S` reads `0 ft/min` because it
+    is measured from the same two altitudes, and the stage never ends. Only
+    `pitchUp`, `pitchDown`, `throttleUp` and `throttleDown` end the hold
+    (`VERTICAL_CONTROLS` in `js/input-map.js:26`), so roll and yaw steer the
+    aircraft to the strip at a fixed height with nothing pulling it.
+    **The hold predates this release and is not what `1.18.1-alpha` broke.**
+    What `1.18.1-alpha` did is declare the case closed: `js/flight-model.js`
+    now says "no pair the aircraft can be in comes out climbing",
+    `docs/controls/game-modes.html:189` says "the one thing that holds height
+    is speed rather than attitude", and `CHANGELOG.md:58` names "the one case
+    that does hold height". The trim hold is a second case, and all three
+    sentences say there is not one.
+  - **Goal**: Decide what the level off means with no engine, then make the
+    three sentences above say it. Refusing the hold in `levelOff` while
+    `this.engine` is false is the smaller of the two answers and keeps the
+    mode's promise; letting it stand and qualifying the prose is the other,
+    and needs saying why a glide can be trimmed to hold height. Whichever is
+    taken, `js/aircraft.js` is not testable in Node - there is no `three` to
+    import - so the check belongs where `glideDescentAt` is checked: a pure
+    function the frame calls, swept the way the plane is swept now, rather
+    than another regex over the source. Record the fix under an `Unreleased`
+    heading in `CHANGELOG.md`, since `1.18.1-alpha` is cut.
+  - From: Game Modes UI/UX `->` New Game Modes
