@@ -27,71 +27,82 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### UI/UX Override - the chart the pointer row hands off to
+### Code Review Override - the held mark's reading and the rename left half done
 
-#### Found Issues
-
-- [ ] A mark held at the edge of the chart keeps none of its three readings
-  - **Issue**: `.minimap-mark.off-map` in `index.html` carries the same
-    specificity as `.minimap-mark.next` and `.minimap-mark.flown` and is
-    written after both, so it wins outright: a mark held at the edge of the
-    square is drawn `fill: none; stroke: #ffb000; stroke-width: 0.9`
-    whichever of the three readings it carries. `markClass` in `js/minimap.js`
-    still puts the right class on the element; nothing on the glass says which.
-    That cost nothing while the chart drew only a loop course, whose gates are
-    laid inside the tile they are flown over, and costs something now that a
-    route's strips are drawn on the same terms - as the comment above the rule
-    says in as many words. Measured in the running app at 393x740 and 640x745
-    with the pointer row stood down: `CARGO RUN` / `SHORT HAUL` opens at
-    (-8675, 1626), 675 units the wrong side of the tile boundary at x = -8000,
-    with both its strips in the tile east of it, so both are held at the edge
-    at -50,0.87 and -50,-35.18 and both read `fill: none`,
-    `stroke: rgb(255, 176, 0)`, `stroke-width: 0.9px` - the leg being flown and
-    the leg still ahead identical. Hands off that lasts 7.5 seconds, until the
-    aircraft crosses into the tile the strips are in and the marks read green
-    and amber correctly. `LONG HAUL` opens 301 units the wrong side of
-    x = 8000 and does the same for a shorter beat. A search is untouched in
-    substance: it draws one mark, so there is nothing to tell apart.
-  - **Goal**: Resolve to [edge-held-mark-readings.prompt.md](.claude/prompts/edge-held-mark-readings.prompt.md)
-  - From: UI/UX Override - the chart the pointer row hands off to
-- [ ] The pages written for the chart describe a held mark keeping a reading it
-  gives up
-  - **Issue**: Both paragraphs added to `docs/controls/game-modes.html` this run
-    compose "marked green" with "held hollow at the edge", which the stylesheet
-    the item above describes makes mutually exclusive. The route paragraph has a
-    route drawn "with the leg you are flying marked green and the ones behind
-    you dim, with a strip past the edge of the square held hollow at that edge";
-    the search paragraph has the marker "green the way a gate being waited on
-    is, and held hollow at the edge of the square once it lies past the ground
-    the chart covers - which on a long leg is most of the flight". As shipped a
-    held mark is amber whichever reading it carries, so on the very case each
-    paragraph names as the ordinary one - `CARGO RUN` / `SHORT HAUL` for its
-    first 7.5 seconds, a search for most of a long leg - the published page
-    names a colour the glass never shows. `docs/controls/instruments.html` puts
-    the three readings and the hollow edge in consecutive sentences and reads
-    the same way without claiming it outright.
-  - **Goal**: Work this with the item above rather than apart from it, since the
-    two answers are one decision. If the stroke is made to carry the reading as
-    that item's prompt proposes, all three paragraphs are true as written and
-    none needs touching - say so. If the decision goes the other way, qualify
-    each to say a held mark gives its reading up for the hollow edge.
-  - From: UI/UX Override - the chart the pointer row hands off to
-- [ ] The chart test keeps the vocabulary the rename took out of everything
-  around it
-  - **Issue**: `test/minimap.test.js` was moved from gate to mark throughout
-    this run except in `a chart fitted to new ground draws the course against
-    that ground` at 295-310, whose comment still reads "puts every gate
-    somewhere else on the face", whose locals are `gates` and `gate` against the
-    `marks` and `mark` the tests either side of it now use, and whose message
-    still says "the gate being waited on" for a course that may now be a route's
-    strips. Nothing fails; the file says both words for one thing. In the same
-    file the new seam test writes `const [body] = [method[1]];` at 347, an array
-    built and destructured in place to bind the one value `const body =
-    method[1]` binds directly.
-  - **Goal**: Finish the rename in that test - its comment, its locals and its
-    message - and bind `body` directly. `npm test` should still report 1038
-    passing.
-  - From: UI/UX Override - the chart the pointer row hands off to
+- [ ] The check on a held mark's colour passes whether or not the rule wins
+  - **Issue**: `a mark held at the edge of the chart keeps the colour of the
+    hoop it stands for` at `test/page.test.js:642` asks `styled` whether some
+    rule written for `.minimap-mark.next.off-map` carries `stroke: #00ff44`, and
+    `styled` at 270 reads each rule alone: it finds a rule the selector was
+    written for and tests that rule's own body, with no account of specificity
+    or of source order. The defect `1.19.1-alpha` fixed was a rule that existed
+    and lost - `.minimap-mark.next` carried `fill: #00ff44` the whole time a
+    held mark drew amber, and `a mark on the chart is the colour the hoop it
+    stands for is` at 617 asserted exactly that and passed through the entire
+    life of the bug. The new test inherits the blind spot it was written to
+    close. Verified in review by adding a second
+    `.minimap-mark.off-map { stroke: #ffb000; }` below `index.html:231`, which
+    flattens a held next strip and a held flown strip back to amber on equal
+    specificity and later order: `node --test test/page.test.js` reported 65 of
+    65 passing. The line was removed again and `index.html` is as the run left
+    it.
+  - **Goal**: Give `test/page.test.js` a way to ask which rule wins and assert
+    the winner rather than the presence. `styleRules` at 254 already returns
+    every rule in source order, so it needs each rule's position kept, a
+    specificity read off a selector's `#`, `.` and element parts, and a helper
+    that resolves one declaration for a given set of classes by taking the last
+    rule of the highest specificity that matches them. State the three off-map
+    readings as the colour an element with `next`, `flown` or neither resolves
+    to, and restate the three inside the square at 617 the same way, so the
+    original blind spot closes with it. Not fixed in review: this is new test
+    machinery rather than a correction to what the run wrote, and the review's
+    own fixes are bounded to what it can verify inside the files the run
+    touched.
+  - From: Code Review Override - the held mark's reading and the rename left half done
+- [ ] The rename to mark reached one more test and stopped four short
+  - **Issue**: `test/minimap.test.js` still says gate for what the chart now
+    draws as a mark, in the four tests covering `coursePoints` and `courseLine`
+    at 165-193: the names `a course is drawn where the chart puts each of its
+    gates`, `a gate past the edge of the chart is held at that edge and says
+    so`, `a gate that never carried its number is numbered by where it sits` and
+    `a course is one line through its gates, in the order they are flown`, the
+    comment at 175, the `gate` local at 183, and the message `and a course with
+    no gates draws nothing` at 193. Those are the same two pure functions the
+    mark-named tests from 200 down exercise through `setCourse`, and a course
+    point is now a gate on a loop, a strip on a route or a search's one marker,
+    so the file names one thing two ways with the seam between them falling in
+    the middle of a section. Nothing fails; the item the run worked was scoped
+    to the single test between them, which is why the drift outlived it.
+  - **Goal**: Finish the rename across those four tests - names, comment, local
+    and message - leaving the seam tests from 334 down alone, because they say
+    gate where a gate is what is meant, for `nextGate` and the hoops a loop
+    course lights. Nothing but text changes, so the suite should still report
+    1039 passing. The `1.19.1-alpha` entry in `CHANGELOG.md` says in as many
+    words that the rename is unfinished and that these four are what is left, so
+    amend that sentence when it is done rather than leaving it describing a
+    state the file has moved past.
+  - From: Code Review Override - the held mark's reading and the rename left half done
+- [ ] Nothing records that the chart's published pages were checked against the
+  fix
+  - **Issue**: The completed item `The pages written for the chart describe a
+    held mark keeping a reading it gives up` closed with a Goal that asked, if
+    the stroke were made to carry the reading, for the run to say so rather than
+    edit the pages. The stroke does carry it and the pages are correctly
+    untouched - `docs/controls/game-modes.html:221` and `:233` and
+    `docs/controls/instruments.html:117` all read true against the stylesheet as
+    it now stands, checked in review - but neither the `1.19.1-alpha` entry in
+    `CHANGELOG.md` nor anything else in the tree says so. The item is checked
+    off in `TODO-archive.md` under `## Archived 09-27-26`, so a later reader
+    finding those paragraphs claiming green and hollow together cannot tell from
+    any record whether they were verified or simply never revisited, which is
+    the question the item existed to settle.
+  - **Goal**: Add a sentence to the `1.19.1-alpha` entry saying the pages
+    written for the chart in `docs/controls/game-modes.html` and
+    `docs/controls/instruments.html` are true as written now that a held mark
+    keeps its reading, and that they needed no edit. No documentation changes -
+    the pages are already right, and the gap is in what the release says about
+    them.
+  - From: Code Review Override - the held mark's reading and the rename left half done
 
 ## Game UI/UX
 
@@ -338,75 +349,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 131 earlier items in `TODO-archive.md`, newest last.
+> 134 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **User todo**: force-add `.gitignore`, or narrow the global rule that
-  hides it, so the repository's own ignore rules reach a clone
-  - **Issue**: The file exists in the working copy and nothing tracks it.
-    `git ls-files .gitignore` comes back empty, `git show HEAD:.gitignore` says
-    it "exists on disk, but not in 'HEAD'", and `git check-ignore -v .gitignore`
-    answers with a `.gitignore` rule in a personal global ignore file, so it has
-    never been staged and cannot be by an ordinary `git add`. Nothing in the
-    repository therefore carries `test-results/`, `user-scripts/`, or the
-    `.tmp/` added in `1.17.2-alpha`: a clone gets no `.gitignore` at all. It
-    reaches the deploy too - `actions/checkout` in
-    `.github/workflows/workflow.yml` fetches a tree without the file, and the
-    workflow runs `npm test` against it, so the guard in `test/site.test.js`
-    skips itself there rather than failing the deploy for a thing the deploy
-    cannot fix.
-  - **Goal**: Either force-add the file once with `git add -f .gitignore`, or
-    narrow the rule excluding it in the global ignore file so this repository's
-    copy stops being caught by it. Both are the user's call, which is why this
-    is a user item and no run attempts it: what excludes the file is the user's
-    own global configuration rather than anything this repository owns.
-    `.nojekyll` is tracked here under that same global rule, so force-adding a
-    dotfile is a route this repository has already taken once.
-  - Once it is tracked, the other half is ordinary work a run can take: drop the
-    stand-down branch at the top of the `test/site.test.js` check so the guard
-    applies on every tree, and say in that run's changelog entry that the rules
-    now reach a clone. Queue that only after the file is tracked - until then it
-    has nothing to apply to.
-  - From: Current
-- [x] The cheatsheet's glide paragraph was edited without being rewrapped
-  - **Issue**: `CHEATSHEET.md:207` runs to 96 characters inside a paragraph
-    whose other lines wrap at about 75. The sentence `1.18.1-alpha` replaced
-    was rewritten in place and the text after it was left where it sat, so one
-    line of the paragraph is a third longer than the lines above and below it.
-    Nothing reads wrong - `docs/cheatsheet.html` carries the same prose as one
-    line per paragraph, which is why the suite did not notice.
-  - **Goal**: Rewrap the paragraph at `CHEATSHEET.md:203-208` to the width the
-    rest of the file uses, changing line breaks and nothing else.
-  - From: Code Review Override - the dead stick's vertical, and what was written about it
-- [x] Glide Climb 2
-  - **Issue**: A dead stick still does not always come down. `Space` is the
-    level off, and `levelOff` in `js/aircraft.js:487` does not read
-    `this.engine`, so pressing it once on a dead engine sets `holdingAltitude`
-    and `js/aircraft.js:406` writes `this.position.y = startY` on every frame
-    after it - which throws away the `glideDescentAt` the line above it just
-    worked out. Start `DEAD STICK`, press `Space` while airborne, and touch
-    nothing else: the altitude never falls, `V/S` reads `0 ft/min` because it
-    is measured from the same two altitudes, and the stage never ends. Only
-    `pitchUp`, `pitchDown`, `throttleUp` and `throttleDown` end the hold
-    (`VERTICAL_CONTROLS` in `js/input-map.js:26`), so roll and yaw steer the
-    aircraft to the strip at a fixed height with nothing pulling it.
-    **The hold predates this release and is not what `1.18.1-alpha` broke.**
-    What `1.18.1-alpha` did is declare the case closed: `js/flight-model.js`
-    now says "no pair the aircraft can be in comes out climbing",
-    `docs/controls/game-modes.html:189` says "the one thing that holds height
-    is speed rather than attitude", and `CHANGELOG.md:58` names "the one case
-    that does hold height". The trim hold is a second case, and all three
-    sentences say there is not one.
-  - **Goal**: Decide what the level off means with no engine, then make the
-    three sentences above say it. Refusing the hold in `levelOff` while
-    `this.engine` is false is the smaller of the two answers and keeps the
-    mode's promise; letting it stand and qualifying the prose is the other,
-    and needs saying why a glide can be trimmed to hold height. Whichever is
-    taken, `js/aircraft.js` is not testable in Node - there is no `three` to
-    import - so the check belongs where `glideDescentAt` is checked: a pure
-    function the frame calls, swept the way the plane is swept now, rather
-    than another regex over the source. Record the fix under an `Unreleased`
-    heading in `CHANGELOG.md`, since `1.18.1-alpha` is cut.
-  - From: Game Modes UI/UX `->` New Game Modes
 - [x] Pointer Wrap 1
   - **Issue**: The comment the item left behind names a mechanism the
     stylesheet does not have. `index.html:408` says "Wrapped is not clipped -
@@ -563,3 +507,64 @@ how the simulator got here rather than as a list still to be worked.
     clause and keep the sentence saying why the comment stays a reason. Leave the
     `### Fixed` entry as it is
   - From: Code Review Override - the reason written for the bounded span
+- [x] A mark held at the edge of the chart keeps none of its three readings
+  - **Issue**: `.minimap-mark.off-map` in `index.html` carries the same
+    specificity as `.minimap-mark.next` and `.minimap-mark.flown` and is
+    written after both, so it wins outright: a mark held at the edge of the
+    square is drawn `fill: none; stroke: #ffb000; stroke-width: 0.9`
+    whichever of the three readings it carries. `markClass` in `js/minimap.js`
+    still puts the right class on the element; nothing on the glass says which.
+    That cost nothing while the chart drew only a loop course, whose gates are
+    laid inside the tile they are flown over, and costs something now that a
+    route's strips are drawn on the same terms - as the comment above the rule
+    says in as many words. Measured in the running app at 393x740 and 640x745
+    with the pointer row stood down: `CARGO RUN` / `SHORT HAUL` opens at
+    (-8675, 1626), 675 units the wrong side of the tile boundary at x = -8000,
+    with both its strips in the tile east of it, so both are held at the edge
+    at -50,0.87 and -50,-35.18 and both read `fill: none`,
+    `stroke: rgb(255, 176, 0)`, `stroke-width: 0.9px` - the leg being flown and
+    the leg still ahead identical. Hands off that lasts 7.5 seconds, until the
+    aircraft crosses into the tile the strips are in and the marks read green
+    and amber correctly. `LONG HAUL` opens 301 units the wrong side of
+    x = 8000 and does the same for a shorter beat. A search is untouched in
+    substance: it draws one mark, so there is nothing to tell apart.
+  - **Goal**: Resolve to [edge-held-mark-readings.prompt.md](.claude/prompts/edge-held-mark-readings.prompt.md)
+  - From: UI/UX Override - the chart the pointer row hands off to
+- [x] The pages written for the chart describe a held mark keeping a reading it
+  gives up
+  - **Issue**: Both paragraphs added to `docs/controls/game-modes.html` this run
+    compose "marked green" with "held hollow at the edge", which the stylesheet
+    the item above describes makes mutually exclusive. The route paragraph has a
+    route drawn "with the leg you are flying marked green and the ones behind
+    you dim, with a strip past the edge of the square held hollow at that edge";
+    the search paragraph has the marker "green the way a gate being waited on
+    is, and held hollow at the edge of the square once it lies past the ground
+    the chart covers - which on a long leg is most of the flight". As shipped a
+    held mark is amber whichever reading it carries, so on the very case each
+    paragraph names as the ordinary one - `CARGO RUN` / `SHORT HAUL` for its
+    first 7.5 seconds, a search for most of a long leg - the published page
+    names a colour the glass never shows. `docs/controls/instruments.html` puts
+    the three readings and the hollow edge in consecutive sentences and reads
+    the same way without claiming it outright.
+  - **Goal**: Work this with the item above rather than apart from it, since the
+    two answers are one decision. If the stroke is made to carry the reading as
+    that item's prompt proposes, all three paragraphs are true as written and
+    none needs touching - say so. If the decision goes the other way, qualify
+    each to say a held mark gives its reading up for the hollow edge.
+  - From: UI/UX Override - the chart the pointer row hands off to
+- [x] The chart test keeps the vocabulary the rename took out of everything
+  around it
+  - **Issue**: `test/minimap.test.js` was moved from gate to mark throughout
+    this run except in `a chart fitted to new ground draws the course against
+    that ground` at 295-310, whose comment still reads "puts every gate
+    somewhere else on the face", whose locals are `gates` and `gate` against the
+    `marks` and `mark` the tests either side of it now use, and whose message
+    still says "the gate being waited on" for a course that may now be a route's
+    strips. Nothing fails; the file says both words for one thing. In the same
+    file the new seam test writes `const [body] = [method[1]];` at 347, an array
+    built and destructured in place to bind the one value `const body =
+    method[1]` binds directly.
+  - **Goal**: Finish the rename in that test - its comment, its locals and its
+    message - and bind `body` directly. `npm test` should still report 1038
+    passing.
+  - From: UI/UX Override - the chart the pointer row hands off to
