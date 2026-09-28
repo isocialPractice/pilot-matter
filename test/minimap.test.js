@@ -162,7 +162,7 @@ const COURSE = [
     { index: 2, x: -4000, z: -4000 }
 ];
 
-test('a course is drawn where the chart puts each of its gates', () => {
+test('a course is drawn where the chart puts each of its marks', () => {
     const points = coursePoints(BOUNDS, COURSE);
 
     assert.equal(points.length, COURSE.length);
@@ -172,25 +172,25 @@ test('a course is drawn where the chart puts each of its gates', () => {
     assert.ok(points[2].x > 0 && points[2].y > 0, 'south east is down and to the right');
 });
 
-// A gate off the square is held at the edge it lies beyond, the way the
+// A mark off the square is held at the edge it lies beyond, the way the
 // aircraft marker is: dropping it would leave the course vanishing exactly
 // when the pilot most wants to know which way it ran.
-test('a gate past the edge of the chart is held at that edge and says so', () => {
+test('a mark past the edge of the chart is held at that edge and says so', () => {
     const point = coursePoints(BOUNDS, [{ index: 0, x: 40000, z: 0 }])[0];
 
     assert.equal(point.x, -MINIMAP_SIZE / 2, 'held at the edge it lies beyond');
     assert.equal(point.offMap, true);
-    assert.equal(coursePoints(BOUNDS, COURSE).every(gate => !gate.offMap), true);
+    assert.equal(coursePoints(BOUNDS, COURSE).every(mark => !mark.offMap), true);
 });
 
-test('a gate that never carried its number is numbered by where it sits', () => {
+test('a mark that never carried its number is numbered by where it sits', () => {
     const points = coursePoints(BOUNDS, [{ x: 0, z: 0 }, { x: 100, z: 100 }]);
     assert.deepEqual(points.map(point => point.index), [0, 1]);
 });
 
-test('a course is one line through its gates, in the order they are flown', () => {
+test('a course is one line through its marks, in the order they are flown', () => {
     assert.equal(courseLine(coursePoints(BOUNDS, COURSE)), '0.00,0.00 -25.00,-25.00 25.00,25.00');
-    assert.equal(courseLine([]), '', 'and a course with no gates draws nothing');
+    assert.equal(courseLine([]), '', 'and a course with no marks draws nothing');
 });
 
 // The chart and the world should not disagree about which mark is next. The

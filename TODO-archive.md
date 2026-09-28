@@ -1333,3 +1333,74 @@ still be found by name.
     than another regex over the source. Record the fix under an `Unreleased`
     heading in `CHANGELOG.md`, since `1.18.1-alpha` is cut.
   - From: Game Modes UI/UX `->` New Game Modes
+
+## Archived 09-28-26
+
+- [x] Pointer Wrap 1
+  - **Issue**: The comment the item left behind names a mechanism the
+    stylesheet does not have. `index.html:408` says "Wrapped is not clipped -
+    the bound is summed from the wrapped height, so both lines are drawn
+    whole", and `CHANGELOG.md:82` repeats it as "`--card-pointer` declares the
+    wrapped height and the bound is summed from it". Nothing sums
+    `--card-pointer`. The four bounds written as row sums - `index.html:1054`,
+    `1073`, `1095` and `1099`, which are what `summedFromRows` in
+    `test/page.test.js:1086` matches - add `--card-edges`, `--card-name`,
+    `--card-objective` and `--card-score`, and the two media queries holding
+    them, `(max-height: 551px)` and `(max-height: 479px)`, are both narrower
+    and shorter than `@media (max-width: 640px) and (max-height: 745px)` - so
+    `index.html:1153` applies there too and has already taken the pointer row
+    off with `display: none`. Where the wrapped row is drawn - pads out, width
+    at or under 640, height 746 or more - the card is bounded by the room it has,
+    `calc(100vh - ...)`, which `index.html:1138` calls out as the opposite
+    kind of bound. The row survives because nothing adds it up, not because
+    something does.
+  - **Goal**: Say what actually keeps the two lines whole: the card is bounded
+    by the room under the readouts rather than by a sum of its rows, and below
+    746 pixels of height the row comes off altogether rather than wrapping in
+    a card too short for it - which `index.html:1138` already explains and the
+    new comment should point at instead of restating. Correct
+    `index.html:408`, and correct `CHANGELOG.md:82` in place, since the
+    sentence describes `1.18.1-alpha`'s own reasoning rather than claiming a
+    fix the tag does not carry. `js/hud.js:127` is sound and needs nothing.
+  - From: UI/UX Override - the three new game modes
+- [x] The frame's `heldAltitude` call is no longer held to passing the hold
+  itself
+  - **Issue**: The rewrite in `test/input-map.test.js` swapped one tight
+    assertion for three loose ones. `this.holdingAltitude && this.airborne)
+    this.position.y = startY` used to be matched whole; what replaced it,
+    at lines 167, 170 and 173, checks the call shape, `airborne:
+    this.airborne` and `engine: this.engine`, and nothing checks `holding:
+    this.holdingAltitude`. No other test ties the frame's hold flag to the
+    altitude write either - `heldAltitude` is given its state directly by its
+    own unit tests, so it cannot see what the frame passes it. Editing
+    `js/aircraft.js:417` to read `holding: true` leaves all 1033 tests
+    passing and pins every airborne powered aircraft to the altitude it
+    opened the frame at, so free flight can neither climb nor descend.
+    Confirmed by making that edit and running `npm test`.
+  - **Goal**: Add a fourth assertion beside the two it belongs with, matching
+    `holding:\s*this\.holdingAltitude` inside the `heldAltitude` call. While
+    there, bound the three `[\s\S]*?` spans to the call's own braces: each
+    searches to the end of `js/aircraft.js` as written, so a field deleted
+    from the call still matches if the same text appears anywhere below it.
+  - From: Code Review Override - the field the frame's hold test stopped checking
+- [x] **Bounded Span Reason**: The comment justifying `[^}]*?` states its
+      hazard as present fact
+  - **Issue**: `test/input-map.test.js:161-163` says a span free to reach the
+    end of `js/aircraft.js` "finds the same text somewhere below the call and
+    passes a field that has been deleted from it". It does not, in the source
+    as it stands: `holding:  this.holdingAltitude`, `airborne: this.airborne`
+    and `engine:   this.engine` each occur exactly once in the whole file, so
+    deleting any one of them fails its assertion under `[\s\S]*?` just as it
+    does under `[^}]*?`. The `CHANGELOG.md` entry for the same change states
+    the hazard conditionally - "as soon as the same text appears anywhere
+    below it" - and that is the true version. The bound is worth keeping; only
+    the reason written beside it overstates, and a comment is the one part of
+    a module no test reads.
+  - **Goal**: Reword the comment to the conditional the changelog already
+    uses, so it describes the hazard the bound forecloses rather than one the
+    file currently carries. Keep it a reason rather than shortening it away:
+    this comment is the only account in the repository of why this test uses
+    `[^}]*?` where the other nineteen source-matching spans across `test/`
+    use `[\s\S]*?`, so it is what a later reader weighs before keeping or
+    reverting the divergence.
+  - From: Code Review Override - the reason written for the bounded span
