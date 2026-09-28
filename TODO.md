@@ -27,82 +27,48 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### Code Review Override - the held mark's reading and the rename left half done
+### UI/UX Override - the chart's held readings
 
-- [ ] The check on a held mark's colour passes whether or not the rule wins
-  - **Issue**: `a mark held at the edge of the chart keeps the colour of the
-    hoop it stands for` at `test/page.test.js:642` asks `styled` whether some
-    rule written for `.minimap-mark.next.off-map` carries `stroke: #00ff44`, and
-    `styled` at 270 reads each rule alone: it finds a rule the selector was
-    written for and tests that rule's own body, with no account of specificity
-    or of source order. The defect `1.19.1-alpha` fixed was a rule that existed
-    and lost - `.minimap-mark.next` carried `fill: #00ff44` the whole time a
-    held mark drew amber, and `a mark on the chart is the colour the hoop it
-    stands for is` at 617 asserted exactly that and passed through the entire
-    life of the bug. The new test inherits the blind spot it was written to
-    close. Verified in review by adding a second
-    `.minimap-mark.off-map { stroke: #ffb000; }` below `index.html:231`, which
-    flattens a held next strip and a held flown strip back to amber on equal
-    specificity and later order: `node --test test/page.test.js` reported 65 of
-    65 passing. The line was removed again and `index.html` is as the run left
-    it.
-  - **Goal**: Give `test/page.test.js` a way to ask which rule wins and assert
-    the winner rather than the presence. `styleRules` at 254 already returns
-    every rule in source order, so it needs each rule's position kept, a
-    specificity read off a selector's `#`, `.` and element parts, and a helper
-    that resolves one declaration for a given set of classes by taking the last
-    rule of the highest specificity that matches them. State the three off-map
-    readings as the colour an element with `next`, `flown` or neither resolves
-    to, and restate the three inside the square at 617 the same way, so the
-    original blind spot closes with it. Not fixed in review: this is new test
-    machinery rather than a correction to what the run wrote, and the review's
-    own fixes are bounded to what it can verify inside the files the run
-    touched.
-  - From: Code Review Override - the held mark's reading and the rename left half done
-- [ ] The rename to mark reached one more test and stopped four short
-  - **Issue**: `test/minimap.test.js` still says gate for what the chart now
-    draws as a mark, in the four tests covering `coursePoints` and `courseLine`
-    at 165-193: the names `a course is drawn where the chart puts each of its
-    gates`, `a gate past the edge of the chart is held at that edge and says
-    so`, `a gate that never carried its number is numbered by where it sits` and
-    `a course is one line through its gates, in the order they are flown`, the
-    comment at 175, the `gate` local at 183, and the message `and a course with
-    no gates draws nothing` at 193. Those are the same two pure functions the
-    mark-named tests from 200 down exercise through `setCourse`, and a course
-    point is now a gate on a loop, a strip on a route or a search's one marker,
-    so the file names one thing two ways with the seam between them falling in
-    the middle of a section. Nothing fails; the item the run worked was scoped
-    to the single test between them, which is why the drift outlived it.
-  - **Goal**: Finish the rename across those four tests - names, comment, local
-    and message - leaving the seam tests from 334 down alone, because they say
-    gate where a gate is what is meant, for `nextGate` and the hoops a loop
-    course lights. Nothing but text changes, so the suite should still report
-    1039 passing. The `1.19.1-alpha` entry in `CHANGELOG.md` says in as many
-    words that the rename is unfinished and that these four are what is left, so
-    amend that sentence when it is done rather than leaving it describing a
-    state the file has moved past.
-  - From: Code Review Override - the held mark's reading and the rename left half done
-- [ ] Nothing records that the chart's published pages were checked against the
-  fix
-  - **Issue**: The completed item `The pages written for the chart describe a
-    held mark keeping a reading it gives up` closed with a Goal that asked, if
-    the stroke were made to carry the reading, for the run to say so rather than
-    edit the pages. The stroke does carry it and the pages are correctly
-    untouched - `docs/controls/game-modes.html:221` and `:233` and
-    `docs/controls/instruments.html:117` all read true against the stylesheet as
-    it now stands, checked in review - but neither the `1.19.1-alpha` entry in
-    `CHANGELOG.md` nor anything else in the tree says so. The item is checked
-    off in `TODO-archive.md` under `## Archived 09-27-26`, so a later reader
-    finding those paragraphs claiming green and hollow together cannot tell from
-    any record whether they were verified or simply never revisited, which is
-    the question the item existed to settle.
-  - **Goal**: Add a sentence to the `1.19.1-alpha` entry saying the pages
-    written for the chart in `docs/controls/game-modes.html` and
-    `docs/controls/instruments.html` are true as written now that a held mark
-    keeps its reading, and that they needed no edit. No documentation changes -
-    the pages are already right, and the gap is in what the release says about
-    them.
-  - From: Code Review Override - the held mark's reading and the rename left half done
+#### Found Issues
+
+- [ ] Nothing in the suite pins the wider stroke a held mark is drawn with
+  - **Issue**: a mark held at the edge of the chart reads by three declarations
+    at once - `fill: none`, `stroke-width: 0.9` and the colour - and the suite
+    pins two of them. `a mark held at the edge of the chart keeps the colour of
+    the hoop it stands for` in `test/page.test.js` now resolves the colour and
+    the hollow fill through `cascaded` for all three held readings, and no test
+    in the project mentions a stroke width at all. Measured in Chromium against
+    the running page, all three held readings resolve `stroke-width: 0.9px`,
+    which `.minimap-mark.off-map` takes off `.minimap-mark`'s `0.4` on the same
+    one-more-class the colour rules win on - so a rule that dropped the width,
+    or a later one that overrode it, would leave a held mark the same weight as
+    an unheld one with the suite reporting 1039 passing
+  - **Goal**: one more assertion inside the loop that already runs over the
+    three held readings, beside the `fill: none` one that is there:
+    `assert.equal(cascaded(indexHtml, classes, 'stroke-width'), '0.9')`, so the
+    wider stroke is settled through the cascade the way the other two are
+  - From: UI/UX Override - the chart's held readings
+- [ ] A route's later stages cannot be reached by any automated check
+  - **Issue**: item 3 of the request asked for the two held readings at
+    `CARGO RUN` / `LONG HAUL`, and this run could not read them on the glass.
+    A run opens at its first stage and there is no way to open it at another, so
+    the only route to the second is landing at both of `SHORT HAUL`'s strips:
+    `js/main.js:1128` clears a reported landing on the next frame the aircraft
+    is airborne, which is right for a takeoff and means an arrival cannot be
+    handed to the app from outside while it is flying, and both flown attempts
+    at that leg - one in an earlier run, one this run - failed. This run
+    overflew it,
+    closest 3560 units along the strip, the stage then resetting. Every other
+    mode has reached its second stage in an earlier run - a course, a dead stick
+    and a search all have - because a route is the only one whose stage asks for
+    a second arrival thousands of units from the first. What was confirmed
+    instead is the geometry, read off the app's own
+    `stageStart` and `tileBounds`: `LONG HAUL` opens at (8301, 3504) with both
+    its strips in the tile west of it, so both marks are held the moment it
+    opens, and `THREE STOPS` opens inside its strips' tile and holds neither
+  - **Goal**: a way to open a run at a chosen stage, so a check can reach the
+    later stages of a mode without flying every stage before them
+  - From: UI/UX Override - the chart's held readings
 
 ## Game UI/UX
 
@@ -349,76 +315,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 134 earlier items in `TODO-archive.md`, newest last.
+> 137 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Pointer Wrap 1
-  - **Issue**: The comment the item left behind names a mechanism the
-    stylesheet does not have. `index.html:408` says "Wrapped is not clipped -
-    the bound is summed from the wrapped height, so both lines are drawn
-    whole", and `CHANGELOG.md:82` repeats it as "`--card-pointer` declares the
-    wrapped height and the bound is summed from it". Nothing sums
-    `--card-pointer`. The four bounds written as row sums - `index.html:1054`,
-    `1073`, `1095` and `1099`, which are what `summedFromRows` in
-    `test/page.test.js:1086` matches - add `--card-edges`, `--card-name`,
-    `--card-objective` and `--card-score`, and the two media queries holding
-    them, `(max-height: 551px)` and `(max-height: 479px)`, are both narrower
-    and shorter than `@media (max-width: 640px) and (max-height: 745px)` - so
-    `index.html:1153` applies there too and has already taken the pointer row
-    off with `display: none`. Where the wrapped row is drawn - pads out, width
-    at or under 640, height 746 or more - the card is bounded by the room it has,
-    `calc(100vh - ...)`, which `index.html:1138` calls out as the opposite
-    kind of bound. The row survives because nothing adds it up, not because
-    something does.
-  - **Goal**: Say what actually keeps the two lines whole: the card is bounded
-    by the room under the readouts rather than by a sum of its rows, and below
-    746 pixels of height the row comes off altogether rather than wrapping in
-    a card too short for it - which `index.html:1138` already explains and the
-    new comment should point at instead of restating. Correct
-    `index.html:408`, and correct `CHANGELOG.md:82` in place, since the
-    sentence describes `1.18.1-alpha`'s own reasoning rather than claiming a
-    fix the tag does not carry. `js/hud.js:127` is sound and needs nothing.
-  - From: UI/UX Override - the three new game modes
-- [x] The frame's `heldAltitude` call is no longer held to passing the hold
-  itself
-  - **Issue**: The rewrite in `test/input-map.test.js` swapped one tight
-    assertion for three loose ones. `this.holdingAltitude && this.airborne)
-    this.position.y = startY` used to be matched whole; what replaced it,
-    at lines 167, 170 and 173, checks the call shape, `airborne:
-    this.airborne` and `engine: this.engine`, and nothing checks `holding:
-    this.holdingAltitude`. No other test ties the frame's hold flag to the
-    altitude write either - `heldAltitude` is given its state directly by its
-    own unit tests, so it cannot see what the frame passes it. Editing
-    `js/aircraft.js:417` to read `holding: true` leaves all 1033 tests
-    passing and pins every airborne powered aircraft to the altitude it
-    opened the frame at, so free flight can neither climb nor descend.
-    Confirmed by making that edit and running `npm test`.
-  - **Goal**: Add a fourth assertion beside the two it belongs with, matching
-    `holding:\s*this\.holdingAltitude` inside the `heldAltitude` call. While
-    there, bound the three `[\s\S]*?` spans to the call's own braces: each
-    searches to the end of `js/aircraft.js` as written, so a field deleted
-    from the call still matches if the same text appears anywhere below it.
-  - From: Code Review Override - the field the frame's hold test stopped checking
-- [x] **Bounded Span Reason**: The comment justifying `[^}]*?` states its
-      hazard as present fact
-  - **Issue**: `test/input-map.test.js:161-163` says a span free to reach the
-    end of `js/aircraft.js` "finds the same text somewhere below the call and
-    passes a field that has been deleted from it". It does not, in the source
-    as it stands: `holding:  this.holdingAltitude`, `airborne: this.airborne`
-    and `engine:   this.engine` each occur exactly once in the whole file, so
-    deleting any one of them fails its assertion under `[\s\S]*?` just as it
-    does under `[^}]*?`. The `CHANGELOG.md` entry for the same change states
-    the hazard conditionally - "as soon as the same text appears anywhere
-    below it" - and that is the true version. The bound is worth keeping; only
-    the reason written beside it overstates, and a comment is the one part of
-    a module no test reads.
-  - **Goal**: Reword the comment to the conditional the changelog already
-    uses, so it describes the hazard the bound forecloses rather than one the
-    file currently carries. Keep it a reason rather than shortening it away:
-    this comment is the only account in the repository of why this test uses
-    `[^}]*?` where the other nineteen source-matching spans across `test/`
-    use `[\s\S]*?`, so it is what a later reader weighs before keeping or
-    reverting the divergence.
-  - From: Code Review Override - the reason written for the bounded span
 - [x] A short screen drops the objective's bearing with nothing left saying it
   - **Issue**: Below 746 pixels of height on a narrow screen the objective card
     drops its pointer row, and the `@media (max-width: 640px) and
@@ -568,3 +466,77 @@ how the simulator got here rather than as a list still to be worked.
     message - and bind `body` directly. `npm test` should still report 1038
     passing.
   - From: UI/UX Override - the chart the pointer row hands off to
+- [x] The check on a held mark's colour passes whether or not the rule wins
+  - **Issue**: `a mark held at the edge of the chart keeps the colour of the
+    hoop it stands for` at `test/page.test.js:642` asks `styled` whether some
+    rule written for `.minimap-mark.next.off-map` carries `stroke: #00ff44`, and
+    `styled` at 270 reads each rule alone: it finds a rule the selector was
+    written for and tests that rule's own body, with no account of specificity
+    or of source order. The defect `1.19.1-alpha` fixed was a rule that existed
+    and lost - `.minimap-mark.next` carried `fill: #00ff44` the whole time a
+    held mark drew amber, and `a mark on the chart is the colour the hoop it
+    stands for is` at 617 asserted exactly that and passed through the entire
+    life of the bug. The new test inherits the blind spot it was written to
+    close. Verified in review by adding a second
+    `.minimap-mark.off-map { stroke: #ffb000; }` below `index.html:231`, which
+    flattens a held next strip and a held flown strip back to amber on equal
+    specificity and later order: `node --test test/page.test.js` reported 65 of
+    65 passing. The line was removed again and `index.html` is as the run left
+    it.
+  - **Goal**: Give `test/page.test.js` a way to ask which rule wins and assert
+    the winner rather than the presence. `styleRules` at 254 already returns
+    every rule in source order, so it needs each rule's position kept, a
+    specificity read off a selector's `#`, `.` and element parts, and a helper
+    that resolves one declaration for a given set of classes by taking the last
+    rule of the highest specificity that matches them. State the three off-map
+    readings as the colour an element with `next`, `flown` or neither resolves
+    to, and restate the three inside the square at 617 the same way, so the
+    original blind spot closes with it. Not fixed in review: this is new test
+    machinery rather than a correction to what the run wrote, and the review's
+    own fixes are bounded to what it can verify inside the files the run
+    touched.
+  - From: Code Review Override - the held mark's reading and the rename left half done
+- [x] The rename to mark reached one more test and stopped four short
+  - **Issue**: `test/minimap.test.js` still says gate for what the chart now
+    draws as a mark, in the four tests covering `coursePoints` and `courseLine`
+    at 165-193: the names `a course is drawn where the chart puts each of its
+    gates`, `a gate past the edge of the chart is held at that edge and says
+    so`, `a gate that never carried its number is numbered by where it sits` and
+    `a course is one line through its gates, in the order they are flown`, the
+    comment at 175, the `gate` local at 183, and the message `and a course with
+    no gates draws nothing` at 193. Those are the same two pure functions the
+    mark-named tests from 200 down exercise through `setCourse`, and a course
+    point is now a gate on a loop, a strip on a route or a search's one marker,
+    so the file names one thing two ways with the seam between them falling in
+    the middle of a section. Nothing fails; the item the run worked was scoped
+    to the single test between them, which is why the drift outlived it.
+  - **Goal**: Finish the rename across those four tests - names, comment, local
+    and message - leaving the seam tests from 334 down alone, because they say
+    gate where a gate is what is meant, for `nextGate` and the hoops a loop
+    course lights. Nothing but text changes, so the suite should still report
+    1039 passing. The `1.19.1-alpha` entry in `CHANGELOG.md` says in as many
+    words that the rename is unfinished and that these four are what is left, so
+    amend that sentence when it is done rather than leaving it describing a
+    state the file has moved past.
+  - From: Code Review Override - the held mark's reading and the rename left half done
+- [x] Nothing records that the chart's published pages were checked against the
+  fix
+  - **Issue**: The completed item `The pages written for the chart describe a
+    held mark keeping a reading it gives up` closed with a Goal that asked, if
+    the stroke were made to carry the reading, for the run to say so rather than
+    edit the pages. The stroke does carry it and the pages are correctly
+    untouched - `docs/controls/game-modes.html:221` and `:233` and
+    `docs/controls/instruments.html:117` all read true against the stylesheet as
+    it now stands, checked in review - but neither the `1.19.1-alpha` entry in
+    `CHANGELOG.md` nor anything else in the tree says so. The item is checked
+    off in `TODO-archive.md` under `## Archived 09-27-26`, so a later reader
+    finding those paragraphs claiming green and hollow together cannot tell from
+    any record whether they were verified or simply never revisited, which is
+    the question the item existed to settle.
+  - **Goal**: Add a sentence to the `1.19.1-alpha` entry saying the pages
+    written for the chart in `docs/controls/game-modes.html` and
+    `docs/controls/instruments.html` are true as written now that a held mark
+    keeps its reading, and that they needed no edit. No documentation changes -
+    the pages are already right, and the gap is in what the release says about
+    them.
+  - From: Code Review Override - the held mark's reading and the rename left half done
