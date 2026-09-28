@@ -69,6 +69,28 @@ its context survives being archived.
   - **Goal**: a way to open a run at a chosen stage, so a check can reach the
     later stages of a mode without flying every stage before them
   - From: UI/UX Override - the chart's held readings
+- [ ] The stylesheet's own note says the held block wins without the order
+  being touched
+  - **Issue**: the comment over the held rules, `index.html:219-228`, ends
+    "Three classes beat two, so these win on specificity without the order being
+    touched". That is false for the one declaration in the block that competes
+    with anything. `.minimap-mark.off-map` at line 229 carries two classes, the
+    same as `.minimap-mark.next` at 216, so its `fill: none` beats that rule's
+    `fill: #00ff44` on written order alone. The two rules that do win on three
+    classes against two are the strokes at 230 and 231, and a stroke never
+    competes with a fill. Moving line 229 above line 216 - which the comment
+    says costs nothing - fills a held next mark green and drops the hollow that
+    is what says it is past the edge. Confirmed this run by making that move:
+    `a mark held at the edge of the chart keeps the colour of the hoop it stands
+    for` in `test/page.test.js` fails on it, that reading having been settled
+    through the cascade for `1.19.2-alpha`, so the sheet is now pinned by a test
+    whose reason its own comment denies
+  - **Goal**: correct the comment's last sentence to what holds - the two stroke
+    rules win on specificity, `fill: none` wins on order, so the block has to
+    stay below `.minimap-mark.next` and `.minimap-mark.flown` - and say that the
+    order is pinned by the held-mark reading in `test/page.test.js` rather than
+    only by the comment. `index.html` is otherwise sound and needs no edit
+  - From: UI/UX Override - the chart's held readings
 
 ## Game UI/UX
 
