@@ -5,6 +5,56 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.2-alpha] - 2026-09-28
+
+The chart's colour tests ask which rule wins rather than whether one exists.
+Both readings added for `1.19.1-alpha` looked for a rule carrying the right
+colour, which is the weaker of the two questions and the one the defect that
+release fixed answered yes to throughout: `.minimap-mark.next` carried the green
+the whole time a held mark drew amber, and the reading written to close that
+blind spot inherited it.
+
+### Changed
+
+- **`test/page.test.js` settles a declaration through the cascade.**
+  `styleRules` now keeps each rule's position in the sheet and whether an at-rule
+  is wrapped around it, `specificity` reads a selector's ids, classes and element
+  names, and `cascaded` answers what an element carrying a set of classes is left
+  with for one property: of the rules matching it that declare the property, the
+  one marked important if any rule marked it, and otherwise the last written
+  among those of the highest specificity. A body naming the property twice is
+  read as leaving the second, the way the cascade leaves it. The three readings
+  inside the square and the three at its edge are stated as the colour a mark
+  with `next`, `flown` or neither resolves to, and the hollow fill is now
+  asserted for all three held readings rather than for the base rule alone -
+  which is the same cascade question in reverse, since `.minimap-mark.off-map`
+  ties with `.minimap-mark.next` and wins only by being written below it. What a
+  set of classes cannot settle is refused rather than answered around: a rule
+  reaching the element through an ancestor, an id or an element name, and a rule
+  written inside an at-rule, which decides whether it applies at all. A rule
+  written for some other subject is passed over instead - which is what keeps
+  `#minimap.off-map .minimap-marker` out of a reading about marks. Verified by
+  writing `.minimap-mark.next.off-map { stroke: #ffb000; }` below the fix and
+  `.minimap-mark.next { fill: #ffb000; }` below the base rules, each flattening a
+  reading on equal specificity and later order: the new readings fail on both and
+  the readings as `1.19.1-alpha` left them pass on both. Four further sheets were
+  tried against the finished reading and each of them fails it: the held block
+  moved above `.minimap-mark.next`, which is the order the hollow fill depends
+  on; a second `fill` added to the held rule; an `!important` stroke added to the
+  base rule; and a `.minimap-mark.next` fill written inside `@media`, which
+  reports that it cannot be weighed rather than reporting a colour. The suite
+  reports 1039 passing, and `index.html` is unchanged
+- **The four chart tests left saying gate now say mark.** `coursePoints` and
+  `courseLine` in `test/minimap.test.js` are the same two functions the
+  mark-named tests below them exercise through `setCourse`, and a course point is
+  now a gate on a loop, a strip on a route or a search's one marker. Their four
+  names, the comment above the held-mark test, its `gate` local and the assertion
+  message about a course with nothing on it all say mark, which finishes the
+  rename `1.19.1-alpha` began and leaves the seam between the two halves of the
+  file gone. The seam tests below are untouched: they say gate where a gate is
+  what is meant, for `nextGate` and the hoops a loop course lights. Text only,
+  and the suite reports 1039 passing either way
+
 ## [1.19.1-alpha] - 2026-09-27
 
 A mark held at the edge of the chart says which leg it is again. `1.19.0-alpha`
@@ -31,7 +81,13 @@ gave a bearing with no leg attached to it.
   stroke go on saying what they said. On `CARGO RUN` / `SHORT HAUL`, which opens
   675 units the wrong side of a tile boundary from both its strips, that was
   7.5 seconds of a stage with the two legs indistinguishable; a search draws one
-  mark and had nothing to tell apart
+  mark and had nothing to tell apart. The pages written for the chart needed no
+  edit: the route and search paragraphs in `docs/controls/game-modes.html` and
+  the chart's own section in `docs/controls/instruments.html` each compose a
+  colour with the hollow edge - a leg "marked green" with a strip "held hollow at
+  that edge", a marker "green" and "held hollow at the edge of the square" - which
+  the shipped stylesheet made mutually exclusive and this fix makes true
+  together, so all three read true as written
 
 ### Changed
 
@@ -41,9 +97,9 @@ gave a bearing with no leg attached to it.
   moved to mark: its comment, its `gates` and `gate` locals and its assertion
   message all still said gate for a course that may now be a route's strips or a
   search's marker. The four tests above it that cover `coursePoints` and
-  `courseLine` still say gate, in all four names, a comment, a local and an
-  assertion message, so the rename is not finished and the file still says both
-  words for one thing. The seam tests below it are not part of that: they say
+  `courseLine` still said gate, in all four names, a comment, a local and an
+  assertion message; `1.19.2-alpha` finishes those four, after which the file
+  says one word for one thing. The seam tests below it are not part of that: they say
   gate where a gate is what is meant, for `nextGate` and the hoops a loop course
   lights. The seam test beside it also built and destructured a single-element
   array to bind one value, which is now bound directly

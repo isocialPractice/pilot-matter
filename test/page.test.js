@@ -245,20 +245,39 @@ test('the instrument readout is labelled for every value the HUD reports', () =>
 });
 
 /**
- * Every rule in the page's stylesheet, as the selectors it was written for and
- * the declarations it carries. Rules that style several things at once are read
- * the same as rules that style one, so grouping two overlays that are drawn the
+ * Every rule in the page's stylesheet, as the selectors it was written for, the
+ * declarations it carries, where in the sheet it sits, and whether an at-rule
+ * is wrapped around it. Rules that style several things at once are read the
+ * same as rules that style one, so grouping two overlays that are drawn the
  * same way does not hide either of them from a check that they are drawn that
- * way.
+ * way. The position is what lets a reader ask which of two matching rules wins
+ * rather than only whether one of them exists, and the nesting is what stops a
+ * rule written for one screen being read as a rule written for every screen.
  */
 function styleRules(css) {
     // Comments come off first: a rule written under one would otherwise read as
     // a rule whose selector is the note above it.
     const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(rule => ({
-        selectors: rule[1].split(',').map(selector => selector.trim()),
-        body: rule[2]
-    }));
+    let read = 0;
+    let depth = 0;
+
+    return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((rule, order) => {
+        // A rule's own braces balance, so the braces left over between one rule
+        // and the next are the at-rules opening and closing around them.
+        // Counting those as they go by says which rules sit inside a condition.
+        for (const character of stripped.slice(read, rule.index)) {
+            if (character === '{') depth += 1;
+            else if (character === '}') depth -= 1;
+        }
+        read = rule.index + rule[0].length;
+
+        return {
+            selectors: rule[1].split(',').map(selector => selector.trim()),
+            body: rule[2],
+            order,
+            nested: depth > 0
+        };
+    });
 }
 
 /** The declarations of the first rule an id is a selector of. */
@@ -269,6 +288,109 @@ function styleRule(css, id) {
 /** True when some rule written for a selector carries a declaration. */
 function styled(css, selector, declaration) {
     return styleRules(css).some(rule => rule.selectors.includes(selector) && declaration.test(rule.body));
+}
+
+/**
+ * A selector's specificity, as the count of ids, of classes, and of element
+ * names it carries - the three numbers the cascade weighs in that order. An
+ * attribute test and a pseudo-class weigh as classes do, and a pseudo-element
+ * as an element does, which is enough for a stylesheet written by hand.
+ */
+function specificity(selector) {
+    const ids = (selector.match(/#[\w-]+/g) ?? []).length;
+    const classes = (selector.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+/g) ?? []).length;
+    const elements = (selector.replace(/[#.][\w-]+|\[[^\]]*\]|::?[\w-]+/g, ' ')
+        .match(/[a-zA-Z][\w-]*/g) ?? []).length;
+    return [ids, classes, elements];
+}
+
+/** Below zero when the first selector loses, above when it wins, zero on a tie. */
+function compareSpecificity(a, b) {
+    return (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
+}
+
+/**
+ * What a rule body is left declaring for one property: the value of its last
+ * declaration of that property, and whether that declaration was marked
+ * important. A body naming a property twice is left with the second, the way
+ * the cascade leaves it. Null when the body does not name the property at all.
+ */
+function declaredValue(body, property) {
+    const declarations = [...body.matchAll(
+        new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'gi'))];
+    if (!declarations.length) return null;
+
+    const value = declarations.pop()[1].trim();
+    return {
+        value: value.replace(/\s*!\s*important$/i, '').trim(),
+        important: /!\s*important$/i.test(value)
+    };
+}
+
+/**
+ * The value an element carrying a set of classes is left with for one property:
+ * of the rules matching it that declare the property, the important one if any
+ * rule marked it so, and otherwise the last written among those of the highest
+ * specificity, which is the order the cascade settles them in. Null when no
+ * rule declares it.
+ *
+ * Which rule wins is a different question from whether a rule exists, and the
+ * defect 1.19.1-alpha fixed was a rule that existed and lost - `.minimap-mark
+ * .next` carried the green the whole time a held mark drew amber. A reading of
+ * a colour belongs here rather than in `styled`, which answers the weaker
+ * question and answered it happily throughout that bug.
+ */
+function cascaded(css, classes, property) {
+    const wanted = new Set(classes);
+    const matching = [];
+
+    for (const rule of styleRules(css)) {
+        for (const selector of rule.selectors) {
+            // Only the rightmost compound says what a rule is written to style;
+            // everything left of it is the context it wants that thing in. A
+            // subject naming a class the set does not carry is a rule about some
+            // other element, and none of this element's business.
+            const subject = selector.split(/\s*[>+~]\s*|\s+/).pop();
+            const parts = (subject.match(/\.[\w-]+/g) ?? []).map(part => part.slice(1));
+            if (!parts.length || !parts.every(part => wanted.has(part))) continue;
+
+            // Past that, a rule reaching this element through anything but its
+            // own classes - an ancestor, an id, an element name - cannot be
+            // settled from a set of classes alone, so say so rather than answer
+            // around it. Skipping one quietly would hide exactly the kind of
+            // rule this helper exists to weigh.
+            assert.equal(selector.replace(/\.[\w-]+/g, '').trim(), '',
+                `cascaded() cannot weigh "${selector}" against a class set alone: `
+                + `it reaches .${classes.join('.')} through more than its classes`);
+
+            matching.push({ rule, selector });
+        }
+    }
+
+    const declared = matching
+        .map(candidate => ({ ...candidate, declared: declaredValue(candidate.rule.body, property) }))
+        .filter(candidate => candidate.declared);
+
+    // A rule inside an at-rule is applied only while its condition holds, and a
+    // set of classes does not say whether it holds. One that declares the
+    // property asked for is refused for the reason an ancestor selector is,
+    // rather than weighed as though it were written for every screen.
+    for (const candidate of declared) {
+        assert.equal(candidate.rule.nested, false,
+            `cascaded() cannot weigh "${candidate.selector}" against a class set alone: `
+            + 'it is written inside an at-rule, which decides whether it applies at all');
+    }
+
+    // An important declaration outranks every ordinary one whatever selector
+    // carries it, so importance is weighed before specificity, and specificity
+    // before the order the sheet was written in.
+    const winner = declared
+        .sort((a, b) => (Number(a.declared.important) - Number(b.declared.important))
+            || compareSpecificity(specificity(a.selector), specificity(b.selector))
+            || a.rule.order - b.rule.order)
+        .pop();
+
+    return winner ? winner.declared.value : null;
 }
 
 test('the warning overlays start hidden and wait for the flight to trip them', () => {
@@ -619,16 +741,16 @@ test('a mark on the chart is the colour the hoop it stands for is', () => {
     const hex = (name) => rings.match(new RegExp(`${name}\\s*=\\s*0x([0-9a-fA-F]{6})`))?.[1];
 
     const readings = [
-        ['.minimap-mark',       'RING_COLOR'],
-        ['.minimap-mark.next',  'RING_NEXT_COLOR'],
-        ['.minimap-mark.flown', 'RING_DONE_COLOR']
+        [['minimap-mark'],          'RING_COLOR'],
+        [['minimap-mark', 'next'],  'RING_NEXT_COLOR'],
+        [['minimap-mark', 'flown'], 'RING_DONE_COLOR']
     ];
 
-    for (const [selector, name] of readings) {
+    for (const [classes, name] of readings) {
         const color = hex(name);
         assert.ok(color, `js/rings.js should name ${name}`);
-        assert.ok(styled(indexHtml, selector, new RegExp(`fill:\\s*#${color}`, 'i')),
-            `${selector} should be drawn in ${name}`);
+        assert.equal(cascaded(indexHtml, classes, 'fill')?.toLowerCase(), `#${color.toLowerCase()}`,
+            `a mark carrying .${classes.join('.')} should resolve its fill to ${name}`);
     }
 });
 
@@ -644,19 +766,26 @@ test('a mark held at the edge of the chart keeps the colour of the hoop it stand
     const hex = (name) => rings.match(new RegExp(`${name}\\s*=\\s*0x([0-9a-fA-F]{6})`))?.[1];
 
     const readings = [
-        ['.minimap-mark.next.off-map',  'RING_NEXT_COLOR'],
-        ['.minimap-mark.flown.off-map', 'RING_DONE_COLOR']
+        [['minimap-mark', 'off-map'],          'RING_COLOR'],
+        [['minimap-mark', 'next', 'off-map'],  'RING_NEXT_COLOR'],
+        [['minimap-mark', 'flown', 'off-map'], 'RING_DONE_COLOR']
     ];
 
-    for (const [selector, name] of readings) {
+    for (const [classes, name] of readings) {
         const color = hex(name);
         assert.ok(color, `js/rings.js should name ${name}`);
-        assert.ok(styled(indexHtml, selector, new RegExp(`stroke:\\s*#${color}`, 'i')),
-            `${selector} should be stroked in ${name}, the reading the fill carries inside the square`);
-    }
+        assert.equal(cascaded(indexHtml, classes, 'stroke')?.toLowerCase(), `#${color.toLowerCase()}`,
+            `a held mark carrying .${classes.join('.')} should resolve its stroke to ${name}, `
+            + 'the reading the fill carries inside the square');
 
-    assert.ok(styled(indexHtml, '.minimap-mark.off-map', /fill:\s*none/),
-        'a held mark should stay hollow, which is what says it is past the edge');
+        // The hollow has to survive the reading being restored, and it is the
+        // reverse of the same cascade question: `.minimap-mark.off-map` ties
+        // with `.minimap-mark.next` on specificity and wins only by being
+        // written below it.
+        assert.equal(cascaded(indexHtml, classes, 'fill'), 'none',
+            `a held mark carrying .${classes.join('.')} should stay hollow, `
+            + 'which is what says it is past the edge');
+    }
 });
 
 /**
