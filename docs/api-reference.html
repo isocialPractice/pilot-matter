@@ -800,7 +800,8 @@ const pilot = createPilot({
         <tr><td><code>RUNWAY_LANDING</code>, <code>LOOP_COURSE</code>, <code>DEAD_STICK</code>, <code>CARGO_RUN</code>, <code>SEARCH_RESCUE</code></td><td>The five of them by name</td></tr>
         <tr><td><code>LAND_OBJECTIVE</code>, <code>LOOP_OBJECTIVE</code>, <code>CARGO_OBJECTIVE</code>, <code>SEARCH_OBJECTIVE</code></td><td>What a mode is asking for</td></tr>
         <tr><td><code>getGameMode(id)</code>, <code>isGameModeId(id)</code></td><td>Looking one up</td></tr>
-        <tr><td><code>createRunState(modeId)</code>, <code>startRun(state, id)</code>, <code>endRun(state)</code></td><td>A run, started and stopped</td></tr>
+        <tr><td><code>createRunState(modeId)</code>, <code>startRun(state, id, stageIndex)</code>, <code>endRun(state)</code></td><td>A run, started and stopped. The stage is optional and clamped into the ones the mode has</td></tr>
+        <tr><td><code>openingRun(query)</code>, <code>OPENING_MODE_KEY</code>, <code>OPENING_STAGE_KEY</code></td><td>The run a <code>?mode=&amp;stage=</code> query asks for, or why it cannot be given</td></tr>
         <tr><td><code>runningMode(state)</code>, <code>currentStage(state)</code>, <code>advanceStage(state)</code>, <code>restartStage(state)</code></td><td>Where it is up to</td></tr>
         <tr><td><code>recordLanding(state, runway)</code>, <code>recordGate(state, index)</code>, <code>recordRescue(state, marker, report)</code>, <code>recordCrash(state)</code></td><td>Telling it what happened</td></tr>
         <tr><td><code>stageProgress(state)</code>, <code>isStageComplete(state)</code>, <code>nextGate(state)</code>, <code>nextStrip(state)</code></td><td>How far through it is</td></tr>

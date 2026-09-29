@@ -32,7 +32,7 @@ import {
     stageWorld, stageStart, buildCourse, runPointer, approachGuidance,
     tickRun, missNotice, isStageComplete, chartCourse, chartNext,
     nextStrip, burnFuel, fuelRemaining, engineLive, stageMarker, recordRescue,
-    gameModeEntries, syncGameModeEntries, isGameModesCloseKey,
+    gameModeEntries, syncGameModeEntries, isGameModesCloseKey, openingRun,
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE, CARGO_OBJECTIVE
 } from './game-modes.js';
 import {
@@ -295,6 +295,12 @@ class FlightSimulator {
 
         this.setupKeys();
         this.applySettings();
+
+        // And then whatever the address asked for, which is the one way into a
+        // stage past the first. It goes after the settings because it builds a
+        // world of its own over the one they just built.
+        this.openRequestedRun(window.location.search);
+
         this.syncOverlays();
         this.loaded('instruments');
 
@@ -956,6 +962,34 @@ class FlightSimulator {
         if ((this.run.modeId ?? FREE_FLIGHT_ID) === (wanted ?? FREE_FLIGHT_ID)) return;
 
         startRun(this.run, wanted);
+        this.stageHold = 0;
+        this.refreshWorld();
+        this.aircraft.reset();
+    }
+
+    /**
+     * Opens the run the address asked for - `?mode=cargo-run&stage=2` opens
+     * that route's second stage on the first frame, with nothing flown before
+     * it. That is what lets a check read a later stage at all: the stages of a
+     * route stand thousands of units apart, and an arrival cannot be handed to
+     * the app from outside while the aircraft is flying.
+     *
+     * A request that cannot be honoured opens nothing and says why on the
+     * console. Opening the nearest stage instead would hand a check a stage it
+     * did not ask for and no way to tell.
+     */
+    openRequestedRun(search) {
+        const request = openingRun(search);
+        if (!request) return;
+
+        if (request.problem) {
+            console.warn(`Ignoring the run asked for on the address: ${request.problem}`);
+            return;
+        }
+
+        // The same three steps the panel takes, because it is the same thing
+        // happening: a fresh world under a fresh flight.
+        startRun(this.run, request.modeId, request.stageIndex);
         this.stageHold = 0;
         this.refreshWorld();
         this.aircraft.reset();

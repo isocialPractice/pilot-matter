@@ -371,14 +371,35 @@ export function createRunState(modeId = null) {
     return state;
 }
 
-export function startRun(state, modeId) {
+/**
+ * Opens a run of a mode, at its first stage or at one further in.
+ *
+ * Nothing on the panel passes the third argument: a mode chosen there opens
+ * where the pilot is meant to start it and is flown through the rest in order.
+ * It is there for `openingRun` below, which is what lets a stage past the first
+ * be reached without flying every stage before it.
+ *
+ * The index is clamped into the stages the mode actually has, because a run
+ * standing on a stage the mode does not carry is a run with nothing to fly and
+ * no world to build. Callers that need the request honoured exactly, rather
+ * than answered with the nearest stage, check it before they get here - which
+ * is what `openingRun` does.
+ */
+export function startRun(state, modeId, stageIndex = 0) {
     if (!isGameModeId(modeId)) return endRun(state);
 
     state.modeId = modeId;
-    state.stageIndex = 0;
+    state.stageIndex = clampStageIndex(modeId, stageIndex);
     state.complete = false;
     restartStage(state);
     return getGameMode(modeId);
+}
+
+/** A stage index held inside the mode's own range, and a whole number. */
+function clampStageIndex(modeId, stageIndex) {
+    if (!Number.isFinite(stageIndex)) return 0;
+    const last = Math.max((getGameMode(modeId)?.stages.length ?? 0) - 1, 0);
+    return Math.min(Math.max(Math.trunc(stageIndex), 0), last);
 }
 
 /** Back to free flight, which is the run every session opens in. */
@@ -388,6 +409,79 @@ export function endRun(state) {
     state.complete = false;
     restartStage(state);
     return null;
+}
+
+// --- Opening a run from the address ----------------------------------------
+
+/**
+ * The keys a run is asked for by on the address the page is opened at:
+ *
+ *     ?mode=cargo-run&stage=2
+ *
+ * This is the only way to reach a stage past the first without flying every
+ * stage before it, and it exists for checking rather than for playing. A
+ * route's stages are thousands of units of flying apart, and an arrival cannot
+ * be handed to the app from outside - a landing reported while the aircraft is
+ * airborne is cleared on the next frame, which is right for a takeoff - so a
+ * stage nothing can open directly is a stage nothing automated can read.
+ */
+export const OPENING_MODE_KEY  = 'mode';
+export const OPENING_STAGE_KEY = 'stage';
+
+/**
+ * Reads an opening request off a query string.
+ *
+ * Returns null when the address asks for nothing, which is the ordinary case
+ * and leaves the session in the free flight it opens in. Otherwise it returns
+ * the run asked for as `{ modeId, stageIndex, problem }`, where `problem` names
+ * why the request cannot be honoured and is null when it can. `modeId` is null
+ * for free flight, which is what `startRun` is given to end a run.
+ *
+ * A request that cannot be honoured is refused rather than rounded into one
+ * that can. A check handed the stage next to the one it named would report on
+ * the wrong stage and call it the right one, which is worse than opening
+ * nothing and saying why - and worse than the flying it was meant to replace,
+ * because a flight that misses a stage at least fails visibly.
+ *
+ * The stage is counted the way the corner of the screen counts it - `STAGE 2
+ * OF 3` - so the number asked for is the number read back off the glass.
+ */
+export function openingRun(query) {
+    const params = new URLSearchParams(query ?? '');
+    const wanted = params.get(OPENING_MODE_KEY);
+    const stage  = params.get(OPENING_STAGE_KEY);
+    if (wanted == null && stage == null) return null;
+
+    const refuse = (problem) => ({ modeId: null, stageIndex: 0, problem });
+    if (wanted == null) {
+        return refuse(`a ${OPENING_STAGE_KEY} was asked for with no ${OPENING_MODE_KEY} to open it in`);
+    }
+
+    // Free flight is a run of nothing, so it has no stage to open at - but it
+    // is a name on the panel, and refusing it as an unknown mode would read as
+    // the address being wrong rather than as the request being empty.
+    const asked = wanted.trim().toLowerCase();
+    if (asked === FREE_FLIGHT_ID) {
+        return stage == null
+            ? { modeId: null, stageIndex: 0, problem: null }
+            : refuse('free flight has no stages to open at');
+    }
+
+    const mode = getGameMode(asked);
+    if (!mode) return refuse(`there is no mode named "${wanted}"`);
+    if (stage == null) return { modeId: asked, stageIndex: 0, problem: null };
+
+    const number = Number(stage.trim());
+    if (!Number.isInteger(number) || number < 1) {
+        return refuse(`a stage is counted from 1, and "${stage}" is not a stage number`);
+    }
+    if (number > mode.stages.length) {
+        return refuse(
+            `${mode.label} has ${mode.stages.length} stages, and stage ${number} was asked for`
+        );
+    }
+
+    return { modeId: asked, stageIndex: number - 1, problem: null };
 }
 
 export function runningMode(state) {

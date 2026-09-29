@@ -5,6 +5,73 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0-alpha] - 2026-09-29
+
+A mode's later stages can be opened directly, which is what put them back
+within reach of anything automated. A run opened at its first stage and had no
+way to open at another, so the only route to a route's second stage was landing
+at both of the first stage's strips thousands of units apart - and an arrival
+cannot be handed to the page from outside, because a landing reported while the
+aircraft is airborne is cleared on the next frame. Two runs tried that leg and
+neither flew it, which left the two held chart marks at `CARGO RUN` /
+`LONG HAUL` confirmed off the geometry rather than off the glass.
+
+### Added
+
+- **A run can be opened at a chosen stage, from the address.**
+  `startRun(state, id, stageIndex)` takes an optional stage and clamps it into
+  the ones the mode carries, so a run never stands on a stage with no world to
+  build; nothing on the panel passes it, and a mode chosen there opens where the
+  pilot is meant to start it. `openingRun(query)` reads
+  `?mode=cargo-run&stage=2` off a query string and answers with the run asked
+  for, `OPENING_MODE_KEY` and `OPENING_STAGE_KEY` naming the two keys. The stage
+  is counted the way the card counts it, so `STAGE 2 OF 3` on the glass is
+  `stage=2` on the address. `js/main.js` reads it once at start-up and lays the
+  stage out on the first frame - its own world, its own seed, its own start,
+  the clock at nothing - by the same three steps the panel takes. A request that
+  cannot be met opens nothing and writes the reason to the console rather than
+  opening the nearest stage: something checking the page would otherwise read a
+  stage it did not ask for with no way to tell, which is worse than the flying
+  it replaced, because a flight that misses a stage at least fails visibly.
+  Refused are a mode nothing answers to, a stage below 1, above the last, or not
+  a whole number, and a stage asked for with no mode to open it in;
+  `free-flight` is a name the address accepts and has no stage. Published
+  through `js/api/index.js` and named in `docs/api.md`. Read in Chromium against
+  the running page: `?mode=cargo-run&stage=2` opens `LONG HAUL · STAGE 2 OF 3 ·
+  LEG 1 OF 2` with both marks held and hollow - the next one stroked
+  `rgb(0, 255, 68)`, the one still ahead `rgb(255, 176, 0)`, both at
+  `0.9px` - and `stage=3` opens `THREE STOPS` holding neither, which is what the
+  geometry predicted for each and had no way to show
+
+### Changed
+
+- **`test/page.test.js` pins the weight a held mark is drawn at.** A mark held
+  at the edge of the chart reads by three declarations at once - `fill: none`,
+  the colour, and a stroke wider than an unheld mark's - and the suite settled
+  two of them for `1.19.2-alpha` while no test in the project mentioned a stroke
+  width at all. The loop over the three held readings now resolves
+  `stroke-width` through `cascaded` beside the fill and the colour, so a rule
+  that dropped the width or a later one that overrode it fails here. The number
+  is read against the unheld mark's as well as against itself: pinned alone it
+  would still pass with `.minimap-mark`'s own width raised to meet it, and a
+  held mark drawn at the weight of an unheld one is the reading gone whatever
+  either number says. Measured in Chromium against the running page, all three
+  held readings resolve `0.9px`, which is what the assertion holds them to
+- **The stylesheet's note about the held block says what actually holds.** The
+  comment over `index.html:219` ended "Three classes beat two, so these win on
+  specificity without the order being touched", which is false for the one
+  declaration in the block that competes with anything. `.minimap-mark.off-map`
+  carries two classes, the same as `.minimap-mark.next`, so its `fill: none`
+  beats that rule's `fill: #00ff44` on written order alone; only the two strokes
+  below it carry three classes and win on specificity, and a stroke never
+  competes with a fill. Following the comment and lifting the block above
+  `.minimap-mark.next` - which it said cost nothing - fills a held next mark
+  green and drops the hollow that is what says it is past the edge. The note now
+  says which half wins on what, that the block has to stay below
+  `.minimap-mark.next` and `.minimap-mark.flown`, and that the order is pinned
+  by the held-mark reading in `test/page.test.js` rather than only by the
+  comment. The rules themselves are unchanged
+
 ## [1.19.2-alpha] - 2026-09-28
 
 The chart's colour tests ask which rule wins rather than whether one exists.

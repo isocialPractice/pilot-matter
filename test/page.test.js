@@ -754,6 +754,10 @@ test('a mark on the chart is the colour the hoop it stands for is', () => {
     }
 });
 
+// The weight a held mark's outline is drawn at, which is the page's own number
+// rather than a figure this file invents: `.minimap-mark.off-map` declares it.
+const HELD_MARK_STROKE = 0.9;
+
 /**
  * A mark past the edge of the square is hollowed out, so the fill the reading
  * above is carried by is gone and the stroke has to carry it instead. That is
@@ -771,6 +775,17 @@ test('a mark held at the edge of the chart keeps the colour of the hoop it stand
         [['minimap-mark', 'flown', 'off-map'], 'RING_DONE_COLOR']
     ];
 
+    // Pinning the held weight to a number of its own would still pass with the
+    // unheld weight raised to meet it, and a held mark that draws at the weight
+    // of an unheld one is the reading gone whatever either number says. So the
+    // pair is read together, and the number below is the one the loop then
+    // holds the three readings to.
+    const unheld = Number(cascaded(indexHtml, ['minimap-mark'], 'stroke-width'));
+    assert.ok(Number.isFinite(unheld), 'an unheld mark should declare a stroke-width to widen over');
+    assert.ok(HELD_MARK_STROKE > unheld,
+        `a held mark should be drawn wider than the ${unheld} an unheld one carries, `
+        + 'rather than at the same weight with no fill to tell them apart');
+
     for (const [classes, name] of readings) {
         const color = hex(name);
         assert.ok(color, `js/rings.js should name ${name}`);
@@ -785,6 +800,14 @@ test('a mark held at the edge of the chart keeps the colour of the hoop it stand
         assert.equal(cascaded(indexHtml, classes, 'fill'), 'none',
             `a held mark carrying .${classes.join('.')} should stay hollow, `
             + 'which is what says it is past the edge');
+
+        // A hollow mark is drawn by its outline alone, so the outline is what
+        // has to be seen: the held rules widen it over the one an unheld mark
+        // carries, and the reading is three declarations rather than the two
+        // above.
+        assert.equal(cascaded(indexHtml, classes, 'stroke-width'), String(HELD_MARK_STROKE),
+            `a held mark carrying .${classes.join('.')} should resolve its stroke-width `
+            + `to ${HELD_MARK_STROKE}, the weight a mark drawn without a fill needs`);
     }
 });
 

@@ -224,8 +224,16 @@
            Hollowed out, it keeps its reading: the stroke carries what the fill
            carried inside the square, because a route's strips are ordinarily
            all held at once and a pilot who cannot tell them apart has a
-           bearing but no leg. Three classes beat two, so these win on
-           specificity without the order being touched. */
+           bearing but no leg. The two strokes below carry three classes
+           against the two `.minimap-mark.off-map` carries, so those win on
+           specificity - but `fill: none` is not one of them. It ties with
+           `.minimap-mark.next` at two classes each and wins on written order
+           alone, so this block has to stay below `.minimap-mark.next` and
+           `.minimap-mark.flown`: lifted above them, a held next mark fills
+           green and loses the hollow that is what says it is past the edge.
+           `a mark held at the edge of the chart keeps the colour of the hoop
+           it stands for` in `test/page.test.js` resolves that fill through the
+           cascade, so the order is pinned by the suite and not only here. */
         .minimap-mark.off-map       { fill: none; stroke: #ffb000; stroke-width: 0.9; }
         .minimap-mark.next.off-map  { stroke: #00ff44; }
         .minimap-mark.flown.off-map { stroke: #2c5c3a; }

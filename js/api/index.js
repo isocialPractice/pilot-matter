@@ -94,6 +94,7 @@ export {
     ENGINE_LIVE, ENGINE_DEAD,
     getGameMode, isGameModeId,
     createRunState, startRun, endRun, runningMode, currentStage, advanceStage,
+    openingRun, OPENING_MODE_KEY, OPENING_STAGE_KEY,
     restartStage, recordLanding, recordGate, recordCrash, recordRescue,
     nextGate, nextStrip, stripIndex,
     stageProgress, progressNoun, isStageComplete, runObjective, runStatus,

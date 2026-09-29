@@ -241,6 +241,23 @@ Best times are kept per stage per mode in `localStorage`. The clock runs from
 the moment a stage is laid out to the moment its objective is met, and a stage
 restarted is timed from nothing.
 
+A mode can also be opened straight from the address, at any stage it has:
+
+```text
+http://localhost:8080/index.html?mode=cargo-run&stage=2
+```
+
+| Key | Takes | Missing means |
+|-----|-------|---------------|
+| `mode` | A mode id - `runway-landing`, `loop-course`, `dead-stick`, `cargo-run`, `search-rescue`, or `free-flight` | Nothing is opened, and the session starts in free flight |
+| `stage` | The stage number the card shows, counted from 1 | The mode opens at its first stage, the way the panel opens it |
+
+The stage is the one on the card - `STAGE 2 OF 3` is `stage=2`. A request that
+cannot be met opens nothing and writes the reason to the console rather than
+opening the nearest stage instead. This is for reaching a stage without flying
+the stages before it, which is the only way an automated check can read a
+mode's later stages.
+
 ## API
 
 ```javascript

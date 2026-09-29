@@ -1404,3 +1404,74 @@ still be found by name.
     use `[\s\S]*?`, so it is what a later reader weighs before keeping or
     reverting the divergence.
   - From: Code Review Override - the reason written for the bounded span
+
+## Archived 09-29-26
+
+- [x] A short screen drops the objective's bearing with nothing left saying it
+  - **Issue**: Below 746 pixels of height on a narrow screen the objective card
+    drops its pointer row, and the `@media (max-width: 640px) and
+    (max-height: 745px)` rule in `index.html` gives its reason as "the chart in
+    the corner is left to say which way the gate lies - which it is drawing
+    already". The `@media (max-height: 540px) and (min-width: 500px) and
+    (max-width: 771px)` rule below it says the same. Measured in the running
+    app at 393x740, that holds for one of the three modes that write the row
+    and not the other two: `FLYING THROUGH LOOPS` draws three gates and the
+    course polyline with the next gate marked, while `CARGO RUN` and
+    `SEARCH AND RESCUE` draw no gates and an empty course line, leaving the
+    face, the grid, the `N` label and the aircraft marker - none of which says
+    where the objective is. The chart only ever gets a course: `js/main.js`
+    builds one under `mode?.objective === LOOP_OBJECTIVE` and hands every other
+    objective an empty array. So a route loses `LEG 1 · 234° · 8570 ft` and a
+    search loses `MARKER · 045° · 11810 ft` with no replacement, which the
+    comment over `runPointer` in `js/game-modes.js` argues against directly: "A
+    strip is not: it is a grey mark on grey country, several miles off, and a
+    pilot looking straight at one has no way of knowing it. So a route's
+    pointer stays up."
+  - **Goal**: Resolve to [pointer-row-short-screen-fallback.prompt.md](.claude/prompts/pointer-row-short-screen-fallback.prompt.md)
+  - From: UI/UX Override - the chart behind the pointer row
+- [x] Nothing in the suite pins the two halves of the engine rule in `js/aircraft.js`
+  - **Issue**: `test/flight-model.test.js` sweeps `heldAltitude` and
+    `test/input-map.test.js` pins the three fields the frame hands it, so the
+    rule the frame applies is covered. The two paths that normally set the flag
+    are not. Deleting `if (!this.engine) return false;` from `levelOff` and
+    `if (!this.engine) this.endLevelOff();` from `setEngine` was tried this run:
+    `npm test` reported 1033 of 1033 passing with both gone, the same count as
+    before they were removed. The first puts the level off's own refusal back
+    to what it was before the fix, and the second lets `isHoldingAltitude` keep
+    reporting a trim the frame has already stopped honouring. Both were
+    verified in the browser this run because `js/aircraft.js` imports `three`
+    and cannot be constructed in Node, so a regression in either would reach a
+    release with nothing in the suite to catch it.
+  - **Goal**: Add two assertions to the existing `the aircraft holds the
+    altitude it was levelled at` test in `test/input-map.test.js`, in the
+    `aircraftSource` idiom the rest of that test already uses and with the same
+    `[^}]*?` bound so neither span can run past its own method: one that
+    `levelOff` refuses without an engine, and one that `setEngine` ends the
+    level off when it is handed a dead one.
+  - From: UI/UX Override - the chart behind the pointer row
+- [x] The hold test's own levelling span is unbounded against the reason written
+  above it
+  - **Issue**: `test/input-map.test.js:176` matches
+    `/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/`, the one source-matching
+    span in that test still free to run to the end of the file. The comment at
+    156-168 says the three `heldAltitude` spans below it are bounded with
+    `[^}]*?` "rather than the `[\s\S]*?` the source-matching tests elsewhere in
+    this folder use", and gives the reason as the day a matched text is written
+    a second time below the call. That span is open to the same day and sits
+    four lines under the reason: anchored on `levelOff() {` at
+    `js/aircraft.js:506` it searches to the end of the file for
+    `this.levelling = {`, which occurs once after the anchor today, at line 510
+    inside `levelOff`. Delete line 510 and write `this.levelling = {` anywhere
+    below it and the assertion passes on the second occurrence while `levelOff`
+    no longer brings the nose to level - `endLevelOff` at 519 and the frame loop
+    at 357-360 already assign `this.levelling`, so an edit reseeding the ease is
+    the plausible one. `levelOff` holds no `}` between its opening brace and
+    line 510, so the same bound fits without changing what the assertion matches
+    now. As written the comment's "elsewhere in this folder" also reads as though
+    this file were uniformly bounded, which the span four lines down contradicts
+  - **Goal**: Bound that span the way the three below it are bounded,
+    `/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/`, and widen the comment's
+    second paragraph so it speaks for every source-matching span in the test
+    rather than only the three the frame hands `heldAltitude`. `npm test` should
+    still report 1033 passing
+  - From: UI/UX Override - the chart behind the pointer row

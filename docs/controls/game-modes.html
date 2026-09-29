@@ -240,6 +240,28 @@ OFF THE STRIP  4&deg;</code></pre>
 
 <p>Three stages, each a longer leg out, off the heading you open on, into rougher country, with a tighter ring at the end of it.</p>
 
+<h2 id="opening-a-stage-directly">Opening a stage directly</h2>
+
+<p>The panel opens a mode where the pilot is meant to start it, and the stages after that are reached by flying the ones before them. A mode can also be asked for on the address the page is opened at, at whichever stage you name:</p>
+
+<pre><code>http://localhost:8080/index.html?mode=cargo-run&amp;stage=2</code></pre>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Key</th><th>Takes</th><th>Left off</th></tr></thead>
+    <tbody>
+        <tr><td><code>mode</code></td><td>A mode id: <code>runway-landing</code>, <code>loop-course</code>, <code>dead-stick</code>, <code>cargo-run</code>, <code>search-rescue</code>, or <code>free-flight</code></td><td>Nothing is opened, and the session starts in free flight the way it always has</td></tr>
+        <tr><td><code>stage</code></td><td>The stage number the card shows, counted from 1</td><td>The mode opens at its first stage, exactly as choosing it off the panel does</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The number is the one on the card, so <code>STAGE 2 OF 3</code> is <code>stage=2</code>. The stage is laid out on the first frame with nothing flown before it: its own world, its own seed, its own start, and the clock at nothing.</p>
+
+<p>A request that cannot be met - a mode nothing answers to, a stage past the last one, a stage that is not a number - opens nothing and writes the reason to the browser console. It does not open the nearest stage instead: something checking the page would then be reading a stage it did not ask for with no way to tell.</p>
+
+<p>That is what this is for. A route's stages stand thousands of units of flying apart, and a landing cannot be handed to the page from outside, so before this the later stages of <code>CARGO RUN</code> could only be reached by flying every leg of every stage ahead of them - which put them out of reach of anything automated.</p>
+
             <nav class="page-nav" aria-label="Nearby pages">
                 <a href="../controls/settings.html" rel="prev">&#8592; Settings</a>
                 <a href="../controls/sound.html" rel="next">Sound &#8594;</a>

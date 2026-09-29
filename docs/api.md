@@ -800,7 +800,8 @@ read them as a worked example of a game built on the two APIs.
 | `RUNWAY_LANDING`, `LOOP_COURSE`, `DEAD_STICK`, `CARGO_RUN`, `SEARCH_RESCUE` | The five of them by name |
 | `LAND_OBJECTIVE`, `LOOP_OBJECTIVE`, `CARGO_OBJECTIVE`, `SEARCH_OBJECTIVE` | What a mode is asking for |
 | `getGameMode(id)`, `isGameModeId(id)` | Looking one up |
-| `createRunState(modeId)`, `startRun(state, id)`, `endRun(state)` | A run, started and stopped |
+| `createRunState(modeId)`, `startRun(state, id, stageIndex)`, `endRun(state)` | A run, started and stopped. The stage is optional and clamped into the ones the mode has |
+| `openingRun(query)`, `OPENING_MODE_KEY`, `OPENING_STAGE_KEY` | The run a `?mode=&stage=` query asks for, or why it cannot be given |
 | `runningMode(state)`, `currentStage(state)`, `advanceStage(state)`, `restartStage(state)` | Where it is up to |
 | `recordLanding(state, runway)`, `recordGate(state, index)`, `recordRescue(state, marker, report)`, `recordCrash(state)` | Telling it what happened |
 | `stageProgress(state)`, `isStageComplete(state)`, `nextGate(state)`, `nextStrip(state)` | How far through it is |
