@@ -40,6 +40,9 @@ import {
     nextGate,
     runObjective,
     runStatus,
+    openingRun,
+    OPENING_MODE_KEY,
+    OPENING_STAGE_KEY,
     stageSeed,
     stageWorld,
     stageStart,
@@ -100,6 +103,8 @@ import { FEET_PER_UNIT, KNOTS_PER_UNIT, headingToYaw } from '../js/units.js';
 import {
     glideSpeed, glideDescent, convergeSpeed, sinkRate, GLIDE_ACCEL, GLIDE_DECEL
 } from '../js/flight-model.js';
+import { tileIndexAt, tileBounds } from '../js/world-tiles.js';
+import { isOffMap } from '../js/minimap.js';
 
 const WORLD_SIZE = 16000;
 
@@ -338,6 +343,123 @@ test('the status line says where the run is up to', () => {
     assert.ok(runStatus(course).includes('LOOP 1 OF 3'), 'a course also says which loop');
     recordGate(course, 0);
     assert.ok(runStatus(course).includes('LOOP 2 OF 3'));
+});
+
+// --- Opening a run at a stage ----------------------------------------------
+
+/**
+ * A stage past the first used to be reachable only by flying every stage before
+ * it, which for a route means landing at strips thousands of units apart with no
+ * way to hand an arrival to the app from outside. So the later stages of CARGO
+ * RUN went unread by anything automated, and the two held chart marks at its
+ * second stage were confirmed off the geometry rather than off the glass.
+ */
+
+test('a run can be opened at a stage past the first', () => {
+    const state = createRunState();
+    startRun(state, CARGO_RUN, 1);
+
+    assert.equal(runningMode(state).id, CARGO_RUN);
+    assert.equal(stageNumber(state), 2);
+    assert.equal(currentStage(state).label, getGameMode(CARGO_RUN).stages[1].label);
+    assert.equal(state.complete, false);
+    assert.deepEqual(stageProgress(state), { done: 0, total: 2 },
+        'with nothing done, the way any stage opens');
+});
+
+test('the stage a run opens at brings its own world and its own start', () => {
+    const first = createRunState(CARGO_RUN);
+    const later = createRunState();
+    startRun(later, CARGO_RUN, 1);
+
+    assert.notEqual(stageWorld(later).seed, stageWorld(first).seed,
+        'the seed moves with the stage, so the ground is the second stage\'s');
+    const strip = stageWorld(later).elements.findLast(element => element.type === 'runway');
+    assert.equal(strip.config.separation, getGameMode(CARGO_RUN).stages[1].separation,
+        'and the strips stand as far apart as that stage asks for');
+    assert.ok(stageStart(later), 'and there is somewhere to open it');
+});
+
+test('a mode opens at its first stage when no stage is named', () => {
+    const state = createRunState();
+    startRun(state, LOOP_COURSE);
+    assert.equal(stageNumber(state), 1, 'which is what the panel asks for every time');
+});
+
+test('a stage the mode does not carry is pulled back into the ones it does', () => {
+    const last = stageCount(createRunState(RUNWAY_LANDING));
+
+    for (const [asked, expected] of [[-4, 1], [99, last], [Number.NaN, 1], [1.8, 2]]) {
+        const state = createRunState();
+        startRun(state, RUNWAY_LANDING, asked);
+        assert.equal(stageNumber(state), expected,
+            `opening at index ${asked} should leave the run on a stage the mode has`);
+        assert.ok(currentStage(state), 'and on a stage there is something to fly');
+    }
+});
+
+test('an address asking for nothing opens nothing', () => {
+    for (const query of ['', '?', undefined, '?environment=back-country']) {
+        assert.equal(openingRun(query), null, `"${query}" asks for no run`);
+    }
+});
+
+test('an address names the mode and counts the stage the way the screen does', () => {
+    assert.deepEqual(openingRun(`?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=2`),
+        { modeId: CARGO_RUN, stageIndex: 1, problem: null },
+        'STAGE 2 OF 3 on the glass is stage=2 on the address');
+
+    assert.deepEqual(openingRun(`${OPENING_MODE_KEY}=${LOOP_COURSE}`),
+        { modeId: LOOP_COURSE, stageIndex: 0, problem: null },
+        'a mode on its own opens where the panel would open it');
+
+    assert.deepEqual(openingRun(`?${OPENING_MODE_KEY}=%20Cargo-Run%20&${OPENING_STAGE_KEY}=%203%20`),
+        { modeId: CARGO_RUN, stageIndex: 2, problem: null },
+        'and an id typed with spaces or capitals is still that id');
+});
+
+test('free flight is a name the address can use, and has no stage to open at', () => {
+    assert.deepEqual(openingRun(`?${OPENING_MODE_KEY}=${FREE_FLIGHT_ID}`),
+        { modeId: null, stageIndex: 0, problem: null },
+        'which is the run every session opens in anyway');
+
+    assert.ok(openingRun(`?${OPENING_MODE_KEY}=${FREE_FLIGHT_ID}&${OPENING_STAGE_KEY}=2`).problem);
+});
+
+/**
+ * The whole use of this is a check reading a stage it could not otherwise
+ * reach, so a request answered with a different stage is worse than one
+ * refused: the check reports on the stage it was given and calls it the stage
+ * it asked for.
+ */
+test('a request that cannot be honoured is refused rather than rounded', () => {
+    const stages = getGameMode(CARGO_RUN).stages.length;
+    const refusals = [
+        `?${OPENING_MODE_KEY}=three-stops`,
+        `?${OPENING_STAGE_KEY}=2`,
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=0`,
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=-1`,
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=1.5`,
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=last`,
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=`,
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=${stages + 1}`
+    ];
+
+    for (const query of refusals) {
+        const request = openingRun(query);
+        assert.equal(request.modeId, null, `"${query}" should open no run`);
+        assert.equal(typeof request.problem, 'string', 'and say why rather than only refusing');
+        assert.ok(request.problem.length, `"${query}" should give a reason`);
+    }
+});
+
+test('a refused stage says what the mode actually has', () => {
+    const mode = getGameMode(CARGO_RUN);
+    const { problem } = openingRun(
+        `?${OPENING_MODE_KEY}=${CARGO_RUN}&${OPENING_STAGE_KEY}=${mode.stages.length + 1}`);
+
+    assert.ok(problem.includes(mode.label), 'named by the label the panel shows');
+    assert.ok(problem.includes(String(mode.stages.length)), 'and by how many stages there are');
 });
 
 // --- The panel -------------------------------------------------------------
@@ -1596,6 +1718,55 @@ test('a route is given the strips its stage asks for and no others', () => {
         'and a world that could only take one strip is drawn with the one it has');
     assert.deepEqual(chartCourse(route, {}), [],
         'and a world not laid yet is drawn with nothing');
+});
+
+/**
+ * The held mark is drawn hollow and the unheld one filled, and the stylesheet
+ * says so - but a rule only draws anything if some stage actually opens with a
+ * strip past the edge of the square the chart covers. That square is the tile
+ * the aircraft is over, so whether a mark is held is settled by where a stage
+ * opens against where it lays its strips, and nothing in the cascade can hold
+ * it: move a route's opening into its own strips' tile and every held mark on
+ * the chart quietly stops existing, with the rules still passing their own
+ * tests.
+ *
+ * So the two readings are pinned here, at the route that carries both. It is
+ * the stages a browser check reads the marks on, and this is the half of that
+ * reading the suite can hold on its own.
+ */
+test('a route opens with its strips held past the edge of the chart, and one stage does not', () => {
+    const held = [];
+    const state = createRunState(CARGO_RUN);
+    do {
+        const { field, runway } = worldFor(state);
+        const { position } = stageStart(state, { runway, size: WORLD_SIZE });
+        // The square the chart covers is the tile the aircraft is over, the way
+        // the terrain hands its bounds over while the aircraft flies.
+        const bounds = tileBounds(tileIndexAt(position.x, position.z, WORLD_SIZE), WORLD_SIZE);
+        const marks  = chartCourse(state, { runways: field.runways });
+
+        assert.equal(marks.length, stageStrips(state),
+            `${currentStage(state).label} should chart every strip it asks for`);
+        held.push({
+            label: currentStage(state).label,
+            offMap: marks.map(mark => isOffMap(bounds, mark.x, mark.z))
+        });
+    } while (advanceStage(state));
+
+    const byLabel = label => held.find(stage => stage.label === label);
+    for (const label of ['SHORT HAUL', 'LONG HAUL']) {
+        const stage = byLabel(label);
+        assert.ok(stage, `the route should still carry a stage called ${label}`);
+        assert.ok(stage.offMap.length > 1 && stage.offMap.every(Boolean),
+            `${label} should open in a different tile from its strips, so every mark it `
+            + `draws is held at the edge of the square - held: ${stage.offMap.join(', ')}`);
+    }
+
+    const inside = byLabel('THREE STOPS');
+    assert.ok(inside, 'the route should still carry a stage called THREE STOPS');
+    assert.ok(inside.offMap.length > 1 && inside.offMap.every(off => !off),
+        'THREE STOPS should open inside its own strips\' tile, so nothing it draws is held - '
+        + `held: ${inside.offMap.join(', ')}`);
 });
 
 // The chart lights the mark the card is naming, so the two cannot disagree
