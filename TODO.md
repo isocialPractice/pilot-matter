@@ -27,70 +27,35 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### UI/UX Override - the chart's held readings
+### Code Review Override - the address opener's wiring
 
-#### Found Issues
-
-- [ ] Nothing in the suite pins the wider stroke a held mark is drawn with
-  - **Issue**: a mark held at the edge of the chart reads by three declarations
-    at once - `fill: none`, `stroke-width: 0.9` and the colour - and the suite
-    pins two of them. `a mark held at the edge of the chart keeps the colour of
-    the hoop it stands for` in `test/page.test.js` now resolves the colour and
-    the hollow fill through `cascaded` for all three held readings, and no test
-    in the project mentions a stroke width at all. Measured in Chromium against
-    the running page, all three held readings resolve `stroke-width: 0.9px`,
-    which `.minimap-mark.off-map` takes off `.minimap-mark`'s `0.4` on the same
-    one-more-class the colour rules win on - so a rule that dropped the width,
-    or a later one that overrode it, would leave a held mark the same weight as
-    an unheld one with the suite reporting 1039 passing
-  - **Goal**: one more assertion inside the loop that already runs over the
-    three held readings, beside the `fill: none` one that is there:
-    `assert.equal(cascaded(indexHtml, classes, 'stroke-width'), '0.9')`, so the
-    wider stroke is settled through the cascade the way the other two are
-  - From: UI/UX Override - the chart's held readings
-- [ ] A route's later stages cannot be reached by any automated check
-  - **Issue**: item 3 of the request asked for the two held readings at
-    `CARGO RUN` / `LONG HAUL`, and this run could not read them on the glass.
-    A run opens at its first stage and there is no way to open it at another, so
-    the only route to the second is landing at both of `SHORT HAUL`'s strips:
-    `js/main.js:1128` clears a reported landing on the next frame the aircraft
-    is airborne, which is right for a takeoff and means an arrival cannot be
-    handed to the app from outside while it is flying, and both flown attempts
-    at that leg - one in an earlier run, one this run - failed. This run
-    overflew it,
-    closest 3560 units along the strip, the stage then resetting. Every other
-    mode has reached its second stage in an earlier run - a course, a dead stick
-    and a search all have - because a route is the only one whose stage asks for
-    a second arrival thousands of units from the first. What was confirmed
-    instead is the geometry, read off the app's own
-    `stageStart` and `tileBounds`: `LONG HAUL` opens at (8301, 3504) with both
-    its strips in the tile west of it, so both marks are held the moment it
-    opens, and `THREE STOPS` opens inside its strips' tile and holds neither
-  - **Goal**: a way to open a run at a chosen stage, so a check can reach the
-    later stages of a mode without flying every stage before them
-  - From: UI/UX Override - the chart's held readings
-- [ ] The stylesheet's own note says the held block wins without the order
-  being touched
-  - **Issue**: the comment over the held rules, `index.html:219-228`, ends
-    "Three classes beat two, so these win on specificity without the order being
-    touched". That is false for the one declaration in the block that competes
-    with anything. `.minimap-mark.off-map` at line 229 carries two classes, the
-    same as `.minimap-mark.next` at 216, so its `fill: none` beats that rule's
-    `fill: #00ff44` on written order alone. The two rules that do win on three
-    classes against two are the strokes at 230 and 231, and a stroke never
-    competes with a fill. Moving line 229 above line 216 - which the comment
-    says costs nothing - fills a held next mark green and drops the hollow that
-    is what says it is past the edge. Confirmed this run by making that move:
-    `a mark held at the edge of the chart keeps the colour of the hoop it stands
-    for` in `test/page.test.js` fails on it, that reading having been settled
-    through the cascade for `1.19.2-alpha`, so the sheet is now pinned by a test
-    whose reason its own comment denies
-  - **Goal**: correct the comment's last sentence to what holds - the two stroke
-    rules win on specificity, `fill: none` wins on order, so the block has to
-    stay below `.minimap-mark.next` and `.minimap-mark.flown` - and say that the
-    order is pinned by the held-mark reading in `test/page.test.js` rather than
-    only by the comment. `index.html` is otherwise sound and needs no edit
-  - From: UI/UX Override - the chart's held readings
+- [ ] Nothing in the suite reaches the line that opens the run an address asks
+  for
+  - **Issue**: `openingRun` itself is covered - `test/game-modes.test.js` runs
+    five cases over it and four more over `startRun`'s new stage argument - but
+    nothing in the project reaches `js/main.js`, where the feature is actually
+    connected to the page. The call at `js/main.js:302`,
+    `this.openRequestedRun(window.location.search)`, and the
+    `openRequestedRun` method at `js/main.js:981` are named by no test.
+    Replacing line 302 with a comment and running `npm test` was tried this
+    review: it reports 1049 of 1049 passing, the same count as with the line
+    there. So the whole feature can be disconnected - `?mode=cargo-run&stage=2`
+    silently opening free flight at stage 1 - with the suite reporting a clean
+    run. That line is the one the completed item exists for, since a check
+    reaching a later stage reaches it through that call and nothing else, and
+    the pure function below it passing is no evidence the page ever asks.
+    `js/main.js` imports Three.js and cannot be constructed in Node, which is
+    why four test files already read it as source text through a `mainSource`
+    regex: `test/landing-score.test.js:258`, `test/minimap.test.js:332`,
+    `test/page.test.js:1306` and `test/world-tiles.test.js:120`
+  - **Goal**: Pin the wiring the way the rest of `js/main.js` is pinned, in the
+    `mainSource` idiom those four files use - that the constructor calls
+    `openRequestedRun` with `window.location.search`, that the method hands
+    `openingRun`'s `modeId` and `stageIndex` to `startRun`, and that a request
+    carrying a `problem` is refused rather than opened. Bound each source span
+    with `[^}]*?` the way `test/input-map.test.js` bounds its spans, so neither
+    can run past the method it is anchored on
+  - From: Code Review Override - the address opener's wiring
 
 ## Game UI/UX
 
@@ -337,76 +302,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 137 earlier items in `TODO-archive.md`, newest last.
+> 140 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A short screen drops the objective's bearing with nothing left saying it
-  - **Issue**: Below 746 pixels of height on a narrow screen the objective card
-    drops its pointer row, and the `@media (max-width: 640px) and
-    (max-height: 745px)` rule in `index.html` gives its reason as "the chart in
-    the corner is left to say which way the gate lies - which it is drawing
-    already". The `@media (max-height: 540px) and (min-width: 500px) and
-    (max-width: 771px)` rule below it says the same. Measured in the running
-    app at 393x740, that holds for one of the three modes that write the row
-    and not the other two: `FLYING THROUGH LOOPS` draws three gates and the
-    course polyline with the next gate marked, while `CARGO RUN` and
-    `SEARCH AND RESCUE` draw no gates and an empty course line, leaving the
-    face, the grid, the `N` label and the aircraft marker - none of which says
-    where the objective is. The chart only ever gets a course: `js/main.js`
-    builds one under `mode?.objective === LOOP_OBJECTIVE` and hands every other
-    objective an empty array. So a route loses `LEG 1 · 234° · 8570 ft` and a
-    search loses `MARKER · 045° · 11810 ft` with no replacement, which the
-    comment over `runPointer` in `js/game-modes.js` argues against directly: "A
-    strip is not: it is a grey mark on grey country, several miles off, and a
-    pilot looking straight at one has no way of knowing it. So a route's
-    pointer stays up."
-  - **Goal**: Resolve to [pointer-row-short-screen-fallback.prompt.md](.claude/prompts/pointer-row-short-screen-fallback.prompt.md)
-  - From: UI/UX Override - the chart behind the pointer row
-- [x] Nothing in the suite pins the two halves of the engine rule in `js/aircraft.js`
-  - **Issue**: `test/flight-model.test.js` sweeps `heldAltitude` and
-    `test/input-map.test.js` pins the three fields the frame hands it, so the
-    rule the frame applies is covered. The two paths that normally set the flag
-    are not. Deleting `if (!this.engine) return false;` from `levelOff` and
-    `if (!this.engine) this.endLevelOff();` from `setEngine` was tried this run:
-    `npm test` reported 1033 of 1033 passing with both gone, the same count as
-    before they were removed. The first puts the level off's own refusal back
-    to what it was before the fix, and the second lets `isHoldingAltitude` keep
-    reporting a trim the frame has already stopped honouring. Both were
-    verified in the browser this run because `js/aircraft.js` imports `three`
-    and cannot be constructed in Node, so a regression in either would reach a
-    release with nothing in the suite to catch it.
-  - **Goal**: Add two assertions to the existing `the aircraft holds the
-    altitude it was levelled at` test in `test/input-map.test.js`, in the
-    `aircraftSource` idiom the rest of that test already uses and with the same
-    `[^}]*?` bound so neither span can run past its own method: one that
-    `levelOff` refuses without an engine, and one that `setEngine` ends the
-    level off when it is handed a dead one.
-  - From: UI/UX Override - the chart behind the pointer row
-- [x] The hold test's own levelling span is unbounded against the reason written
-  above it
-  - **Issue**: `test/input-map.test.js:176` matches
-    `/levelOff\(\)\s*\{[\s\S]*?this\.levelling = \{/`, the one source-matching
-    span in that test still free to run to the end of the file. The comment at
-    156-168 says the three `heldAltitude` spans below it are bounded with
-    `[^}]*?` "rather than the `[\s\S]*?` the source-matching tests elsewhere in
-    this folder use", and gives the reason as the day a matched text is written
-    a second time below the call. That span is open to the same day and sits
-    four lines under the reason: anchored on `levelOff() {` at
-    `js/aircraft.js:506` it searches to the end of the file for
-    `this.levelling = {`, which occurs once after the anchor today, at line 510
-    inside `levelOff`. Delete line 510 and write `this.levelling = {` anywhere
-    below it and the assertion passes on the second occurrence while `levelOff`
-    no longer brings the nose to level - `endLevelOff` at 519 and the frame loop
-    at 357-360 already assign `this.levelling`, so an edit reseeding the ease is
-    the plausible one. `levelOff` holds no `}` between its opening brace and
-    line 510, so the same bound fits without changing what the assertion matches
-    now. As written the comment's "elsewhere in this folder" also reads as though
-    this file were uniformly bounded, which the span four lines down contradicts
-  - **Goal**: Bound that span the way the three below it are bounded,
-    `/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/`, and widen the comment's
-    second paragraph so it speaks for every source-matching span in the test
-    rather than only the three the frame hands `heldAltitude`. `npm test` should
-    still report 1033 passing
-  - From: UI/UX Override - the chart behind the pointer row
 - [x] Bounded Span Reason 1
   - **Issue**: The `CHANGELOG.md` entry written for the reworded comment ends
     "this is the only account in the repository of why this test bounds its
@@ -562,3 +459,63 @@ how the simulator got here rather than as a list still to be worked.
     the pages are already right, and the gap is in what the release says about
     them.
   - From: Code Review Override - the held mark's reading and the rename left half done
+- [x] Nothing in the suite pins the wider stroke a held mark is drawn with
+  - **Issue**: a mark held at the edge of the chart reads by three declarations
+    at once - `fill: none`, `stroke-width: 0.9` and the colour - and the suite
+    pins two of them. `a mark held at the edge of the chart keeps the colour of
+    the hoop it stands for` in `test/page.test.js` now resolves the colour and
+    the hollow fill through `cascaded` for all three held readings, and no test
+    in the project mentions a stroke width at all. Measured in Chromium against
+    the running page, all three held readings resolve `stroke-width: 0.9px`,
+    which `.minimap-mark.off-map` takes off `.minimap-mark`'s `0.4` on the same
+    one-more-class the colour rules win on - so a rule that dropped the width,
+    or a later one that overrode it, would leave a held mark the same weight as
+    an unheld one with the suite reporting 1039 passing
+  - **Goal**: one more assertion inside the loop that already runs over the
+    three held readings, beside the `fill: none` one that is there:
+    `assert.equal(cascaded(indexHtml, classes, 'stroke-width'), '0.9')`, so the
+    wider stroke is settled through the cascade the way the other two are
+  - From: UI/UX Override - the chart's held readings
+- [x] A route's later stages cannot be reached by any automated check
+  - **Issue**: item 3 of the request asked for the two held readings at
+    `CARGO RUN` / `LONG HAUL`, and this run could not read them on the glass.
+    A run opens at its first stage and there is no way to open it at another, so
+    the only route to the second is landing at both of `SHORT HAUL`'s strips:
+    `js/main.js:1128` clears a reported landing on the next frame the aircraft
+    is airborne, which is right for a takeoff and means an arrival cannot be
+    handed to the app from outside while it is flying, and both flown attempts
+    at that leg - one in an earlier run, one this run - failed. This run
+    overflew it,
+    closest 3560 units along the strip, the stage then resetting. Every other
+    mode has reached its second stage in an earlier run - a course, a dead stick
+    and a search all have - because a route is the only one whose stage asks for
+    a second arrival thousands of units from the first. What was confirmed
+    instead is the geometry, read off the app's own
+    `stageStart` and `tileBounds`: `LONG HAUL` opens at (8301, 3504) with both
+    its strips in the tile west of it, so both marks are held the moment it
+    opens, and `THREE STOPS` opens inside its strips' tile and holds neither
+  - **Goal**: a way to open a run at a chosen stage, so a check can reach the
+    later stages of a mode without flying every stage before them
+  - From: UI/UX Override - the chart's held readings
+- [x] The stylesheet's own note says the held block wins without the order
+  being touched
+  - **Issue**: the comment over the held rules, `index.html:219-228`, ends
+    "Three classes beat two, so these win on specificity without the order being
+    touched". That is false for the one declaration in the block that competes
+    with anything. `.minimap-mark.off-map` at line 229 carries two classes, the
+    same as `.minimap-mark.next` at 216, so its `fill: none` beats that rule's
+    `fill: #00ff44` on written order alone. The two rules that do win on three
+    classes against two are the strokes at 230 and 231, and a stroke never
+    competes with a fill. Moving line 229 above line 216 - which the comment
+    says costs nothing - fills a held next mark green and drops the hollow that
+    is what says it is past the edge. Confirmed this run by making that move:
+    `a mark held at the edge of the chart keeps the colour of the hoop it stands
+    for` in `test/page.test.js` fails on it, that reading having been settled
+    through the cascade for `1.19.2-alpha`, so the sheet is now pinned by a test
+    whose reason its own comment denies
+  - **Goal**: correct the comment's last sentence to what holds - the two stroke
+    rules win on specificity, `fill: none` wins on order, so the block has to
+    stay below `.minimap-mark.next` and `.minimap-mark.flown` - and say that the
+    order is pinned by the held-mark reading in `test/page.test.js` rather than
+    only by the comment. `index.html` is otherwise sound and needs no edit
+  - From: UI/UX Override - the chart's held readings
