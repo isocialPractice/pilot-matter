@@ -5,6 +5,57 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1-alpha] - 2026-09-30
+
+The address opener is pinned where it is connected to the page, not only where
+it is worked out. `openingRun` was read five ways and `startRun`'s new stage
+argument three more, and none of those readings reached `js/main.js`, which is
+where the feature meets the browser: replacing the one call at start-up with a
+comment left the suite reporting 1049 of 1049 passing while
+`?mode=cargo-run&stage=2` opened free flight at the first stage without a word
+said about it. The same edit now fails one test and nothing else.
+
+### Changed
+
+- **`test/game-modes.test.js` pins the wiring the address reaches the run
+  through.** `js/main.js` imports Three.js and cannot be constructed in Node, so
+  the three tests read it as source text through a `mainSource` regex, which is
+  the idiom `test/landing-score.test.js`, `test/minimap.test.js`,
+  `test/page.test.js` and `test/world-tiles.test.js` already use on that file. A
+  `simulatorMethod` helper extracts a named method by its own braces, so no span
+  can run past the method it is anchored on - which is the reason the hold test
+  in `test/input-map.test.js` gives for bounding a span, applied at the method
+  rather than at the call - and inside a method the spans are bounded tighter
+  again with `[^}]*?` and `[^)]*?`. Three things are held: that start-up hands
+  `window.location.search` to `openRequestedRun`, and hands it over after
+  `applySettings`, whose world would otherwise be built on top of the stage just
+  opened; that the request is read from the address the method was given and its
+  `modeId` and `stageIndex` passed to `startRun` on this session's run, with that
+  stage's own ground laid and the aircraft put back to its start; and that a
+  request carrying a `problem`, or no request at all, opens nothing - the guard
+  read by position as well as by text, because a guard written below the call it
+  guards reads exactly the same and stops nothing. Comments come off the source
+  before any of that, the way `styleRules` in `test/page.test.js` takes them off
+  the stylesheet: a call read as text reads the same whether it is made or
+  commented out, so without the strip putting `//` in front of the call in
+  `init` - which is how a line is disconnected in practice - left all three
+  tests passing on a page that no longer asks. Only a comment opening its own
+  line is taken, so a `//` inside a string is left alone. The two calls whose
+  order is held are both found before they are compared, because a call that is
+  not there at all is `indexOf` -1, which sits below every real position and so
+  reads as the right order: without that, deleting `applySettings` from `init`
+  passed the very assertion written to hold the opener behind it. Fifteen edits
+  to `js/main.js` were tried against the finished tests and every one of them
+  fails: the call commented out and the call replaced by a comment, the call
+  moved above `applySettings`, `applySettings` gone from `init` altogether, the
+  stage argument dropped from `startRun`, `refreshWorld` and the aircraft reset
+  each dropped and each commented out, the `problem` guard deleted and commented
+  out, the guard left reporting to the console without returning, the `!request`
+  return deleted and commented out, and the guard moved below `startRun`. The
+  first of those was run against the whole suite, which reports 1051 of 1052
+  with the wiring cut and 1052 passing with it in place; `js/main.js` is
+  unchanged either way
+
 ## [1.20.0-alpha] - 2026-09-29
 
 A mode's later stages can be opened directly, which is what put them back

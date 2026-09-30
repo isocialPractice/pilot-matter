@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     RUNWAY_LANDING,
     LOOP_COURSE,
@@ -460,6 +461,109 @@ test('a refused stage says what the mode actually has', () => {
 
     assert.ok(problem.includes(mode.label), 'named by the label the panel shows');
     assert.ok(problem.includes(String(mode.stages.length)), 'and by how many stages there are');
+});
+
+// --- The wiring the address reaches the run through ------------------------
+
+/**
+ * Everything above proves `openingRun` reads an address correctly, and none of
+ * it proves the page ever asks. The request is read in `js/main.js`, which
+ * imports Three.js and cannot be constructed in Node, so for a while the whole
+ * feature could be cut out with the suite still reporting a clean run:
+ * replacing the one call in `init` with a comment left every test passing, and
+ * `?mode=cargo-run&stage=2` opened free flight at the first stage without a
+ * word said about it.
+ *
+ * So the seam is read out of the source, the way `test/landing-score.test.js`
+ * reads the landing handler and `test/minimap.test.js` reads the chart. Each
+ * span below is taken from a method extracted by its own braces rather than
+ * from the whole file, for the reason the hold test in
+ * `test/input-map.test.js` gives: a span free to run to the end of the file
+ * matches the same text written a second time somewhere below, and passes a
+ * method that no longer makes the call. Inside a method the spans are bounded
+ * tighter still, with `[^}]*?` and `[^)]*?`, so none of them can leave the
+ * block or the call it is anchored on either.
+ *
+ * Comments come off before any of that, the way `styleRules` in
+ * `test/page.test.js` takes them off the stylesheet, and for the same reason
+ * one language over: a call read out of the source reads exactly the same
+ * whether it is made or commented out. Without this, putting `//` in front of
+ * the one call in `init` - which is how a line is disconnected in practice -
+ * left all three tests below passing on a page that no longer asks. Only a
+ * comment opening its own line is taken, so a `//` inside a string stays where
+ * it is.
+ */
+const mainSource = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^([ \t]*)\/\/.*$/gm, '$1');
+
+/** A method of the simulator, read off `js/main.js` by its own braces. */
+function simulatorMethod(name) {
+    return mainSource.match(new RegExp(
+        String.raw`^ {4}${name}\((.*?)\)\s*\{([\s\S]*?)^ {4}\}`, 'm'));
+}
+
+test('the page hands the address over on the way up', () => {
+    const init = simulatorMethod('init');
+    assert.ok(init, 'js/main.js should still bring the simulator up in init');
+
+    assert.ok(/this\.openRequestedRun\(window\.location\.search\)/.test(init[2]),
+        'start-up should hand the address to openRequestedRun, or nothing ever reads it');
+
+    // The opener builds a world of its own over the one the settings just
+    // built, so a call moved above applySettings is buried by it: the address
+    // is read, the run is started, and the screen still shows free flight.
+    const settled = init[2].indexOf('this.applySettings()');
+    const opened = init[2].indexOf('this.openRequestedRun(');
+
+    // Found before they are compared, because a missing call is `indexOf` -1,
+    // which is below every real position and so reads as the right order.
+    assert.notEqual(settled, -1, 'start-up should still apply the settings');
+    assert.ok(settled < opened,
+        'and hand it over after the settings, whose world would otherwise land on top of it');
+});
+
+test('the run the address asked for is the run that is opened', () => {
+    const opener = simulatorMethod('openRequestedRun');
+    assert.ok(opener, 'js/main.js should still define openRequestedRun');
+
+    const [search] = opener[1].split(',').map(name => name.trim());
+    assert.ok(search, 'openRequestedRun should take the address it is to read');
+    assert.ok(new RegExp(String.raw`openingRun\(\s*${search}\s*\)`).test(opener[2]),
+        `the request should be read from ${search}, which is the address it was handed`);
+
+    const started = opener[2].match(/startRun\(([^)]*?)\)/);
+    assert.ok(started, 'and a request that stands should open the run it names');
+    assert.deepEqual(started[1].split(',').map(argument => argument.trim()),
+        ['this.run', 'request.modeId', 'request.stageIndex'],
+        'with the mode and the stage the address asked for, on this session\'s run');
+
+    // Without these the run is set to a stage and nothing under it moves: the
+    // ground and the aircraft stay where free flight left them.
+    assert.ok(/startRun\([^)]*\);[^}]*?this\.refreshWorld\(\)/.test(opener[2]),
+        'the stage should bring its own ground with it');
+    assert.ok(/startRun\([^)]*\);[^}]*?this\.aircraft\.reset\(\)/.test(opener[2]),
+        'and put the aircraft at that stage\'s start rather than wherever the last one was');
+});
+
+test('an address that cannot be honoured opens nothing', () => {
+    const opener = simulatorMethod('openRequestedRun');
+    assert.ok(opener, 'js/main.js should still define openRequestedRun');
+
+    assert.ok(/if \(!request\) return;/.test(opener[2]),
+        'an address asking for no run should leave the session in the free flight it opened in');
+
+    const refusal = opener[2].match(/^ {8}if \(request\.problem\)\s*\{([\s\S]*?)^ {8}\}/m);
+    assert.ok(refusal, 'a request carrying a problem should be caught before anything is opened');
+    assert.ok(/return;/.test(refusal[1]),
+        'and turned away, rather than reported on the console and then opened anyway');
+    assert.ok(!/startRun\(/.test(refusal[1]),
+        'so a refused request starts no run of its own inside the guard either');
+
+    // Read by position as well, because a guard written below the call it
+    // guards reads exactly the same and stops nothing.
+    assert.ok(opener[2].indexOf('if (request.problem)') < opener[2].indexOf('startRun('),
+        'the refusal should stand in front of the run being started, not behind it');
 });
 
 // --- The panel -------------------------------------------------------------
