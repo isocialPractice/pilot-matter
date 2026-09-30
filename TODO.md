@@ -27,36 +27,6 @@ its context survives being archived.
   reach a clone
   - From: Documentation & Polish
 
-### Code Review Override - the address opener's wiring
-
-- [ ] Nothing in the suite reaches the line that opens the run an address asks
-  for
-  - **Issue**: `openingRun` itself is covered - `test/game-modes.test.js` runs
-    five cases over it and four more over `startRun`'s new stage argument - but
-    nothing in the project reaches `js/main.js`, where the feature is actually
-    connected to the page. The call at `js/main.js:302`,
-    `this.openRequestedRun(window.location.search)`, and the
-    `openRequestedRun` method at `js/main.js:981` are named by no test.
-    Replacing line 302 with a comment and running `npm test` was tried this
-    review: it reports 1049 of 1049 passing, the same count as with the line
-    there. So the whole feature can be disconnected - `?mode=cargo-run&stage=2`
-    silently opening free flight at stage 1 - with the suite reporting a clean
-    run. That line is the one the completed item exists for, since a check
-    reaching a later stage reaches it through that call and nothing else, and
-    the pure function below it passing is no evidence the page ever asks.
-    `js/main.js` imports Three.js and cannot be constructed in Node, which is
-    why four test files already read it as source text through a `mainSource`
-    regex: `test/landing-score.test.js:258`, `test/minimap.test.js:332`,
-    `test/page.test.js:1306` and `test/world-tiles.test.js:120`
-  - **Goal**: Pin the wiring the way the rest of `js/main.js` is pinned, in the
-    `mainSource` idiom those four files use - that the constructor calls
-    `openRequestedRun` with `window.location.search`, that the method hands
-    `openingRun`'s `modeId` and `stageIndex` to `startRun`, and that a request
-    carrying a `problem` is refused rather than opened. Bound each source span
-    with `[^}]*?` the way `test/input-map.test.js` bounds its spans, so neither
-    can run past the method it is anchored on
-  - From: Code Review Override - the address opener's wiring
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -302,28 +272,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 140 earlier items in `TODO-archive.md`, newest last.
+> 141 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Bounded Span Reason 1
-  - **Issue**: The `CHANGELOG.md` entry written for the reworded comment ends
-    "this is the only account in the repository of why this test bounds its
-    spans where the source-matching tests elsewhere in `test/` do not". The same
-    file contradicts that thirty lines above, where the third `### Fixed` entry
-    under `## Unreleased` already gives the account: "all three spans are
-    bounded to the call's own braces with `[^}]*?` rather than running to the end
-    of the file with `[\s\S]*?` - an unbounded span passes a field deleted from
-    the call as soon as the same text appears anywhere below it". The new entry
-    cites that very sentence as "the conditional the entry above already used",
-    so one entry both points at the earlier account and denies it exists. The
-    comment in `test/input-map.test.js` claims nothing of the kind and is correct
-    as written; only the changelog overstates, which is the class of defect this
-    item existed to remove
-  - **Goal**: Narrow the clause in the `### Changed` entry to what holds - the
-    comment is the only account a reader of the test finds, the changelog being
-    the record of the change rather than something the test carries - or drop the
-    clause and keep the sentence saying why the comment stays a reason. Leave the
-    `### Fixed` entry as it is
-  - From: Code Review Override - the reason written for the bounded span
 - [x] A mark held at the edge of the chart keeps none of its three readings
   - **Issue**: `.minimap-mark.off-map` in `index.html` carries the same
     specificity as `.minimap-mark.next` and `.minimap-mark.flown` and is
@@ -519,3 +469,30 @@ how the simulator got here rather than as a list still to be worked.
     order is pinned by the held-mark reading in `test/page.test.js` rather than
     only by the comment. `index.html` is otherwise sound and needs no edit
   - From: UI/UX Override - the chart's held readings
+- [x] Nothing in the suite reaches the line that opens the run an address asks
+  for
+  - **Issue**: `openingRun` itself is covered - `test/game-modes.test.js` runs
+    five cases over it and four more over `startRun`'s new stage argument - but
+    nothing in the project reaches `js/main.js`, where the feature is actually
+    connected to the page. The call at `js/main.js:302`,
+    `this.openRequestedRun(window.location.search)`, and the
+    `openRequestedRun` method at `js/main.js:981` are named by no test.
+    Replacing line 302 with a comment and running `npm test` was tried this
+    review: it reports 1049 of 1049 passing, the same count as with the line
+    there. So the whole feature can be disconnected - `?mode=cargo-run&stage=2`
+    silently opening free flight at stage 1 - with the suite reporting a clean
+    run. That line is the one the completed item exists for, since a check
+    reaching a later stage reaches it through that call and nothing else, and
+    the pure function below it passing is no evidence the page ever asks.
+    `js/main.js` imports Three.js and cannot be constructed in Node, which is
+    why four test files already read it as source text through a `mainSource`
+    regex: `test/landing-score.test.js:258`, `test/minimap.test.js:332`,
+    `test/page.test.js:1306` and `test/world-tiles.test.js:120`
+  - **Goal**: Pin the wiring the way the rest of `js/main.js` is pinned, in the
+    `mainSource` idiom those four files use - that the constructor calls
+    `openRequestedRun` with `window.location.search`, that the method hands
+    `openingRun`'s `modeId` and `stageIndex` to `startRun`, and that a request
+    carrying a `problem` is refused rather than opened. Bound each source span
+    with `[^}]*?` the way `test/input-map.test.js` bounds its spans, so neither
+    can run past the method it is anchored on
+  - From: Code Review Override - the address opener's wiring

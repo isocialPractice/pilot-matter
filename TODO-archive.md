@@ -1475,3 +1475,26 @@ still be found by name.
     rather than only the three the frame hands `heldAltitude`. `npm test` should
     still report 1033 passing
   - From: UI/UX Override - the chart behind the pointer row
+
+## Archived 09-30-26
+
+- [x] Bounded Span Reason 1
+  - **Issue**: The `CHANGELOG.md` entry written for the reworded comment ends
+    "this is the only account in the repository of why this test bounds its
+    spans where the source-matching tests elsewhere in `test/` do not". The same
+    file contradicts that thirty lines above, where the third `### Fixed` entry
+    under `## Unreleased` already gives the account: "all three spans are
+    bounded to the call's own braces with `[^}]*?` rather than running to the end
+    of the file with `[\s\S]*?` - an unbounded span passes a field deleted from
+    the call as soon as the same text appears anywhere below it". The new entry
+    cites that very sentence as "the conditional the entry above already used",
+    so one entry both points at the earlier account and denies it exists. The
+    comment in `test/input-map.test.js` claims nothing of the kind and is correct
+    as written; only the changelog overstates, which is the class of defect this
+    item existed to remove
+  - **Goal**: Narrow the clause in the `### Changed` entry to what holds - the
+    comment is the only account a reader of the test finds, the changelog being
+    the record of the change rather than something the test carries - or drop the
+    clause and keep the sentence saying why the comment stays a reason. Leave the
+    `### Fixed` entry as it is
+  - From: Code Review Override - the reason written for the bounded span
