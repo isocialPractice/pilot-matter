@@ -11,21 +11,17 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Traffic Pattern**: a full circuit flown to a pattern - takeoff, climb
-  out, downwind, base, and final - judged on holding each leg's altitude and
-  heading rather than only on the landing at the end of it
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Canyon Run**: fly the length of a canyon under a ceiling and between
-  its walls, with the ceiling coming down and the cut narrowing stage by stage
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Photo Survey**: photograph a list of named landmarks, each counting
-  only when it is caught from inside a height, range, and heading window
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] Drop the stand-down branch at the top of the ignore-rules check in
-  `test/site.test.js` so the guard applies on every tree, now that the user has
-  tracked `.gitignore`, and say in that run's changelog entry that the rules
-  reach a clone
-  - From: Documentation & Polish
+- [ ] Rename the **Controls** entry to **Control Settings**, and make what it
+  opens a panel of settings rather than a list
+  - From: Simulator Configuration
+- [ ] Toggle pitch and roll between inverted and directional, independently
+  - From: Flight Controls
+- [ ] Allow a full 360 in pitch and in roll, without breaking the controls at
+  the limit
+  - From: Flight Controls
+- [ ] Propose seven control settings worth having, as items in the **Flight
+  Controls** section
+  - From: Flight Controls
 
 ## Game UI/UX
 
@@ -41,19 +37,36 @@ minor version update.
 
 ### New Game Modes
 
-- [ ] **Traffic Pattern**: a full circuit flown to a pattern - takeoff, climb
-  out, downwind, base, and final - judged on holding each leg's altitude and
-  heading rather than only on the landing at the end of it
-- [ ] **Canyon Run**: fly the length of a canyon under a ceiling and between
-  its walls, with the ceiling coming down and the cut narrowing stage by stage
-- [ ] **Photo Survey**: photograph a list of named landmarks, each counting
-  only when it is caught from inside a height, range, and heading window
-
 ### Improve Existing Game Modes
 
 #### Runway Landing
 
 #### Flying through Loops
+
+#### Canyon Run
+
+- [ ] Pin the way a cut is drawn against the way a cut is tested, so the two
+  cannot drift apart
+  - Nothing in `test/` reaches `js/walls.js`. The beam across each cut is the
+    piece that was got wrong once, and the only thing that has ever caught it
+    is a pair of eyes on a screenshot or - this run - a browser reading the
+    quaternion back off the live scene. Both are checks that only happen when
+    somebody runs them.
+  - Two things are worth pinning, in the source-text idiom `test/page.test.js`
+    already uses for `js/rings.js` and `js/guidance.js`, since `js/walls.js`
+    imports Three.js and cannot be constructed in Node. First, that `buildBeam`
+    turns the cylinder with `quaternion.setFromUnitVectors` from `(0, 1, 0)` to
+    the across vector rather than by Euler angles - the module's own comment
+    says a pair of Euler angles does not compose in the order Three.js applies
+    them here, and that is the fault in as many words. Second, that `buildCut`
+    takes `acrossX = section.dirZ` and `acrossZ = -section.dirX`, the same span
+    `corridorCrossing` in `js/corridor.js` measures its offset along, so the
+    posts stand where the rule tests. The second is the one with teeth: a
+    corridor that flipped its offset convention would draw its walls on the
+    wrong axis with the suite still green.
+  - Bound each source span with `[^}]*?` the way `test/input-map.test.js`
+    bounds its spans, so neither assertion can run past the function it is
+    anchored on.
 
 ## World & Environment
 
@@ -259,112 +272,13 @@ applies a minor version update.
 Keep the docs accurate and improve first-run experience. Completing items
 in this section applies a patch version update.
 
-- [ ] Drop the stand-down branch at the top of the ignore-rules check in
-  `test/site.test.js` so the guard applies on every tree. The check skips
-  itself where the repository carries no `.gitignore`, because a personal
-  global rule kept the file out and `actions/checkout` fetched a tree without
-  it. The user has since tracked it - `git ls-files .gitignore` answers - so
-  the branch now guards nothing and hides the check on any tree that loses the
-  file. Say in that run's changelog entry that the rules reach a clone
-
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 141 earlier items in `TODO-archive.md`, newest last.
+> 145 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A mark held at the edge of the chart keeps none of its three readings
-  - **Issue**: `.minimap-mark.off-map` in `index.html` carries the same
-    specificity as `.minimap-mark.next` and `.minimap-mark.flown` and is
-    written after both, so it wins outright: a mark held at the edge of the
-    square is drawn `fill: none; stroke: #ffb000; stroke-width: 0.9`
-    whichever of the three readings it carries. `markClass` in `js/minimap.js`
-    still puts the right class on the element; nothing on the glass says which.
-    That cost nothing while the chart drew only a loop course, whose gates are
-    laid inside the tile they are flown over, and costs something now that a
-    route's strips are drawn on the same terms - as the comment above the rule
-    says in as many words. Measured in the running app at 393x740 and 640x745
-    with the pointer row stood down: `CARGO RUN` / `SHORT HAUL` opens at
-    (-8675, 1626), 675 units the wrong side of the tile boundary at x = -8000,
-    with both its strips in the tile east of it, so both are held at the edge
-    at -50,0.87 and -50,-35.18 and both read `fill: none`,
-    `stroke: rgb(255, 176, 0)`, `stroke-width: 0.9px` - the leg being flown and
-    the leg still ahead identical. Hands off that lasts 7.5 seconds, until the
-    aircraft crosses into the tile the strips are in and the marks read green
-    and amber correctly. `LONG HAUL` opens 301 units the wrong side of
-    x = 8000 and does the same for a shorter beat. A search is untouched in
-    substance: it draws one mark, so there is nothing to tell apart.
-  - **Goal**: Resolve to [edge-held-mark-readings.prompt.md](.claude/prompts/edge-held-mark-readings.prompt.md)
-  - From: UI/UX Override - the chart the pointer row hands off to
-- [x] The pages written for the chart describe a held mark keeping a reading it
-  gives up
-  - **Issue**: Both paragraphs added to `docs/controls/game-modes.html` this run
-    compose "marked green" with "held hollow at the edge", which the stylesheet
-    the item above describes makes mutually exclusive. The route paragraph has a
-    route drawn "with the leg you are flying marked green and the ones behind
-    you dim, with a strip past the edge of the square held hollow at that edge";
-    the search paragraph has the marker "green the way a gate being waited on
-    is, and held hollow at the edge of the square once it lies past the ground
-    the chart covers - which on a long leg is most of the flight". As shipped a
-    held mark is amber whichever reading it carries, so on the very case each
-    paragraph names as the ordinary one - `CARGO RUN` / `SHORT HAUL` for its
-    first 7.5 seconds, a search for most of a long leg - the published page
-    names a colour the glass never shows. `docs/controls/instruments.html` puts
-    the three readings and the hollow edge in consecutive sentences and reads
-    the same way without claiming it outright.
-  - **Goal**: Work this with the item above rather than apart from it, since the
-    two answers are one decision. If the stroke is made to carry the reading as
-    that item's prompt proposes, all three paragraphs are true as written and
-    none needs touching - say so. If the decision goes the other way, qualify
-    each to say a held mark gives its reading up for the hollow edge.
-  - From: UI/UX Override - the chart the pointer row hands off to
-- [x] The chart test keeps the vocabulary the rename took out of everything
-  around it
-  - **Issue**: `test/minimap.test.js` was moved from gate to mark throughout
-    this run except in `a chart fitted to new ground draws the course against
-    that ground` at 295-310, whose comment still reads "puts every gate
-    somewhere else on the face", whose locals are `gates` and `gate` against the
-    `marks` and `mark` the tests either side of it now use, and whose message
-    still says "the gate being waited on" for a course that may now be a route's
-    strips. Nothing fails; the file says both words for one thing. In the same
-    file the new seam test writes `const [body] = [method[1]];` at 347, an array
-    built and destructured in place to bind the one value `const body =
-    method[1]` binds directly.
-  - **Goal**: Finish the rename in that test - its comment, its locals and its
-    message - and bind `body` directly. `npm test` should still report 1038
-    passing.
-  - From: UI/UX Override - the chart the pointer row hands off to
-- [x] The check on a held mark's colour passes whether or not the rule wins
-  - **Issue**: `a mark held at the edge of the chart keeps the colour of the
-    hoop it stands for` at `test/page.test.js:642` asks `styled` whether some
-    rule written for `.minimap-mark.next.off-map` carries `stroke: #00ff44`, and
-    `styled` at 270 reads each rule alone: it finds a rule the selector was
-    written for and tests that rule's own body, with no account of specificity
-    or of source order. The defect `1.19.1-alpha` fixed was a rule that existed
-    and lost - `.minimap-mark.next` carried `fill: #00ff44` the whole time a
-    held mark drew amber, and `a mark on the chart is the colour the hoop it
-    stands for is` at 617 asserted exactly that and passed through the entire
-    life of the bug. The new test inherits the blind spot it was written to
-    close. Verified in review by adding a second
-    `.minimap-mark.off-map { stroke: #ffb000; }` below `index.html:231`, which
-    flattens a held next strip and a held flown strip back to amber on equal
-    specificity and later order: `node --test test/page.test.js` reported 65 of
-    65 passing. The line was removed again and `index.html` is as the run left
-    it.
-  - **Goal**: Give `test/page.test.js` a way to ask which rule wins and assert
-    the winner rather than the presence. `styleRules` at 254 already returns
-    every rule in source order, so it needs each rule's position kept, a
-    specificity read off a selector's `#`, `.` and element parts, and a helper
-    that resolves one declaration for a given set of classes by taking the last
-    rule of the highest specificity that matches them. State the three off-map
-    readings as the colour an element with `next`, `flown` or neither resolves
-    to, and restate the three inside the square at 617 the same way, so the
-    original blind spot closes with it. Not fixed in review: this is new test
-    machinery rather than a correction to what the run wrote, and the review's
-    own fixes are bounded to what it can verify inside the files the run
-    touched.
-  - From: Code Review Override - the held mark's reading and the rename left half done
 - [x] The rename to mark reached one more test and stopped four short
   - **Issue**: `test/minimap.test.js` still says gate for what the chart now
     draws as a mark, in the four tests covering `coursePoints` and `courseLine`
@@ -496,3 +410,18 @@ how the simulator got here rather than as a list still to be worked.
     with `[^}]*?` the way `test/input-map.test.js` bounds its spans, so neither
     can run past the method it is anchored on
   - From: Code Review Override - the address opener's wiring
+- [x] **Traffic Pattern**: a full circuit flown to a pattern - takeoff, climb
+  out, downwind, base, and final - judged on holding each leg's altitude and
+  heading rather than only on the landing at the end of it
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Canyon Run**: fly the length of a canyon under a ceiling and between
+  its walls, with the ceiling coming down and the cut narrowing stage by stage
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Photo Survey**: photograph a list of named landmarks, each counting
+  only when it is caught from inside a height, range, and heading window
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] Drop the stand-down branch at the top of the ignore-rules check in
+  `test/site.test.js` so the guard applies on every tree, now that the user has
+  tracked `.gitignore`, and say in that run's changelog entry that the rules
+  reach a clone
+  - From: Documentation & Polish
