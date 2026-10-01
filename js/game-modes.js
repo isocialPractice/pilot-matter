@@ -16,22 +16,29 @@
 import { createRandom, runwayThresholds, DEFAULT_SIZE } from './environment/elements.js';
 import {
     OPEN_COUNTRY_ID, LOOP_VALLEY_ID, BACK_COUNTRY_ID,
+    CANYON_REACH_ID, SURVEY_COUNTRY_ID,
     getEnvironment, environmentElements
 } from './environment/presets.js';
 import {
-    START_FLYING, startDefaults, snapStartValue, startField
+    START_FLYING, START_TAKEOFF, startDefaults, snapStartValue, startField
 } from './config.js';
 import {
     FEET_PER_UNIT, KNOTS_PER_UNIT,
     bearingToDirection as bearingDirection, directionToBearing
 } from './units.js';
 import { GLIDE_SPEED } from './flight-model.js';
+import { buildPattern, legCrossed, PATTERN_LEGS, FINAL_LEG } from './pattern.js';
+import { buildCorridor, corridorCrossing, missedBy } from './corridor.js';
+import { buildSurvey, shotFor, shotFault, landmarkBrief } from './survey.js';
 
 export const RUNWAY_LANDING = 'runway-landing';
 export const LOOP_COURSE    = 'loop-course';
 export const DEAD_STICK     = 'dead-stick';
 export const CARGO_RUN      = 'cargo-run';
 export const SEARCH_RESCUE  = 'search-rescue';
+export const TRAFFIC_PATTERN = 'traffic-pattern';
+export const CANYON_RUN      = 'canyon-run';
+export const PHOTO_SURVEY    = 'photo-survey';
 
 // What a stage asks for. A landing is one thing done once; a course is a count
 // of gates flown in the order they were laid; a cargo run is a count of strips
@@ -41,6 +48,14 @@ export const LAND_OBJECTIVE   = 'landing';
 export const LOOP_OBJECTIVE   = 'loops';
 export const CARGO_OBJECTIVE  = 'cargo';
 export const SEARCH_OBJECTIVE = 'search';
+
+// And the three that count something other than a place reached: a circuit is
+// the legs of a pattern flown in order and held while they are flown, a run is
+// the sections of a corridor crossed inside the cut, and a survey is the
+// landmarks on a list caught from inside the window each one declares.
+export const PATTERN_OBJECTIVE  = 'pattern';
+export const CORRIDOR_OBJECTIVE = 'corridor';
+export const SURVEY_OBJECTIVE   = 'survey';
 
 /**
  * Whether there is an engine pulling. A mode may take it away at the start, as
@@ -333,7 +348,198 @@ const searchRescue = {
     ]
 };
 
-export const GAME_MODES = [runwayLanding, loopCourse, deadStick, cargoRun, searchRescue];
+/**
+ * A full circuit flown to a pattern: off the strip, out on the climb, round the
+ * downwind, in on the base, and down the final to land back where it started.
+ *
+ * It is the one mode that is not about arriving. Every other landing mode asks
+ * what the touchdown came to and nothing about the eight miles that preceded
+ * it; this one reads the aircraft against the leg it is on every frame and
+ * marks each leg on how near the heading and the height it was held. The
+ * landing is still scored, and it is a fifth of the circuit rather than the
+ * whole of it.
+ *
+ * It is also the one mode that opens on the ground. Every other stage opens in
+ * flight because a takeoff is the part nobody is being scored on - here the
+ * takeoff is the first leg of the thing being scored, so it is flown.
+ *
+ * The stages tighten the circuit rather than roughen the ground: the pattern
+ * draws in, the field gets shorter, and what counts as holding a leg narrows.
+ * A mode about precision gets harder by asking for more of it.
+ */
+const trafficPattern = {
+    id: TRAFFIC_PATTERN,
+    label: 'TRAFFIC PATTERN',
+    description: 'Fly the circuit to the pattern, and hold every leg of it',
+    objective: PATTERN_OBJECTIVE,
+    goal: 'FLY THE CIRCUIT AND LAND',
+    environment: OPEN_COUNTRY_ID,
+    seed: 6700417,
+    stages: [
+        {
+            label: 'WIDE CIRCUIT',
+            note: 'a big pattern over flat ground, with room to settle on each leg',
+            base: { maxHeight: 150, scale: 1.8 },
+            runway: { length: [1900, 2200], width: [260, 300] },
+            pattern: { altitudeFeet: 1000, upwind: 1100, offset: 1600, final: 1500 },
+            reaches: { altitude: 380, heading: 30 },
+            guidance: { centreline: true, threshold: true }
+        },
+        {
+            label: 'STANDARD',
+            note: 'the pattern drawn in to the usual shape, and the ground rising',
+            base: { maxHeight: 260, scale: 2.4 },
+            runway: { length: [1700, 2000], width: [240, 280] },
+            pattern: { altitudeFeet: 1000, upwind: 900, offset: 1300, final: 1300 },
+            reaches: { altitude: 300, heading: 24 },
+            guidance: { centreline: false, threshold: true }
+        },
+        {
+            label: 'CLOSE IN',
+            note: 'close in, low, and little room between one turn and the next',
+            base: { maxHeight: 400, scale: 3.0 },
+            runway: { length: [1500, 1800], width: [220, 260] },
+            pattern: { altitudeFeet: 800, upwind: 700, offset: 1050, final: 1050 },
+            reaches: { altitude: 220, heading: 18 }
+        },
+        {
+            label: 'SHORT FIELD',
+            note: 'a short strip, a tight pattern, and nothing given away on any leg',
+            base: { maxHeight: 540, scale: 3.8 },
+            runway: { length: [1300, 1600], width: [200, 240] },
+            pattern: { altitudeFeet: 700, upwind: 600, offset: 850, final: 900 },
+            reaches: { altitude: 160, heading: 14 }
+        }
+    ]
+};
+
+/**
+ * A run down a canyon: the length of a corridor, under a ceiling and between
+ * two walls, section by section.
+ *
+ * A section is counted only when the aircraft crosses it inside the cut, so
+ * climbing over the top is not a way through - it is the one way the mode can
+ * be cheated and the only thing it guards against. Going over or wide leaves
+ * the section standing and tells the pilot which of the two it was, the way a
+ * loop gone by leaves the gate standing: the run is a line to be flown, and a
+ * pilot who has climbed out of it comes back down and tries the section again.
+ *
+ * The ceiling comes down and the cut narrows stage by stage, which is the mode
+ * getting harder at exactly the thing it is about.
+ */
+const canyonRun = {
+    id: CANYON_RUN,
+    label: 'CANYON RUN',
+    description: 'Fly the length of the corridor, under the ceiling and inside the walls',
+    objective: CORRIDOR_OBJECTIVE,
+    goal: 'RUN THE CANYON END TO END',
+    environment: CANYON_REACH_ID,
+    seed: 2147483647,
+    stages: [
+        {
+            label: 'OPEN REACH',
+            note: 'a wide cut with plenty of air over it, to learn the line on',
+            base: { maxHeight: 420, scale: 3.2 },
+            corridor: { count: 5, spacing: 1900, halfWidth: 420, ceiling: 620, turn: 0.18 }
+        },
+        {
+            label: 'NARROWS',
+            note: 'the walls closer together, and the ceiling coming down on you',
+            base: { maxHeight: 500, scale: 3.6 },
+            corridor: { count: 7, spacing: 1750, halfWidth: 300, ceiling: 450, turn: 0.26 }
+        },
+        {
+            label: 'THE RIM',
+            note: 'low enough that the rim is above you the whole way down',
+            base: { maxHeight: 580, scale: 4.0 },
+            corridor: { count: 9, spacing: 1600, halfWidth: 215, ceiling: 320, turn: 0.34 }
+        },
+        {
+            label: 'THE SLOT',
+            note: 'a cut barely wider than the turn it asks for, with a lid on it',
+            base: { maxHeight: 660, scale: 4.4 },
+            corridor: { count: 11, spacing: 1450, halfWidth: 155, ceiling: 230, turn: 0.42 }
+        }
+    ]
+};
+
+/**
+ * A list of landmarks to photograph, each one counting only when the shutter
+ * goes with the aircraft inside the height, the range and the heading the brief
+ * asked for.
+ *
+ * The camera is the one instrument the simulator has that the pilot presses
+ * rather than reads, and this is the mode that asks a question of it. A pass
+ * over a landmark is worth nothing on its own: the aircraft has to be at the
+ * height the shot wants, out at the range that frames it, and round on the side
+ * the brief named. Three readings, all at once, on a key that takes one frame.
+ *
+ * The stages lengthen the list and draw the windows in, so what starts as a
+ * tour of three obvious things becomes a route flown to a plan.
+ */
+const photoSurvey = {
+    id: PHOTO_SURVEY,
+    label: 'PHOTO SURVEY',
+    description: 'Photograph every landmark on the list, from inside its window',
+    objective: SURVEY_OBJECTIVE,
+    goal: 'PHOTOGRAPH EVERY LANDMARK',
+    environment: SURVEY_COUNTRY_ID,
+    seed: 999983,
+    stages: [
+        {
+            label: 'SHORT LIST',
+            note: 'three landmarks close in, with a wide window on each',
+            base: { maxHeight: 300, scale: 2.6 },
+            survey: {
+                opening: { heading: 40, altitudeFeet: 2200 },
+                window: { heightFeet: [1200, 3000], range: [500, 2200], headingReach: 55 },
+                landmarks: [
+                    { name: 'THE BLUFF',    bearing: 40,  distance: 2600, heading: 40,  height: 220 },
+                    { name: 'MILL TOWN',    bearing: 135, distance: 3400, heading: 160, height: 80 },
+                    { name: 'THE OXBOW',    bearing: 250, distance: 3000, heading: 290, height: 20 }
+                ]
+            }
+        },
+        {
+            label: 'LONGER LIST',
+            note: 'a longer list, further apart, and the windows drawn in',
+            base: { maxHeight: 360, scale: 2.9 },
+            survey: {
+                opening: { heading: 20, altitudeFeet: 2000 },
+                window: { heightFeet: [900, 2200], range: [600, 1700], headingReach: 42 },
+                landmarks: [
+                    { name: 'NORTH RIDGE',  bearing: 15,  distance: 3800, heading: 15,  height: 300 },
+                    { name: 'THE QUARRY',   bearing: 88,  distance: 4400, heading: 110, height: 120 },
+                    { name: 'LOW WATER',    bearing: 162, distance: 4000, heading: 190, height: 10 },
+                    { name: 'THE STANDS',   bearing: 231, distance: 4600, heading: 250, height: 180 },
+                    { name: 'WEST POINT',   bearing: 302, distance: 3600, heading: 320, height: 60 }
+                ]
+            }
+        },
+        {
+            label: 'FULL LIST',
+            note: 'six landmarks out to the far country, each caught one way only',
+            base: { maxHeight: 440, scale: 3.3 },
+            survey: {
+                opening: { heading: 350, altitudeFeet: 1800 },
+                window: { heightFeet: [700, 1500], range: [450, 1200], headingReach: 30 },
+                landmarks: [
+                    { name: 'HIGH SADDLE',  bearing: 350, distance: 5200, heading: 350, height: 340 },
+                    { name: 'THE CUT',      bearing: 52,  distance: 5800, heading: 70,  height: 160 },
+                    { name: 'OLD WHARF',    bearing: 118, distance: 5400, heading: 140, height: 30 },
+                    { name: 'THE TERRACE',  bearing: 186, distance: 6000, heading: 205, height: 210 },
+                    { name: 'SOUTH MILL',   bearing: 254, distance: 5600, heading: 275, height: 90 },
+                    { name: 'THE SPUR',     bearing: 310, distance: 6200, heading: 335, height: 260 }
+                ]
+            }
+        }
+    ]
+};
+
+export const GAME_MODES = [
+    runwayLanding, loopCourse, deadStick, cargoRun, searchRescue,
+    trafficPattern, canyonRun, photoSurvey
+];
 
 export const GAME_MODE_IDS = GAME_MODES.map(mode => mode.id);
 
@@ -361,11 +567,17 @@ export function createRunState(modeId = null) {
         modeId: null, stageIndex: 0, gate: 0, missed: 0,
         elapsed: 0, landed: false, complete: false,
         // The strips of a route already landed at, the budget left to spend on
-        // the rest of it, and whether the marker has been reached. All three
-        // are carried by every run rather than only by the runs that use them,
-        // for the reason free flight is a run of nothing: everything reading a
-        // run reads one shape.
-        leg: 0, fuel: 0, found: false
+        // the rest of it, whether the marker has been reached, and the
+        // landmarks a survey has caught. All four are carried by every run
+        // rather than only by the runs that use them, for the reason free
+        // flight is a run of nothing: everything reading a run reads one shape.
+        //
+        // `leg` counts the legs of a circuit as well as the strips of a route,
+        // and `gate` the sections of a corridor as well as the loops of a
+        // course. A run is one mode, so the two never have to mean both at
+        // once, and a second field per mode would be four ways of saying "how
+        // far down the list the pilot has got".
+        leg: 0, fuel: 0, found: false, shot: 0
     };
     if (isGameModeId(modeId)) startRun(state, modeId);
     return state;
@@ -517,6 +729,7 @@ export function restartStage(state) {
     state.landed = false;
     state.leg = 0;
     state.found = false;
+    state.shot = 0;
 
     // The budget goes back with the stage, which is what makes a run out of
     // fuel something to fly again rather than something to sit in.
@@ -534,6 +747,40 @@ export function stageBudget(state) {
 export function stageStrips(state) {
     const strips = currentStage(state)?.strips;
     return Number.isFinite(strips) && strips > 0 ? Math.round(strips) : 0;
+}
+
+/**
+ * How many sections a canyon stage cuts its corridor into, which is how many
+ * have to be flown through.
+ */
+export function stageSections(state) {
+    const count = currentStage(state)?.corridor?.count;
+    return Number.isFinite(count) && count > 0 ? Math.round(count) : 0;
+}
+
+/** The landmarks a survey stage lists, placed in the world and ready to shoot. */
+export function stageLandmarks(state) {
+    const mode = runningMode(state);
+    return mode?.objective === SURVEY_OBJECTIVE ? buildSurvey(currentStage(state)) : [];
+}
+
+/**
+ * The circuit a pattern stage is flown round, laid off the strip the world put
+ * down. Empty for every other mode, and for a pattern stage over a world whose
+ * ground would take no strip.
+ */
+export function stagePattern(state, runway) {
+    const mode = runningMode(state);
+    return mode?.objective === PATTERN_OBJECTIVE ? buildPattern(currentStage(state), runway) : [];
+}
+
+/**
+ * How close a leg of the circuit has to be held to count as held, as the miss
+ * that takes each of the two marks to nothing. Read off the stage so a later
+ * stage can ask for more of the same thing rather than for something else.
+ */
+export function stageReaches(state) {
+    return currentStage(state)?.reaches ?? {};
 }
 
 /**
@@ -556,16 +803,39 @@ export function stageProgress(state) {
         return { done: state.found ? 1 : 0, total: 1 };
     }
 
+    if (mode.objective === PATTERN_OBJECTIVE) {
+        return { done: state.leg, total: PATTERN_LEGS.length };
+    }
+
+    if (mode.objective === CORRIDOR_OBJECTIVE) {
+        return { done: state.gate, total: stageSections(state) };
+    }
+
+    if (mode.objective === SURVEY_OBJECTIVE) {
+        return { done: state.shot, total: stageLandmarks(state).length };
+    }
+
     return { done: state.landed ? 1 : 0, total: 1 };
 }
 
 /**
  * What the thing being counted off is called, for the one line the run is
- * reported in. A course counts loops and a route counts legs; everything else
- * counts one thing once and never reaches the plural.
+ * reported in. A course counts loops, a route and a circuit count legs, a run
+ * counts the cuts the corridor is divided into, and a survey counts shots;
+ * everything else counts one thing once and never reaches the plural.
+ *
+ * Every one of them is short on purpose, and the corridor's is the one that
+ * had to be chosen rather than found. The status row is measured at
+ * forty-four characters with the stage's own name in front of it, and a run of
+ * twelve `SECTION`s runs past that; `CUT` is both short enough and the word
+ * the thing is already called, a canyon run being a run down a cut.
  */
 export function progressNoun(state) {
-    return runningMode(state)?.objective === CARGO_OBJECTIVE ? 'LEG' : 'LOOP';
+    const objective = runningMode(state)?.objective;
+    if (objective === CARGO_OBJECTIVE || objective === PATTERN_OBJECTIVE) return 'LEG';
+    if (objective === CORRIDOR_OBJECTIVE) return 'CUT';
+    if (objective === SURVEY_OBJECTIVE) return 'SHOT';
+    return 'LOOP';
 }
 
 export function isStageComplete(state) {
@@ -617,10 +887,67 @@ export function recordLanding(state, runway = null) {
         return true;
     }
 
+    // A circuit is landed at the end of its last leg and nowhere else. The
+    // pilot is over their own threshold four times in a pattern - on the
+    // takeoff roll, and on each pass down the strip a go-around leaves - and
+    // an arrival on any of them is an arrival in the middle of the circuit
+    // rather than the end of one.
+    if (mode.objective === PATTERN_OBJECTIVE) {
+        if (state.landed || nextLeg(state) !== FINAL_LEG) return false;
+        state.landed = true;
+        state.leg = PATTERN_LEGS.length;
+        return true;
+    }
+
     if (mode.objective !== LAND_OBJECTIVE || state.landed) return false;
 
     state.landed = true;
     return true;
+}
+
+/** The leg of the circuit being flown, or -1 once the circuit is flown out. */
+export function nextLeg(state) {
+    const { done, total } = stageProgress(state);
+    return runningMode(state)?.objective === PATTERN_OBJECTIVE && done < total ? done : -1;
+}
+
+/**
+ * Reports a leg of the circuit flown to its turn. Only the leg the pattern is
+ * on counts, as only the gate a course is waiting on counts, and for the same
+ * reason: a circuit is a shape flown in order.
+ *
+ * The last leg is refused here and closed by the landing instead. Final ends
+ * at the threshold, and an aircraft crosses that threshold on every go-around
+ * it flies - counting the crossing would finish the circuit for a pilot who
+ * never got down.
+ */
+export function recordPatternLeg(state, index) {
+    const mode = runningMode(state);
+    if (!mode || mode.objective !== PATTERN_OBJECTIVE || state.complete) return false;
+    if (index !== state.leg || index >= FINAL_LEG) return false;
+
+    state.leg += 1;
+    return true;
+}
+
+/**
+ * The step the aircraft just flew, put to the leg the circuit is on.
+ *
+ * A step rather than a place, for the reason a gate takes one: the end of a leg
+ * is a line square across it, and an aircraft covers more ground in a frame
+ * than a line is wide.
+ *
+ * Returns the leg the step was put to and whether it turned onto the next one.
+ */
+export function flyPattern(state, circuit, from, to) {
+    const index = nextLeg(state);
+    const nothing = { leg: index, turned: false };
+    if (index < 0 || !from || !to) return nothing;
+
+    const leg = circuit?.[index];
+    if (!leg || !legCrossed(leg, from, to)) return nothing;
+
+    return { leg: index, turned: recordPatternLeg(state, index) };
 }
 
 /** The strip a route is up to, or -1 once the route is flown out. */
@@ -713,6 +1040,119 @@ export function flyStep(state, course, from, to) {
 export function nextGate(state) {
     const { done, total } = stageProgress(state);
     return runningMode(state)?.objective === LOOP_OBJECTIVE && done < total ? done : -1;
+}
+
+// --- The corridor a run is flown down --------------------------------------
+
+/** The section the run is up to, or -1 once the corridor is flown out. */
+export function nextSection(state) {
+    const { done, total } = stageProgress(state);
+    return runningMode(state)?.objective === CORRIDOR_OBJECTIVE && done < total ? done : -1;
+}
+
+/**
+ * Reports a section crossed inside the cut. Only the section the run is up to
+ * counts: a corridor is a length flown down, so a section further along it is
+ * not the pilot's business yet.
+ *
+ * Returns true when it completed the stage.
+ */
+export function recordSection(state, index) {
+    const mode = runningMode(state);
+    if (!mode || mode.objective !== CORRIDOR_OBJECTIVE || state.complete) return false;
+    if (index !== state.gate) return false;
+
+    state.gate += 1;
+    return isStageComplete(state);
+}
+
+/**
+ * Reports a section reached outside the cut - over the ceiling, wide of a
+ * wall, or both. Nothing about the run moves: the section stays the one the
+ * run is up to, which is what lets it be flown again. What the fault buys is
+ * that the pilot is told which of the two walls they were the wrong side of.
+ */
+export function recordSectionFault(state, index) {
+    const mode = runningMode(state);
+    if (!mode || mode.objective !== CORRIDOR_OBJECTIVE || state.complete) return false;
+    if (index !== state.gate) return false;
+
+    state.missed += 1;
+    return true;
+}
+
+/**
+ * The step the aircraft just flew, put to the section the run is up to.
+ *
+ * The same shape as `flyStep`, and for the same reasons: a section is thinner
+ * than the distance an aircraft covers in a frame, and everything a step can do
+ * to a run is decided here rather than half here and half in the caller.
+ *
+ * Returns what became of the step: the section it was put to, whether it went
+ * through inside the cut or reached it outside, what it was outside by, and
+ * whether going through it was the last section the stage was waiting on.
+ */
+export function flyCorridor(state, corridor, from, to) {
+    const index = nextSection(state);
+    const nothing = { section: index, passed: false, faulted: false, fault: '', finished: false };
+    if (index < 0 || !from || !to) return nothing;
+
+    const crossing = corridorCrossing(corridor?.[index], from, to);
+    if (!crossing) return nothing;
+
+    if (crossing.inside) {
+        return { section: index, passed: true, faulted: false, fault: '',
+                 finished: recordSection(state, index) };
+    }
+
+    if (!crossing.forward) return nothing;
+
+    return {
+        section: index,
+        passed: false,
+        faulted: recordSectionFault(state, index),
+        fault: missedBy(crossing),
+        finished: false
+    };
+}
+
+// --- The list a survey works through ---------------------------------------
+
+/** The landmark the survey is up to, or -1 once the list is worked out. */
+export function nextLandmark(state) {
+    const { done, total } = stageProgress(state);
+    return runningMode(state)?.objective === SURVEY_OBJECTIVE && done < total ? done : -1;
+}
+
+/**
+ * Reports the shutter to a survey, with where the aircraft was when it went.
+ *
+ * The photograph is taken either way - the camera belongs to the pilot rather
+ * than to the mode, and a mode that swallowed a picture because it was not the
+ * one it wanted would be a mode that broke the camera. What is decided here is
+ * only whether it counted.
+ *
+ * Returns what the shot was: which landmark it was put to, whether it was
+ * inside the window, what it was outside by where it was not, and whether
+ * catching it finished the stage. A shot with no landmark outstanding is a
+ * photograph and nothing else, which is the ordinary case in every other mode.
+ */
+export function recordPhoto(state, landmarks, report = {}) {
+    const index = nextLandmark(state);
+    const nothing = { index, caught: false, fault: '', finished: false, shot: null };
+    if (index < 0 || state.complete) return nothing;
+
+    const landmark = landmarks?.[index];
+    const shot = shotFor(landmark, report);
+    if (!shot) return nothing;
+
+    if (!shot.inside) {
+        state.missed += 1;
+        return { index, caught: false, fault: shotFault(shot, landmark), finished: false, shot };
+    }
+
+    state.shot += 1;
+    return { index, caught: true, fault: '', finished: isStageComplete(state), shot };
 }
 
 /**
@@ -895,6 +1335,71 @@ export function missNotice(state) {
     return gate < 0 ? '' : `LOOP ${gate + 1} MISSED  ·  COME ROUND`;
 }
 
+/**
+ * What a section reached outside the cut is reported as: which one it was, and
+ * which of the two walls the aircraft was the wrong side of. The run is still
+ * waiting on that section, so naming it is naming what to come back and fly.
+ *
+ * Empty for a run with nothing outstanding, and for a fault with nothing to
+ * say about it.
+ */
+export function faultNotice(state, fault) {
+    const section = nextSection(state);
+    return section < 0 || !fault ? '' : `CUT ${section + 1}  ·  ${fault}`;
+}
+
+/**
+ * What a shot outside the window is reported as: the landmark it was taken of,
+ * and the first thing that was wrong with it. The survey is still waiting on
+ * that landmark, so it comes round and is shot again.
+ */
+export function shotNotice(landmark, fault) {
+    return landmark && fault ? `${landmark.name}  ·  ${fault}` : '';
+}
+
+/**
+ * What a leg of the circuit held to is reported as: the leg, and the mark the
+ * two readings came to over the length of it.
+ */
+export function legNotice(flown) {
+    return flown ? `${flown.label}  ·  HELD ${flown.score}` : '';
+}
+
+/**
+ * What the pilot is being asked for right now, which for most modes is the
+ * mode's own goal and never changes.
+ *
+ * Two of them change inside a stage, because what they are asking for does.
+ * A circuit asks for a different height and a different heading on every leg,
+ * and a survey asks for a different landmark on every shot, so the line that
+ * stands in for the goal is the brief for the leg or the landmark the run is
+ * on. Both are written to the room the objective row has, which is what keeps
+ * the range band of a survey off it and on the ground instead, drawn round the
+ * landmark where it is a place rather than a pair of numbers.
+ */
+export function runBrief(state, world = {}) {
+    const mode = runningMode(state);
+    if (!mode) return '';
+
+    if (mode.objective === PATTERN_OBJECTIVE) {
+        const leg = world.circuit?.[nextLeg(state)];
+        return leg ? `${leg.label}  ·  ${Math.round(leg.altitudeFeet)} FT  ·  ${bearing(leg.heading)}°`
+                   : mode.goal;
+    }
+
+    if (mode.objective === SURVEY_OBJECTIVE) {
+        const landmark = world.landmarks?.[nextLandmark(state)];
+        return landmark ? landmarkBrief(landmark) : mode.goal;
+    }
+
+    return mode.goal;
+}
+
+/** A bearing written the way the compass readout writes one, three digits. */
+function bearing(degrees) {
+    return String(Math.round(wrapDegrees(degrees))).padStart(3, '0');
+}
+
 // --- Where the gate is -----------------------------------------------------
 
 /**
@@ -1007,7 +1512,54 @@ export function runPointer(state, world = {}, position, heading) {
     if (mode.objective === CARGO_OBJECTIVE) return stripPointer(state, world.runways, position, heading);
     if (mode.objective === SEARCH_OBJECTIVE) return searchBriefing(state);
 
+    // A corridor is a built thing standing in the world, so its pointer is
+    // suppressed while the section is in front of the aircraft, exactly as a
+    // gate's is: what is on the screen is already pointing at itself.
+    if (mode.objective === CORRIDOR_OBJECTIVE) {
+        const pointer = markPointer(world.corridor?.[nextSection(state)], position, heading, true);
+        return pointer ? { ...pointer, index: nextSection(state), label: `CUT ${nextSection(state) + 1}` } : null;
+    }
+
+    // A turn in a circuit is a place in empty air with nothing drawn at it, and
+    // a landmark is a piece of ground among a great deal of other ground. A
+    // pilot looking straight at either has no way of knowing it, so neither
+    // pointer is suppressed for being in view.
+    if (mode.objective === PATTERN_OBJECTIVE) {
+        const index = nextLeg(state);
+        const pointer = markPointer(world.circuit?.[index], position, heading, false);
+        return pointer ? { ...pointer, index, label: `LEG ${index + 1}` } : null;
+    }
+
+    if (mode.objective === SURVEY_OBJECTIVE) {
+        const index = nextLandmark(state);
+        const pointer = markPointer(world.landmarks?.[index], position, heading, false);
+        return pointer ? { ...pointer, index, label: `SHOT ${index + 1}` } : null;
+    }
+
     return null;
+}
+
+/**
+ * A pointer at any mark in the world: the bearing to it, how far that is off
+ * the nose, and how far away it is.
+ *
+ * `hide` is whether a mark in front of the aircraft points at itself. It is
+ * the one thing that differs between the things a run flies to, and it is the
+ * caller's to decide because it turns on whether the mark is drawn.
+ */
+function markPointer(mark, position, heading, hide) {
+    if (!mark || !position) return null;
+
+    const to       = gateBearing(mark, position);
+    const relative = relativeBearing(to, heading);
+    if (hide && gateInView(relative)) return null;
+
+    return {
+        bearing: to,
+        relative,
+        arrow: gateArrow(relative),
+        distance: gateDistance(mark, position)
+    };
 }
 
 /**
@@ -1097,6 +1649,14 @@ export function chartCourse(state, world = {}) {
         return marker ? [marker] : [];
     }
 
+    // A circuit is drawn as the turns it is flown round, which is the one way
+    // the shape of a pattern can be seen whole before it is flown. A run is
+    // its sections and a survey is its landmarks, both in the order they are
+    // worked.
+    if (mode.objective === PATTERN_OBJECTIVE)  return world.circuit ?? [];
+    if (mode.objective === CORRIDOR_OBJECTIVE) return world.corridor ?? [];
+    if (mode.objective === SURVEY_OBJECTIVE)   return world.landmarks ?? [];
+
     return [];
 }
 
@@ -1112,9 +1672,12 @@ export function chartNext(state) {
     const mode = runningMode(state);
     if (!mode) return -1;
 
-    if (mode.objective === LOOP_OBJECTIVE)   return nextGate(state);
-    if (mode.objective === CARGO_OBJECTIVE)  return nextStrip(state);
-    if (mode.objective === SEARCH_OBJECTIVE) return state.found ? -1 : 0;
+    if (mode.objective === LOOP_OBJECTIVE)     return nextGate(state);
+    if (mode.objective === CARGO_OBJECTIVE)    return nextStrip(state);
+    if (mode.objective === SEARCH_OBJECTIVE)   return state.found ? -1 : 0;
+    if (mode.objective === PATTERN_OBJECTIVE)  return nextLeg(state);
+    if (mode.objective === CORRIDOR_OBJECTIVE) return nextSection(state);
+    if (mode.objective === SURVEY_OBJECTIVE)   return nextLandmark(state);
 
     return -1;
 }
@@ -1189,9 +1752,15 @@ export function stageWorld(state) {
     };
 }
 
-/** True for a mode whose objective is arriving on a prepared strip. */
+/**
+ * True for a mode whose objective is arriving on a prepared strip. A circuit
+ * is one of them: the last leg of a pattern is a landing, and the strip it is
+ * made on is the strip the whole shape was laid off.
+ */
 function landsOnStrips(mode) {
-    return mode.objective === LAND_OBJECTIVE || mode.objective === CARGO_OBJECTIVE;
+    return mode.objective === LAND_OBJECTIVE
+        || mode.objective === CARGO_OBJECTIVE
+        || mode.objective === PATTERN_OBJECTIVE;
 }
 
 /**
@@ -1258,7 +1827,7 @@ export function stageStart(state, world = {}) {
     return {
         start: {
             ...startDefaults(),
-            startMode: START_FLYING,
+            startMode: opening.onStrip ? START_TAKEOFF : START_FLYING,
             runway: landsOnStrips(mode),
             airspeedKnots:    snapStartValue('airspeedKnots', opening.airspeedKnots),
             altitudeFeet:     snapStartValue('altitudeFeet', opening.altitudeFeet),
@@ -1266,7 +1835,12 @@ export function stageStart(state, world = {}) {
             headingDegrees:   snapStartValue('headingDegrees', wrapDegrees(opening.headingDegrees)),
             throttlePercent:  snapStartValue('throttlePercent', opening.throttlePercent)
         },
-        position: { x: opening.x, z: opening.z }
+        // A stage that opens on the strip is left where the takeoff start puts
+        // it - a margin in from the threshold, stopped, pointing down the
+        // centreline - rather than at a place worked out a second time here.
+        // Two answers to one question is how an aircraft ends up beside the
+        // strip it is supposed to be lined up on.
+        position: opening.onStrip ? null : { x: opening.x, z: opening.z }
     };
 }
 
@@ -1298,9 +1872,68 @@ function stageOpening(mode, stage, world) {
 }
 
 function openingFor(mode, stage, world) {
-    if (mode.objective === SEARCH_OBJECTIVE) return searchOpening(stage);
+    if (mode.objective === SEARCH_OBJECTIVE)   return searchOpening(stage.search);
+    if (mode.objective === SURVEY_OBJECTIVE)   return searchOpening(stage.survey?.opening);
+    if (mode.objective === PATTERN_OBJECTIVE)  return patternOpening(world.runway);
+    if (mode.objective === CORRIDOR_OBJECTIVE) return corridorOpening(stage, world.corridor);
     if (landsOnStrips(mode)) return approachOpening(stage, world.runway);
     return courseOpening(stage, world.rings);
+}
+
+/**
+ * Where a circuit opens: stopped on the strip, pointing down it, with the
+ * takeoff still to be made. The place and the attitude are the takeoff start's
+ * to decide - `onStrip` is the whole of what is said here - because a pattern
+ * is flown off the same threshold a landing is flown onto, and the one that
+ * puts an aircraft there already exists.
+ *
+ * It is the only opening in the simulator that is not in the air, and the
+ * reason is the mode: everywhere else the takeoff is the part nobody is being
+ * scored on, and here it is the first leg of the thing being scored.
+ */
+function patternOpening(runway) {
+    const field = (runway?.elevation ?? 0) * FEET_PER_UNIT;
+
+    return {
+        onStrip: true,
+        x: runway?.x ?? 0,
+        z: runway?.z ?? 0,
+        headingDegrees: runway?.heading ?? 0,
+        altitudeFeet: field,
+        airspeedKnots: 0,
+        throttlePercent: 0
+    };
+}
+
+/**
+ * Where a run opens: back down the line of the first section, lined up on it
+ * and already under the ceiling.
+ *
+ * The height is read off the section rather than configured, the way a course
+ * reads its opening off the first loop - a run that opened over the lid it is
+ * meant to stay under would open with its first section already failed.
+ */
+function corridorOpening(stage, corridor) {
+    const first = corridor?.[0];
+    const altitudeField = startField('altitudeFeet');
+
+    if (!first) {
+        return { x: 0, z: 0, headingDegrees: 0, altitudeFeet: altitudeField.default,
+                 airspeedKnots: OPENING_KNOTS, throttlePercent: OPENING_THROTTLE };
+    }
+
+    const run = stage.corridor.spacing;
+
+    return {
+        x: first.x - first.dirX * run,
+        z: first.z - first.dirZ * run,
+        headingDegrees: directionToBearing(first.dirX, first.dirZ),
+        // Halfway between the floor and the lid, which is the middle of the
+        // only air the run is flown in.
+        altitudeFeet: (first.floor + first.ceiling) / 2 * FEET_PER_UNIT,
+        airspeedKnots: OPENING_KNOTS,
+        throttlePercent: OPENING_THROTTLE
+    };
 }
 
 /**
@@ -1308,9 +1941,13 @@ function openingFor(mode, stage, world) {
  * puts the nose. The middle is not a decorative choice - the briefing is a
  * bearing and a distance from the start, so the start has to be the place the
  * marker was measured from, and `stageMarker` measures from the origin.
+ *
+ * A survey opens the same way and for the same reason: its landmarks are
+ * placed by a bearing and a distance from the middle too, so a list briefed
+ * from anywhere else would be a list of wrong numbers.
  */
-function searchOpening(stage) {
-    const { heading = 0, altitudeFeet = startField('altitudeFeet').default } = stage.search ?? {};
+function searchOpening(opening) {
+    const { heading = 0, altitudeFeet = startField('altitudeFeet').default } = opening ?? {};
 
     return {
         x: 0,

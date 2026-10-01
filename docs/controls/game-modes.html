@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Game modes - Pilot Matter</title>
-    <meta name="description" content="The five modes, their stages, and what each of them gets harder at.">
+    <meta name="description" content="The eight modes, their stages, and what each of them gets harder at.">
     <link rel="icon" href="../../favicon.png">
     <link rel="stylesheet" href="../assets/site.css">
     <script src="../assets/site.js"></script>
@@ -105,6 +105,9 @@
         <tr><td><code>DEAD STICK</code></td><td>Glide to the strip with the engine out</td><td>How much of the glide you are given, and how far off the line the strip is</td></tr>
         <tr><td><code>CARGO RUN</code></td><td>Land at each strip in turn on the fuel given</td><td>How far apart the strips are, and how little budget there is to reach them</td></tr>
         <tr><td><code>SEARCH AND RESCUE</code></td><td>Find the marker on the bearing given, and set down beside it</td><td>How far out the marker is, and how small the ground you may land on</td></tr>
+        <tr><td><code>TRAFFIC PATTERN</code></td><td>Fly the circuit to the pattern, and hold every leg of it</td><td>How tight the circuit is drawn, and how close each leg has to be held</td></tr>
+        <tr><td><code>CANYON RUN</code></td><td>Fly the corridor under the ceiling and inside the walls</td><td>How low the ceiling comes down, and how narrow the cut gets</td></tr>
+        <tr><td><code>PHOTO SURVEY</code></td><td>Photograph every landmark from inside its window</td><td>How long the list is, and how narrow the window each shot is caught through</td></tr>
     </tbody>
 </table>
 </div>
@@ -240,6 +243,116 @@ OFF THE STRIP  4&deg;</code></pre>
 
 <p>Three stages, each a longer leg out, off the heading you open on, into rougher country, with a tighter ring at the end of it.</p>
 
+<h2 id="traffic-pattern">Traffic Pattern</h2>
+
+<p><code>TRAFFIC PATTERN</code> is the one mode that is not about arriving. Every other landing mode asks what the touchdown came to and nothing at all about the flying that got there; this one reads the aircraft against the leg of the circuit it is on every frame, and marks each leg on how near the heading and the height it was held. The landing is still scored, and it is a fifth of the circuit rather than the whole of it.</p>
+
+<p>It is also the one mode that opens on the ground. Every other stage opens in the air because a takeoff is the part nobody is being scored on - here the takeoff is the first leg of the thing being scored, so the aircraft is sitting on the threshold with the lever closed when the stage is laid out.</p>
+
+<h3 id="the-five-legs">The five legs</h3>
+
+<p>A circuit is five legs flown in order, each one ending at the turn onto the next:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Leg</th><th>Runs</th><th>Wants you at</th></tr></thead>
+    <tbody>
+        <tr><td><code>TAKEOFF</code></td><td>Down the strip, on its own bearing</td><td>The field's own elevation - this is the roll and the lift-off</td></tr>
+        <tr><td><code>CLIMB OUT</code></td><td>Out past the departure end and over onto the downwind line</td><td>Circuit height by the end of it</td></tr>
+        <tr><td><code>DOWNWIND</code></td><td>Back past the field on the reciprocal, parallel to the strip</td><td>Circuit height, held</td></tr>
+        <tr><td><code>BASE</code></td><td>Square across the extended centreline</td><td>Just under half the circuit height by the end of it</td></tr>
+        <tr><td><code>FINAL</code></td><td>Down the extended centreline to the threshold</td><td>The field, which is where the landing is</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The turn onto the downwind belongs to the climb out rather than standing as a crosswind leg of its own, which is what leaves the downwind exactly parallel to the strip. The downwind is the leg that is genuinely about holding a heading, and a leg laid diagonally would be asking you to hold a number nothing on the ground explains.</p>
+
+<p>The circuit is a left-hand one - the field is off your left shoulder on the climb out - and it is laid off the strip rather than placed world by world, so the same pattern at any strip in any world is the circuit that strip would be flown.</p>
+
+<p>Each turn is drawn in the world as a mast standing up to the height its leg wants, lit green when it is the one you are flying to and dim once it is behind you. The whole circuit is on the <a href="../controls/instruments.html#the-minimap">chart</a> from the moment the stage is laid out, so the shape is something to read before you open the throttle.</p>
+
+<h3 id="holding-a-leg">Holding a leg</h3>
+
+<p>While you are on a leg the card says what it is asking for:</p>
+
+<pre><code>DOWNWIND  &middot;  1328 FT  &middot;  270&deg;</code></pre>
+
+<p>The height is read off a ramp between the two ends of the leg rather than as one number for the whole of it. A leg whose ends are at the same height - the downwind - is a height to hold; a leg whose ends differ is a climb or a descent to fly at a steady rate. That is what lets one reading serve all five without any of them needing a rule of its own.</p>
+
+<p>Both errors are measured against time rather than against frames, so what a leg comes to does not depend on how fast the machine drawing it is. At the turn the leg is closed and marked, and the card says what it came to for a few seconds:</p>
+
+<pre><code>DOWNWIND  &middot;  HELD 92</code></pre>
+
+<p>Each of the two readings gets full marks for dead on and falls straight to nothing at the miss the stage allows - 320 feet and 25 degrees by default, drawn in stage by stage. The two averaged and put out of a hundred are the leg's mark.</p>
+
+<p>A leg crossed in a single frame has no time on it to have held badly, and reads as flown. A leg flown to its turn is marked there and stays marked: what happens after the turn belongs to the next leg and is held against that one's height and heading instead.</p>
+
+<h3 id="finishing-the-circuit">Finishing the circuit</h3>
+
+<p>The last leg is the one a turn cannot close. Final ends at the threshold, and an aircraft crosses that threshold on every go-around it flies - so the circuit is finished by the landing rather than by the crossing, and a landing made anywhere earlier in the pattern finishes nothing. Go round again as often as you like; the stage ends when you are down off a final.</p>
+
+<p>Four stages. <code>WIDE CIRCUIT</code> is a big pattern over flat ground with room to settle on each leg. <code>STANDARD</code> draws it in to the usual shape over rising ground. <code>CLOSE IN</code> flies it lower with little room between one turn and the next, and <code>SHORT FIELD</code> is a short strip, a tight pattern, and nothing given away on any leg.</p>
+
+<h2 id="canyon-run">Canyon Run</h2>
+
+<p><code>CANYON RUN</code> is the length of a corridor flown under a ceiling and between two walls, cut by cut. The corridor is laid across deep country cut by canyons, and it is laid rather than found: the generator draws its canyons wherever the noise puts them, so a run that went looking for one would be a run whose difficulty was whatever the seed handed it.</p>
+
+<p>Each cut is drawn as a post at either wall and a beam across the top of them at the ceiling. The opening you fly at is bounded on three sides by something drawn, and on the fourth by the ground - which needs no drawing, being already the thing that ends a flight. The ceiling is held a declared height over whatever is underneath, so it follows the country rather than lying flat across it.</p>
+
+<h3 id="what-counts-as-through">What counts as through</h3>
+
+<p>A cut counts when the aircraft crosses it inside the walls and under the beam. Climbing over the top is not a way through - it is the one way the mode could be cheated, and the only thing it guards against. There is no floor to the cut, so a low pass is still a pass.</p>
+
+<p>Reach a cut over the lid or wide of a wall and the card says which it was:</p>
+
+<pre><code>CUT 4  &middot;  OVER THE TOP</code></pre>
+
+<p>Nothing about the run moves. The cut is still the one you are on, which is what lets it be flown again - coming back down and coming back in are different corrections, so you are told which one you need. Turning round and crossing the plane on the way back is the turn rather than a second fault, exactly as it is for a <a href="#flying-through-loops">gate gone past</a>.</p>
+
+<p>Only the cut the run is up to counts, and the run opens halfway between the floor and the lid of the first one, a full spacing back from it and lined up on it. The whole corridor is on the chart from the start, and the cut you are flying to is lit green in the world the way a gate is.</p>
+
+<p>Four stages, and both the things the mode is about move together: <code>OPEN REACH</code> is a wide cut with plenty of air over it, <code>NARROWS</code> brings the walls in and the ceiling down, <code>THE RIM</code> is low enough that the rim is above you the whole way, and <code>THE SLOT</code> is a cut barely wider than the turn it asks for, with a lid on it.</p>
+
+<h2 id="photo-survey">Photo Survey</h2>
+
+<p><code>PHOTO SURVEY</code> is the mode that asks a question of the camera. Every other objective is met by being somewhere - through the gate, down on the strip, stopped beside the marker. This one is met by being somewhere <em>and saying so</em>: <kbd>F2</kbd> is the report, and the mode's whole question is whether the aircraft was where the brief asked when it was pressed.</p>
+
+<p>The photograph is taken either way. The camera belongs to the pilot, and a mode that swallowed a picture for being of the wrong thing would be a mode that broke it - what the survey decides is only whether it counted.</p>
+
+<h3 id="the-window">The window</h3>
+
+<p>Three readings, all at once:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Reading</th><th>What it asks</th><th>Where you read it</th></tr></thead>
+    <tbody>
+        <tr><td>Height</td><td>Inside a band of altitude</td><td>The card, as the middle of the band</td></tr>
+        <tr><td>Range</td><td>Inside a band of distance from the landmark</td><td>Two circles drawn on the ground around it</td></tr>
+        <tr><td>Heading</td><td>Pointing within a few dozen degrees of a briefed bearing</td><td>The card</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A landmark photographed from directly overhead at four thousand feet is a photograph of a roof, and the brief asked for an elevation - which is why there are three readings rather than one. The card has room for two of them:</p>
+
+<pre><code>MILL TOWN  &middot;  2100 FT  &middot;  160&deg;</code></pre>
+
+<p>The range is the one of the three that is a place, and a place can be drawn - so it is laid round the landmark as a pair of circles on the ground, the near edge and the far edge of the band, and read off the ground instead of off a row that has no room for it. Each landmark also stands on a mast, lit green while it is the one the survey is waiting on.</p>
+
+<h3 id="a-shot-that-missed">A shot that missed</h3>
+
+<p>Take one from outside the window and the card says the first thing that was wrong with it:</p>
+
+<pre><code>MILL TOWN  &middot;  TOO FAR OUT</code></pre>
+
+<p>One fault rather than all of them - a line that lists three is a line nobody reads in the second it is up, and a pilot who fixes the first comes round and is told the second. The range is reported first, then the height, then <code>WRONG SIDE</code> for a shot taken from the wrong bearing. The survey stays on that landmark until it is caught.</p>
+
+<p>The list is worked in the order it is written, the way a course of loops is flown in the order it was laid. A list that could be worked in any order would want a chart lighting all of it at once and a card naming none of it, and the instruments the rest of the game is read on say one thing at a time on purpose.</p>
+
+<p>Three stages over mixed country with something to look at in it - town, forest, water and standing rock. <code>SHORT LIST</code> is three landmarks close in with a wide window on each; <code>LONGER LIST</code> is five, further apart, with the windows drawn in; <code>FULL LIST</code> is six out to the far country, each caught one way only.</p>
+
 <h2 id="opening-a-stage-directly">Opening a stage directly</h2>
 
 <p>The panel opens a mode where the pilot is meant to start it, and the stages after that are reached by flying the ones before them. A mode can also be asked for on the address the page is opened at, at whichever stage you name:</p>
@@ -250,7 +363,7 @@ OFF THE STRIP  4&deg;</code></pre>
 <table>
     <thead><tr><th>Key</th><th>Takes</th><th>Left off</th></tr></thead>
     <tbody>
-        <tr><td><code>mode</code></td><td>A mode id: <code>runway-landing</code>, <code>loop-course</code>, <code>dead-stick</code>, <code>cargo-run</code>, <code>search-rescue</code>, or <code>free-flight</code></td><td>Nothing is opened, and the session starts in free flight the way it always has</td></tr>
+        <tr><td><code>mode</code></td><td>A mode id: <code>runway-landing</code>, <code>loop-course</code>, <code>dead-stick</code>, <code>cargo-run</code>, <code>search-rescue</code>, <code>traffic-pattern</code>, <code>canyon-run</code>, <code>photo-survey</code>, or <code>free-flight</code></td><td>Nothing is opened, and the session starts in free flight the way it always has</td></tr>
         <tr><td><code>stage</code></td><td>The stage number the card shows, counted from 1</td><td>The mode opens at its first stage, exactly as choosing it off the panel does</td></tr>
     </tbody>
 </table>

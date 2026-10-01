@@ -7,10 +7,16 @@ import {
     DEAD_STICK,
     CARGO_RUN,
     SEARCH_RESCUE,
+    TRAFFIC_PATTERN,
+    CANYON_RUN,
+    PHOTO_SURVEY,
     LAND_OBJECTIVE,
     LOOP_OBJECTIVE,
     CARGO_OBJECTIVE,
     SEARCH_OBJECTIVE,
+    PATTERN_OBJECTIVE,
+    CORRIDOR_OBJECTIVE,
+    SURVEY_OBJECTIVE,
     ENGINE_LIVE,
     ENGINE_DEAD,
     GAME_MODES,
@@ -91,9 +97,31 @@ import {
     chartCourse,
     chartNext,
     RESCUE_RADIUS,
-    RESCUE_STOP_SPEED
+    RESCUE_STOP_SPEED,
+    stageSections,
+    stageLandmarks,
+    stagePattern,
+    stageReaches,
+    nextLeg,
+    nextSection,
+    nextLandmark,
+    recordPatternLeg,
+    recordSection,
+    recordSectionFault,
+    recordPhoto,
+    flyPattern,
+    flyCorridor,
+    runBrief,
+    faultNotice,
+    shotNotice,
+    legNotice
 } from '../js/game-modes.js';
-import { isStartValue, START_FIELD_IDS, START_FLYING, startField } from '../js/config.js';
+import { buildPattern, PATTERN_LEGS, FINAL_LEG, createPatternState, completeLeg } from '../js/pattern.js';
+import { buildCorridor } from '../js/corridor.js';
+import { buildSurvey } from '../js/survey.js';
+import {
+    isStartValue, START_FIELD_IDS, START_FLYING, START_TAKEOFF, startField
+} from '../js/config.js';
 import {
     buildEnvironment, getEnvironment, MODE_ENVIRONMENTS, isEnvironmentId
 } from '../js/environment/presets.js';
@@ -143,10 +171,15 @@ function worldFor(state, segments = 100) {
 // --- The modes -------------------------------------------------------------
 
 test('every mode is a world, an objective, and stages', () => {
-    assert.deepEqual(GAME_MODE_IDS,
-        [RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, CARGO_RUN, SEARCH_RESCUE]);
+    assert.deepEqual(GAME_MODE_IDS, [
+        RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, CARGO_RUN, SEARCH_RESCUE,
+        TRAFFIC_PATTERN, CANYON_RUN, PHOTO_SURVEY
+    ]);
 
-    const objectives = [LAND_OBJECTIVE, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE];
+    const objectives = [
+        LAND_OBJECTIVE, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE,
+        PATTERN_OBJECTIVE, CORRIDOR_OBJECTIVE, SURVEY_OBJECTIVE
+    ];
 
     for (const mode of GAME_MODES) {
         assert.ok(mode.label.length > 0, `${mode.id} needs a label to be listed by`);
@@ -685,16 +718,29 @@ test('a stage opens on a start the configuration can actually hold', () => {
 
             assert.deepEqual(Object.keys(start), START_FIELD_IDS,
                 'a stage should hand over a start and nothing else');
-            assert.equal(start.startMode, START_FLYING,
-                'every stage opens in the air, because nobody is scored on the takeoff');
+            // Every stage opens in the air, because nobody is scored on the
+            // takeoff - except the one mode where the takeoff is the first leg
+            // of the thing being scored, which is the whole of why a circuit
+            // is allowed to open on the ground and nothing else is.
+            const circuit = runningMode(state).objective === PATTERN_OBJECTIVE;
+            assert.equal(start.startMode, circuit ? START_TAKEOFF : START_FLYING,
+                `${id} opens the wrong way round`);
 
             for (const field of START_FIELD_IDS) {
                 assert.equal(isStartValue(field, start[field]), true,
                     `${id} stage ${stageNumber(state)} asked for a ${field} of ${start[field]}`);
             }
 
-            assert.ok(Number.isFinite(position.x) && Number.isFinite(position.z),
-                `${id} stage ${stageNumber(state)} opens at ${position.x},${position.z}`);
+            // A stage that opens on the strip names no place of its own: the
+            // takeoff start puts the aircraft on the threshold, and a second
+            // answer here is a second answer that can disagree with it.
+            if (circuit) {
+                assert.equal(position, null,
+                    `${id} should leave the threshold to the takeoff start`);
+            } else {
+                assert.ok(Number.isFinite(position.x) && Number.isFinite(position.z),
+                    `${id} stage ${stageNumber(state)} opens at ${position.x},${position.z}`);
+            }
         } while (advanceStage(state));
     }
 });
@@ -2027,5 +2073,478 @@ test('every route stage is given enough budget to fly it, and not much more', ()
         assert.ok(budget < careless * 3,
             `${currentStage(state).label} has so much budget that the throttle `
           + 'stops being a decision');
+    } while (advanceStage(state));
+});
+
+// --- The three modes that count something other than a place reached -------
+
+/**
+ * A strip in the shape the generator hands one over, for laying a circuit off.
+ * The thresholds are read from `alongX` and `alongZ` rather than recomputed
+ * from the bearing, so a stand-in carrying only the bearing lays a circuit
+ * round nothing.
+ */
+function patternStrip(stage, heading = 90) {
+    return {
+        x: 0, z: 0, heading, ...runwayDirection(heading),
+        length: stage.runway.length[1], width: stage.runway.width[1], elevation: 40
+    };
+}
+
+/** A run standing on a mode's stage, with whatever that stage is flown to. */
+function runOf(id, stageIndex = 0) {
+    const state = createRunState();
+    startRun(state, id, stageIndex);
+    const stage = currentStage(state);
+
+    return {
+        state,
+        stage,
+        circuit: stagePattern(state, stage.pattern ? patternStrip(stage) : null),
+        corridor: buildCorridor(stage, { seed: 909, size: 16000, sampleHeight: () => 0 }),
+        landmarks: stageLandmarks(state)
+    };
+}
+
+/** The aircraft standing exactly where a landmark's window wants it. */
+function atWindow(landmark, over = {}) {
+    const { heightFeet, range, heading } = landmark.window;
+    const back = bearingDirection((heading + 180) % 360);
+    const out  = (range[0] + range[1]) / 2;
+
+    return {
+        x: landmark.x + back.x * out,
+        z: landmark.z + back.z * out,
+        altitudeFeet: (heightFeet[0] + heightFeet[1]) / 2,
+        headingDegrees: heading,
+        ...over
+    };
+}
+
+test('a circuit counts the legs of the pattern, and opens with all of them to fly', () => {
+    const { state } = runOf(TRAFFIC_PATTERN);
+
+    assert.deepEqual(stageProgress(state), { done: 0, total: PATTERN_LEGS.length });
+    assert.equal(nextLeg(state), 0);
+    assert.equal(progressNoun(state), 'LEG');
+    assert.equal(isStageComplete(state), false);
+});
+
+test('a circuit is flown in order: the leg it is on and no other', () => {
+    const { state } = runOf(TRAFFIC_PATTERN);
+
+    assert.equal(recordPatternLeg(state, 2), false, 'a leg further round is not this one to fly yet');
+    assert.equal(stageProgress(state).done, 0);
+
+    assert.equal(recordPatternLeg(state, 0), true);
+    assert.equal(nextLeg(state), 1);
+    assert.equal(recordPatternLeg(state, 0), false, 'and one already behind is not progress');
+});
+
+// Final ends at the threshold, and an aircraft crosses that threshold on
+// every go-around it flies. Counting the crossing would finish the circuit
+// for a pilot who never got down.
+test('the last leg of a circuit is closed by the landing rather than by the turn', () => {
+    const { state } = runOf(TRAFFIC_PATTERN);
+    for (let leg = 0; leg < FINAL_LEG; leg++) recordPatternLeg(state, leg);
+
+    assert.equal(nextLeg(state), FINAL_LEG);
+    assert.equal(recordPatternLeg(state, FINAL_LEG), false, 'the turn cannot close the final');
+    assert.equal(isStageComplete(state), false);
+
+    assert.equal(recordLanding(state), true);
+    assert.equal(isStageComplete(state), true);
+});
+
+test('a landing before the final leg is an arrival in the middle of the circuit', () => {
+    const { state } = runOf(TRAFFIC_PATTERN);
+
+    assert.equal(recordLanding(state), false, 'a landing off the takeoff roll finishes nothing');
+    assert.equal(stageProgress(state).done, 0);
+
+    recordPatternLeg(state, 0);
+    assert.equal(recordLanding(state), false, 'and neither does one off the climb out');
+});
+
+test('a step across the end of a leg turns the circuit onto the next one', () => {
+    const { state, circuit } = runOf(TRAFFIC_PATTERN);
+    const leg = circuit[0];
+
+    const before = { x: leg.x - leg.dirX * 20, z: leg.z - leg.dirZ * 20 };
+    const after  = { x: leg.x + leg.dirX * 20, z: leg.z + leg.dirZ * 20 };
+
+    assert.deepEqual(flyPattern(state, circuit, before, after), { leg: 0, turned: true });
+    assert.equal(nextLeg(state), 1);
+
+    // And a step that goes nowhere near the turn leaves the circuit alone.
+    assert.deepEqual(flyPattern(state, circuit, before, before), { leg: 1, turned: false });
+});
+
+test('a circuit has a brief for the leg it is on, and it changes with the leg', () => {
+    const { state, circuit } = runOf(TRAFFIC_PATTERN);
+    const world = { circuit };
+
+    const takeoff = runBrief(state, world);
+    assert.ok(takeoff.startsWith('TAKEOFF'), takeoff);
+
+    recordPatternLeg(state, 0);
+    const climb = runBrief(state, world);
+    assert.ok(climb.startsWith('CLIMB OUT'), climb);
+    assert.notEqual(climb, takeoff, 'a different leg asks for a different thing');
+});
+
+test('a leg held is reported as the leg and what it came to', () => {
+    const { state, circuit } = runOf(TRAFFIC_PATTERN);
+    const flown = completeLeg(createPatternState(), circuit[2], stageReaches(state));
+
+    assert.equal(legNotice(flown), `DOWNWIND  ·  HELD ${flown.score}`);
+    assert.equal(legNotice(null), '');
+});
+
+test('a run counts the cuts of the corridor, and opens with all of them to fly', () => {
+    const { state, stage } = runOf(CANYON_RUN);
+
+    assert.equal(stageSections(state), stage.corridor.count);
+    assert.deepEqual(stageProgress(state), { done: 0, total: stage.corridor.count });
+    assert.equal(nextSection(state), 0);
+    assert.equal(progressNoun(state), 'CUT');
+});
+
+test('a corridor is flown in order, and a cut flown out of turn is not progress', () => {
+    const { state } = runOf(CANYON_RUN);
+
+    assert.equal(recordSection(state, 3), false);
+    assert.equal(recordSection(state, 0), false, 'and the first does not finish a run of five');
+    assert.equal(nextSection(state), 1);
+});
+
+test('a run is finished by the last cut of the stage', () => {
+    const { state, stage } = runOf(CANYON_RUN);
+
+    for (let cut = 0; cut < stage.corridor.count - 1; cut++) {
+        assert.equal(recordSection(state, cut), false);
+    }
+    assert.equal(recordSection(state, stage.corridor.count - 1), true);
+    assert.equal(isStageComplete(state), true);
+    assert.equal(nextSection(state), -1);
+});
+
+// A fault is the pilot being told, not the run being set back: the cut is
+// still there and still has to be flown.
+test('a cut reached over the lid leaves the run waiting on that same cut', () => {
+    const { state, corridor } = runOf(CANYON_RUN);
+    const section = corridor[0];
+    const y = section.ceiling + 100;
+
+    const from = { x: section.x - section.dirX * 40, y, z: section.z - section.dirZ * 40 };
+    const to   = { x: section.x + section.dirX * 40, y, z: section.z + section.dirZ * 40 };
+
+    const step = flyCorridor(state, corridor, from, to);
+    assert.equal(step.passed, false);
+    assert.equal(step.faulted, true);
+    assert.equal(step.fault, 'OVER THE TOP');
+    assert.equal(nextSection(state), 0, 'the cut is still there to be flown');
+    assert.equal(state.missed, 1);
+
+    assert.equal(faultNotice(state, step.fault), 'CUT 1  ·  OVER THE TOP');
+});
+
+test('a cut flown inside the walls and under the lid counts', () => {
+    const { state, corridor } = runOf(CANYON_RUN);
+    const section = corridor[0];
+    const y = (section.floor + section.ceiling) / 2;
+
+    const from = { x: section.x - section.dirX * 40, y, z: section.z - section.dirZ * 40 };
+    const to   = { x: section.x + section.dirX * 40, y, z: section.z + section.dirZ * 40 };
+
+    const step = flyCorridor(state, corridor, from, to);
+    assert.equal(step.passed, true);
+    assert.equal(step.faulted, false);
+    assert.equal(nextSection(state), 1);
+});
+
+test('a fault answers to the cut the run is on and to no other', () => {
+    const { state } = runOf(CANYON_RUN);
+
+    assert.equal(recordSectionFault(state, 2), false);
+    assert.equal(state.missed, 0);
+    assert.equal(faultNotice(state, ''), '', 'a fault with nothing to say says nothing');
+});
+
+test('a survey counts the landmarks on the list, and opens with all of them to shoot', () => {
+    const { state, landmarks } = runOf(PHOTO_SURVEY);
+
+    assert.ok(landmarks.length >= 3);
+    assert.deepEqual(stageProgress(state), { done: 0, total: landmarks.length });
+    assert.equal(nextLandmark(state), 0);
+    assert.equal(progressNoun(state), 'SHOT');
+});
+
+test('a landmark caught inside its window counts, and the survey moves on', () => {
+    const { state, landmarks } = runOf(PHOTO_SURVEY);
+
+    const shot = recordPhoto(state, landmarks, atWindow(landmarks[0]));
+    assert.equal(shot.caught, true);
+    assert.equal(shot.index, 0);
+    assert.equal(shot.fault, '');
+    assert.equal(nextLandmark(state), 1);
+});
+
+test('a shot outside the window leaves the survey on the same landmark', () => {
+    const { state, landmarks } = runOf(PHOTO_SURVEY);
+    const mark = landmarks[0];
+
+    const shot = recordPhoto(state, landmarks, atWindow(mark, { altitudeFeet: 90000 }));
+    assert.equal(shot.caught, false);
+    assert.equal(shot.fault, 'TOO HIGH');
+    assert.equal(nextLandmark(state), 0, 'it comes round and is shot again');
+    assert.equal(state.missed, 1);
+
+    assert.equal(shotNotice(mark, shot.fault), `${mark.name}  ·  TOO HIGH`);
+    assert.equal(shotNotice(null, 'TOO HIGH'), '');
+    assert.equal(shotNotice(mark, ''), '');
+});
+
+test('a survey is worked in order, and the last landmark finishes the stage', () => {
+    const { state, landmarks } = runOf(PHOTO_SURVEY);
+
+    for (const [at, mark] of landmarks.entries()) {
+        const shot = recordPhoto(state, landmarks, atWindow(mark));
+        assert.equal(shot.caught, true);
+        assert.equal(shot.finished, at === landmarks.length - 1);
+    }
+
+    assert.equal(isStageComplete(state), true);
+    assert.equal(nextLandmark(state), -1);
+});
+
+// The shutter belongs to the pilot. A photograph taken with nothing
+// outstanding is a photograph, and the mode says nothing about it.
+test('the shutter outside a survey is a photograph and nothing else', () => {
+    const { state } = runOf(LOOP_COURSE);
+    const shot = recordPhoto(state, [], { x: 0, z: 0, altitudeFeet: 1000, headingDegrees: 0 });
+
+    assert.equal(shot.caught, false);
+    assert.equal(shot.index, -1);
+    assert.equal(shot.fault, '');
+    assert.equal(state.missed, 0, 'and it is not held against anything');
+});
+
+test('a survey has a brief for the landmark it is on, and it changes with the landmark', () => {
+    const { state, landmarks } = runOf(PHOTO_SURVEY);
+    const world = { landmarks };
+
+    const first = runBrief(state, world);
+    assert.ok(first.startsWith(landmarks[0].name), first);
+
+    recordPhoto(state, landmarks, atWindow(landmarks[0]));
+    assert.ok(runBrief(state, world).startsWith(landmarks[1].name));
+});
+
+test('a mode whose objective does not move inside a stage briefs its own goal', () => {
+    for (const id of [RUNWAY_LANDING, LOOP_COURSE, DEAD_STICK, CARGO_RUN, SEARCH_RESCUE, CANYON_RUN]) {
+        const { state } = runOf(id);
+        assert.equal(runBrief(state, {}), getGameMode(id).goal, id);
+    }
+});
+
+test('each of the three draws what it is flying to on the chart, in the order it is flown', () => {
+    for (const [id, key] of [
+        [TRAFFIC_PATTERN, 'circuit'], [CANYON_RUN, 'corridor'], [PHOTO_SURVEY, 'landmarks']
+    ]) {
+        const run = runOf(id);
+        const marks = chartCourse(run.state, run);
+
+        assert.equal(marks.length, run[key].length, `${id} should draw its whole ${key}`);
+        assert.deepEqual(marks.map(mark => mark.index), run[key].map(mark => mark.index));
+        assert.equal(chartNext(run.state), 0, `${id} should light the first of them`);
+
+        for (const mark of marks) {
+            assert.ok(Number.isFinite(mark.x) && Number.isFinite(mark.z),
+                `${id} draws a mark at ${mark.x},${mark.z}`);
+        }
+    }
+});
+
+test('the chart lights the mark each of the three is waiting on', () => {
+    const pattern = runOf(TRAFFIC_PATTERN);
+    recordPatternLeg(pattern.state, 0);
+    assert.equal(chartNext(pattern.state), 1);
+
+    const canyon = runOf(CANYON_RUN);
+    recordSection(canyon.state, 0);
+    assert.equal(chartNext(canyon.state), 1);
+
+    const survey = runOf(PHOTO_SURVEY);
+    recordPhoto(survey.state, survey.landmarks, atWindow(survey.landmarks[0]));
+    assert.equal(chartNext(survey.state), 1);
+});
+
+/**
+ * A turn in a circuit is a place in empty air, and a landmark is a piece of
+ * ground among a great deal of other ground: a pilot looking straight at
+ * either has no way of knowing it. A cut is a built thing standing in front of
+ * them, so its pointer goes away like a gate's.
+ */
+test('the pointer stays up for what cannot be seen and goes away for what can', () => {
+    const ahead = { x: 0, z: 0 };
+
+    const pattern = runOf(TRAFFIC_PATTERN);
+    const leg = pattern.circuit[0];
+    assert.ok(runPointer(pattern.state, pattern, ahead, gateBearing(leg, ahead)),
+        'a turn is pointed at even while the aircraft is pointing straight at it');
+
+    const survey = runOf(PHOTO_SURVEY);
+    const mark = survey.landmarks[0];
+    assert.ok(runPointer(survey.state, survey, ahead, gateBearing(mark, ahead)),
+        'and so is a landmark');
+
+    const canyon = runOf(CANYON_RUN);
+    const cut = canyon.corridor[0];
+    assert.equal(runPointer(canyon.state, canyon, ahead, gateBearing(cut, ahead)), null,
+        'a cut in front of the aircraft is already pointing at itself');
+    assert.ok(runPointer(canyon.state, canyon, ahead, gateBearing(cut, ahead) + 180),
+        'and comes back the moment it is behind');
+});
+
+test('each pointer names what it is pointing at in the room the row has', () => {
+    for (const [id, label] of [
+        [TRAFFIC_PATTERN, 'LEG 1'], [PHOTO_SURVEY, 'SHOT 1']
+    ]) {
+        const run = runOf(id);
+        assert.equal(runPointer(run.state, run, { x: 0, z: 0 }, 0).label, label);
+    }
+
+    const canyon = runOf(CANYON_RUN);
+    const cut = canyon.corridor[0];
+    const behind = gateBearing(cut, { x: 0, z: 0 }) + 180;
+    assert.equal(runPointer(canyon.state, canyon, { x: 0, z: 0 }, behind).label, 'CUT 1');
+});
+
+test('a run with nothing outstanding has nothing to point at', () => {
+    for (const id of [TRAFFIC_PATTERN, CANYON_RUN, PHOTO_SURVEY]) {
+        const run = runOf(id);
+        const { total } = stageProgress(run.state);
+
+        // Flown out by hand, which is the one state the pointer has to be
+        // silent in: there is no mark left for it to name.
+        if (id === TRAFFIC_PATTERN) {
+            for (let leg = 0; leg < FINAL_LEG; leg++) recordPatternLeg(run.state, leg);
+            recordLanding(run.state);
+        } else if (id === CANYON_RUN) {
+            for (let cut = 0; cut < total; cut++) recordSection(run.state, cut);
+        } else {
+            for (const mark of run.landmarks) recordPhoto(run.state, run.landmarks, atWindow(mark));
+        }
+
+        assert.equal(isStageComplete(run.state), true, id);
+        assert.equal(runPointer(run.state, run, { x: 0, z: 0 }, 0), null, id);
+        assert.equal(chartNext(run.state), -1, id);
+    }
+});
+
+test('a crash puts each of the three back to the beginning of its stage', () => {
+    for (const id of [TRAFFIC_PATTERN, CANYON_RUN, PHOTO_SURVEY]) {
+        const run = runOf(id);
+        const { total } = stageProgress(run.state);
+
+        recordPatternLeg(run.state, 0);
+        recordSection(run.state, 0);
+        if (run.landmarks.length) recordPhoto(run.state, run.landmarks, atWindow(run.landmarks[0]));
+
+        assert.equal(recordCrash(run.state), true, id);
+        assert.deepEqual(stageProgress(run.state), { done: 0, total }, id);
+        assert.equal(run.state.missed, 0, id);
+    }
+});
+
+test('the stages of each get harder at exactly the thing they are about', () => {
+    const canyon = getGameMode(CANYON_RUN).stages;
+    for (let at = 1; at < canyon.length; at++) {
+        assert.ok(canyon[at].corridor.ceiling < canyon[at - 1].corridor.ceiling,
+            `${canyon[at].label} should bring the ceiling down`);
+        assert.ok(canyon[at].corridor.halfWidth < canyon[at - 1].corridor.halfWidth,
+            `${canyon[at].label} should narrow the cut`);
+    }
+
+    const pattern = getGameMode(TRAFFIC_PATTERN).stages;
+    for (let at = 1; at < pattern.length; at++) {
+        assert.ok(pattern[at].reaches.altitude < pattern[at - 1].reaches.altitude
+               && pattern[at].reaches.heading  < pattern[at - 1].reaches.heading,
+            `${pattern[at].label} should ask the legs to be held closer`);
+        assert.ok(pattern[at].pattern.offset < pattern[at - 1].pattern.offset,
+            `${pattern[at].label} should draw the circuit in`);
+    }
+
+    const survey = getGameMode(PHOTO_SURVEY).stages;
+    for (let at = 1; at < survey.length; at++) {
+        const now = survey[at].survey, before = survey[at - 1].survey;
+        assert.ok(now.landmarks.length > before.landmarks.length,
+            `${survey[at].label} should list more to photograph`);
+        assert.ok(now.window.headingReach < before.window.headingReach,
+            `${survey[at].label} should draw the window in`);
+    }
+});
+
+// Every landmark has to be reachable from inside its own window, or the stage
+// is a list of things that cannot be photographed.
+test('every landmark on every list can be caught from somewhere', () => {
+    const state = createRunState();
+    startRun(state, PHOTO_SURVEY);
+
+    do {
+        const landmarks = stageLandmarks(state);
+        for (const landmark of landmarks) {
+            const { heightFeet, range } = landmark.window;
+            assert.ok(heightFeet[0] < heightFeet[1] && heightFeet[0] > 0,
+                `${landmark.name} needs a height band to be caught in`);
+            assert.ok(range[0] < range[1] && range[0] > 0,
+                `${landmark.name} needs a range band to be caught from`);
+
+            const shot = recordPhoto(state, landmarks, atWindow(landmark));
+            assert.equal(shot.caught, true, `${landmark.name} could not be caught from its own window`);
+        }
+        assert.equal(isStageComplete(state), true);
+    } while (advanceStage(state));
+});
+
+// A circuit opens stopped on the threshold, which is the one opening in the
+// simulator that is not in the air.
+test('a circuit opens on the strip it is flown round', () => {
+    const state = createRunState();
+    startRun(state, TRAFFIC_PATTERN);
+
+    do {
+        const runway = patternStrip(currentStage(state));
+        const opening = stageStart(state, { runway });
+
+        assert.equal(opening.start.startMode, START_TAKEOFF);
+        assert.equal(opening.position, null, 'and names no place, leaving that to the takeoff start');
+        assert.equal(opening.start.runway, true, 'a circuit needs a strip under it');
+    } while (advanceStage(state));
+});
+
+// A run opens under the lid rather than over it. Opening above the ceiling
+// would open with the first cut already failed.
+test('a run opens inside the corridor it is flown down', () => {
+    const state = createRunState();
+    startRun(state, CANYON_RUN);
+
+    do {
+        const corridor = buildCorridor(currentStage(state), {
+            seed: 4321, size: 16000, sampleHeight: () => 150
+        });
+        const { start, position } = stageStart(state, { corridor });
+        const first = corridor[0];
+
+        const altitude = start.altitudeFeet / FEET_PER_UNIT;
+        assert.ok(altitude < first.ceiling && altitude > first.floor,
+            `${currentStage(state).label} opens at ${Math.round(altitude)} in a cut `
+          + `between ${Math.round(first.floor)} and ${Math.round(first.ceiling)}`);
+
+        // Back down the line of the first cut, pointing at it.
+        const back = Math.hypot(position.x - first.x, position.z - first.z);
+        assert.ok(Math.abs(back - currentStage(state).corridor.spacing) < 1,
+            'and a run short of the first cut');
     } while (advanceStage(state));
 });

@@ -194,15 +194,64 @@ const backCountry = {
 };
 
 /**
+ * Deep country cut by canyons, which is what a run down a corridor is flown
+ * over. The ground is high and the cuts are deep and narrow, so the walls the
+ * corridor is laid between have real walls standing beside them - the corridor
+ * is what the run is judged on, and this is what makes flying it feel like
+ * flying a canyon rather than threading a line over open ground.
+ */
+const canyonReach = {
+    id: 'canyon-reach',
+    label: 'CANYON REACH',
+    description: 'A deep plateau cut end to end by canyons, for a run flown low',
+    seed: 3141592,
+    base: { maxHeight: 560, scale: 3.8 },
+    elements: [
+        { type: 'mountain', config: { count: 8, height: [220, 440], radius: [600, 1400], girth: 0.7 } },
+        { type: 'canyon',   config: { depth: [220, 420], width: [300, 680], steepness: 0.8, branches: 2, windiness: 0.35 } },
+        { type: 'grass',    config: { band: [40, 160], color: { light: [0.46, 0.48, 0.22], dark: [0.24, 0.28, 0.14] } } },
+        { type: 'sand',     config: { band: [0, 40], color: { light: [0.80, 0.62, 0.42], dark: [0.48, 0.31, 0.20] } } },
+        { type: 'snow',     config: { line: 440, coverage: 0.6, slope: 0.7 } }
+    ]
+};
+
+/**
+ * Mixed country with something to look at in it, which is what a survey needs:
+ * a town, forest, water and standing rock, so the landmarks a stage lists are
+ * things on the ground rather than places on a map. Nothing is prepared to land
+ * on - a survey is flown and photographed, and the stage ends at the shutter.
+ */
+const surveyCountry = {
+    id: 'survey-country',
+    label: 'SURVEY COUNTRY',
+    description: 'Town, forest, water and rock together, for a survey flown with a camera',
+    seed: 8675309,
+    base: { maxHeight: 380, scale: 2.8 },
+    elements: [
+        { type: 'mountain', config: { count: 8, height: [180, 400], radius: [600, 1500] } },
+        { type: 'grass',    config: { band: [14, 220] } },
+        { type: 'sand',     config: { band: [8, 14] } },
+        { type: 'water',    config: { level: 8, flatten: 1 } },
+        { type: 'river',    config: { windiness: 0.55, width: [110, 260], depth: [12, 28] } },
+        { type: 'forest',   config: { count: 8, size: [600, 1600], density: 0.6, band: [16, 240] } },
+        { type: 'town',     config: { grid: 320, density: 0.6, buildingHeight: [20, 86], extent: [1000, 1800] } }
+    ]
+};
+
+/**
  * The worlds a game mode opens over. They are kept out of `ENVIRONMENTS`
  * because they are not worlds to choose between: a mode brings its own ground
  * with it, and offering it in the settings panel would be offering half a game.
  */
-export const MODE_ENVIRONMENTS = [openCountry, loopValley, backCountry];
+export const MODE_ENVIRONMENTS = [
+    openCountry, loopValley, backCountry, canyonReach, surveyCountry
+];
 
-export const OPEN_COUNTRY_ID = openCountry.id;
-export const LOOP_VALLEY_ID  = loopValley.id;
-export const BACK_COUNTRY_ID = backCountry.id;
+export const OPEN_COUNTRY_ID    = openCountry.id;
+export const LOOP_VALLEY_ID     = loopValley.id;
+export const BACK_COUNTRY_ID    = backCountry.id;
+export const CANYON_REACH_ID    = canyonReach.id;
+export const SURVEY_COUNTRY_ID  = surveyCountry.id;
 
 const LISTED = new Map(ENVIRONMENTS.map(environment => [environment.id, environment]));
 const BY_ID  = new Map(

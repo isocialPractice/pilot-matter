@@ -1,6 +1,6 @@
 {
   "name": "pilot-matter",
-  "version": "1.20.1-alpha",
+  "version": "1.21.0-alpha",
   "description": "Browser-based Three.js flight simulator over procedurally generated terrain, with no build step",
   "homepage": "https://isocialpractice.github.io/pilot-matter/docs/index.html",
   "license": "MIT",
@@ -15,6 +15,9 @@
     "./crash": "./js/crash.js",
     "./landing-score": "./js/landing-score.js",
     "./game-modes": "./js/game-modes.js",
+    "./pattern": "./js/pattern.js",
+    "./corridor": "./js/corridor.js",
+    "./survey": "./js/survey.js",
     "./environment": "./js/environment/presets.js",
     "./elements": "./js/environment/elements.js",
     "./day-night": "./js/day-night.js",

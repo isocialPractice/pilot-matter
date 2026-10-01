@@ -150,8 +150,8 @@ Everything above is stored in `localStorage` and reopens with the next session.
 | `DUNE SEA` | `dune-sea` | Dunes, outcrops, one desert river, palm groves |
 | `LAKESIDE` | `lakeside` | A town on a lake, forested hills, snow peaks |
 
-Three more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
-`LOOP VALLEY` and `BACK COUNTRY`.
+Five more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
+`LOOP VALLEY`, `BACK COUNTRY`, `CANYON REACH` and `SURVEY COUNTRY`.
 
 ## Elements
 
@@ -197,9 +197,21 @@ available while a game mode is being played: a mode brings its own ground.
 | `DEAD STICK` | 4 | Glide to the strip, engine out. Harder: less height, further out, off the line, less help |
 | `CARGO RUN` | 3 | Land at each strip in turn. Harder: strips further apart, less budget, a third stop |
 | `SEARCH AND RESCUE` | 3 | Find the marker and set down beside it. Harder: further out, rougher ground, a tighter ring |
+| `TRAFFIC PATTERN` | 4 | Fly the circuit and hold every leg. Harder: the pattern drawn in, the legs held closer |
+| `CANYON RUN` | 4 | Fly the corridor cut by cut. Harder: the ceiling down, the cut narrower, more of them |
+| `PHOTO SURVEY` | 3 | Photograph each landmark from inside its window. Harder: a longer list, a tighter window |
 
 Gate colours: green is the one the course is waiting on, amber is still to
 come, dim is behind you. A crash restarts the stage.
+
+A circuit is five legs - `TAKEOFF`, `CLIMB OUT`, `DOWNWIND`, `BASE`, `FINAL` -
+each marked on how near its heading and its height it was held, and finished by
+the landing rather than by crossing the threshold. A canyon run counts a cut
+only when it is crossed inside the walls and under the beam; over the top is
+not a way through, and there is no floor. A survey counts a shot only with the
+aircraft inside the height, the range and the heading the brief asked for - the
+range is drawn as two circles on the ground, the other two are written on the
+card.
 
 With no engine - a dead stick, or a cargo run out of budget - the nose sets
 the airspeed instead of the lever: nose down buys speed with height, nose up

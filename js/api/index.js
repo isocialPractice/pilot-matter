@@ -85,26 +85,54 @@ export {
 
 // The modes the bundled game is played in, and the pure rules behind them: the
 // stages, the run state, the course geometry, the gate tests, the step a course
-// is flown a frame at a time with, the budget a route is flown against, and the
-// marker a search is flown to.
+// is flown a frame at a time with, the budget a route is flown against, the
+// marker a search is flown to, the circuit a pattern is held round, the
+// corridor a run is flown down, and the window a landmark is caught through.
 export {
     GAME_MODES, GAME_MODE_IDS, RUNWAY_LANDING, LOOP_COURSE,
     DEAD_STICK, CARGO_RUN, SEARCH_RESCUE,
+    TRAFFIC_PATTERN, CANYON_RUN, PHOTO_SURVEY,
     LAND_OBJECTIVE, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE,
+    PATTERN_OBJECTIVE, CORRIDOR_OBJECTIVE, SURVEY_OBJECTIVE,
     ENGINE_LIVE, ENGINE_DEAD,
     getGameMode, isGameModeId,
     createRunState, startRun, endRun, runningMode, currentStage, advanceStage,
     openingRun, OPENING_MODE_KEY, OPENING_STAGE_KEY,
     restartStage, recordLanding, recordGate, recordCrash, recordRescue,
+    recordPatternLeg, recordSection, recordSectionFault, recordPhoto,
     nextGate, nextStrip, stripIndex,
+    nextLeg, nextSection, nextLandmark,
     stageProgress, progressNoun, isStageComplete, runObjective, runStatus,
+    runBrief, faultNotice, shotNotice, legNotice,
     stageWorld, stageStart, buildCourse,
+    stagePattern, stageReaches, stageSections, stageLandmarks,
     stageBudget, stageStrips, burnFuel, fuelRemaining, runEngine, engineLive,
     stageMarker, RESCUE_RADIUS, RESCUE_STOP_SPEED,
     gateOffset, gateAspect, gateAxes, gateCrossing, gatePassed, gateMissed, flyStep,
+    flyPattern, flyCorridor,
     gatePointer, runPointer, stripPointer, searchBriefing, chartCourse, chartNext,
     approachThreshold, approachGuidance, CENTRELINE_REACH, CENTRELINE_MARKS
 } from '../game-modes.js';
+
+// The three pure mechanics those modes are built on, published on their own as
+// well: the circuit and how it is marked, the corridor and its crossing test,
+// and the landmark window and the reading taken against it. A host wanting one
+// of them without the run state around it imports it here.
+export {
+    buildPattern, legOffset, legCrossed, legProgress, legAltitude,
+    createPatternState, resetPattern, samplePattern, scoreLeg, completeLeg,
+    patternScore, flownLegs,
+    PATTERN_LEGS, TAKEOFF_LEG, FINAL_LEG, LEG_HEIGHTS, LEFT_HAND, RIGHT_HAND
+} from '../pattern.js';
+
+export {
+    buildCorridor, sectionOffset, corridorCrossing, sectionPassed, sectionMissed,
+    missedBy, CORRIDOR_REACH, MIN_HEADROOM
+} from '../corridor.js';
+
+export {
+    buildSurvey, shotFor, shotFault, landmarkBrief, rangeBand, windowHeight
+} from '../survey.js';
 
 // The rule the bundled simulator uses at the end of the ground, published so a
 // host handling its own edge can use it, or match it.

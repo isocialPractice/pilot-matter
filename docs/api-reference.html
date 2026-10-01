@@ -797,26 +797,33 @@ const pilot = createPilot({
     <thead><tr><th>Export</th><th>Is</th></tr></thead>
     <tbody>
         <tr><td><code>GAME_MODES</code>, <code>GAME_MODE_IDS</code></td><td>The modes there are</td></tr>
-        <tr><td><code>RUNWAY_LANDING</code>, <code>LOOP_COURSE</code>, <code>DEAD_STICK</code>, <code>CARGO_RUN</code>, <code>SEARCH_RESCUE</code></td><td>The five of them by name</td></tr>
-        <tr><td><code>LAND_OBJECTIVE</code>, <code>LOOP_OBJECTIVE</code>, <code>CARGO_OBJECTIVE</code>, <code>SEARCH_OBJECTIVE</code></td><td>What a mode is asking for</td></tr>
+        <tr><td><code>RUNWAY_LANDING</code>, <code>LOOP_COURSE</code>, <code>DEAD_STICK</code>, <code>CARGO_RUN</code>, <code>SEARCH_RESCUE</code>, <code>TRAFFIC_PATTERN</code>, <code>CANYON_RUN</code>, <code>PHOTO_SURVEY</code></td><td>The eight of them by name</td></tr>
+        <tr><td><code>LAND_OBJECTIVE</code>, <code>LOOP_OBJECTIVE</code>, <code>CARGO_OBJECTIVE</code>, <code>SEARCH_OBJECTIVE</code>, <code>PATTERN_OBJECTIVE</code>, <code>CORRIDOR_OBJECTIVE</code>, <code>SURVEY_OBJECTIVE</code></td><td>What a mode is asking for</td></tr>
         <tr><td><code>getGameMode(id)</code>, <code>isGameModeId(id)</code></td><td>Looking one up</td></tr>
         <tr><td><code>createRunState(modeId)</code>, <code>startRun(state, id, stageIndex)</code>, <code>endRun(state)</code></td><td>A run, started and stopped. The stage is optional and clamped into the ones the mode has</td></tr>
         <tr><td><code>openingRun(query)</code>, <code>OPENING_MODE_KEY</code>, <code>OPENING_STAGE_KEY</code></td><td>The run a <code>?mode=&amp;stage=</code> query asks for, or why it cannot be given</td></tr>
         <tr><td><code>runningMode(state)</code>, <code>currentStage(state)</code>, <code>advanceStage(state)</code>, <code>restartStage(state)</code></td><td>Where it is up to</td></tr>
         <tr><td><code>recordLanding(state, runway)</code>, <code>recordGate(state, index)</code>, <code>recordRescue(state, marker, report)</code>, <code>recordCrash(state)</code></td><td>Telling it what happened</td></tr>
+        <tr><td><code>recordPatternLeg(state, index)</code>, <code>recordSection(state, index)</code>, <code>recordSectionFault(state, index)</code>, <code>recordPhoto(state, landmarks, report)</code></td><td>The same, for the three that count something other than a place reached</td></tr>
         <tr><td><code>stageProgress(state)</code>, <code>isStageComplete(state)</code>, <code>nextGate(state)</code>, <code>nextStrip(state)</code></td><td>How far through it is</td></tr>
+        <tr><td><code>nextLeg(state)</code>, <code>nextSection(state)</code>, <code>nextLandmark(state)</code></td><td>The same, for a circuit, a corridor and a list</td></tr>
         <tr><td><code>progressNoun(state)</code>, <code>stripIndex(runway)</code></td><td>What it counts in, and which strip a landing was made on</td></tr>
         <tr><td><code>runObjective(state)</code>, <code>runStatus(state)</code></td><td>What to write on the screen</td></tr>
+        <tr><td><code>runBrief(state, world)</code></td><td>The same, for the two modes whose objective moves inside a stage</td></tr>
+        <tr><td><code>faultNotice(state, fault)</code>, <code>shotNotice(landmark, fault)</code>, <code>legNotice(flown)</code></td><td>What just went wrong, or what a leg came to, as a line</td></tr>
         <tr><td><code>runPointer(state, world, position, heading)</code></td><td>Where the thing it is waiting on lies</td></tr>
-        <tr><td><code>gatePointer(...)</code>, <code>stripPointer(...)</code>, <code>searchBriefing(state)</code></td><td>The three <code>runPointer</code> dispatches to, one per objective</td></tr>
+        <tr><td><code>gatePointer(...)</code>, <code>stripPointer(...)</code>, <code>searchBriefing(state)</code></td><td>Three of the things <code>runPointer</code> dispatches to</td></tr>
         <tr><td><code>chartCourse(state, world)</code>, <code>chartNext(state)</code></td><td>The same answer as marks on a chart, and which one is next</td></tr>
         <tr><td><code>stageWorld(state)</code></td><td>The world the stage is flown over</td></tr>
         <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
         <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
+        <tr><td><code>stagePattern(state, runway)</code>, <code>stageReaches(state)</code></td><td>The circuit a pattern stage is flown round, and how closely its legs have to be held</td></tr>
+        <tr><td><code>stageSections(state)</code>, <code>stageLandmarks(state)</code></td><td>The cuts a run is divided into, and the landmarks a survey lists</td></tr>
         <tr><td><code>gatePassed(ring, from, to)</code>, <code>gateMissed(ring, from, to)</code>, <code>gateOffset(ring, point)</code></td><td>Whether a step went through one, or past it</td></tr>
         <tr><td><code>gateCrossing(ring, from, to)</code></td><td>The one crossing both of those are read off</td></tr>
         <tr><td><code>gateAspect(ring)</code>, <code>gateAxes(ring)</code></td><td>The shape of a gate opening, and the two directions across it</td></tr>
         <tr><td><code>flyStep(state, course, from, to)</code></td><td>Both of those put to the gate the course is waiting on</td></tr>
+        <tr><td><code>flyPattern(state, circuit, from, to)</code>, <code>flyCorridor(state, corridor, from, to)</code></td><td>The same for the turn a circuit is on and the cut a run is up to</td></tr>
         <tr><td><code>ENGINE_LIVE</code>, <code>ENGINE_DEAD</code>, <code>runEngine(state)</code>, <code>engineLive(state)</code></td><td>Whether the run still has an engine</td></tr>
         <tr><td><code>stageBudget(state)</code>, <code>burnFuel(state, throttle, dt)</code>, <code>fuelRemaining(state)</code></td><td>The budget a route spends on its throttle</td></tr>
         <tr><td><code>stageStrips(state)</code></td><td>How many strips a route stops at</td></tr>
@@ -824,6 +831,34 @@ const pilot = createPilot({
         <tr><td><code>approachThreshold(runway)</code></td><td>The end of a strip a landing stage is flown onto</td></tr>
         <tr><td><code>approachGuidance(state, runway)</code></td><td>What is drawn on the ground to help the pilot find it</td></tr>
         <tr><td><code>CENTRELINE_REACH</code>, <code>CENTRELINE_MARKS</code></td><td>How far the lead-in runs back, and in how many marks</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The three mechanics the newer modes are built on are published on their own as well, for a host wanting one of them without the run state around it. Each is a module of its own - <code>pilot-matter/pattern</code>, <code>pilot-matter/corridor</code>, <code>pilot-matter/survey</code> - and all three are re-exported from the main entry.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>buildPattern(stage, runway)</code></td><td>The circuit a stage is flown round, laid off a strip</td></tr>
+        <tr><td><code>PATTERN_LEGS</code>, <code>TAKEOFF_LEG</code>, <code>FINAL_LEG</code>, <code>LEG_HEIGHTS</code></td><td>The five legs by name, the two that are special, and the share of the circuit height each ends at</td></tr>
+        <tr><td><code>LEFT_HAND</code>, <code>RIGHT_HAND</code></td><td>Which side of the strip the circuit lies on</td></tr>
+        <tr><td><code>legOffset(leg, point)</code>, <code>legCrossed(leg, from, to)</code></td><td>How far past the turn a place is, and whether a step crossed it</td></tr>
+        <tr><td><code>legProgress(leg, point)</code>, <code>legAltitude(leg, point)</code></td><td>How far along a leg a place is, and the height wanted there</td></tr>
+        <tr><td><code>createPatternState(legs)</code>, <code>resetPattern(state, legs)</code></td><td>The reading of how each leg was held, kept beside the run</td></tr>
+        <tr><td><code>samplePattern(state, leg, report, dt)</code></td><td>One frame of that reading</td></tr>
+        <tr><td><code>scoreLeg(state, leg, reaches)</code>, <code>completeLeg(state, leg, reaches)</code></td><td>What a leg came to, and closing it at the turn</td></tr>
+        <tr><td><code>patternScore(state)</code>, <code>flownLegs(state)</code></td><td>What the circuit came to, and the legs behind it</td></tr>
+        <tr><td><code>buildCorridor(stage, options)</code></td><td>The cuts a canyon stage is flown through</td></tr>
+        <tr><td><code>sectionOffset(section, point)</code></td><td>How far past a cut a place lies, along the run</td></tr>
+        <tr><td><code>corridorCrossing(section, from, to)</code></td><td>Where a step crossed one, and what it was doing there</td></tr>
+        <tr><td><code>sectionPassed(...)</code>, <code>sectionMissed(...)</code>, <code>missedBy(crossing)</code></td><td>Through it, past it, and which limit was broken</td></tr>
+        <tr><td><code>CORRIDOR_REACH</code>, <code>MIN_HEADROOM</code></td><td>How much of the world a corridor is laid inside, and the least air a cut may have in it</td></tr>
+        <tr><td><code>buildSurvey(stage)</code></td><td>The landmarks a survey stage lists, placed</td></tr>
+        <tr><td><code>shotFor(landmark, report)</code>, <code>shotFault(shot, landmark)</code></td><td>The reading a shutter takes, and the first thing wrong with it</td></tr>
+        <tr><td><code>landmarkBrief(landmark)</code></td><td>The line to write for the landmark being flown to</td></tr>
+        <tr><td><code>rangeBand(landmark)</code>, <code>windowHeight(landmark)</code></td><td>The two bands a renderer draws, in the units it draws in</td></tr>
     </tbody>
 </table>
 </div>
@@ -907,11 +942,100 @@ function frame(dt) {
     if (found) say('found');
 }</code></pre>
 
+<h3 id="a-circuit-and-the-legs-it-is-held-on">A circuit, and the legs it is held on</h3>
+
+<p>A traffic pattern is the one mode that is judged on the flying rather than on the arrival. <code>buildPattern</code> lays the circuit off a strip - five legs, each with a heading to track, a height to be at by the end of it, and the turn it ends at - and the reading of how well each was held is kept beside the run rather than inside it, the way a rollout is.</p>
+
+<pre><code>import {
+    createRunState, TRAFFIC_PATTERN, stagePattern, flyPattern, nextLeg
+} from 'pilot-matter';
+import {
+    createPatternState, samplePattern, completeLeg, patternScore
+} from 'pilot-matter/pattern';
+
+const run = createRunState(TRAFFIC_PATTERN);
+const circuit = stagePattern(run, runway);
+const held = createPatternState();
+
+let last = pilot.pose().position;
+function frame(dt) {
+    pilot.update(dt);
+    const now = pilot.pose().position;
+    const leg = circuit[nextLeg(run)];
+
+    // Read against the leg being flown, then close it at the turn.
+    if (leg) samplePattern(held, leg, { ...now, altitudeFeet, headingDegrees }, dt);
+    if (flyPattern(run, circuit, last, now).turned) say(completeLeg(held, leg));
+
+    last = now;
+}</code></pre>
+
+<p>A leg is <code>{index, label, fromX, fromZ, fromFeet, x, z, altitudeFeet, heading, dirX, dirZ, run}</code>. <code>fromX</code>/<code>fromZ</code> are where it begins and <code>x</code>/<code>z</code> where it ends, which is also the turn onto the next one and the mark a chart draws. <code>fromFeet</code> and <code>altitudeFeet</code> are the heights at those two ends: the target between them is the ramp from one to the other, so a leg whose ends match is a height to hold and a leg whose ends differ is a climb or a descent to fly at a steady rate. One reading serves all five legs without any of them needing a rule of its own.</p>
+
+<p>Both errors are accumulated against time rather than against frames, so what a leg comes to does not depend on how fast the host is drawing. <code>scoreLeg</code> and <code>completeLeg</code> give <code>{index, label, seconds, altitude, heading, marks, score}</code>, where the two errors are means over the time the leg took and the score is their marks averaged out of a hundred. <code>completeLeg</code> closes a leg once: what happens after the turn belongs to the next leg.</p>
+
+<p>The last leg is the one a turn cannot close. Final ends at the threshold, and an aircraft crosses that threshold on every go-around it flies, so <code>recordLanding</code> finishes the circuit and <code>recordPatternLeg</code> refuses the final leg. A landing reported anywhere earlier in the pattern counts for nothing.</p>
+
+<p>A circuit is also the one run that opens on the ground: <code>stageStart</code> hands back <code>startMode: 'takeoff'</code> and a null <code>position</code>, leaving the threshold to the takeoff start rather than naming it a second time.</p>
+
+<h3 id="a-corridor-and-the-walls-it-is-flown-between">A corridor, and the walls it is flown between</h3>
+
+<p>A canyon run is a line through the world with a wall either side of it and a ceiling over it, cut into sections. It is laid rather than found - a generator puts its canyons wherever its noise does, so a run that went looking for one would be a run whose difficulty was whatever the seed handed it.</p>
+
+<p><code>buildCorridor</code> walks the line across the ground and holds the ceiling a declared height over whatever is underneath, so a stage that brings the ceiling down brings it down everywhere rather than only where the ground was already high. A section is <code>{index, x, z, floor, ceiling, y, halfWidth, dirX, dirZ}</code>, with <code>y</code> the ceiling again under the name a chart reads a mark's height by.</p>
+
+<pre><code>import { createRunState, CANYON_RUN, currentStage, flyCorridor } from 'pilot-matter';
+import { buildCorridor } from 'pilot-matter/corridor';
+
+const run = createRunState(CANYON_RUN);
+const corridor = buildCorridor(currentStage(run), { seed: 1, sampleHeight: world.sampleHeight });
+
+function frame(dt) {
+    pilot.update(dt);
+    const now = pilot.pose().position;
+
+    const step = flyCorridor(run, corridor, last, now);
+    if (step.finished) endOfStage(run);
+    else if (step.faulted) say(step.fault);   // OVER THE TOP, WIDE, or OVER AND WIDE
+
+    last = now;
+}</code></pre>
+
+<p><code>flyCorridor</code> is the same shape as <code>flyStep</code>, and tested the same way: a section is thinner than the distance covered in a frame, so the step is put to the plane rather than the place. It is the gate test asked of a rectangle open at the bottom rather than of an ellipse - open at the bottom because the floor is the ground, and the ground is already a thing that ends a flight. Climbing over the lid is the one way the mode could be cheated and the only thing it guards against.</p>
+
+<p>A fault moves nothing. The section stays the one the run is up to, which is what lets it be flown again, and <code>missedBy</code> names which of the two limits was broken - coming back down and coming back in are different corrections.</p>
+
+<h3 id="a-survey-and-the-window-a-landmark-is-caught-through">A survey, and the window a landmark is caught through</h3>
+
+<p>A photo survey is met by being somewhere *and saying so*. <code>buildSurvey</code> places the landmarks a stage lists, each by a bearing and a distance from where the stage opens, and each carrying the window it has to be caught from:</p>
+
+<pre><code>import { createRunState, PHOTO_SURVEY, stageLandmarks, recordPhoto } from 'pilot-matter';
+
+const run = createRunState(PHOTO_SURVEY);
+const landmarks = stageLandmarks(run);
+
+function onShutter() {
+    const shot = recordPhoto(run, landmarks, {
+        x: position.x, z: position.z, altitudeFeet, headingDegrees
+    });
+
+    if (shot.finished) endOfStage(run);
+    else if (!shot.caught) say(shot.fault);   // TOO FAR OUT, TOO HIGH, WRONG SIDE, ...
+}</code></pre>
+
+<p>A landmark is <code>{index, name, x, z, bearing, distance, height, window}</code>, and the window is a height band in feet, a range band in world units, and a heading with a reach either side of it. All three have to hold at once: a landmark photographed from directly overhead at four thousand feet is a photograph of a roof, and the brief asked for an elevation.</p>
+
+<p>The shutter belongs to the host. <code>recordPhoto</code> is told that a picture was taken and answers whether it counted - a mode that swallowed a picture for being of the wrong thing would be a mode that broke the camera. A shot with no landmark outstanding is a photograph and nothing else.</p>
+
+<p><code>shotFor</code> is the reading on its own, as <code>{heightOk, rangeOk, headingOk, inside, range, bearing}</code>, and <code>shotFault</code> turns a reading that missed into the first thing wrong with it rather than all of them. A reading that cannot be taken - a report with no place in it - is outside every part of the window rather than inside it by default: a missing place measures <code>NaN</code>, and <code>NaN</code> fails every comparison including the ones that would have rejected it.</p>
+
+<p><code>landmarkBrief</code> is the line to write, and it carries the name, the height and the heading but not the range. The range is the one of the three readings that is a place, and a place can be drawn: <code>rangeBand</code> hands the near and far edges over as circles to lay on the ground, which is where the bundled game reads them from.</p>
+
 <h3 id="what-a-chart-draws-for-a-run">What a chart draws for a run</h3>
 
 <p><code>runPointer</code> is one line of text, and a host with a map instead of a status row wants the same answer as places. <code>chartCourse</code> gives it: the marks the run is flying to, in the order it flies them, each an <code>{x, z}</code> a chart can plot. A course is its gates and a route is the strips it lands at, and both carry the <code>index</code> the run counts them by; a search is the one marker it is looking for, which the run counts by nothing and which carries no index of its own, so a chart reads that one by its place in the list. A landing and a free flight are an empty array, having no objective standing off somewhere to be drawn. <code>chartNext</code> says which of those marks the run is waiting on, or <code>-1</code> for none, so the mark a chart lights is the one the pointer row is naming.</p>
 
-<p>The world it is handed is the same shape <code>runPointer</code> takes - <code>{course, runways}</code> - because the two answer one question and should not be able to disagree about it.</p>
+<p>The world it is handed is the same shape <code>runPointer</code> takes - <code>{course, runways, circuit, corridor, landmarks}</code>, of which a run uses one - because the two answer one question and should not be able to disagree about it. A circuit is drawn as its turns, a canyon run as its cuts, and a survey as its landmarks.</p>
 
 <pre><code>import { createRunState, CARGO_RUN, chartCourse, chartNext } from 'pilot-matter';
 
@@ -960,7 +1084,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
 </table>
 </div>
 
-<p>Two more are built for the game modes rather than to be chosen between, and are deliberately thin - what a mode asks the pilot to read is the objective, not the scenery around it. <code>isEnvironmentId</code> answers no for both, so a stored choice can never leave a free flight parked in one; <code>getEnvironment</code> still finds them by name.</p>
+<p>Five more are built for the game modes rather than to be chosen between. <code>isEnvironmentId</code> answers no for all of them, so a stored choice can never leave a free flight parked in one; <code>getEnvironment</code> still finds them by name.</p>
 
 <div class="table-wrap">
 <table>
@@ -968,9 +1092,14 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
     <tbody>
         <tr><td><code>'open-country'</code></td><td>Low rolling ground under a wide sky, with one strip cut into it</td></tr>
         <tr><td><code>'loop-valley'</code></td><td>A shallow valley with clear air over it, for a course of loops</td></tr>
+        <tr><td><code>'back-country'</code></td><td>Rough, wooded ground with no strip in it, for a search flown by the compass</td></tr>
+        <tr><td><code>'canyon-reach'</code></td><td>A deep plateau cut end to end by canyons, for a run flown low</td></tr>
+        <tr><td><code>'survey-country'</code></td><td>Town, forest, water and rock together, for a survey flown with a camera</td></tr>
     </tbody>
 </table>
 </div>
+
+<p>The first three are deliberately thin - what a mode asks the pilot to read is the objective, not the scenery around it. The last two are not, and for the same reason read the other way round: a canyon run wants real walls standing beside the corridor it is judged on, and a survey wants something on the ground worth photographing.</p>
 
 <p>An environment is a description rather than geometry: a name, a seed, the base ground, and the elements placed over it. A host can pass its own list of placements instead of a preset's, and every value in one is clamped into the range the element declares, so a placement cannot configure an element outside what it says it supports.</p>
 

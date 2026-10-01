@@ -332,12 +332,21 @@ test('a chart fitted to new ground draws the course against that ground', () => 
 const mainSource = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
 
 test('the chart is handed what the run is flying to, whatever kind of run it is', () => {
-    assert.ok(/this\.hud\.setCourse\([^;]*?chartCourse\(this\.run,/.test(mainSource),
+    assert.ok(/this\.hud\.setCourse\(chartCourse\(this\.run, this\.runWorld\(\)\)\)/.test(mainSource),
         'js/main.js should hand the chart the run\'s own marks rather than only a loop course');
-    assert.ok(/chartCourse\(this\.run,[^;]*?runways:\s*this\.runways/.test(mainSource),
-        'and hand over the strips, which is the only place a route\'s marks can come from');
-    assert.ok(/chartCourse\(this\.run,[^;]*?course:\s*this\.course/.test(mainSource),
-        'and the gates, so a loop course is drawn as it always was');
+
+    // The marks are gathered in one place now, so that place is what is read
+    // rather than the call. There are five kinds of them, and a mode bringing
+    // a sixth has to be added here as well - which is the point of listing
+    // them: leaving one out is exactly what lost a route its bearing before.
+    const world = mainSource.match(/^ {4}runWorld\(\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(world, 'js/main.js should still gather the run\'s marks in one place');
+
+    const marks = ['course', 'runways', 'corridor', 'circuit', 'landmarks'];
+    for (const mark of marks) {
+        assert.match(world[1], new RegExp(`${mark}: this\.${mark}`),
+            `and carry the ${mark}, which is the only place those marks can come from`);
+    }
 });
 
 test('the chart lights the mark the run is waiting on, and the hoops their gate', () => {
@@ -345,10 +354,19 @@ test('the chart lights the mark the run is waiting on, and the hoops their gate'
     assert.ok(method, 'js/main.js should still write the objective card in one place');
 
     const body = method[1];
-    assert.ok(/this\.hud\.setNextMark\(chartNext\(this\.run\)\)/.test(body),
+    assert.match(body, /const next = chartNext\(this\.run\);/,
+        'what the run is waiting on is read once, so everything drawn agrees on it');
+    assert.match(body, /this\.hud\.setNextMark\(next\)/,
         'the chart is lit from what the run is waiting on, which is not always a gate');
     assert.ok(!/setNextMark\(nextGate\(/.test(body),
         'a route and a search count legs and markers, and nextGate answers -1 for both');
-    assert.ok(/this\.loops\.setNext\(nextGate\(this\.run\)\)/.test(body),
+    assert.match(body, /this\.loops\.setNext\(nextGate\(this\.run\)\)/,
         'while the hoops in the world are still lit by the gate a course is up to');
+
+    // And the two drawn things the newer modes brought with them, lit off that
+    // same reading so the world and the corner of the screen agree.
+    assert.match(body, /this\.walls\.setNext\(nextSection\(this\.run\)\)/,
+        'the corridor is lit by the cut a run is up to');
+    assert.match(body, /this\.beacon\.setNext\(next\)/,
+        'and the masts by whatever mark the run is waiting on');
 });

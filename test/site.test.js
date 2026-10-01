@@ -532,18 +532,13 @@ test('the deploy workflow has every piece a Pages deploy needs', () => {
 // a clone without that rule - another machine, or CI - the folders are untracked
 // and visible, and a `git add -A` sweeps every file in them into the repository.
 //
-// The check stands down on a tree that has no `.gitignore`, because the file is
-// not in the repository yet: a global rule on the machine it is written on
-// excludes it, so `actions/checkout` fetches a tree without it and asserting on
-// one unconditionally would fail the deploy rather than the thing it guards.
-// Tracking it is queued as a found issue, and this starts applying everywhere
-// the moment it lands.
-test('the repository excludes its own verification output rather than trusting a machine to', (t) => {
-    if (!existsSync(join(ROOT, '.gitignore'))) {
-        t.skip('this tree carries no .gitignore, which is the found issue rather than this check');
-        return;
-    }
-
+// `.gitignore` is tracked, so every clone carries the rules and this check
+// applies to every tree it runs on. It used to stand down where the file was
+// missing, back when a personal global rule kept it out of the repository and
+// `actions/checkout` fetched a tree without it. That branch guarded nothing
+// once the file landed, and it would have hidden this check on any tree that
+// lost it again - which is the one tree worth failing on.
+test('the repository excludes its own verification output rather than trusting a machine to', () => {
     const ignored = read('.gitignore')
         .split('\n')
         .map(line => line.trim())

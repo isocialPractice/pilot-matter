@@ -25,7 +25,7 @@ import {
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
 import { runwayWanted } from './config.js';
-import { headingDegrees } from './units.js';
+import { headingDegrees, altitudeToFeet, feetToAltitude } from './units.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
@@ -33,8 +33,17 @@ import {
     tickRun, missNotice, isStageComplete, chartCourse, chartNext,
     nextStrip, burnFuel, fuelRemaining, engineLive, stageMarker, recordRescue,
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey, openingRun,
-    FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE, CARGO_OBJECTIVE
+    stagePattern, stageLandmarks, stageReaches, flyPattern, nextLeg,
+    flyCorridor, nextSection, recordPhoto, nextLandmark,
+    runBrief, faultNotice, shotNotice, legNotice,
+    FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE, CARGO_OBJECTIVE,
+    PATTERN_OBJECTIVE, CORRIDOR_OBJECTIVE, SURVEY_OBJECTIVE
 } from './game-modes.js';
+import {
+    createPatternState, resetPattern, samplePattern, completeLeg
+} from './pattern.js';
+import { buildCorridor } from './corridor.js';
+import { rangeBand } from './survey.js';
 import {
     scoreLanding, createRolloutState, beginRollout, clearRollout, updateRollout
 } from './landing-score.js';
@@ -47,8 +56,9 @@ import {
     setEditorClearance, isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
+import { CanyonWalls } from './walls.js';
 import { ApproachGuidance } from './guidance.js';
-import { RescueMarker } from './marker.js';
+import { RescueMarker, MAST_HEIGHT } from './marker.js';
 import { TILE_REACH } from './world-tiles.js';
 import {
     createLoadingState, advanceLoading, loadingComplete, LoadingScreen
@@ -137,6 +147,16 @@ class FlightSimulator {
         // Where the marker of a search stands, held rather than asked for every
         // frame: it is laid with the stage and does not move inside one.
         this.marker = null;
+        // And the three the newer modes are flown to, held for the same
+        // reason: a circuit, a corridor and a list of landmarks are all laid
+        // with the stage and none of them moves inside one.
+        this.circuit   = [];
+        this.corridor  = [];
+        this.landmarks = [];
+        // How each leg of a circuit has been held so far. Kept beside the run
+        // the way a rollout is, because it is one mode's working rather than
+        // something every mode reads.
+        this.pattern = createPatternState();
 
         // The board a finished stage is measured against, which outlives the
         // session it was flown in.
@@ -154,6 +174,7 @@ class FlightSimulator {
         this.loops   = new LoopCourse(this.scene);
         this.guidance = new ApproachGuidance(this.scene);
         this.beacon   = new RescueMarker(this.scene);
+        this.walls    = new CanyonWalls(this.scene);
         // The square the world covers, held rather than asked for every frame:
         // it only changes when the world does.
         this.bounds  = this.terrain.getBounds();
@@ -211,7 +232,13 @@ class FlightSimulator {
         // the beat a missed gate is reported for, and where the aircraft was
         // last frame, which is what a gate is tested against.
         this.stageHold = 0;
-        this.missHold = 0;
+        // The beat the objective line is given up for, and what it is given up
+        // to say. One timer rather than one per mode: a missed gate, a cut
+        // flown over the top of, a shot outside its window and a leg just held
+        // are all the same thing to the card - something that just happened,
+        // worth a moment of the row the objective is usually in.
+        this.noticeHold = 0;
+        this.notice = '';
         this.lastPosition = null;
 
         // What the stage just flown out came to, for as long as it is held on
@@ -421,16 +448,32 @@ class FlightSimulator {
             : [];
         this.loops.setRings(this.course);
 
+        // A corridor is laid over the ground the same way, and for the same
+        // reason: its ceiling is held a height over whatever is underneath, so
+        // it cannot be worked out until the ground it is laid on has been.
+        this.corridor = mode?.objective === CORRIDOR_OBJECTIVE
+            ? buildCorridor(currentStage(this.run), {
+                seed: world.seed,
+                size: this.terrain.size,
+                sampleHeight: (x, z) => this.terrain.getTerrainHeightAt(x, z)
+            })
+            : [];
+        this.walls.setCorridor(this.corridor);
+
+        // The circuit is laid off the strip rather than over the ground, so it
+        // waits on the runway the world put down rather than on the terrain.
+        this.circuit = stagePattern(this.run, this.terrain.getRunway());
+        resetPattern(this.pattern, Math.max(this.circuit.length, 1));
+
+        this.landmarks = stageLandmarks(this.run);
+
         // The whole of what is being flown to is on the chart the moment it is
         // laid, rather than as it is reached: the first gate should not be the
         // only one the pilot has ever seen, and a route's strips and a search's
         // marker are drawn on the same terms. The chart is what a short screen
         // gives as its reason for taking the card's pointer row off, so a mode
         // it drew nothing for was a mode with no bearing left anywhere.
-        this.hud.setCourse(chartCourse(this.run, {
-            course: this.course,
-            runways: this.runways
-        }));
+        this.hud.setCourse(chartCourse(this.run, this.runWorld()));
 
         // And the help a landing stage is given, drawn out over the ground it
         // is laid on rather than at the strip's own height, because the lead-in
@@ -440,10 +483,70 @@ class FlightSimulator {
         // The marker a search is flown to, if this stage has one. Laid on the
         // ground the same way the lead-in is, because it stands in open country
         // rather than on anything graded.
+        // The marker a search is flown to, the landmarks a survey works
+        // through, and the turns a circuit is flown round all stand in open
+        // country on a mast, so one call draws whichever of them this stage
+        // has. A turn carries no circle and stands to the height its leg is
+        // flown at; a landmark carries the two circles its range band is.
         this.marker = stageMarker(this.run);
-        this.beacon.setMarker(this.marker, (x, z) => this.terrain.getTerrainHeightAt(x, z));
+        this.beacon.setMarkers(this.standingMarks(),
+            (x, z) => this.terrain.getTerrainHeightAt(x, z));
 
         return rebuilt;
+    }
+
+    /**
+     * The things this stage puts on a mast: a search's marker, a survey's
+     * landmarks, or a circuit's turns. One list, because they are drawn by one
+     * renderer, and the differences between them are what each carries rather
+     * than how many of them there are.
+     *
+     * A landmark carries the two circles its range band is drawn as - the band
+     * is the one of its three readings that is a place, so it is put on the
+     * ground rather than on the card. A turn carries no circle and a mast as
+     * tall as the height its leg wants, which is the one thing about a place
+     * in empty air that cannot be read off the country under it.
+     */
+    standingMarks() {
+        if (this.marker) return [this.marker];
+
+        if (this.landmarks.length) {
+            return this.landmarks.map(landmark => {
+                const band = rangeBand(landmark);
+                return {
+                    x: landmark.x,
+                    z: landmark.z,
+                    mast: MAST_HEIGHT + landmark.height,
+                    radius: band?.far ?? 0,
+                    inner: band?.near ?? 0
+                };
+            });
+        }
+
+        return this.circuit.map(leg => ({
+            x: leg.x,
+            z: leg.z,
+            mast: Math.max(
+                feetToAltitude(leg.altitudeFeet) - this.terrain.getTerrainHeightAt(leg.x, leg.z),
+                MAST_HEIGHT
+            )
+        }));
+    }
+
+    /**
+     * Everything the run is flown to, as the one object the mode's own rules
+     * read it off. Built here because this is where all of it is held, and
+     * handed over whole rather than a piece at a time: a pointer, a chart and
+     * a brief are three readings of the same world.
+     */
+    runWorld() {
+        return {
+            course: this.course,
+            runways: this.runways,
+            corridor: this.corridor,
+            circuit: this.circuit,
+            landmarks: this.landmarks
+        };
     }
 
     /**
@@ -483,8 +586,16 @@ class FlightSimulator {
         const runway = this.terrain.getRunway();
 
         if (isRunning(this.run)) {
-            const opening = stageStart(this.run, { runway, rings: this.course });
-            return { ...flightStart(opening.start, { runway }), ...opening.position };
+            const opening = stageStart(this.run, {
+                runway, rings: this.course, corridor: this.corridor
+            });
+
+            // A circuit opens on the strip and hands over no place, because
+            // the takeoff start already put the aircraft on the threshold.
+            // Spreading an absent position over that would be spreading
+            // nothing; spreading a second answer would be worse.
+            const start = flightStart(opening.start, { runway });
+            return opening.position ? { ...start, ...opening.position } : start;
         }
 
         return flightStart(startSettings(this.settings), { runway });
@@ -496,25 +607,34 @@ class FlightSimulator {
      * being asked for is not something that changes inside a stage.
      */
     syncObjective() {
-        // The hoops are lit by the gate a course is up to; the chart is lit by
-        // whichever mark the run is waiting on, which is that same gate for a
-        // course and a strip or a marker for the modes that fly to those.
+        // The hoops, the corridor and the masts are each lit by the mark the
+        // run is waiting on, and so is the chart. Every one of them is told
+        // the same index, so what is lit in the world, what is lit on the
+        // chart and what is named on the card are one answer.
+        const next = chartNext(this.run);
         this.loops.setNext(nextGate(this.run));
-        this.hud.setNextMark(chartNext(this.run));
+        this.walls.setNext(nextSection(this.run));
+        this.beacon.setNext(next);
+        this.hud.setNextMark(next);
 
         const mode  = runningMode(this.run);
         const stage = currentStage(this.run);
 
         // The objective line is given up for two things, both of them shorter
-        // lived than it and both of them more urgent while they last: a gate
-        // gone by, and the time a stage just flown out came to. The objective
-        // is written back the moment their beat runs out.
-        const missed = this.missHold > 0 ? missNotice(this.run) : '';
+        // lived than it and both of them more urgent while they last: a notice
+        // about what just happened, and the time a stage just flown out came
+        // to. The objective is written back the moment their beat runs out.
+        const notice = this.noticeHold > 0 ? this.notice : '';
         const report = this.stageHold > 0 ? stageReport(this.stageResult) : '';
+
+        // And what the objective is, for the two modes whose objective moves
+        // inside a stage: a circuit asks for a different height and heading on
+        // every leg, and a survey for a different landmark on every shot.
+        const asking = this.run.complete ? 'MODE COMPLETE' : runBrief(this.run, this.runWorld());
 
         this.hud.setObjective(mode ? {
             name: mode.label,
-            objective: missed || report || (this.run.complete ? 'MODE COMPLETE' : runObjective(this.run)),
+            objective: notice || report || asking,
             status: this.run.complete ? runStatus(this.run) : `${stage.label}  ·  ${runStatus(this.run)}`
         } : {});
     }
@@ -1003,7 +1123,8 @@ class FlightSimulator {
     onFlightReset() {
         this.camera2?.setMode(this.start?.cameraMode ?? INITIAL_CAMERA_MODE);
         this.lastPosition = null;
-        this.missHold = 0;
+        this.noticeHold = 0;
+        this.notice = '';
         this.stageResult = null;
         this.clearLanding();
 
@@ -1013,6 +1134,11 @@ class FlightSimulator {
 
         if (!isRunning(this.run) || this.run.complete) return;
         restartStage(this.run);
+
+        // The circuit is flown again from the takeoff, so what was held on
+        // each leg of the last attempt goes with it. A stage flown twice is
+        // scored as the attempt that finished it, the way the clock is.
+        resetPattern(this.pattern, Math.max(this.circuit.length, 1));
 
         // The budget goes back with the stage, so the engine a run had spent
         // comes back with it. Read from the run rather than assumed, because a
@@ -1089,7 +1215,18 @@ class FlightSimulator {
     /** Holds a finished stage on screen for a beat before laying out the next. */
     holdStage() {
         this.stageHold = STAGE_HOLD;
-        this.missHold = 0;
+        this.noticeHold = 0;
+        this.notice = '';
+    }
+
+    /**
+     * Gives the objective row up for a beat to say what just happened. An
+     * empty notice is nothing happening, which leaves whatever is there.
+     */
+    holdNotice(text) {
+        if (!text) return;
+        this.notice = text;
+        this.noticeHold = MISS_HOLD;
     }
 
     /**
@@ -1112,14 +1249,24 @@ class FlightSimulator {
      */
     trackCourse() {
         const position = this.aircraft.getPosition();
-
-        if (nextGate(this.run) < 0 || !this.lastPosition) {
-            this.lastPosition = position;
-            return;
-        }
-
-        const step = flyStep(this.run, this.course, this.lastPosition, position);
+        const from = this.lastPosition;
         this.lastPosition = position;
+        if (!from) return;
+
+        // Three modes are flown as a line crossed rather than a place reached,
+        // and all three are read off the same step. Which of them this is has
+        // already been decided by the run - each of these answers nothing at
+        // all outside its own mode - so the step is simply put to all three.
+        this.trackGates(from, position);
+        this.trackCuts(from, position);
+        this.trackLegs(from, position);
+    }
+
+    /** The step put to the course of loops, if that is what is being flown. */
+    trackGates(from, to) {
+        if (nextGate(this.run) < 0) return;
+
+        const step = flyStep(this.run, this.course, from, to);
 
         // The stage is finished before the card is written, so a card written
         // on the last gate of a stage carries the time it took.
@@ -1128,9 +1275,62 @@ class FlightSimulator {
         // A miss leaves the course waiting on the same gate, so nothing about
         // the run has moved. What the pilot gets is the one thing they were not
         // getting before: told.
-        if (step.missed) this.missHold = MISS_HOLD;
+        if (step.missed) this.holdNotice(missNotice(this.run));
 
         if (step.passed || step.missed) this.syncObjective();
+    }
+
+    /** The step put to the corridor, if a canyon run is being flown. */
+    trackCuts(from, to) {
+        if (nextSection(this.run) < 0) return;
+
+        const step = flyCorridor(this.run, this.corridor, from, to);
+
+        if (step.finished) this.finishStage();
+
+        // A cut reached over the lid or wide of a wall leaves the run waiting
+        // on it, exactly as a missed gate does. The pilot is told which of the
+        // two it was, because coming back down and coming back in are
+        // different corrections.
+        if (step.faulted) this.holdNotice(faultNotice(this.run, step.fault));
+
+        if (step.passed || step.faulted) this.syncObjective();
+    }
+
+    /**
+     * The step put to the circuit, if a pattern is being flown.
+     *
+     * A leg is closed here rather than where it is read, because the turn is
+     * the moment the reading stops: everything after it belongs to the next
+     * leg and is held against that one's height and heading instead.
+     */
+    trackLegs(from, to) {
+        const index = nextLeg(this.run);
+        if (index < 0) return;
+
+        const step = flyPattern(this.run, this.circuit, from, to);
+        if (!step.turned) return;
+
+        this.holdNotice(legNotice(completeLeg(this.pattern, this.circuit[index], stageReaches(this.run))));
+        this.syncObjective();
+    }
+
+    /**
+     * Reads the aircraft against the leg of the circuit it is on, for one
+     * frame. Costs nothing outside a pattern, which has no circuit to be on a
+     * leg of.
+     */
+    trackPattern(dt) {
+        const leg = this.circuit[nextLeg(this.run)];
+        if (!leg) return;
+
+        const position = this.aircraft.getPosition();
+        samplePattern(this.pattern, leg, {
+            x: position.x,
+            z: position.z,
+            altitudeFeet: altitudeToFeet(this.aircraft.getAltitude()),
+            headingDegrees: headingDegrees(this.aircraft.getHeading())
+        }, dt);
     }
 
     /**
@@ -1150,9 +1350,14 @@ class FlightSimulator {
         burnFuel(this.run, this.aircraft.getThrottle(), dt);
         this.syncEngine();
 
-        if (this.missHold > 0) {
-            this.missHold = Math.max(0, this.missHold - dt);
-            if (this.missHold === 0) this.syncObjective();
+        // And what the frame did to the leg being flown. A circuit is scored
+        // on the whole of each leg rather than on the turn at the end of it,
+        // so the reading is taken every frame and closed at the turn.
+        this.trackPattern(dt);
+
+        if (this.noticeHold > 0) {
+            this.noticeHold = Math.max(0, this.noticeHold - dt);
+            if (this.noticeHold === 0) this.syncObjective();
         }
 
         // The breakdown of a leg belongs to the ground it was read on. Once the
@@ -1169,7 +1374,7 @@ class FlightSimulator {
 
         this.hud.setRunPointer(runPointer(
             this.run,
-            { course: this.course, runways: this.runways },
+            this.runWorld(),
             this.aircraft.getPosition(),
             headingDegrees(this.aircraft.getHeading())
         ));
@@ -1398,7 +1603,35 @@ class FlightSimulator {
     takePhoto() {
         savePhoto(this.renderer.domElement, photoFilename());
         completePhoto(this.photoState);
+        this.surveyPhoto();
         this.syncOverlays();
+    }
+
+    /**
+     * Puts the shutter to a survey. The picture has already been taken and
+     * saved by the time this runs, and that is the order on purpose: the
+     * camera belongs to the pilot, and a mode that swallowed a photograph for
+     * being of the wrong thing would be a mode that broke it.
+     *
+     * Everything about whether it counted is decided in `js/game-modes.js`,
+     * which holds the window; what is here is reading the aircraft off and
+     * saying what came of it.
+     */
+    surveyPhoto() {
+        if (nextLandmark(this.run) < 0) return;
+
+        const position = this.aircraft.getPosition();
+        const shot = recordPhoto(this.run, this.landmarks, {
+            x: position.x,
+            z: position.z,
+            altitudeFeet: altitudeToFeet(this.aircraft.getAltitude()),
+            headingDegrees: headingDegrees(this.aircraft.getHeading())
+        });
+
+        if (shot.finished) this.finishStage();
+        if (!shot.caught) this.holdNotice(shotNotice(this.landmarks[shot.index], shot.fault));
+
+        this.syncObjective();
     }
 }
 

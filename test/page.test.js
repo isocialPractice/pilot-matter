@@ -20,8 +20,17 @@ import {
     GAME_MODES, GATE_ARROWS, missNotice, runStatus, runObjective,
     createRunState, startRun, currentStage, stageProgress, recordGate,
     recordLanding, advanceStage, searchBriefing,
-    nextStrip, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE
+    nextStrip, LOOP_OBJECTIVE, CARGO_OBJECTIVE, SEARCH_OBJECTIVE,
+    PATTERN_OBJECTIVE, CORRIDOR_OBJECTIVE, SURVEY_OBJECTIVE,
+    stagePattern, stageLandmarks, stageReaches, stageSections,
+    recordPatternLeg, recordSection, recordPhoto,
+    runBrief, faultNotice, shotNotice, legNotice
 } from '../js/game-modes.js';
+import { completeLeg, createPatternState, FINAL_LEG } from '../js/pattern.js';
+import { missedBy } from '../js/corridor.js';
+import { shotFault, shotFor } from '../js/survey.js';
+import { bearingToDirection } from '../js/units.js';
+import { runwayDirection } from '../js/environment/elements.js';
 import { formatStageClock, formatRunPointer } from '../js/hud.js';
 import { stageReport } from '../js/best-times.js';
 
@@ -176,10 +185,80 @@ const CARD_STATES = [
  * what the row has to hold.
  */
 function pointerLabel(mode, state, total) {
-    if (mode.objective === LOOP_OBJECTIVE)  return `LOOP ${Math.max(1, total)}`;
-    if (mode.objective === CARGO_OBJECTIVE) return `LEG ${Math.max(1, total)}`;
+    if (mode.objective === LOOP_OBJECTIVE)   return `LOOP ${Math.max(1, total)}`;
+    if (mode.objective === CARGO_OBJECTIVE)  return `LEG ${Math.max(1, total)}`;
     if (mode.objective === SEARCH_OBJECTIVE) return searchBriefing(state)?.label ?? '';
+    if (mode.objective === PATTERN_OBJECTIVE)  return `LEG ${Math.max(1, total)}`;
+    if (mode.objective === CORRIDOR_OBJECTIVE) return `CUT ${Math.max(1, total)}`;
+    if (mode.objective === SURVEY_OBJECTIVE)   return `SHOT ${Math.max(1, total)}`;
     return '';
+}
+
+/**
+ * A strip to lay a circuit off, in the shape the generator hands one over. The
+ * circuit's own dimensions are the stage's, so the strip only has to be a
+ * strip - but it has to be a whole one, because the thresholds are read off
+ * `alongX` and `alongZ` rather than off the bearing.
+ */
+function strip(stage) {
+    const heading = 90;
+    return {
+        x: 0, z: 0, heading, ...runwayDirection(heading),
+        length: stage.runway.length[1], width: stage.runway.width[1], elevation: 60
+    };
+}
+
+/**
+ * Everything a mode's own rules read the world off, for whichever mode this
+ * is. The lines the card writes for a circuit and a survey are read off the
+ * circuit and the list, so a check of those lines has to lay both.
+ */
+function worldFor(state) {
+    const stage = currentStage(state);
+    return {
+        circuit: stage?.pattern ? stagePattern(state, strip(stage)) : [],
+        landmarks: stageLandmarks(state)
+    };
+}
+
+/**
+ * The same shot taken wrong, one way for each thing `shotFault` can say about
+ * one. Every fault is a line the card has to hold, and the one that is longest
+ * is not obvious from reading them - so they are all generated rather than the
+ * worst of them guessed at.
+ */
+function outsideWindow(landmark) {
+    const inside = insideWindow(landmark);
+    const { heightFeet, range, heading } = landmark.window;
+    const back = bearingToDirection((heading + 180) % 360);
+
+    const at = (over) => ({ shot: shotFor(landmark, { ...inside, ...over }) });
+    const out = (distance) => ({
+        x: landmark.x + back.x * distance,
+        z: landmark.z + back.z * distance
+    });
+
+    return [
+        at(out(range[1] * 2)),            // too far out
+        at(out(Math.max(range[0] / 4, 1))), // too close in
+        at({ altitudeFeet: heightFeet[1] * 2 }), // too high
+        at({ altitudeFeet: 0 }),          // too low
+        at({ headingDegrees: (heading + 180) % 360 }) // the wrong side of it
+    ];
+}
+
+/** A shot taken from the middle of a landmark's own window, which counts. */
+function insideWindow(landmark) {
+    const { heightFeet, range, heading } = landmark.window;
+    const back = bearingToDirection((heading + 180) % 360);
+    const out  = (range[0] + range[1]) / 2;
+
+    return {
+        x: landmark.x + back.x * out,
+        z: landmark.z + back.z * out,
+        altitudeFeet: (heightFeet[0] + heightFeet[1]) / 2,
+        headingDegrees: heading
+    };
 }
 
 /** Counts one step of a stage off, by whatever a stage of this mode counts. */
@@ -189,6 +268,16 @@ function countOff(mode, state, step) {
     // reported with that strip under it rather than with nothing.
     if (mode.objective === CARGO_OBJECTIVE) return recordLanding(state, { index: nextStrip(state) });
     if (mode.objective === SEARCH_OBJECTIVE) return true;
+    if (mode.objective === CORRIDOR_OBJECTIVE) return recordSection(state, step);
+    if (mode.objective === SURVEY_OBJECTIVE) {
+        const landmarks = stageLandmarks(state);
+        return recordPhoto(state, landmarks, insideWindow(landmarks[step]));
+    }
+    // A circuit turns onto each leg in order and lands off the last one, which
+    // is the one leg a turn cannot close.
+    if (mode.objective === PATTERN_OBJECTIVE) {
+        return step < FINAL_LEG ? recordPatternLeg(state, step) : recordLanding(state);
+    }
     return recordLanding(state);
 }
 
@@ -1197,6 +1286,28 @@ test("the card's rows are written inside the lines they were measured at", () =>
             for (let step = 0; step <= total; step++) {
                 lines.status.push(`${currentStage(state).label}  ·  ${runStatus(state)}`);
                 lines.objective.push(missNotice(state));
+
+                // The lines the newer modes write into that same row. A
+                // circuit and a survey write a brief there that changes with
+                // every leg and every landmark, and all three write a notice
+                // when something has just gone wrong - so each is collected at
+                // every step rather than once per mode.
+                const world = worldFor(state);
+                lines.objective.push(runBrief(state, world));
+                lines.objective.push(faultNotice(state, missedBy({ inside: false, under: false, within: false })));
+
+                const landmark = world.landmarks[step];
+                if (landmark) {
+                    for (const bad of outsideWindow(landmark)) {
+                        lines.objective.push(shotNotice(landmark, shotFault(bad.shot, landmark)));
+                    }
+                }
+
+                const leg = world.circuit[step];
+                if (leg) {
+                    lines.objective.push(legNotice(completeLeg(createPatternState(), leg, stageReaches(state))));
+                }
+
                 lines.pointer.push(formatRunPointer({
                     // The arrow a mode's pointer carries, which a briefing does
                     // not: it is a bearing the pilot was given rather than a

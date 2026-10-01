@@ -797,26 +797,33 @@ read them as a worked example of a game built on the two APIs.
 | Export | Is |
 |--------|-----|
 | `GAME_MODES`, `GAME_MODE_IDS` | The modes there are |
-| `RUNWAY_LANDING`, `LOOP_COURSE`, `DEAD_STICK`, `CARGO_RUN`, `SEARCH_RESCUE` | The five of them by name |
-| `LAND_OBJECTIVE`, `LOOP_OBJECTIVE`, `CARGO_OBJECTIVE`, `SEARCH_OBJECTIVE` | What a mode is asking for |
+| `RUNWAY_LANDING`, `LOOP_COURSE`, `DEAD_STICK`, `CARGO_RUN`, `SEARCH_RESCUE`, `TRAFFIC_PATTERN`, `CANYON_RUN`, `PHOTO_SURVEY` | The eight of them by name |
+| `LAND_OBJECTIVE`, `LOOP_OBJECTIVE`, `CARGO_OBJECTIVE`, `SEARCH_OBJECTIVE`, `PATTERN_OBJECTIVE`, `CORRIDOR_OBJECTIVE`, `SURVEY_OBJECTIVE` | What a mode is asking for |
 | `getGameMode(id)`, `isGameModeId(id)` | Looking one up |
 | `createRunState(modeId)`, `startRun(state, id, stageIndex)`, `endRun(state)` | A run, started and stopped. The stage is optional and clamped into the ones the mode has |
 | `openingRun(query)`, `OPENING_MODE_KEY`, `OPENING_STAGE_KEY` | The run a `?mode=&stage=` query asks for, or why it cannot be given |
 | `runningMode(state)`, `currentStage(state)`, `advanceStage(state)`, `restartStage(state)` | Where it is up to |
 | `recordLanding(state, runway)`, `recordGate(state, index)`, `recordRescue(state, marker, report)`, `recordCrash(state)` | Telling it what happened |
+| `recordPatternLeg(state, index)`, `recordSection(state, index)`, `recordSectionFault(state, index)`, `recordPhoto(state, landmarks, report)` | The same, for the three that count something other than a place reached |
 | `stageProgress(state)`, `isStageComplete(state)`, `nextGate(state)`, `nextStrip(state)` | How far through it is |
+| `nextLeg(state)`, `nextSection(state)`, `nextLandmark(state)` | The same, for a circuit, a corridor and a list |
 | `progressNoun(state)`, `stripIndex(runway)` | What it counts in, and which strip a landing was made on |
 | `runObjective(state)`, `runStatus(state)` | What to write on the screen |
+| `runBrief(state, world)` | The same, for the two modes whose objective moves inside a stage |
+| `faultNotice(state, fault)`, `shotNotice(landmark, fault)`, `legNotice(flown)` | What just went wrong, or what a leg came to, as a line |
 | `runPointer(state, world, position, heading)` | Where the thing it is waiting on lies |
-| `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | The three `runPointer` dispatches to, one per objective |
+| `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | Three of the things `runPointer` dispatches to |
 | `chartCourse(state, world)`, `chartNext(state)` | The same answer as marks on a chart, and which one is next |
 | `stageWorld(state)` | The world the stage is flown over |
 | `stageStart(state, world)` | Where in it the flight opens |
 | `buildCourse(stage, options)` | The loops a course stage is flown through |
+| `stagePattern(state, runway)`, `stageReaches(state)` | The circuit a pattern stage is flown round, and how closely its legs have to be held |
+| `stageSections(state)`, `stageLandmarks(state)` | The cuts a run is divided into, and the landmarks a survey lists |
 | `gatePassed(ring, from, to)`, `gateMissed(ring, from, to)`, `gateOffset(ring, point)` | Whether a step went through one, or past it |
 | `gateCrossing(ring, from, to)` | The one crossing both of those are read off |
 | `gateAspect(ring)`, `gateAxes(ring)` | The shape of a gate opening, and the two directions across it |
 | `flyStep(state, course, from, to)` | Both of those put to the gate the course is waiting on |
+| `flyPattern(state, circuit, from, to)`, `flyCorridor(state, corridor, from, to)` | The same for the turn a circuit is on and the cut a run is up to |
 | `ENGINE_LIVE`, `ENGINE_DEAD`, `runEngine(state)`, `engineLive(state)` | Whether the run still has an engine |
 | `stageBudget(state)`, `burnFuel(state, throttle, dt)`, `fuelRemaining(state)` | The budget a route spends on its throttle |
 | `stageStrips(state)` | How many strips a route stops at |
@@ -824,6 +831,32 @@ read them as a worked example of a game built on the two APIs.
 | `approachThreshold(runway)` | The end of a strip a landing stage is flown onto |
 | `approachGuidance(state, runway)` | What is drawn on the ground to help the pilot find it |
 | `CENTRELINE_REACH`, `CENTRELINE_MARKS` | How far the lead-in runs back, and in how many marks |
+
+The three mechanics the newer modes are built on are published on their own as
+well, for a host wanting one of them without the run state around it. Each is a
+module of its own - `pilot-matter/pattern`, `pilot-matter/corridor`,
+`pilot-matter/survey` - and all three are re-exported from the main entry.
+
+| Export | Is |
+|--------|-----|
+| `buildPattern(stage, runway)` | The circuit a stage is flown round, laid off a strip |
+| `PATTERN_LEGS`, `TAKEOFF_LEG`, `FINAL_LEG`, `LEG_HEIGHTS` | The five legs by name, the two that are special, and the share of the circuit height each ends at |
+| `LEFT_HAND`, `RIGHT_HAND` | Which side of the strip the circuit lies on |
+| `legOffset(leg, point)`, `legCrossed(leg, from, to)` | How far past the turn a place is, and whether a step crossed it |
+| `legProgress(leg, point)`, `legAltitude(leg, point)` | How far along a leg a place is, and the height wanted there |
+| `createPatternState(legs)`, `resetPattern(state, legs)` | The reading of how each leg was held, kept beside the run |
+| `samplePattern(state, leg, report, dt)` | One frame of that reading |
+| `scoreLeg(state, leg, reaches)`, `completeLeg(state, leg, reaches)` | What a leg came to, and closing it at the turn |
+| `patternScore(state)`, `flownLegs(state)` | What the circuit came to, and the legs behind it |
+| `buildCorridor(stage, options)` | The cuts a canyon stage is flown through |
+| `sectionOffset(section, point)` | How far past a cut a place lies, along the run |
+| `corridorCrossing(section, from, to)` | Where a step crossed one, and what it was doing there |
+| `sectionPassed(...)`, `sectionMissed(...)`, `missedBy(crossing)` | Through it, past it, and which limit was broken |
+| `CORRIDOR_REACH`, `MIN_HEADROOM` | How much of the world a corridor is laid inside, and the least air a cut may have in it |
+| `buildSurvey(stage)` | The landmarks a survey stage lists, placed |
+| `shotFor(landmark, report)`, `shotFault(shot, landmark)` | The reading a shutter takes, and the first thing wrong with it |
+| `landmarkBrief(landmark)` | The line to write for the landmark being flown to |
+| `rangeBand(landmark)`, `windowHeight(landmark)` | The two bands a renderer draws, in the units it draws in |
 
 A gate is tested against the step the aircraft flew rather than against where it
 ended up, because a hoop is thinner than the distance covered in a frame and a
@@ -958,6 +991,155 @@ function frame(dt) {
 }
 ```
 
+### A circuit, and the legs it is held on
+
+A traffic pattern is the one mode that is judged on the flying rather than on
+the arrival. `buildPattern` lays the circuit off a strip - five legs, each with
+a heading to track, a height to be at by the end of it, and the turn it ends
+at - and the reading of how well each was held is kept beside the run rather
+than inside it, the way a rollout is.
+
+```javascript
+import {
+    createRunState, TRAFFIC_PATTERN, stagePattern, flyPattern, nextLeg
+} from 'pilot-matter';
+import {
+    createPatternState, samplePattern, completeLeg, patternScore
+} from 'pilot-matter/pattern';
+
+const run = createRunState(TRAFFIC_PATTERN);
+const circuit = stagePattern(run, runway);
+const held = createPatternState();
+
+let last = pilot.pose().position;
+function frame(dt) {
+    pilot.update(dt);
+    const now = pilot.pose().position;
+    const leg = circuit[nextLeg(run)];
+
+    // Read against the leg being flown, then close it at the turn.
+    if (leg) samplePattern(held, leg, { ...now, altitudeFeet, headingDegrees }, dt);
+    if (flyPattern(run, circuit, last, now).turned) say(completeLeg(held, leg));
+
+    last = now;
+}
+```
+
+A leg is `{index, label, fromX, fromZ, fromFeet, x, z, altitudeFeet, heading,
+dirX, dirZ, run}`. `fromX`/`fromZ` are where it begins and `x`/`z` where it
+ends, which is also the turn onto the next one and the mark a chart draws.
+`fromFeet` and `altitudeFeet` are the heights at those two ends: the target
+between them is the ramp from one to the other, so a leg whose ends match is a
+height to hold and a leg whose ends differ is a climb or a descent to fly at a
+steady rate. One reading serves all five legs without any of them needing a
+rule of its own.
+
+Both errors are accumulated against time rather than against frames, so what a
+leg comes to does not depend on how fast the host is drawing. `scoreLeg` and
+`completeLeg` give `{index, label, seconds, altitude, heading, marks, score}`,
+where the two errors are means over the time the leg took and the score is
+their marks averaged out of a hundred. `completeLeg` closes a leg once: what
+happens after the turn belongs to the next leg.
+
+The last leg is the one a turn cannot close. Final ends at the threshold, and
+an aircraft crosses that threshold on every go-around it flies, so
+`recordLanding` finishes the circuit and `recordPatternLeg` refuses the final
+leg. A landing reported anywhere earlier in the pattern counts for nothing.
+
+A circuit is also the one run that opens on the ground: `stageStart` hands back
+`startMode: 'takeoff'` and a null `position`, leaving the threshold to the
+takeoff start rather than naming it a second time.
+
+### A corridor, and the walls it is flown between
+
+A canyon run is a line through the world with a wall either side of it and a
+ceiling over it, cut into sections. It is laid rather than found - a generator
+puts its canyons wherever its noise does, so a run that went looking for one
+would be a run whose difficulty was whatever the seed handed it.
+
+`buildCorridor` walks the line across the ground and holds the ceiling a
+declared height over whatever is underneath, so a stage that brings the ceiling
+down brings it down everywhere rather than only where the ground was already
+high. A section is `{index, x, z, floor, ceiling, y, halfWidth, dirX, dirZ}`,
+with `y` the ceiling again under the name a chart reads a mark's height by.
+
+```javascript
+import { createRunState, CANYON_RUN, currentStage, flyCorridor } from 'pilot-matter';
+import { buildCorridor } from 'pilot-matter/corridor';
+
+const run = createRunState(CANYON_RUN);
+const corridor = buildCorridor(currentStage(run), { seed: 1, sampleHeight: world.sampleHeight });
+
+function frame(dt) {
+    pilot.update(dt);
+    const now = pilot.pose().position;
+
+    const step = flyCorridor(run, corridor, last, now);
+    if (step.finished) endOfStage(run);
+    else if (step.faulted) say(step.fault);   // OVER THE TOP, WIDE, or OVER AND WIDE
+
+    last = now;
+}
+```
+
+`flyCorridor` is the same shape as `flyStep`, and tested the same way: a
+section is thinner than the distance covered in a frame, so the step is put to
+the plane rather than the place. It is the gate test asked of a rectangle open
+at the bottom rather than of an ellipse - open at the bottom because the floor
+is the ground, and the ground is already a thing that ends a flight. Climbing
+over the lid is the one way the mode could be cheated and the only thing it
+guards against.
+
+A fault moves nothing. The section stays the one the run is up to, which is
+what lets it be flown again, and `missedBy` names which of the two limits was
+broken - coming back down and coming back in are different corrections.
+
+### A survey, and the window a landmark is caught through
+
+A photo survey is met by being somewhere *and saying so*. `buildSurvey` places
+the landmarks a stage lists, each by a bearing and a distance from where the
+stage opens, and each carrying the window it has to be caught from:
+
+```javascript
+import { createRunState, PHOTO_SURVEY, stageLandmarks, recordPhoto } from 'pilot-matter';
+
+const run = createRunState(PHOTO_SURVEY);
+const landmarks = stageLandmarks(run);
+
+function onShutter() {
+    const shot = recordPhoto(run, landmarks, {
+        x: position.x, z: position.z, altitudeFeet, headingDegrees
+    });
+
+    if (shot.finished) endOfStage(run);
+    else if (!shot.caught) say(shot.fault);   // TOO FAR OUT, TOO HIGH, WRONG SIDE, ...
+}
+```
+
+A landmark is `{index, name, x, z, bearing, distance, height, window}`, and the
+window is a height band in feet, a range band in world units, and a heading
+with a reach either side of it. All three have to hold at once: a landmark
+photographed from directly overhead at four thousand feet is a photograph of a
+roof, and the brief asked for an elevation.
+
+The shutter belongs to the host. `recordPhoto` is told that a picture was
+taken and answers whether it counted - a mode that swallowed a picture for
+being of the wrong thing would be a mode that broke the camera. A shot with no
+landmark outstanding is a photograph and nothing else.
+
+`shotFor` is the reading on its own, as `{heightOk, rangeOk, headingOk,
+inside, range, bearing}`, and `shotFault` turns a reading that missed into the
+first thing wrong with it rather than all of them. A reading that cannot be
+taken - a report with no place in it - is outside every part of the window
+rather than inside it by default: a missing place measures `NaN`, and `NaN`
+fails every comparison including the ones that would have rejected it.
+
+`landmarkBrief` is the line to write, and it carries the name, the height and
+the heading but not the range. The range is the one of the three readings that
+is a place, and a place can be drawn: `rangeBand` hands the near and far edges
+over as circles to lay on the ground, which is where the bundled game reads
+them from.
+
 ### What a chart draws for a run
 
 `runPointer` is one line of text, and a host with a map instead of a status row
@@ -972,8 +1154,10 @@ an empty array, having no objective standing off somewhere to be drawn.
 so the mark a chart lights is the one the pointer row is naming.
 
 The world it is handed is the same shape `runPointer` takes -
-`{course, runways}` - because the two answer one question and should not be able
-to disagree about it.
+`{course, runways, circuit, corridor, landmarks}`, of which a run uses one -
+because the two answer one question and should not be able to disagree about
+it. A circuit is drawn as its turns, a canyon run as its cuts, and a survey as
+its landmarks.
 
 ```javascript
 import { createRunState, CARGO_RUN, chartCourse, chartNext } from 'pilot-matter';
@@ -1014,16 +1198,23 @@ The five worlds a host can ask for by name:
 | `'dune-sea'` | Wind-blown dunes and rock outcrops, cut by one desert river |
 | `'lakeside'` | A town on the shore of a wide lake, under forested hills |
 
-Two more are built for the game modes rather than to be chosen between, and are
-deliberately thin - what a mode asks the pilot to read is the objective, not the
-scenery around it. `isEnvironmentId` answers no for both, so a stored choice can
-never leave a free flight parked in one; `getEnvironment` still finds them by
-name.
+Five more are built for the game modes rather than to be chosen between.
+`isEnvironmentId` answers no for all of them, so a stored choice can never leave
+a free flight parked in one; `getEnvironment` still finds them by name.
 
 | Id | Is |
 |----|-----|
 | `'open-country'` | Low rolling ground under a wide sky, with one strip cut into it |
 | `'loop-valley'` | A shallow valley with clear air over it, for a course of loops |
+| `'back-country'` | Rough, wooded ground with no strip in it, for a search flown by the compass |
+| `'canyon-reach'` | A deep plateau cut end to end by canyons, for a run flown low |
+| `'survey-country'` | Town, forest, water and rock together, for a survey flown with a camera |
+
+The first three are deliberately thin - what a mode asks the pilot to read is
+the objective, not the scenery around it. The last two are not, and for the
+same reason read the other way round: a canyon run wants real walls standing
+beside the corridor it is judged on, and a survey wants something on the ground
+worth photographing.
 
 An environment is a description rather than geometry: a name, a seed, the base
 ground, and the elements placed over it. A host can pass its own list of

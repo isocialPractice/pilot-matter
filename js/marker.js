@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { colorFor } from './rings.js';
 
 /**
  * The marker a search is flown to, as the meshes the geometry in
@@ -48,6 +49,7 @@ export class RescueMarker {
         this.group = new THREE.Group();
         this.group.name = 'pilot-matter-rescue-marker';
         this.parts = [];
+        this.heads = [];
         scene?.add(this.group);
     }
 
@@ -64,26 +66,69 @@ export class RescueMarker {
      * Returns how many pieces were drawn.
      */
     setMarker(marker, groundAt = () => 0) {
+        return this.setMarkers(marker ? [marker] : [], groundAt);
+    }
+
+    /**
+     * Draws a list of them, which is what the modes that fly to more than one
+     * place need: the landmarks of a survey, and the turns of a circuit.
+     *
+     * A marker is a mast with a head on it and, where it carries a radius, a
+     * circle round it on the ground. Everything optional is left out rather
+     * than drawn at nothing - a turn in a circuit has no circle, and drawing
+     * one of no size would put a knot of geometry in the air over it.
+     *
+     * A marker may name its own mast height. A rescue marker stands high
+     * enough to clear the trees; a turn in a circuit stands up to the height
+     * the leg is to be flown at, which is the one thing about a turn that
+     * cannot be read off the ground.
+     *
+     * Returns how many pieces were drawn.
+     */
+    setMarkers(markers = [], groundAt = () => 0) {
         this.clear();
-        if (!marker) return 0;
 
-        const base = groundAt(marker.x, marker.z);
+        this.heads = markers.map(marker => {
+            const base = groundAt(marker.x, marker.z);
+            const mast = marker.mast ?? MAST_HEIGHT;
 
-        this.add(buildMast(marker, base));
-        this.add(buildHead(marker, base));
+            this.add(buildMast(marker, base, mast));
+            const head = this.add(buildHead(marker, base, mast));
 
-        // The ring is laid to the ground under itself rather than to the
-        // ground under the mast: over a slope the two are not the same height,
-        // and a circle drawn flat across one would tell the pilot the hillside
-        // is level when it is the thing they are about to land on.
-        this.add(buildCircle(marker, groundAt));
+            // The rings are laid to the ground under themselves rather than to
+            // the ground under the mast: over a slope the two are not the same
+            // height, and a circle drawn flat across one would tell the pilot
+            // the hillside is level when it is the thing they are about to
+            // land on.
+            if (marker.radius > 0) this.add(buildCircle(marker, marker.radius, groundAt));
+            if (marker.inner > 0)  this.add(buildCircle(marker, marker.inner, groundAt));
+
+            return head;
+        });
 
         return this.parts.length;
+    }
+
+    /**
+     * Colours the heads from the one the run is waiting on, the way a course
+     * colours its hoops: everything before it done, that one lit, and anything
+     * after it still to come. A list with nothing left is drawn entirely as
+     * done.
+     *
+     * One marker and no call to this is the rescue marker as it has always
+     * been drawn, lit, because there is only ever one and it is always the one
+     * outstanding.
+     */
+    setNext(index) {
+        this.heads.forEach((head, at) => {
+            head.material.color.setHex(colorFor(at, index));
+        });
     }
 
     add(part) {
         this.parts.push(part);
         this.group.add(part);
+        return part;
     }
 
     clear() {
@@ -93,6 +138,7 @@ export class RescueMarker {
             part.material.dispose();
         }
         this.parts.length = 0;
+        this.heads.length = 0;
     }
 
     /** Takes the marker out of the scene entirely, for a run that has ended. */
@@ -102,25 +148,25 @@ export class RescueMarker {
     }
 }
 
-function buildMast({ x, z }, base) {
+function buildMast({ x, z }, base, height) {
     const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(MAST_RADIUS, MAST_RADIUS, MAST_HEIGHT, 8),
+        new THREE.CylinderGeometry(MAST_RADIUS, MAST_RADIUS, height, 8),
         new THREE.MeshBasicMaterial({ color: MAST_COLOR })
     );
 
     // A cylinder is built about its own middle, so it is raised by half its
     // height to stand on the ground rather than half buried in it.
-    mesh.position.set(x, base + MAST_HEIGHT / 2, z);
+    mesh.position.set(x, base + height / 2, z);
     return mesh;
 }
 
-function buildHead({ x, z }, base) {
+function buildHead({ x, z }, base, height) {
     const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(HEAD_RADIUS, HEAD_SEGMENTS, HEAD_SEGMENTS),
         new THREE.MeshBasicMaterial({ color: MARKER_COLOR })
     );
 
-    mesh.position.set(x, base + MAST_HEIGHT, z);
+    mesh.position.set(x, base + height, z);
     return mesh;
 }
 
@@ -129,7 +175,7 @@ function buildHead({ x, z }, base) {
  * sitting on the ground beneath it. A torus would be one flat plane and would
  * lie about the slope; this follows the country the way the ground does.
  */
-function buildCircle({ x, z, radius }, groundAt) {
+function buildCircle({ x, z }, radius, groundAt) {
     // One point short of all the way round: the curve is closed below, so a
     // point at the start and another at the same place at the end is one point
     // twice, which a spline reads as a corner rather than as a join.
