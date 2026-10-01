@@ -5,6 +5,147 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0-alpha] - 2026-10-01
+
+Three modes that are not met by arriving somewhere. A traffic pattern is
+marked on how each leg of the circuit was held rather than only on the landing
+at the end of it; a canyon run counts a cut only when it is crossed inside the
+walls and under the ceiling; and a photo survey counts a landmark only when the
+shutter goes with the aircraft inside the height, the range and the heading the
+brief asked for. The simulator goes from five modes to eight.
+
+### Added
+
+- **`js/pattern.js` lays a traffic circuit off a strip and marks each leg of
+  it.** Five legs - takeoff, climb out, downwind, base, final - each carrying
+  the heading that runs along it, the height to be at by the end of it, and the
+  turn it ends at. The circuit is laid off the runway rather than placed world
+  by world, so the same plan at any strip in any world is the circuit that strip
+  would be flown; `buildPattern` closes it back on the threshold it opened from,
+  which the suite checks at six bearings. The turn onto the downwind belongs to
+  the climb out rather than standing as a crosswind leg of its own, which is
+  what leaves the downwind exactly parallel to the strip - the downwind is the
+  leg genuinely about holding a heading, and a leg laid diagonally would be
+  asking for a number nothing on the ground explains. The height a leg asks for
+  at a place along it is read off a ramp between its two ends, so a leg whose
+  ends match is a height to hold and a leg whose ends differ is a climb or a
+  descent to fly at a steady rate; one reading serves all five without any of
+  them needing a rule of its own. Both errors accumulate against time rather
+  than against frames, so what a leg comes to does not depend on how fast the
+  machine was drawing - the suite flies one leg identically wrong in long frames
+  and in short ones and holds the two to the same mark.
+- **`js/corridor.js` lays a canyon corridor and says whether a step went
+  through a cut.** The line is walked across the ground the way a course of
+  loops is, and the ceiling is held a declared height over whatever is
+  underneath, so a stage that brings the ceiling down brings it down everywhere
+  rather than only where the ground was already high. It is laid rather than
+  found: the generator draws its canyons wherever the noise puts them, so a run
+  that went looking for one would be a run whose difficulty was whatever the
+  seed handed it. `corridorCrossing` is the gate test asked of a rectangle open
+  at the bottom rather than of an ellipse - open at the bottom because the floor
+  is the ground, and the ground is already a thing that ends a flight. Climbing
+  over the lid is the one way the mode could be cheated and the only thing it
+  guards against. `MIN_HEADROOM` keeps a plan from asking for a cut with no air
+  in it, which is not a hard cut but an impossible one.
+- **`js/survey.js` places a list of landmarks and reads a shot against the
+  window each one has to be caught through.** Three readings at once - a height
+  band, a range band, and a heading with a reach either side of it - because a
+  landmark photographed from directly overhead at four thousand feet is a
+  photograph of a roof and the brief asked for an elevation. A reading that
+  cannot be taken is outside every part of the window rather than inside it by
+  default: a missing place measures `NaN`, and `NaN` fails every comparison
+  including the ones that would have rejected it. `shotFault` names the first
+  thing wrong with a shot rather than all of them, because a line that lists
+  three is a line nobody reads in the second it is up, and a pilot who fixes the
+  first comes round and is told the second.
+- **`js/walls.js` draws a corridor as a post at either wall and a beam across
+  the top.** The opening the pilot flies at is bounded on three sides by
+  something drawn and on the fourth by the ground, which needs no drawing. The
+  beam's turn is written as the two directions it is between rather than as a
+  pair of Euler angles: a hoop's two turns happen to compose in the order
+  Three.js applies them and the same pair here does not, so saying it the short
+  way would have been saying it wrong in a way only a screenshot would show.
+- **Two worlds for the two modes that needed ground of their own.**
+  `CANYON REACH` is a deep plateau cut end to end by canyons, so the corridor a
+  run is judged on has real walls standing beside it; `SURVEY COUNTRY` puts
+  town, forest, water and rock together, so a survey's landmarks are things on
+  the ground rather than places on a map. Both are read the other way round from
+  the three mode worlds already there, which are deliberately thin because what
+  those modes ask the pilot to read is the objective rather than the scenery.
+- **`test/pattern.test.js`, `test/corridor.test.js` and `test/survey.test.js`,
+  and thirty-three more in `test/game-modes.test.js`.** The suite goes from
+  1052 to 1149.
+
+### Changed
+
+- **A circuit is the one run that opens on the ground.** Every other stage
+  opens in the air because a takeoff is the part nobody is being scored on;
+  here the takeoff is the first leg of the thing being scored. `stageStart`
+  hands back `START_TAKEOFF` and a null `position`, leaving the threshold to
+  the takeoff start rather than naming it a second time - two answers to one
+  question is how an aircraft ends up beside the strip it is supposed to be
+  lined up on. The test that read `START_FLYING` for every mode now reads the
+  rule it was written for rather than the shape it had.
+- **The last leg of a circuit is closed by the landing rather than by the
+  turn.** Final ends at the threshold, and an aircraft crosses that threshold on
+  every go-around it flies, so counting the crossing would have finished the
+  circuit for a pilot who never got down. `recordPatternLeg` refuses the final
+  leg and `recordLanding` closes it; a landing reported anywhere earlier in the
+  pattern counts for nothing.
+- **`js/marker.js` draws a list of marks rather than one.** A rescue marker, a
+  survey's landmarks and a circuit's turns are all a mast with a lit head and,
+  where one is wanted, a circle on the ground - so one renderer draws all three
+  rather than two near-copies of it being written. A mark may name its own mast
+  height, which is what lets a turn in a circuit stand up to the height its leg
+  wants; `setNext` colours the heads from the mark the run is waiting on, the
+  way a course colours its hoops.
+- **The objective card's notice is one timer rather than one per mode.** A
+  missed gate, a cut flown over the top of, a shot outside its window and a leg
+  just held are all the same thing to the card - something that just happened,
+  worth a moment of the row the objective is usually in - so `missHold` became
+  `noticeHold` and the text it holds.
+- **What a run is flying to is gathered in one place.** `runWorld()` in
+  `js/main.js` carries the course, the strips, the corridor, the circuit and the
+  landmarks, and the chart, the pointer and the brief are all read off it. The
+  check in `test/minimap.test.js` that caught a chart being handed only a loop
+  course now reads that one place rather than the call, and names all five:
+  leaving one out is exactly what lost a route its bearing before.
+- **The corridor is counted in cuts rather than in sections.** The status row
+  is measured at forty-four characters with the stage's own name in front of it,
+  and a run of eleven `SECTION`s runs past that. `CUT` is both short enough and
+  the word the thing is already called, a canyon run being a run down a cut.
+  The survey's brief sits at exactly the thirty-two characters the objective row
+  was measured at, and the check in `test/page.test.js` now walks the new modes'
+  lines - the briefs, the fault notices and the leg reports - so none of them
+  can drift past the height its row was declared at.
+- **A survey's range band is drawn on the ground rather than written on the
+  card.** The objective row has room for a name, a height and a bearing, and not
+  for a second band on top of them. The range is the one of the three readings
+  that is a place, and a place can be drawn, so `rangeBand` hands its near and
+  far edges to the renderer as circles laid round the landmark.
+- **The ignore-rules check in `test/site.test.js` applies on every tree.** The
+  stand-down branch at the top of it dated from a personal global rule keeping
+  `.gitignore` out of the repository, so `actions/checkout` fetched a tree
+  without it. The file has been tracked since - `git ls-files .gitignore`
+  answers - so the branch guarded nothing and would have hidden the check on any
+  tree that lost the file again, which is the one tree worth failing on. The
+  rules now reach a clone: a fresh checkout carries `.tmp/`, `test-results/` and
+  `user-scripts/` and is held to carrying them.
+- **`js/pattern.js`, `js/corridor.js` and `js/survey.js` are published.** Each
+  is a subpath of its own in the manifest and re-exported from `js/api/index.js`,
+  so a host wanting one of the three mechanics without the run state around it
+  can import it. `docs/api.md` names every one of the new exports and carries a
+  worked example per mode.
+
+### Fixed
+
+- **The terrain page keeps the qualifier that made its element count true.**
+  Listing the two new mode worlds turned "All three are deliberately thin - four
+  elements each at most" into "Most of them are deliberately thin - four elements
+  each", and `LOOP VALLEY` carries three: a mountain, grass and water. The
+  sentence is about the three older worlds either way, so the count goes back to
+  being an upper bound rather than a figure one of the three does not meet.
+
 ## [1.20.1-alpha] - 2026-09-30
 
 The address opener is pinned where it is connected to the page, not only where
