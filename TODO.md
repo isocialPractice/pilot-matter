@@ -25,6 +25,76 @@ its context survives being archived.
 
 ### UI/UX Override - the corridor's opening and its lid
 
+- [ ] Nothing tells the lid rule's two halves apart
+  - **Issue**: `buildCorridor` in `js/corridor.js` now holds the lid at
+    `Math.max(floor + plan.ceiling, crest + MIN_HEADROOM)` - the stage's own
+    headroom over the centre line, or the least room over the highest ground the
+    cut is open over, whichever is higher. `docs/api.md:1087` states that rule in
+    as many words, and the comment over the formula gives it as the reason the
+    gully case was wrong. No test distinguishes it from
+    `Math.max(crest + plan.ceiling, crest + MIN_HEADROOM)`, which measures both
+    halves off the crest and is a materially different canyon: over the test
+    file's own `STEEP` ground it raises every lid by `crest - floor`, hundreds of
+    units on the steeper cuts. Confirmed by making that substitution and running
+    the suite: 1160 passing, 0 failing, with the probe then reverted. The three
+    tests that read the lid each stop short of it - `over level ground the
+    stage's headroom is the whole of the lid` runs on a world where
+    `crest === floor`, so the two rules agree; `the lid clears the highest ground
+    across the cut` asserts `ceiling - height >= MIN_HEADROOM` and
+    `ceiling - floor > 400`, both of which the crest version satisfies more
+    generously; and `a stage cannot ask for a cut with no air in it` runs with
+    `ceiling: 1`, where `MIN_HEADROOM` wins on both sides. The completed item
+    `Canyon Run 1` asked for those first two to be "rewritten against whatever
+    the new rule is" - they were rewritten, and what they pin is the crest half
+    and the level-ground case rather than the rule.
+  - **Goal**: One case over ground that is not level across the cut, asserting
+    the lid against the formula rather than against a bound it clears -
+    `assert.ok(Math.abs(section.ceiling - Math.max(section.floor + 400, section.crest + MIN_HEADROOM)) < 1e-9)`
+    over `ROLLING` or `STEEP`, which fails on the crest version wherever
+    `floor + 400` is the winning half. Worth a plan whose `ceiling` is large
+    enough against the slope that the floor half wins on at least one cut, since
+    on `STEEP` as it stands the crest half may win everywhere and the assertion
+    would hold for both rules.
+  - From: UI/UX Override - the corridor's opening and its lid
+- [ ] Two of `docs/api.md`'s enumerations do not carry what this run added to them
+  - **Issue**: the file lists each module's exports in a table and each shape's
+    fields inline, and both listings are exhaustive everywhere else. `docs/api.md:1029`
+    gives a leg as `{index, label, fromX, fromZ, fromFeet, x, z, altitudeFeet,
+    heading, dirX, dirZ, run}` and `buildPattern` now puts `onStrip` on every leg
+    - the one field a host has to read to draw the circuit without standing a
+    mast on the runway, and the prose two paragraphs below describes it. The
+    corridor section's parallel listing at `:1084` was updated with `crest`, so
+    the two shapes now document themselves to different standards. `docs/api.md:856`
+    gives the corridor module's constants as `CORRIDOR_REACH`, `MIN_HEADROOM`,
+    and `HEADROOM_SAMPLES` is now exported beside them and imported by
+    `test/corridor.test.js`. Both propagate to the published page through
+    `tools/build-api-reference.mjs`.
+  - **Goal**: Add `onStrip` to the leg shape at `docs/api.md:1029` and
+    `HEADROOM_SAMPLES` to the constants row at `:856` with a phrase saying what
+    it is - how many points across a cut the ground under it is read at - then
+    `npm run docs:api` to carry both to `docs/api-reference.html`. While in the
+    entry, the `1.22.0-alpha` sentence in `CHANGELOG.md` reading "`patternScore`
+    was a published export the game never asked" is missing its last word.
+  - From: UI/UX Override - the corridor's opening and its lid
+- [ ] A source-text assertion claims a bound its span does not have
+  - **Issue**: `the landing closes the final leg, and reports the circuit with it`
+    in `test/pattern.test.js` ends by matching `onLanding` for
+    `/this\.closeFinalLeg\(\);/` under the message "the final leg is closed by
+    the arrival, inside the guard that counts it". The span is the whole method
+    body, so it says nothing about the guard. Moved above
+    `if (recordLanding(this.run, runway))` in `js/main.js` the call still
+    matches, and a landing anywhere earlier in the circuit - the takeoff roll, or
+    a pass down the strip a go-around leaves, both of which `recordLanding`
+    refuses by design - would close `FINAL` and report a circuit the pilot never
+    flew out, with the suite green. The sibling assertions in the same file bound
+    their spans to one method for exactly this reason.
+  - **Goal**: Anchor the assertion on the guard rather than on the method:
+    match `recordLanding\(this\.run, runway\)\)\s*\{[^}]*?this\.closeFinalLeg\(\);`
+    against the `onLanding` body, bounded with `[^}]*?` the way
+    `test/input-map.test.js` bounds its spans, so the call has to sit inside the
+    block that counts the arrival.
+  - From: UI/UX Override - the corridor's opening and its lid
+
 #### Found Issues
 
 - [ ] A corridor opening is held clear of the ground under it and nothing holds
