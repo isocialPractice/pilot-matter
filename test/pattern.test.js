@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
     buildPattern, legOffset, legCrossed, legProgress, legAltitude, headingMiss,
@@ -58,6 +59,39 @@ test('a circuit closes on the threshold it opened from', () => {
             `the takeoff on ${heading} should begin at the threshold`);
         assert.ok(Math.hypot(end.x - approach.x, end.z - approach.z) < 1e-6,
             `and the final on ${heading} should end back at it`);
+    }
+});
+
+// Two of the five turns are on the strip itself, and a leg says which it is.
+// Whatever draws the circuit needs telling: a turn in open air is a place with
+// nothing at it and wants a mast, while the two thresholds are the ends of a
+// drawn strip the approach marks already pick out. A mast at those stood on
+// the runway, at the place the takeoff roll ends and the place the landing is
+// flown onto.
+test('a leg says whether the turn it is named by stands on the strip', () => {
+    for (const heading of [0, 90, 237, 304]) {
+        const runway = strip(heading);
+        const legs = buildPattern(PLAN, runway);
+        const [approach, departure] = runwayThresholds(runway);
+
+        assert.deepEqual(legs.map(leg => leg.onStrip), [true, false, false, false, true],
+            `on ${heading} the takeoff and the final are the two turns on the strip`);
+
+        // And they are on it because they are the thresholds, rather than by
+        // being the first and the last.
+        const ends = legs.filter(leg => leg.onStrip);
+        assert.ok(Math.hypot(ends[0].x - departure.x, ends[0].z - departure.z) < 1e-6,
+            'the takeoff ends at the departure threshold');
+        assert.ok(Math.hypot(ends[1].x - approach.x, ends[1].z - approach.z) < 1e-6,
+            'and the final back at the approach one');
+
+        // Every turn that is not on the strip is somewhere else entirely, so
+        // nothing is drawn at a threshold by accident.
+        for (const leg of legs.filter(leg => !leg.onStrip)) {
+            assert.ok(Math.hypot(leg.x - approach.x, leg.z - approach.z) > 1
+                   && Math.hypot(leg.x - departure.x, leg.z - departure.z) > 1,
+                `${leg.label} turns in open air, away from either threshold`);
+        }
     }
 });
 
@@ -376,4 +410,100 @@ test('a circuit put back to its beginning has nothing held against it', () => {
     resetPattern(state);
     assert.equal(patternScore(state), null);
     assert.equal(state.legs[0].seconds, 0);
+});
+
+// The approach is read against its height and heading every frame it is flown,
+// the same as the other four legs - `LEG_HEIGHTS` ramps it down to the field and
+// the module calls it an approach. What it had no way of becoming was a mark:
+// no turn can close it, because the pilot crosses the threshold on every
+// go-around they fly, so the tally filled up every frame and nothing ever read
+// it. The landing is what closes it.
+test('the final leg can be closed, and the circuit counts it when it is', () => {
+    const legs = buildPattern(PLAN, strip(90, { elevation: 0 }));
+    const final = legs[FINAL_LEG];
+    const state = createPatternState();
+
+    // One leg flown dead on, and the approach flown well off its height, so
+    // the circuit's mark moves when the approach is counted into it.
+    completeLeg(state, legs[0]);
+    samplePattern(state, final, {
+        x: final.fromX, z: final.fromZ,
+        altitudeFeet: legAltitude(final, final) + ALTITUDE_REACH * 4,
+        headingDegrees: final.heading + HEADING_REACH * 4
+    }, 3);
+
+    const before = patternScore(state);
+    assert.equal(flownLegs(state).length, 1, 'the approach is read but not yet closed');
+
+    const flown = completeLeg(state, final, {});
+    assert.equal(flown.index, FINAL_LEG);
+    assert.equal(flown.label, 'FINAL');
+    assert.equal(flown.score, 0, 'an approach flown right out of both reaches holds nothing');
+
+    assert.equal(flownLegs(state).length, 2, 'and once closed it is one of the legs flown');
+    assert.equal(patternScore(state), Math.round(PERFECT_SCORE / 2));
+    assert.notEqual(patternScore(state), before,
+        'so the circuit is read over the approach rather than around it');
+});
+
+// --- The seam between the circuit and what draws it -----------------------
+
+/**
+ * Everything above is the circuit as geometry and arithmetic. What is done with
+ * it is decided in `js/main.js`, which imports Three.js and cannot be loaded
+ * here, so the seam is read out of the source the way `test/minimap.test.js`
+ * reads the chart's.
+ *
+ * Both spans below have already been wrong, and neither failure could be seen
+ * from Node: a mast standing on the runway at each end of the strip, and a
+ * final leg sampled every frame into a tally no call ever closed.
+ *
+ * Each span is bounded to the method it is anchored on rather than running to
+ * the end of the file, for the reason `test/input-map.test.js` gives: an
+ * unbounded span matches the same text written a second time anywhere below,
+ * and passes a call that no longer makes it.
+ */
+const mainSource = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+
+test('a mast is put up at the turns in open air and not at the two on the strip', () => {
+    const method = mainSource.match(/^ {4}standingMarks\(\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(method, 'js/main.js should still gather what a stage puts on a mast in one place');
+
+    const body = method[1];
+    assert.match(body, /this\.circuit\.filter\(leg => !leg\.onStrip\)/,
+        'the turns on the strip are left out, since the strip is already drawn there');
+    assert.match(body, /at: leg\.index/,
+        'and each mark carries its own leg, because the list is now shorter than the circuit');
+});
+
+test('the mast being waited on is lit by the leg rather than by its place in the list', () => {
+    const marker = readFileSync(new URL('../js/marker.js', import.meta.url), 'utf8');
+
+    const method = marker.match(/^ {4}setNext\(index\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(method, 'js/marker.js should still colour the heads in one place');
+    assert.match(method[1], /colorFor\(this\.lit\[at\] \?\? at, index\)/,
+        'a mark that names the mark it stands for is lit by that, and the rest by position');
+
+    assert.match(marker, /this\.lit = markers\.map\(\(marker, at\) => marker\.at \?\? at\)/,
+        'and what each head is lit by is read off the markers when they are drawn');
+});
+
+test('the landing closes the final leg, and reports the circuit with it', () => {
+    const method = mainSource.match(/^ {4}closeFinalLeg\(\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(method, 'js/main.js should close the circuit\'s last leg in one place');
+
+    const body = method[1];
+    assert.match(body, /this\.circuit\[FINAL_LEG\]/,
+        'the leg closed is the final one, which is the leg a turn cannot close');
+    assert.match(body, /completeLeg\(this\.pattern, leg, stageReaches\(this\.run\)\)/,
+        'and it is closed the way every other leg is');
+    assert.match(body, /circuitNotice\(flown, patternScore\(this\.pattern\)\)/,
+        'then the leg and the whole circuit are reported together');
+
+    // And it is the landing that calls it, which is the one event that means a
+    // circuit was flown out rather than crossed over.
+    const landing = mainSource.match(/^ {4}onLanding\(runway, contact\)\s*\{([\s\S]*?)^ {4}\}/m);
+    assert.ok(landing, 'js/main.js should still take a landing in one place');
+    assert.match(landing[1], /this\.closeFinalLeg\(\);/,
+        'the final leg is closed by the arrival, inside the guard that counts it');
 });

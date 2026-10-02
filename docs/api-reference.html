@@ -811,11 +811,12 @@ const pilot = createPilot({
         <tr><td><code>runObjective(state)</code>, <code>runStatus(state)</code></td><td>What to write on the screen</td></tr>
         <tr><td><code>runBrief(state, world)</code></td><td>The same, for the two modes whose objective moves inside a stage</td></tr>
         <tr><td><code>faultNotice(state, fault)</code>, <code>shotNotice(landmark, fault)</code>, <code>legNotice(flown)</code></td><td>What just went wrong, or what a leg came to, as a line</td></tr>
+        <tr><td><code>circuitNotice(flown, score)</code></td><td>The same for the leg that ends a circuit, which reports the leg and the whole of it</td></tr>
         <tr><td><code>runPointer(state, world, position, heading)</code></td><td>Where the thing it is waiting on lies</td></tr>
         <tr><td><code>gatePointer(...)</code>, <code>stripPointer(...)</code>, <code>searchBriefing(state)</code></td><td>Three of the things <code>runPointer</code> dispatches to</td></tr>
         <tr><td><code>chartCourse(state, world)</code>, <code>chartNext(state)</code></td><td>The same answer as marks on a chart, and which one is next</td></tr>
         <tr><td><code>stageWorld(state)</code></td><td>The world the stage is flown over</td></tr>
-        <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens</td></tr>
+        <tr><td><code>stageStart(state, world)</code></td><td>Where in it the flight opens. <code>world</code> carries <code>runway</code>, <code>rings</code>, <code>corridor</code> and <code>sampleHeight</code>, each read by the objectives that need it</td></tr>
         <tr><td><code>buildCourse(stage, options)</code></td><td>The loops a course stage is flown through</td></tr>
         <tr><td><code>stagePattern(state, runway)</code>, <code>stageReaches(state)</code></td><td>The circuit a pattern stage is flown round, and how closely its legs have to be held</td></tr>
         <tr><td><code>stageSections(state)</code>, <code>stageLandmarks(state)</code></td><td>The cuts a run is divided into, and the landmarks a survey lists</td></tr>
@@ -976,13 +977,21 @@ function frame(dt) {
 
 <p>The last leg is the one a turn cannot close. Final ends at the threshold, and an aircraft crosses that threshold on every go-around it flies, so <code>recordLanding</code> finishes the circuit and <code>recordPatternLeg</code> refuses the final leg. A landing reported anywhere earlier in the pattern counts for nothing.</p>
 
+<p>So the landing is what closes it. The approach is read against its height and heading every frame it is flown, the same as the other four legs, and a host calls <code>completeLeg</code> on the final leg where it takes the arrival - that is what turns the reading into a mark rather than a tally nothing reports. Because the reading accumulates until the stage is reset, a go-around is part of the approach that was flown rather than a second attempt at it; <code>resetPattern</code> is what starts the approach over, and a crash is where a host calls it.</p>
+
+<p><code>patternScore</code> is the mean of the legs closed so far, which once the landing is in is the mark for the whole circuit. <code>circuitNotice(flown, score)</code> writes the leg and the circuit as one line for the moment both are finally known.</p>
+
+<p>Each leg also says whether the turn it is named by stands on the strip, as <code>onStrip</code>. Two of the five do - the takeoff ends at the departure threshold and the final back at the approach one - and the other three turn in open air. It is there for whatever draws the circuit: a turn in open air is a place with nothing at it and wants a mark, while a threshold is the end of a drawn strip the approach guidance already picks out.</p>
+
 <p>A circuit is also the one run that opens on the ground: <code>stageStart</code> hands back <code>startMode: 'takeoff'</code> and a null <code>position</code>, leaving the threshold to the takeoff start rather than naming it a second time.</p>
 
 <h3 id="a-corridor-and-the-walls-it-is-flown-between">A corridor, and the walls it is flown between</h3>
 
 <p>A canyon run is a line through the world with a wall either side of it and a ceiling over it, cut into sections. It is laid rather than found - a generator puts its canyons wherever its noise does, so a run that went looking for one would be a run whose difficulty was whatever the seed handed it.</p>
 
-<p><code>buildCorridor</code> walks the line across the ground and holds the ceiling a declared height over whatever is underneath, so a stage that brings the ceiling down brings it down everywhere rather than only where the ground was already high. A section is <code>{index, x, z, floor, ceiling, y, halfWidth, dirX, dirZ}</code>, with <code>y</code> the ceiling again under the name a chart reads a mark's height by.</p>
+<p><code>buildCorridor</code> walks the line across the ground and holds the ceiling a declared height over whatever is underneath, so a stage that brings the ceiling down brings it down everywhere rather than only where the ground was already high. A section is <code>{index, x, z, floor, crest, ceiling, y, halfWidth, dirX, dirZ}</code>, with <code>y</code> the ceiling again under the name a chart reads a mark's height by.</p>
+
+<p><code>floor</code> is the ground on the centre line and <code>crest</code> is the highest ground the cut is open over, read across the whole span its walls stand either side of. The lid is held at whichever is higher of the stage's own headroom over the floor and <code>MIN_HEADROOM</code> over the crest, so the room a stage asks for is room the aircraft has at the posts as well as in the middle - a cut whose centre falls in a gully has far less air at its edges than at its centre, and a lid measured only on the centre line is a lid the walls reach up into.</p>
 
 <pre><code>import { createRunState, CANYON_RUN, currentStage, flyCorridor } from 'pilot-matter';
 import { buildCorridor } from 'pilot-matter/corridor';

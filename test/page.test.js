@@ -24,9 +24,9 @@ import {
     PATTERN_OBJECTIVE, CORRIDOR_OBJECTIVE, SURVEY_OBJECTIVE,
     stagePattern, stageLandmarks, stageReaches, stageSections,
     recordPatternLeg, recordSection, recordPhoto,
-    runBrief, faultNotice, shotNotice, legNotice
+    runBrief, faultNotice, shotNotice, legNotice, circuitNotice
 } from '../js/game-modes.js';
-import { completeLeg, createPatternState, FINAL_LEG } from '../js/pattern.js';
+import { completeLeg, createPatternState, patternScore, FINAL_LEG } from '../js/pattern.js';
 import { missedBy } from '../js/corridor.js';
 import { shotFault, shotFor } from '../js/survey.js';
 import { bearingToDirection } from '../js/units.js';
@@ -1305,7 +1305,15 @@ test("the card's rows are written inside the lines they were measured at", () =>
 
                 const leg = world.circuit[step];
                 if (leg) {
-                    lines.objective.push(legNotice(completeLeg(createPatternState(), leg, stageReaches(state))));
+                    const pattern = createPatternState();
+                    const flown = completeLeg(pattern, leg, stageReaches(state));
+                    lines.objective.push(legNotice(flown));
+
+                    // And the line that ends a circuit, which is the one notice
+                    // written for two readings and so the one most likely to run
+                    // past the row. An unflown leg reads as a perfect hundred,
+                    // which is the widest either number gets.
+                    lines.objective.push(circuitNotice(flown, patternScore(pattern)));
                 }
 
                 lines.pointer.push(formatRunPointer({

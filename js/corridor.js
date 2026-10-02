@@ -35,8 +35,23 @@ export const CORRIDOR_REACH = 0.82;
  * down, and this is where that stops: a section with no air in it is not a
  * hard section, it is an impossible one, and a plan that asks for one gets this
  * instead.
+ *
+ * Held against the highest ground the cut is open over rather than against the
+ * centre line. The walls stand a half width either side, so the ground at the
+ * posts is as much under the cut as the ground at its middle, and a cut whose
+ * centre falls in a gully has far less air at its edges than at its centre.
  */
 export const MIN_HEADROOM = 70;
+
+/**
+ * How many points across a cut the ground under it is read at, from one post to
+ * the other with both ends included.
+ *
+ * Odd, so the centre line is one of them: that is the point the floor is taken
+ * at, and a cut whose highest ground is at its middle should read one number
+ * twice rather than two that nearly agree.
+ */
+export const HEADROOM_SAMPLES = 9;
 
 /**
  * Lays out a stage's corridor.
@@ -49,6 +64,10 @@ export const MIN_HEADROOM = 70;
  * Each section stands square across the line at the point it is laid, and
  * carries the two things the run is judged on: how far either side of the line
  * the walls stand, and how far over the ground the ceiling is held.
+ *
+ * The ceiling is held over the whole span the cut is open over rather than over
+ * its centre line, so the room the stage asks for is room the aircraft has at
+ * the posts as well as in the middle.
  */
 export function buildCorridor(stage, options = {}) {
     const plan = stage?.corridor;
@@ -66,21 +85,36 @@ export function buildCorridor(stage, options = {}) {
 
     const sections = [];
     for (let index = 0; index < plan.count; index++) {
-        const floor   = sample(x, z);
-        const ceiling = floor + Math.max(plan.ceiling, MIN_HEADROOM);
+        const dirX = Math.sin(heading);
+        const dirZ = Math.cos(heading);
+
+        const floor = sample(x, z);
+        const crest = highestAcross(sample, x, z, dirX, dirZ, plan.halfWidth);
+
+        // The stage's own headroom over the centre line, and the least room
+        // anywhere across the cut, whichever puts the lid higher. Measuring
+        // only the first is what let a cut laid across a gully have its lid
+        // read off the gully floor while the ground at its posts stood most of
+        // the way up to it.
+        const ceiling = Math.max(floor + plan.ceiling, crest + MIN_HEADROOM);
 
         sections.push({
             index,
             x,
             z,
             floor,
+            // The highest ground the cut is open over, which is what the lid
+            // is held clear of. Kept because it is the reading the headroom is
+            // measured against: the floor alone no longer says how much air
+            // the cut has in it.
+            crest,
             ceiling,
             // Kept under the name a chart reads a mark's height by, so the
             // corridor draws on the same instruments a course does.
             y: ceiling,
             halfWidth: plan.halfWidth,
-            dirX: Math.sin(heading),
-            dirZ: Math.cos(heading)
+            dirX,
+            dirZ
         });
 
         const out  = Math.hypot(x, z) / reach;
@@ -92,6 +126,37 @@ export function buildCorridor(stage, options = {}) {
     }
 
     return sections;
+}
+
+/**
+ * The highest ground a cut is open over, read across the span its walls stand
+ * either side of rather than at the one point on its centre line.
+ *
+ * The lid is what this is for. A cut whose centre falls in a gully has its
+ * floor read off the gully while the ground at the posts stands far higher, and
+ * a lid held a declared height over that floor is a lid the walls reach up
+ * into. On a steep enough seed the subtraction goes the other way entirely and
+ * the cut has no air in it, which is the one thing `MIN_HEADROOM` exists to
+ * refuse.
+ *
+ * Across the cut is square to the way the run goes - the same span
+ * `corridorCrossing` measures its offset along - so the ground read here is the
+ * ground under the rule a crossing is tested by.
+ */
+function highestAcross(sample, x, z, dirX, dirZ, halfWidth) {
+    const acrossX =  dirZ;
+    const acrossZ = -dirX;
+    const span    = halfWidth || 0;
+
+    let highest = sample(x, z);
+    for (let step = 0; step < HEADROOM_SAMPLES; step++) {
+        // From one post to the other with both ends included, so the span is
+        // read to its edges rather than only inside them.
+        const across = ((step / (HEADROOM_SAMPLES - 1)) * 2 - 1) * span;
+        highest = Math.max(highest, sample(x + acrossX * across, z + acrossZ * across));
+    }
+
+    return highest;
 }
 
 /** One heading turned part of the way toward another, by the short way round. */

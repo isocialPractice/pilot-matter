@@ -1366,6 +1366,33 @@ export function legNotice(flown) {
 }
 
 /**
+ * The same for the leg that ends the circuit, which reports two things because
+ * the landing closes two: final is a leg held like the other four, and it is
+ * also the last of the five the whole shape is made of. So the mark for the
+ * leg and the mark for the circuit are read off together, at the one moment
+ * both are finally known.
+ *
+ * `patternScore` is what the circuit came to, and until this line there was
+ * nowhere the game asked for it: the mode published the figure and never put it
+ * in front of the pilot.
+ *
+ * Written short because it goes into the objective row of the card, the same
+ * row `missNotice` had to be shortened for, which holds 32 characters at the
+ * card's 260 pixel minimum. `FINAL 88  ·  CIRCUIT 91` is 23 of them and the
+ * worst case - three digits on both - is 25. It is `HELD`, carried by every
+ * other leg's line, that gives way rather than either number.
+ *
+ * Falls back to the ordinary leg line when there is no circuit mark to give,
+ * which is a final leg closed with nothing else flown.
+ */
+export function circuitNotice(flown, score) {
+    if (!flown) return '';
+    if (!Number.isFinite(score)) return legNotice(flown);
+
+    return `${flown.label} ${flown.score}  ·  CIRCUIT ${score}`;
+}
+
+/**
  * What the pilot is being asked for right now, which for most modes is the
  * mode's own goal and never changes.
  *
@@ -1875,7 +1902,7 @@ function openingFor(mode, stage, world) {
     if (mode.objective === SEARCH_OBJECTIVE)   return searchOpening(stage.search);
     if (mode.objective === SURVEY_OBJECTIVE)   return searchOpening(stage.survey?.opening);
     if (mode.objective === PATTERN_OBJECTIVE)  return patternOpening(world.runway);
-    if (mode.objective === CORRIDOR_OBJECTIVE) return corridorOpening(stage, world.corridor);
+    if (mode.objective === CORRIDOR_OBJECTIVE) return corridorOpening(stage, world.corridor, world.sampleHeight);
     if (landsOnStrips(mode)) return approachOpening(stage, world.runway);
     return courseOpening(stage, world.rings);
 }
@@ -1912,8 +1939,19 @@ function patternOpening(runway) {
  * The height is read off the section rather than configured, the way a course
  * reads its opening off the first loop - a run that opened over the lid it is
  * meant to stay under would open with its first section already failed.
+ *
+ * It is read off the ground at the opening too, because the opening is a whole
+ * spacing back from that section and the ground between the two is not flat. A
+ * height taken only at the cut is a height over ground the aircraft is nowhere
+ * near: on a seed that puts a ridge behind the first cut it opened a handful of
+ * its own clearances off the deck, and the sign of that margin was the seed's
+ * to decide.
+ *
+ * `sampleHeight` is the terrain contract `stageStart` is handed. Without one
+ * there is no second reading to take, so the cut's own floor stands in for the
+ * ground at the opening and the height is the one it has always been.
  */
-function corridorOpening(stage, corridor) {
+function corridorOpening(stage, corridor, sampleHeight) {
     const first = corridor?.[0];
     const altitudeField = startField('altitudeFeet');
 
@@ -1923,14 +1961,22 @@ function corridorOpening(stage, corridor) {
     }
 
     const run = stage.corridor.spacing;
+    const x = first.x - first.dirX * run;
+    const z = first.z - first.dirZ * run;
+
+    const ground = typeof sampleHeight === 'function' ? sampleHeight(x, z) : first.floor;
+
+    // Half the air at the cut is the margin the opening has always been given.
+    // It is held over whichever is higher of the cut's floor and the ground the
+    // aircraft is actually put over, so the margin is a margin at both places
+    // rather than at one of them.
+    const margin = (first.ceiling - first.floor) / 2;
 
     return {
-        x: first.x - first.dirX * run,
-        z: first.z - first.dirZ * run,
+        x,
+        z,
         headingDegrees: directionToBearing(first.dirX, first.dirZ),
-        // Halfway between the floor and the lid, which is the middle of the
-        // only air the run is flown in.
-        altitudeFeet: (first.floor + first.ceiling) / 2 * FEET_PER_UNIT,
+        altitudeFeet: (Math.max(first.floor, ground) + margin) * FEET_PER_UNIT,
         airspeedKnots: OPENING_KNOTS,
         throttlePercent: OPENING_THROTTLE
     };

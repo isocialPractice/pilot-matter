@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
     buildCorridor, sectionOffset, corridorCrossing, sectionPassed, sectionMissed,
-    missedBy, CORRIDOR_REACH, MIN_HEADROOM
+    missedBy, CORRIDOR_REACH, MIN_HEADROOM, HEADROOM_SAMPLES
 } from '../js/corridor.js';
 import { DEFAULT_SIZE } from '../js/environment/elements.js';
 
@@ -20,6 +20,20 @@ const ROLLING = {
     sampleHeight: (x, z) => 180 + 90 * Math.sin(x / 1100) + 60 * Math.cos(z / 900)
 };
 
+// Ground that climbs steeply away from both axes, so a cut laid anywhere on it
+// and at any heading has its posts well above its own centre line. This is the
+// shape the lid used to be measured wrong on: a floor read out of the low point
+// of the span, and walls standing most of the way up to the beam.
+//
+// Steeper than any shipped environment, deliberately. The fault is in how the
+// span is read rather than in how steep the ground is, so the ground here is
+// steep enough that every cut shows it instead of waiting on a seed that puts
+// one cut across a slope.
+const STEEP = {
+    ...WORLD,
+    sampleHeight: (x, z) => 2 * (Math.abs(x) + Math.abs(z))
+};
+
 /** A step through a section, offset across the cut and set at a height. */
 function stepThrough(section, across = 0, height = null) {
     const y = height ?? (section.floor + section.ceiling) / 2;
@@ -33,6 +47,24 @@ function stepThrough(section, across = 0, height = null) {
     });
 
     return [at(-60), at(60)];
+}
+
+/**
+ * The ground across a cut, read at the points the corridor itself reads - one
+ * post to the other, both ends included.
+ *
+ * Read at the same points on purpose. A denser reading could find a spike
+ * between two of them and fail a lid that honoured the rule as written, which
+ * would be the test disagreeing with the rule rather than with the code.
+ */
+function groundAcross(section, sampleHeight) {
+    const acrossX =  section.dirZ;
+    const acrossZ = -section.dirX;
+
+    return Array.from({ length: HEADROOM_SAMPLES }, (unused, step) => {
+        const across = ((step / (HEADROOM_SAMPLES - 1)) * 2 - 1) * section.halfWidth;
+        return sampleHeight(section.x + acrossX * across, section.z + acrossZ * across);
+    });
 }
 
 // --- Laying it out ---------------------------------------------------------
@@ -60,8 +92,8 @@ test('the ceiling is held over the ground under each section rather than at one 
     const heights = new Set();
 
     for (const section of sections) {
-        assert.ok(Math.abs(section.ceiling - section.floor - 400) < 1e-9,
-            'every section leaves the stage\'s own headroom');
+        assert.ok(section.ceiling - section.floor >= 400 - 1e-9,
+            'every section leaves at least the stage\'s own headroom over its centre line');
         assert.equal(section.y, section.ceiling, 'and the chart reads the ceiling as its height');
         heights.add(Math.round(section.ceiling));
     }
@@ -69,12 +101,67 @@ test('the ceiling is held over the ground under each section rather than at one 
     assert.ok(heights.size > 1, 'over rolling ground the lid is not one flat sheet');
 });
 
+// Ground that is level across the cut has nothing to clear beyond its centre
+// line, so the stage's own figure is the whole of the answer. Held on its own
+// because the rule above it is a floor and this is the case where the floor is
+// exactly what the lid sits at.
+test('over level ground the stage\'s headroom is the whole of the lid', () => {
+    for (const section of buildCorridor(PLAN, WORLD)) {
+        assert.ok(Math.abs(section.ceiling - section.floor - 400) < 1e-9);
+        assert.equal(section.crest, section.floor,
+            'and the highest ground across a level cut is the ground at its middle');
+    }
+});
+
+// The reading the lid is actually held against. A cut is open over the whole
+// span between its posts, so that span is what the room in it is measured
+// across - a lid clearing only the centre line is a lid the walls reach up
+// into, and the aircraft flies between the walls rather than along the line.
+test('the lid clears the highest ground across the cut, not the ground at its centre', () => {
+    const sections = buildCorridor(PLAN, STEEP);
+    let raised = 0;
+
+    for (const section of sections) {
+        const ground = groundAcross(section, STEEP.sampleHeight);
+
+        assert.equal(section.crest, Math.max(...ground),
+            'the crest is the highest ground the cut is open over');
+        assert.ok(section.crest >= section.floor,
+            'which is never below the centre line, since the centre is one of the readings');
+
+        for (const height of ground) {
+            assert.ok(section.ceiling - height >= MIN_HEADROOM - 1e-9,
+                `cut ${section.index} leaves ${section.ceiling - height} over ground at `
+              + `${height}, against a least room of ${MIN_HEADROOM}`);
+        }
+
+        if (section.ceiling - section.floor > 400 + 1e-9) raised++;
+    }
+
+    assert.ok(raised > 0,
+        'and over ground that climbs across the cut the lid is raised past the stage\'s own figure');
+});
+
 // A cut the aircraft cannot fit through is not a hard cut, it is an
-// impossible one, so the plan is held off the floor rather than honoured.
+// impossible one, so the plan is held off the ground rather than honoured.
 test('a stage cannot ask for a cut with no air in it', () => {
     const airless = { corridor: { ...PLAN.corridor, ceiling: 1 } };
+
+    // Over level ground the floor and the crest are the same reading, so the
+    // least room is measured off either.
     for (const section of buildCorridor(airless, WORLD)) {
         assert.ok(Math.abs(section.ceiling - section.floor - MIN_HEADROOM) < 1e-9);
+    }
+
+    // Over ground that climbs across the cut they are not, and it is the crest
+    // the least room is owed to. Measured off the floor instead, this is the
+    // stage whose arithmetic went the other way entirely and left a cut with
+    // less than nothing in it.
+    for (const section of buildCorridor(airless, STEEP)) {
+        assert.ok(Math.abs(section.ceiling - section.crest - MIN_HEADROOM) < 1e-9,
+            `cut ${section.index} should leave exactly the least room over its highest ground`);
+        assert.ok(section.ceiling - section.floor >= MIN_HEADROOM - 1e-9,
+            'and no less than that over its centre line either');
     }
 });
 

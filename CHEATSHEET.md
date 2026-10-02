@@ -206,7 +206,10 @@ come, dim is behind you. A crash restarts the stage.
 
 A circuit is five legs - `TAKEOFF`, `CLIMB OUT`, `DOWNWIND`, `BASE`, `FINAL` -
 each marked on how near its heading and its height it was held, and finished by
-the landing rather than by crossing the threshold. A canyon run counts a cut
+the landing rather than by crossing the threshold. The landing closes `FINAL`
+too, so the arrival reports the approach's mark and the circuit's together. A
+mast stands at the three turns in open air; the other two are the ends of the
+strip, which is drawn there already. A canyon run counts a cut
 only when it is crossed inside the walls and under the beam; over the top is
 not a way through, and there is no floor. A survey counts a shot only with the
 aircraft inside the height, the range and the heading the brief asked for - the

@@ -50,6 +50,9 @@ export class RescueMarker {
         this.group.name = 'pilot-matter-rescue-marker';
         this.parts = [];
         this.heads = [];
+        // What each head is lit by, which is not always where it is in the
+        // list - see `setMarkers`.
+        this.lit = [];
         scene?.add(this.group);
     }
 
@@ -83,10 +86,20 @@ export class RescueMarker {
      * the leg is to be flown at, which is the one thing about a turn that
      * cannot be read off the ground.
      *
+     * A marker may also name the mark it stands for, as `at`. Without one it
+     * is lit by where it is in the list, which is right for a survey - the
+     * landmarks are drawn in the order they are shot. A circuit draws a mast
+     * at some of its turns and not at others, so the list is shorter than the
+     * run's own count and the place in it is not the number the run is
+     * counting in; `at` is the leg, and lighting by it is what keeps the mast
+     * that is lit the mast the pilot is flying to.
+     *
      * Returns how many pieces were drawn.
      */
     setMarkers(markers = [], groundAt = () => 0) {
         this.clear();
+
+        this.lit = markers.map((marker, at) => marker.at ?? at);
 
         this.heads = markers.map(marker => {
             const base = groundAt(marker.x, marker.z);
@@ -121,7 +134,7 @@ export class RescueMarker {
      */
     setNext(index) {
         this.heads.forEach((head, at) => {
-            head.material.color.setHex(colorFor(at, index));
+            head.material.color.setHex(colorFor(this.lit[at] ?? at, index));
         });
     }
 
@@ -139,6 +152,7 @@ export class RescueMarker {
         }
         this.parts.length = 0;
         this.heads.length = 0;
+        this.lit.length = 0;
     }
 
     /** Takes the marker out of the scene entirely, for a run that has ended. */

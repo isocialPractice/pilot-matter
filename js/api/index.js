@@ -103,7 +103,7 @@ export {
     nextGate, nextStrip, stripIndex,
     nextLeg, nextSection, nextLandmark,
     stageProgress, progressNoun, isStageComplete, runObjective, runStatus,
-    runBrief, faultNotice, shotNotice, legNotice,
+    runBrief, faultNotice, shotNotice, legNotice, circuitNotice,
     stageWorld, stageStart, buildCourse,
     stagePattern, stageReaches, stageSections, stageLandmarks,
     stageBudget, stageStrips, burnFuel, fuelRemaining, runEngine, engineLive,

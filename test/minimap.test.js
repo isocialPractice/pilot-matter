@@ -344,8 +344,18 @@ test('the chart is handed what the run is flying to, whatever kind of run it is'
 
     const marks = ['course', 'runways', 'corridor', 'circuit', 'landmarks'];
     for (const mark of marks) {
-        assert.match(world[1], new RegExp(`${mark}: this\.${mark}`),
+        const span = new RegExp(`${mark}: this\\.${mark}`);
+
+        assert.match(world[1], span,
             `and carry the ${mark}, which is the only place those marks can come from`);
+
+        // The dot is matched as a dot, which is the whole value of matching the
+        // span at all. Inside a template literal `\.` is not an escape and
+        // collapses to a bare `.` before the `RegExp` constructor sees it, so
+        // the pattern above once read `${mark}: this.${mark}` with the dot
+        // matching any character - and passed text written to be rejected.
+        assert.ok(!span.test(`${mark}: this${mark}`) && !span.test(`${mark}: thisX${mark}`),
+            `the ${mark} span should match a literal dot rather than any character`);
     }
 });
 

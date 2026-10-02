@@ -35,12 +35,13 @@ import {
     gameModeEntries, syncGameModeEntries, isGameModesCloseKey, openingRun,
     stagePattern, stageLandmarks, stageReaches, flyPattern, nextLeg,
     flyCorridor, nextSection, recordPhoto, nextLandmark,
-    runBrief, faultNotice, shotNotice, legNotice,
+    runBrief, faultNotice, shotNotice, legNotice, circuitNotice,
     FREE_FLIGHT_ID, GAME_MODES_BACK_ID, LOOP_OBJECTIVE, CARGO_OBJECTIVE,
     PATTERN_OBJECTIVE, CORRIDOR_OBJECTIVE, SURVEY_OBJECTIVE
 } from './game-modes.js';
 import {
-    createPatternState, resetPattern, samplePattern, completeLeg
+    createPatternState, resetPattern, samplePattern, completeLeg, patternScore,
+    FINAL_LEG
 } from './pattern.js';
 import { buildCorridor } from './corridor.js';
 import { rangeBand } from './survey.js';
@@ -506,6 +507,14 @@ class FlightSimulator {
      * ground rather than on the card. A turn carries no circle and a mast as
      * tall as the height its leg wants, which is the one thing about a place
      * in empty air that cannot be read off the country under it.
+     *
+     * Which is the reason only three of a circuit's five turns get one. The
+     * takeoff and the final end on the strip's own thresholds, where there is
+     * nothing in empty air to mark: the strip is drawn, and the approach
+     * guidance already marks the end being landed on. A mast there stood on
+     * the runway, at the place the takeoff roll ends and the place the landing
+     * is flown onto. Each mark carries the leg it stands for, because the run
+     * counts in legs and this list no longer has one entry per leg.
      */
     standingMarks() {
         if (this.marker) return [this.marker];
@@ -523,7 +532,8 @@ class FlightSimulator {
             });
         }
 
-        return this.circuit.map(leg => ({
+        return this.circuit.filter(leg => !leg.onStrip).map(leg => ({
+            at: leg.index,
             x: leg.x,
             z: leg.z,
             mast: Math.max(
@@ -587,7 +597,11 @@ class FlightSimulator {
 
         if (isRunning(this.run)) {
             const opening = stageStart(this.run, {
-                runway, rings: this.course, corridor: this.corridor
+                runway, rings: this.course, corridor: this.corridor,
+                // A run opens a spacing back from its first cut, over ground
+                // that is not the ground under the cut, so the opening height
+                // wants the terrain as well as the corridor.
+                sampleHeight: (x, z) => this.terrain.getTerrainHeightAt(x, z)
             });
 
             // A circuit opens on the strip and hands over no place, because
@@ -1164,11 +1178,38 @@ class FlightSimulator {
             this.landing = scoreLanding(runway, contact);
             beginRollout(this.rollout);
 
+            // A circuit's last leg is the one no turn can close: final ends at
+            // the threshold, and the pilot crosses that threshold on every
+            // go-around they fly, so `recordPatternLeg` refuses it. The
+            // landing is what closes it instead - the approach is read against
+            // its height and heading every frame it is flown, the same as the
+            // other four, and closing it here is what turns that reading into
+            // the mark the pilot is shown rather than a tally nothing reads.
+            this.closeFinalLeg();
+
             // The next leg is a different approach, so the help moves to the
             // strip it is flown to.
             this.drawGuidance();
         }
         this.syncObjective();
+    }
+
+    /**
+     * Closes the final leg of a circuit, if a circuit is what was landed.
+     *
+     * Costs nothing for every other landing mode: a route and a landing stage
+     * have no circuit, so there is no final leg to close.
+     */
+    closeFinalLeg() {
+        const leg = this.circuit[FINAL_LEG];
+        if (!leg) return;
+
+        const flown = completeLeg(this.pattern, leg, stageReaches(this.run));
+
+        // Closed before the mark for the whole is read, because the circuit is
+        // five legs and this is the fifth: a score read first would be the
+        // circuit without its own last leg in it.
+        this.holdNotice(circuitNotice(flown, patternScore(this.pattern)));
     }
 
     /**

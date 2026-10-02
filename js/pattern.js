@@ -106,6 +106,15 @@ export function buildPattern(stage, runway) {
         step(approach, 0, 0)
     ];
 
+    // Which of those corners is a threshold of the strip rather than a place in
+    // open air. Two of them are: the takeoff ends at the departure threshold
+    // and final ends at the approach one, which is the same corner the circuit
+    // opened from. Said here because this is where the corners are laid, and
+    // read by whatever draws the circuit - a turn standing on a graded strip
+    // wants nothing built at it, and the strip and its approach marks are
+    // already drawn.
+    const onStrip = [true, true, false, false, false, true];
+
     const field = (runway.elevation ?? 0) * FEET_PER_UNIT;
     const climb = plan.altitudeFeet;
 
@@ -125,6 +134,10 @@ export function buildPattern(stage, runway) {
             fromFeet: field + climb * (LEG_HEIGHTS[index - 1] ?? 0),
             x: to.x,
             z: to.z,
+            // Whether the turn this leg is named by stands on the strip. It is
+            // the end of the leg that is the mark, so it is the end that is
+            // asked about.
+            onStrip: onStrip[index + 1],
             altitudeFeet: field + climb * LEG_HEIGHTS[index],
             heading: directionToBearing(to.x - from.x, to.z - from.z),
             ...legDirection(from, to)

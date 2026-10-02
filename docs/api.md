@@ -811,11 +811,12 @@ read them as a worked example of a game built on the two APIs.
 | `runObjective(state)`, `runStatus(state)` | What to write on the screen |
 | `runBrief(state, world)` | The same, for the two modes whose objective moves inside a stage |
 | `faultNotice(state, fault)`, `shotNotice(landmark, fault)`, `legNotice(flown)` | What just went wrong, or what a leg came to, as a line |
+| `circuitNotice(flown, score)` | The same for the leg that ends a circuit, which reports the leg and the whole of it |
 | `runPointer(state, world, position, heading)` | Where the thing it is waiting on lies |
 | `gatePointer(...)`, `stripPointer(...)`, `searchBriefing(state)` | Three of the things `runPointer` dispatches to |
 | `chartCourse(state, world)`, `chartNext(state)` | The same answer as marks on a chart, and which one is next |
 | `stageWorld(state)` | The world the stage is flown over |
-| `stageStart(state, world)` | Where in it the flight opens |
+| `stageStart(state, world)` | Where in it the flight opens. `world` carries `runway`, `rings`, `corridor` and `sampleHeight`, each read by the objectives that need it |
 | `buildCourse(stage, options)` | The loops a course stage is flown through |
 | `stagePattern(state, runway)`, `stageReaches(state)` | The circuit a pattern stage is flown round, and how closely its legs have to be held |
 | `stageSections(state)`, `stageLandmarks(state)` | The cuts a run is divided into, and the landmarks a survey lists |
@@ -1046,6 +1047,25 @@ an aircraft crosses that threshold on every go-around it flies, so
 `recordLanding` finishes the circuit and `recordPatternLeg` refuses the final
 leg. A landing reported anywhere earlier in the pattern counts for nothing.
 
+So the landing is what closes it. The approach is read against its height and
+heading every frame it is flown, the same as the other four legs, and a host
+calls `completeLeg` on the final leg where it takes the arrival - that is what
+turns the reading into a mark rather than a tally nothing reports. Because the
+reading accumulates until the stage is reset, a go-around is part of the
+approach that was flown rather than a second attempt at it; `resetPattern` is
+what starts the approach over, and a crash is where a host calls it.
+
+`patternScore` is the mean of the legs closed so far, which once the landing is
+in is the mark for the whole circuit. `circuitNotice(flown, score)` writes the
+leg and the circuit as one line for the moment both are finally known.
+
+Each leg also says whether the turn it is named by stands on the strip, as
+`onStrip`. Two of the five do - the takeoff ends at the departure threshold and
+the final back at the approach one - and the other three turn in open air. It
+is there for whatever draws the circuit: a turn in open air is a place with
+nothing at it and wants a mark, while a threshold is the end of a drawn strip
+the approach guidance already picks out.
+
 A circuit is also the one run that opens on the ground: `stageStart` hands back
 `startMode: 'takeoff'` and a null `position`, leaving the threshold to the
 takeoff start rather than naming it a second time.
@@ -1060,8 +1080,17 @@ would be a run whose difficulty was whatever the seed handed it.
 `buildCorridor` walks the line across the ground and holds the ceiling a
 declared height over whatever is underneath, so a stage that brings the ceiling
 down brings it down everywhere rather than only where the ground was already
-high. A section is `{index, x, z, floor, ceiling, y, halfWidth, dirX, dirZ}`,
-with `y` the ceiling again under the name a chart reads a mark's height by.
+high. A section is
+`{index, x, z, floor, crest, ceiling, y, halfWidth, dirX, dirZ}`, with `y` the
+ceiling again under the name a chart reads a mark's height by.
+
+`floor` is the ground on the centre line and `crest` is the highest ground the
+cut is open over, read across the whole span its walls stand either side of.
+The lid is held at whichever is higher of the stage's own headroom over the
+floor and `MIN_HEADROOM` over the crest, so the room a stage asks for is room
+the aircraft has at the posts as well as in the middle - a cut whose centre
+falls in a gully has far less air at its edges than at its centre, and a lid
+measured only on the centre line is a lid the walls reach up into.
 
 ```javascript
 import { createRunState, CANYON_RUN, currentStage, flyCorridor } from 'pilot-matter';

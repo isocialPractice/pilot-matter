@@ -5,6 +5,96 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0-alpha] - 2026-10-02
+
+Five fixes in the two newest modes, four of them about a reading taken in one
+place and used as though it had been taken in another. A traffic pattern no
+longer stands a mast on the runway at each end of the strip, and the approach it
+reads every frame is finally marked. A canyon run measures the air in a cut
+across the span the cut is open over rather than at one point on its centre
+line, and opens at a height read against the ground it actually opens above.
+The fifth is an assertion that was matching a dot against any character.
+
+### Fixed
+
+- **A circuit puts a mast at the turns in open air and at no others.**
+  `standingMarks` in `js/main.js` mapped every leg of the circuit onto a mast,
+  and two of the five legs end on the strip itself - the takeoff at the
+  departure threshold and the final at the approach one, which is the threshold
+  the circuit opened from. Built in Node off the mode's own seed, `TRAFFIC
+  PATTERN` / `WIDE CIRCUIT` stood a 130-unit mast with a lit head on it 0.0
+  units from each of its runway's two thresholds: the takeoff roll ended at one
+  and the landing was flown onto the other. Nothing crashed, because `js/crash.js`
+  reads the terrain height and knows nothing about meshes, so the aircraft
+  passed through the pole rather than into it. But the reason the code gave for
+  the mast - that a turn in a circuit is a place in empty air with nothing drawn
+  at it - is true of the three middle turns and false of these two, which are
+  the ends of a drawn strip the approach guidance already marks. `buildPattern`
+  now says which turns stand on the strip, as `onStrip` on the leg, and the
+  renderer leaves those out.
+- **And the mast being waited on is still the right one.** Dropping two marks
+  from a list of five broke the lighting, because `beacon.setNext` is handed a
+  leg index while `RescueMarker.setNext` coloured `this.heads` by position - so
+  a shorter list would have lit the wrong head from then on. A mark may now
+  name the mark it stands for, as `at`, and is lit by that; a mark without one
+  is lit by its place in the list, which is what a survey's landmarks want
+  since they are drawn in the order they are shot.
+- **The final leg of a circuit is closed by the landing, and reported.**
+  `trackPattern` sampled whatever `nextLeg` answered, which is the final leg for
+  the whole of the approach, so the tally for that leg filled up with the height
+  and heading error flown down final - and nothing ever closed it. `trackLegs`
+  returns unless a turn was crossed, and `recordPatternLeg` refuses the final
+  leg by design, because the pilot crosses that threshold on every go-around
+  they fly. The pilot got `HELD n` for `TAKEOFF`, `CLIMB OUT`, `DOWNWIND` and
+  `BASE`, and nothing at all for `FINAL`. The landing now closes it, which is
+  the one event that means the circuit was flown out rather than crossed over,
+  and `circuitNotice` reports the leg's mark and the circuit's together -
+  `patternScore` was a published export the game never asked.
+- **A cut's headroom is measured across the span the cut is open over.**
+  `MIN_HEADROOM` in `js/corridor.js` is the least room a stage may leave between
+  the ceiling and the ground under a section, and `buildCorridor` applied it
+  against the ground sampled at the section's centre line and nowhere else. A
+  cut whose centre falls in a gully had its lid measured off the gully floor
+  while the ground at its posts stood far higher. Built in Node off the mode's
+  own seed, `CANYON RUN` / `THE SLOT` left 40.4 units between the ground at a
+  post of cut 5 and the beam over it, against a declared minimum of 70 - and
+  nothing in the formula stopped the figure going negative on another seed,
+  which is the impossible cut the constant exists to refuse. A section now
+  carries `crest`, the highest ground it is open over, read at
+  `HEADROOM_SAMPLES` points from one post to the other, and the lid is held at
+  whichever is higher of the stage's own headroom over the floor and the least
+  room over the crest. All four shipped stages now clear the minimum, the worst
+  of them at exactly 70.
+- **A run opens at a height read against the ground it opens above.**
+  `corridorOpening` in `js/game-modes.js` put the aircraft a full `spacing` back
+  from the first cut and set its altitude to the midpoint of the air at the cut,
+  over ground sampled at the cut. The two places are a whole spacing apart and
+  the ground between them is not flat: `CANYON RUN` / `THE SLOT` opened 24.3
+  units over the ground beneath it, and `GROUND_CLEARANCE` in `js/crash.js` is
+  5, so the stage opened about four of its own clearances off the deck at cruise
+  speed. The first cut's floor was 92 units below the ground the aircraft was
+  actually put over, and that difference was the whole of the error. `stageStart`
+  now carries a `sampleHeight` in its world, and the opening is held half the
+  cut's air above whichever is higher of the cut's floor and the ground at the
+  opening - 115.7 units for that stage. A host that hands over no terrain gets
+  the height this always gave.
+- **A source-text assertion matched a dot against any character.**
+  `test/minimap.test.js` built its `runWorld` assertions as `new RegExp(` plus a
+  template literal reading `${mark}: this\.${mark}`. Inside a template literal
+  `\.` is not an escape, so it collapsed to a bare `.` before the `RegExp`
+  constructor saw it, and the assertion passed on text it was written to reject
+  - `course: thisXcourse` satisfied it. Every other span in the file is escaped
+  correctly, so this one read as a slip rather than a choice. The dot is escaped
+  now, and the suite checks each span rejects a non-dot in that position.
+
+### Changed
+
+- `docs/api.md` records the section's new `crest` reading and the rule the lid
+  is held by, the `onStrip` reading on a circuit's legs, what closes and reports
+  the final leg, and the `sampleHeight` a `stageStart` world carries.
+  `CHEATSHEET.md` and the cheatsheet page say that the landing closes `FINAL`
+  and that a mast stands only at the turns in open air.
+
 ## [1.21.0-alpha] - 2026-10-01
 
 Three modes that are not met by arriving somewhere. A traffic pattern is
