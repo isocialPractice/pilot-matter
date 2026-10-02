@@ -23,115 +23,42 @@ its context survives being archived.
   Controls** section
   - From: Flight Controls
 
-### Code Review Override - the circuit's masts and the corridor's air
+### UI/UX Override - the corridor's opening and its lid
 
-- [ ] The chart's wiring test matches a character it meant to match literally
-  - **Issue**: `test/minimap.test.js` builds its `runWorld` assertions as
-    `new RegExp(` plus a template literal reading `${mark}: this\.${mark}`.
-    Inside a template literal `\.` is not an escape, so it collapses to a bare
-    `.` before the `RegExp` constructor ever sees it, and the pattern reads
-    `course: this.course` with the dot matching any character. The assertion
-    passes on text it was written to reject - `course: thisXcourse` satisfies it
-    - and every other span in the file is escaped correctly, so this one reads as
-    a slip rather than a choice.
-  - **Goal**: Escape the dot, `this\\.`, or use a regex literal the way the rest
-    of the file does.
-  - From: Code Review Override - the circuit's masts and the corridor's air
+#### Found Issues
 
-#### Resolve Issues
-
-- [ ] **Traffic Pattern 1**: a mast stands on the runway at both ends of the
-  strip
-  - **Issue**: `standingMarks` in `js/main.js` maps every leg of the circuit onto
-    a mast, and two of the five legs end on the strip itself - `TAKEOFF` at the
-    departure threshold and `FINAL` at the approach threshold, which is what `a
-    circuit closes on the threshold it opened from` in `test/pattern.test.js`
-    pins. Built in Node off the mode's own seed, so this is the strip the stage
-    actually lays: `TRAFFIC PATTERN` / `WIDE CIRCUIT` puts its runway at
-    (-6766, -619) on heading 304, and the takeoff and final masts stand 0.0 units
-    from its two thresholds, 130 units tall with a lit head on each. The takeoff
-    roll ends at one of them and the landing is flown onto the other. Nothing
-    crashes - `js/crash.js` reads the terrain height and knows nothing about
-    meshes, so the aircraft passes through the pole rather than into it - but the
-    reason the code gives for the mast, that "a turn in a circuit is a place in
-    empty air with nothing drawn at it", is true of the three middle turns and
-    false of these two, which are the ends of a drawn strip the approach guidance
-    already marks.
-  - **Goal**: Put masts only at the turns that are not on the strip. The catch is
-    `beacon.setNext`, which is handed `chartNext(this.run)` - for a circuit that
-    is `nextLeg`, a leg index - while `RescueMarker.setNext` lights `this.heads`
-    by position, so dropping two marks lights the wrong head from then on. Decide
-    that first: either carry the leg index on the mark and light by it, or keep
-    five entries and let a mark say it draws nothing.
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Traffic Pattern 2**: the final leg is read every frame and the reading is
-  thrown away
-  - **Issue**: the item asked for a circuit judged on holding each leg, and four
-    of the five are. `trackPattern` in `js/main.js` samples whatever
-    `nextLeg(this.run)` answers, which is `FINAL_LEG` for the whole of the
-    approach, so `this.pattern.legs[4]` fills up with the height and heading
-    error flown down final. Nothing ever closes it: `trackLegs` returns on
-    `!step.turned`, and `recordPatternLeg` refuses the final leg by design, so
-    `completeLeg` is never called for index 4 and `state.flown[4]` stays empty.
-    The pilot gets `HELD n` on the card for `TAKEOFF`, `CLIMB OUT`, `DOWNWIND`
-    and `BASE`, and nothing at all for `FINAL`. `patternScore` and `flownLegs` -
-    the two functions that say what the whole circuit came to - are called by
-    `test/pattern.test.js` and by nothing in `js/`, so the circuit never reports
-    a mark of its own either.
-  - **Goal**: Decide which of the two the mode means and make it say so. If the
-    landing score is the final leg's mark, as `js/pattern.js`'s own header
-    implies when it calls the landing "the last fifth" of the circuit, stop
-    sampling the final leg rather than filling a tally nothing reads. If the
-    approach is held like the other four, close it where `recordLanding` closes
-    the leg - in `onLanding` - and report it. Either way the circuit wants
-    somewhere to show `patternScore`, which today is a published export the game
-    never asks.
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Canyon Run 1**: the least-air guard is measured at the middle of a cut
-  and the walls are where the air runs out
-  - **Issue**: `MIN_HEADROOM` in `js/corridor.js` is declared as the least room a
-    stage may leave between the ceiling and the ground under a section, and
-    `buildCorridor` applies it as `floor + Math.max(plan.ceiling, MIN_HEADROOM)`
-    where `floor` is `sample(x, z)` at the section's centre line and nowhere
-    else. A cut whose centre falls in a gully gets its lid measured off the gully
-    floor while the ground at the posts is far higher. Built in Node off the
-    mode's own seed: `CANYON RUN` / `THE SLOT`, cut 5 sits at (-1599, 336) with a
-    centre floor of -152.4 and a lid at 77.6, and the ground at the left post -
-    155 units across, which is that stage's `halfWidth` - stands at 37.2. That is
-    40.4 units between the ground and the beam, against a declared minimum of 70.
-    It is flyable, because the middle of that cut has 225 units of air in it, and
-    nothing in the formula stops the number going negative on another seed, which
-    is the impossible cut the constant exists to refuse.
-  - **Goal**: Measure the headroom across the span the cut is actually open over
-    rather than at one point on its centre line, and raise the lid to clear the
-    worst of it. Note what it costs: `the ceiling is held over the ground under
-    each section rather than at one height` and `a stage cannot ask for a cut
-    with no air in it` in `test/corridor.test.js` both read the ceiling off the
-    centre floor, so both want rewriting against whatever the new rule is, and
-    the shipped stages' numbers move with it.
-  - From: Game Modes UI/UX `->` New Game Modes
-- [ ] **Canyon Run 2**: a run opens at a height read off ground a full spacing
-  away from where it opens
-  - **Issue**: `corridorOpening` in `js/game-modes.js` puts the aircraft at
-    `first.x - first.dirX * run`, a full `spacing` back from the first cut, and
-    sets its altitude to `(first.floor + first.ceiling) / 2` - the midpoint of
-    the air at the cut, over ground sampled at the cut. The two places are a
-    whole spacing apart and the ground between them is not flat. Built in Node
-    off the mode's own seed: `CANYON RUN` / `THE SLOT` opens at (6980, -805)
-    where the ground is 259.3, at an altitude of 283.5 units, which is 24.3 units
-    of clearance - and `GROUND_CLEARANCE` in `js/crash.js` is 5, so the stage
-    opens about four of its own clearances off the deck at cruise speed. The
-    first cut's floor is 167.1, 92 units below the ground the aircraft is
-    actually put over, and that difference is the whole of the error. All four
-    shipped stages clear the ground today - the other three by 161 units or more
-    - so nothing fails, but the sign of the margin is up to the seed.
-  - **Goal**: Read the opening height against the ground at the opening point as
-    well as at the first cut, and take whichever is higher. `corridorOpening` is
-    handed only `stage` and `corridor` today, so a height sampler has to reach
-    it - `stageStart`'s `world` is the one place it could come from, and that is
-    an interface `docs/api.md` describes, so decide how it is threaded before
-    changing the formula.
-  - From: Game Modes UI/UX `->` New Game Modes
+- [ ] A corridor opening is held clear of the ground under it and nothing holds
+  it clear of the lid over it
+  - **Issue**: `corridorOpening` in `js/game-modes.js` now puts the aircraft at
+    `(Math.max(first.floor, ground) + margin)` where `margin` is half the air at
+    the first cut. The `Math.max` is the floor side of the guard and there is no
+    ceiling side, so the opening rises with the ground at the opening while the
+    lid it has to stay under does not move. The module's own header says what
+    that would cost in as many words - "a run that opened over the lid it is
+    meant to stay under would open with its first section already failed" - and
+    nothing now stops it. Read in Chromium off the corridor each stage actually
+    drew, with `stageStart` handed that corridor: `OPEN REACH` opens 281.7 units
+    under its first lid, `NARROWS` 225.8, `THE RIM` 158.5 and `THE SLOT` 22.1.
+    The three roomy ones are the three whose opening ground sits at or below the
+    first cut's floor; `THE SLOT` is the one where it stands above it, by 92.1
+    units against a margin of 115.0. The remaining 22.9 is the whole of the
+    clearance, and it is the seed's to decide: ground 115 units over that floor
+    instead of 92 opens the stage level with its own lid, and anything above
+    that opens over it. Flown this run, all four stages are fine - every cut of
+    every stage was counted and `THE SLOT` was flown out to `MODE COMPLETE` - so
+    this is the guard being half there rather than a stage that fails today.
+  - **Goal**: Hold the opening under the first cut as well as over the ground,
+    so the two bounds are a band rather than one floor. Something of the shape
+    `Math.min(first.ceiling - clearance, Math.max(first.floor, ground) + margin)`
+    - the height wanted, but never nearer the lid than a stated clearance. State
+    what that clearance is and why, the way `MIN_HEADROOM` states its own, and
+    note that a cut with less air in it than the clearance asks for is already
+    refused by `MIN_HEADROOM`, so the two cannot fight. `a run opens over the
+    ground at its opening, not the ground at the first cut` in
+    `test/game-modes.test.js` is where the new bound wants a case of its own: a
+    corridor whose opening ground stands higher over the floor than half the
+    cut's air, which today opens above the ceiling and should not.
+  - From: UI/UX Override - the corridor's opening and its lid
 
 ## Game UI/UX
 
@@ -387,112 +314,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 145 earlier items in `TODO-archive.md`, newest last.
+> 150 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The rename to mark reached one more test and stopped four short
-  - **Issue**: `test/minimap.test.js` still says gate for what the chart now
-    draws as a mark, in the four tests covering `coursePoints` and `courseLine`
-    at 165-193: the names `a course is drawn where the chart puts each of its
-    gates`, `a gate past the edge of the chart is held at that edge and says
-    so`, `a gate that never carried its number is numbered by where it sits` and
-    `a course is one line through its gates, in the order they are flown`, the
-    comment at 175, the `gate` local at 183, and the message `and a course with
-    no gates draws nothing` at 193. Those are the same two pure functions the
-    mark-named tests from 200 down exercise through `setCourse`, and a course
-    point is now a gate on a loop, a strip on a route or a search's one marker,
-    so the file names one thing two ways with the seam between them falling in
-    the middle of a section. Nothing fails; the item the run worked was scoped
-    to the single test between them, which is why the drift outlived it.
-  - **Goal**: Finish the rename across those four tests - names, comment, local
-    and message - leaving the seam tests from 334 down alone, because they say
-    gate where a gate is what is meant, for `nextGate` and the hoops a loop
-    course lights. Nothing but text changes, so the suite should still report
-    1039 passing. The `1.19.1-alpha` entry in `CHANGELOG.md` says in as many
-    words that the rename is unfinished and that these four are what is left, so
-    amend that sentence when it is done rather than leaving it describing a
-    state the file has moved past.
-  - From: Code Review Override - the held mark's reading and the rename left half done
-- [x] Nothing records that the chart's published pages were checked against the
-  fix
-  - **Issue**: The completed item `The pages written for the chart describe a
-    held mark keeping a reading it gives up` closed with a Goal that asked, if
-    the stroke were made to carry the reading, for the run to say so rather than
-    edit the pages. The stroke does carry it and the pages are correctly
-    untouched - `docs/controls/game-modes.html:221` and `:233` and
-    `docs/controls/instruments.html:117` all read true against the stylesheet as
-    it now stands, checked in review - but neither the `1.19.1-alpha` entry in
-    `CHANGELOG.md` nor anything else in the tree says so. The item is checked
-    off in `TODO-archive.md` under `## Archived 09-27-26`, so a later reader
-    finding those paragraphs claiming green and hollow together cannot tell from
-    any record whether they were verified or simply never revisited, which is
-    the question the item existed to settle.
-  - **Goal**: Add a sentence to the `1.19.1-alpha` entry saying the pages
-    written for the chart in `docs/controls/game-modes.html` and
-    `docs/controls/instruments.html` are true as written now that a held mark
-    keeps its reading, and that they needed no edit. No documentation changes -
-    the pages are already right, and the gap is in what the release says about
-    them.
-  - From: Code Review Override - the held mark's reading and the rename left half done
-- [x] Nothing in the suite pins the wider stroke a held mark is drawn with
-  - **Issue**: a mark held at the edge of the chart reads by three declarations
-    at once - `fill: none`, `stroke-width: 0.9` and the colour - and the suite
-    pins two of them. `a mark held at the edge of the chart keeps the colour of
-    the hoop it stands for` in `test/page.test.js` now resolves the colour and
-    the hollow fill through `cascaded` for all three held readings, and no test
-    in the project mentions a stroke width at all. Measured in Chromium against
-    the running page, all three held readings resolve `stroke-width: 0.9px`,
-    which `.minimap-mark.off-map` takes off `.minimap-mark`'s `0.4` on the same
-    one-more-class the colour rules win on - so a rule that dropped the width,
-    or a later one that overrode it, would leave a held mark the same weight as
-    an unheld one with the suite reporting 1039 passing
-  - **Goal**: one more assertion inside the loop that already runs over the
-    three held readings, beside the `fill: none` one that is there:
-    `assert.equal(cascaded(indexHtml, classes, 'stroke-width'), '0.9')`, so the
-    wider stroke is settled through the cascade the way the other two are
-  - From: UI/UX Override - the chart's held readings
-- [x] A route's later stages cannot be reached by any automated check
-  - **Issue**: item 3 of the request asked for the two held readings at
-    `CARGO RUN` / `LONG HAUL`, and this run could not read them on the glass.
-    A run opens at its first stage and there is no way to open it at another, so
-    the only route to the second is landing at both of `SHORT HAUL`'s strips:
-    `js/main.js:1128` clears a reported landing on the next frame the aircraft
-    is airborne, which is right for a takeoff and means an arrival cannot be
-    handed to the app from outside while it is flying, and both flown attempts
-    at that leg - one in an earlier run, one this run - failed. This run
-    overflew it,
-    closest 3560 units along the strip, the stage then resetting. Every other
-    mode has reached its second stage in an earlier run - a course, a dead stick
-    and a search all have - because a route is the only one whose stage asks for
-    a second arrival thousands of units from the first. What was confirmed
-    instead is the geometry, read off the app's own
-    `stageStart` and `tileBounds`: `LONG HAUL` opens at (8301, 3504) with both
-    its strips in the tile west of it, so both marks are held the moment it
-    opens, and `THREE STOPS` opens inside its strips' tile and holds neither
-  - **Goal**: a way to open a run at a chosen stage, so a check can reach the
-    later stages of a mode without flying every stage before them
-  - From: UI/UX Override - the chart's held readings
-- [x] The stylesheet's own note says the held block wins without the order
-  being touched
-  - **Issue**: the comment over the held rules, `index.html:219-228`, ends
-    "Three classes beat two, so these win on specificity without the order being
-    touched". That is false for the one declaration in the block that competes
-    with anything. `.minimap-mark.off-map` at line 229 carries two classes, the
-    same as `.minimap-mark.next` at 216, so its `fill: none` beats that rule's
-    `fill: #00ff44` on written order alone. The two rules that do win on three
-    classes against two are the strokes at 230 and 231, and a stroke never
-    competes with a fill. Moving line 229 above line 216 - which the comment
-    says costs nothing - fills a held next mark green and drops the hollow that
-    is what says it is past the edge. Confirmed this run by making that move:
-    `a mark held at the edge of the chart keeps the colour of the hoop it stands
-    for` in `test/page.test.js` fails on it, that reading having been settled
-    through the cascade for `1.19.2-alpha`, so the sheet is now pinned by a test
-    whose reason its own comment denies
-  - **Goal**: correct the comment's last sentence to what holds - the two stroke
-    rules win on specificity, `fill: none` wins on order, so the block has to
-    stay below `.minimap-mark.next` and `.minimap-mark.flown` - and say that the
-    order is pinned by the held-mark reading in `test/page.test.js` rather than
-    only by the comment. `index.html` is otherwise sound and needs no edit
-  - From: UI/UX Override - the chart's held readings
 - [x] Nothing in the suite reaches the line that opens the run an address asks
   for
   - **Issue**: `openingRun` itself is covered - `test/game-modes.test.js` runs
@@ -535,3 +358,107 @@ how the simulator got here rather than as a list still to be worked.
   tracked `.gitignore`, and say in that run's changelog entry that the rules
   reach a clone
   - From: Documentation & Polish
+- [x] The chart's wiring test matches a character it meant to match literally
+  - **Issue**: `test/minimap.test.js` builds its `runWorld` assertions as
+    `new RegExp(` plus a template literal reading `${mark}: this\.${mark}`.
+    Inside a template literal `\.` is not an escape, so it collapses to a bare
+    `.` before the `RegExp` constructor ever sees it, and the pattern reads
+    `course: this.course` with the dot matching any character. The assertion
+    passes on text it was written to reject - `course: thisXcourse` satisfies it
+    - and every other span in the file is escaped correctly, so this one reads as
+    a slip rather than a choice.
+  - **Goal**: Escape the dot, `this\\.`, or use a regex literal the way the rest
+    of the file does.
+  - From: Code Review Override - the circuit's masts and the corridor's air
+- [x] **Traffic Pattern 1**: a mast stands on the runway at both ends of the
+  strip
+  - **Issue**: `standingMarks` in `js/main.js` maps every leg of the circuit onto
+    a mast, and two of the five legs end on the strip itself - `TAKEOFF` at the
+    departure threshold and `FINAL` at the approach threshold, which is what `a
+    circuit closes on the threshold it opened from` in `test/pattern.test.js`
+    pins. Built in Node off the mode's own seed, so this is the strip the stage
+    actually lays: `TRAFFIC PATTERN` / `WIDE CIRCUIT` puts its runway at
+    (-6766, -619) on heading 304, and the takeoff and final masts stand 0.0 units
+    from its two thresholds, 130 units tall with a lit head on each. The takeoff
+    roll ends at one of them and the landing is flown onto the other. Nothing
+    crashes - `js/crash.js` reads the terrain height and knows nothing about
+    meshes, so the aircraft passes through the pole rather than into it - but the
+    reason the code gives for the mast, that "a turn in a circuit is a place in
+    empty air with nothing drawn at it", is true of the three middle turns and
+    false of these two, which are the ends of a drawn strip the approach guidance
+    already marks.
+  - **Goal**: Put masts only at the turns that are not on the strip. The catch is
+    `beacon.setNext`, which is handed `chartNext(this.run)` - for a circuit that
+    is `nextLeg`, a leg index - while `RescueMarker.setNext` lights `this.heads`
+    by position, so dropping two marks lights the wrong head from then on. Decide
+    that first: either carry the leg index on the mark and light by it, or keep
+    five entries and let a mark say it draws nothing.
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Traffic Pattern 2**: the final leg is read every frame and the reading is
+  thrown away
+  - **Issue**: the item asked for a circuit judged on holding each leg, and four
+    of the five are. `trackPattern` in `js/main.js` samples whatever
+    `nextLeg(this.run)` answers, which is `FINAL_LEG` for the whole of the
+    approach, so `this.pattern.legs[4]` fills up with the height and heading
+    error flown down final. Nothing ever closes it: `trackLegs` returns on
+    `!step.turned`, and `recordPatternLeg` refuses the final leg by design, so
+    `completeLeg` is never called for index 4 and `state.flown[4]` stays empty.
+    The pilot gets `HELD n` on the card for `TAKEOFF`, `CLIMB OUT`, `DOWNWIND`
+    and `BASE`, and nothing at all for `FINAL`. `patternScore` and `flownLegs` -
+    the two functions that say what the whole circuit came to - are called by
+    `test/pattern.test.js` and by nothing in `js/`, so the circuit never reports
+    a mark of its own either.
+  - **Goal**: Decide which of the two the mode means and make it say so. If the
+    landing score is the final leg's mark, as `js/pattern.js`'s own header
+    implies when it calls the landing "the last fifth" of the circuit, stop
+    sampling the final leg rather than filling a tally nothing reads. If the
+    approach is held like the other four, close it where `recordLanding` closes
+    the leg - in `onLanding` - and report it. Either way the circuit wants
+    somewhere to show `patternScore`, which today is a published export the game
+    never asks.
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Canyon Run 1**: the least-air guard is measured at the middle of a cut
+  and the walls are where the air runs out
+  - **Issue**: `MIN_HEADROOM` in `js/corridor.js` is declared as the least room a
+    stage may leave between the ceiling and the ground under a section, and
+    `buildCorridor` applies it as `floor + Math.max(plan.ceiling, MIN_HEADROOM)`
+    where `floor` is `sample(x, z)` at the section's centre line and nowhere
+    else. A cut whose centre falls in a gully gets its lid measured off the gully
+    floor while the ground at the posts is far higher. Built in Node off the
+    mode's own seed: `CANYON RUN` / `THE SLOT`, cut 5 sits at (-1599, 336) with a
+    centre floor of -152.4 and a lid at 77.6, and the ground at the left post -
+    155 units across, which is that stage's `halfWidth` - stands at 37.2. That is
+    40.4 units between the ground and the beam, against a declared minimum of 70.
+    It is flyable, because the middle of that cut has 225 units of air in it, and
+    nothing in the formula stops the number going negative on another seed, which
+    is the impossible cut the constant exists to refuse.
+  - **Goal**: Measure the headroom across the span the cut is actually open over
+    rather than at one point on its centre line, and raise the lid to clear the
+    worst of it. Note what it costs: `the ceiling is held over the ground under
+    each section rather than at one height` and `a stage cannot ask for a cut
+    with no air in it` in `test/corridor.test.js` both read the ceiling off the
+    centre floor, so both want rewriting against whatever the new rule is, and
+    the shipped stages' numbers move with it.
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Canyon Run 2**: a run opens at a height read off ground a full spacing
+  away from where it opens
+  - **Issue**: `corridorOpening` in `js/game-modes.js` puts the aircraft at
+    `first.x - first.dirX * run`, a full `spacing` back from the first cut, and
+    sets its altitude to `(first.floor + first.ceiling) / 2` - the midpoint of
+    the air at the cut, over ground sampled at the cut. The two places are a
+    whole spacing apart and the ground between them is not flat. Built in Node
+    off the mode's own seed: `CANYON RUN` / `THE SLOT` opens at (6980, -805)
+    where the ground is 259.3, at an altitude of 283.5 units, which is 24.3 units
+    of clearance - and `GROUND_CLEARANCE` in `js/crash.js` is 5, so the stage
+    opens about four of its own clearances off the deck at cruise speed. The
+    first cut's floor is 167.1, 92 units below the ground the aircraft is
+    actually put over, and that difference is the whole of the error. All four
+    shipped stages clear the ground today - the other three by 161 units or more
+    - so nothing fails, but the sign of the margin is up to the seed.
+  - **Goal**: Read the opening height against the ground at the opening point as
+    well as at the first cut, and take whichever is higher. `corridorOpening` is
+    handed only `stage` and `corridor` today, so a height sampler has to reach
+    it - `stageStart`'s `world` is the one place it could come from, and that is
+    an interface `docs/api.md` describes, so decide how it is threaded before
+    changing the formula.
+  - From: Game Modes UI/UX `->` New Game Modes
