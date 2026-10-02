@@ -114,9 +114,13 @@ import {
     runBrief,
     faultNotice,
     shotNotice,
-    legNotice
+    legNotice,
+    circuitNotice
 } from '../js/game-modes.js';
-import { buildPattern, PATTERN_LEGS, FINAL_LEG, createPatternState, completeLeg } from '../js/pattern.js';
+import {
+    buildPattern, PATTERN_LEGS, FINAL_LEG, createPatternState, completeLeg,
+    patternScore, samplePattern
+} from '../js/pattern.js';
 import { buildCorridor } from '../js/corridor.js';
 import { buildSurvey } from '../js/survey.js';
 import {
@@ -597,6 +601,41 @@ test('an address that cannot be honoured opens nothing', () => {
     // guards reads exactly the same and stops nothing.
     assert.ok(opener[2].indexOf('if (request.problem)') < opener[2].indexOf('startRun('),
         'the refusal should stand in front of the run being started, not behind it');
+});
+
+/**
+ * `corridorOpening` above is tested both ways - over the ground at the opening
+ * when it is handed a terrain, and off the cut's own floor when it is not - and
+ * neither case says which of the two the page asks for. The terrain is handed
+ * over in `js/main.js`, so the fallback is one deleted key away: without it the
+ * opening is read off ground a whole spacing from where the aircraft is put,
+ * and `CANYON RUN` / `THE SLOT` opens about five of the simulator's own ground
+ * clearances off the deck at cruise speed instead of a hundred and seventeen
+ * units up. Taking the key out and running the suite was tried: 1159 of 1159
+ * passing, exactly as with it there.
+ */
+test('a run that opens over ground is handed the ground to read it off', () => {
+    const method = simulatorMethod('buildStart');
+    assert.ok(method, 'js/main.js should still build the next flight\'s opening in buildStart');
+
+    // Bounded to the one object literal `stageStart` is handed, with `[^}]*?`
+    // the way the spans above are bounded, so a `sampleHeight` written for some
+    // other call further down the method cannot stand in for this one.
+    const world = method[2].match(/stageStart\(this\.run, \{([^}]*?)\}\)/);
+    assert.ok(world, 'the opening should still be read off stageStart, with a world of its own');
+
+    const sampler = world[1].match(
+        /sampleHeight:\s*\(([^)]*?)\)\s*=>\s*this\.terrain\.getTerrainHeightAt\(([^)]*?)\)/);
+    assert.ok(sampler,
+        'and handed the terrain as sampleHeight, or a corridor opens off the first cut\'s floor');
+
+    // The place asked about is the place answered for. A sampler that read the
+    // terrain somewhere other than where it was asked would pass every check
+    // above and put the aircraft over the wrong ground all the same.
+    assert.deepEqual(
+        sampler[2].split(',').map(name => name.trim()),
+        sampler[1].split(',').map(name => name.trim()),
+        'reading the ground at the point it is asked about rather than at another one');
 });
 
 // --- The panel -------------------------------------------------------------
@@ -2201,6 +2240,32 @@ test('a leg held is reported as the leg and what it came to', () => {
     assert.equal(legNotice(null), '');
 });
 
+// The leg that ends the circuit reports two things, because the landing closes
+// two: final is a leg held like the other four, and it is the last of the five
+// the whole shape is made of. Until this line the mode published `patternScore`
+// and never put it in front of the pilot.
+test('the leg that closes a circuit reports the leg and the circuit together', () => {
+    const { state, circuit } = runOf(TRAFFIC_PATTERN);
+    const pattern = createPatternState();
+
+    // Two legs flown, so the mark for the circuit is a mark over more than the
+    // one leg being reported and the two numbers can be told apart.
+    samplePattern(pattern, circuit[0], { x: circuit[0].x, z: circuit[0].z,
+        altitudeFeet: circuit[0].altitudeFeet + 160, headingDegrees: circuit[0].heading }, 4);
+    completeLeg(pattern, circuit[0], stageReaches(state));
+
+    const flown = completeLeg(pattern, circuit[FINAL_LEG], stageReaches(state));
+    const score = patternScore(pattern);
+
+    assert.notEqual(flown.score, score, 'the leg and the circuit are different readings');
+    assert.equal(circuitNotice(flown, score), `FINAL ${flown.score}  ·  CIRCUIT ${score}`);
+
+    // Nothing to report about, and nothing of a circuit to report: the first
+    // writes no line at all, the second falls back to the ordinary leg line.
+    assert.equal(circuitNotice(null, score), '');
+    assert.equal(circuitNotice(flown, null), legNotice(flown));
+});
+
 test('a run counts the cuts of the corridor, and opens with all of them to fly', () => {
     const { state, stage } = runOf(CANYON_RUN);
 
@@ -2547,4 +2612,76 @@ test('a run opens inside the corridor it is flown down', () => {
         assert.ok(Math.abs(back - currentStage(state).corridor.spacing) < 1,
             'and a run short of the first cut');
     } while (advanceStage(state));
+});
+
+// The opening is a whole spacing back from the first cut, and the ground
+// between the two is not flat. A height read only at the cut is a height over
+// ground the aircraft is nowhere near: on a seed that put a ridge behind the
+// first cut, the run opened a handful of its own clearances off the deck and
+// the sign of that margin was the seed's to decide.
+test('a run opens over the ground at its opening, not the ground at the first cut', () => {
+    const state = createRunState();
+    startRun(state, CANYON_RUN);
+
+    const stage   = currentStage(state);
+    const spacing = stage.corridor.spacing;
+
+    // One cut laid in a hollow at the origin, with a ridge standing where the
+    // run opens a spacing back along the line. Laid by hand rather than
+    // generated, so the two places are known to disagree rather than left to a
+    // seed to disagree by luck.
+    const first = {
+        index: 0, x: 0, z: 0,
+        floor: 0, crest: 0, ceiling: 400, y: 400,
+        halfWidth: stage.corridor.halfWidth, dirX: 0, dirZ: 1
+    };
+
+    const ridge = 900;
+    const ground = (unusedX, z) => (z < -spacing / 2 ? ridge : 0);
+
+    const { start, position } = stageStart(state, { corridor: [first], sampleHeight: ground });
+
+    const altitude = start.altitudeFeet / FEET_PER_UNIT;
+    const under    = ground(position.x, position.z);
+
+    assert.equal(under, ridge, 'the run opens over the ridge, which is the case being read');
+
+    // Half the air at the cut is the margin the opening has always been given,
+    // and it is owed over whichever ground the aircraft is actually put above.
+    // The height is snapped to the step the start field is declared in, so the
+    // margin is allowed that much slack and no more.
+    const margin = (first.ceiling - first.floor) / 2;
+    const slack  = startField('altitudeFeet').step / FEET_PER_UNIT;
+
+    assert.ok(altitude - under >= margin - slack,
+        `opened ${altitude - under} over the ground it is put above, wanting ${margin}`);
+
+    // And the cut's own air is still what sets that margin, so a run over level
+    // ground opens exactly where it always did.
+    const level = stageStart(state, { corridor: [first], sampleHeight: () => 0 });
+    assert.ok(Math.abs(level.start.altitudeFeet / FEET_PER_UNIT - margin) <= slack,
+        'over level ground the opening is the middle of the air at the cut, as before');
+});
+
+// Without a sampler there is no second reading to take, so the cut's own floor
+// stands in for the ground at the opening. A host that hands over no terrain
+// gets the height this has always given rather than a height measured against
+// sea level, which over raised ground would open the run underground.
+test('a run handed no terrain opens off the cut, as it always has', () => {
+    const state = createRunState();
+    startRun(state, CANYON_RUN);
+
+    const stage = currentStage(state);
+    const first = {
+        index: 0, x: 0, z: 0,
+        floor: 1200, crest: 1200, ceiling: 1600, y: 1600,
+        halfWidth: stage.corridor.halfWidth, dirX: 0, dirZ: 1
+    };
+
+    const { start } = stageStart(state, { corridor: [first] });
+    const altitude = start.altitudeFeet / FEET_PER_UNIT;
+    const slack = startField('altitudeFeet').step / FEET_PER_UNIT;
+
+    assert.ok(Math.abs(altitude - (first.floor + first.ceiling) / 2) <= slack,
+        `opened at ${altitude}, wanting the middle of the air at the cut`);
 });
