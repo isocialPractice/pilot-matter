@@ -853,7 +853,7 @@ module of its own - `pilot-matter/pattern`, `pilot-matter/corridor`,
 | `sectionOffset(section, point)` | How far past a cut a place lies, along the run |
 | `corridorCrossing(section, from, to)` | Where a step crossed one, and what it was doing there |
 | `sectionPassed(...)`, `sectionMissed(...)`, `missedBy(crossing)` | Through it, past it, and which limit was broken |
-| `CORRIDOR_REACH`, `MIN_HEADROOM` | How much of the world a corridor is laid inside, and the least air a cut may have in it |
+| `CORRIDOR_REACH`, `MIN_HEADROOM`, `HEADROOM_SAMPLES` | How much of the world a corridor is laid inside, the least air a cut may have in it, and how many points across a cut the ground under it is read at |
 | `buildSurvey(stage)` | The landmarks a survey stage lists, placed |
 | `shotFor(landmark, report)`, `shotFault(shot, landmark)` | The reading a shutter takes, and the first thing wrong with it |
 | `landmarkBrief(landmark)` | The line to write for the landmark being flown to |
@@ -1026,8 +1026,8 @@ function frame(dt) {
 }
 ```
 
-A leg is `{index, label, fromX, fromZ, fromFeet, x, z, altitudeFeet, heading,
-dirX, dirZ, run}`. `fromX`/`fromZ` are where it begins and `x`/`z` where it
+A leg is `{index, label, fromX, fromZ, fromFeet, x, z, onStrip, altitudeFeet,
+heading, dirX, dirZ, run}`. `fromX`/`fromZ` are where it begins and `x`/`z` where it
 ends, which is also the turn onto the next one and the mark a chart draws.
 `fromFeet` and `altitudeFeet` are the heights at those two ends: the target
 between them is the ramp from one to the other, so a leg whose ends match is a
@@ -1091,6 +1091,21 @@ floor and `MIN_HEADROOM` over the crest, so the room a stage asks for is room
 the aircraft has at the posts as well as in the middle - a cut whose centre
 falls in a gully has far less air at its edges than at its centre, and a lid
 measured only on the centre line is a lid the walls reach up into.
+
+`stageStart` opens a run back down the line of the first cut, at a height held
+inside a band rather than over a single floor. It wants half the air at that cut
+over whichever is higher of the cut's floor and the ground at the opening,
+because the opening is a whole spacing back and the ground between the two is
+not flat, and it is held no nearer the first lid than half of `MIN_HEADROOM`.
+Both bounds are needed: the ground at the opening raises the height wanted
+without moving the lid, so ground standing well over the cut's floor would
+otherwise open the run above the ceiling it is flown under. The lid bounds the
+cut rather than the opening a spacing behind it, so ground at the opening
+standing inside that clearance leaves the band no width at all, and there the
+ground takes it: a run opened over its first lid has the whole spacing in which
+to come down, while a run opened below the ground is a wreck on the frame the
+pilot is handed. Hand it no `sampleHeight` and there is no second reading to
+take, so the cut's own floor stands in for the ground.
 
 ```javascript
 import { createRunState, CANYON_RUN, currentStage, flyCorridor } from 'pilot-matter';

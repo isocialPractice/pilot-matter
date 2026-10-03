@@ -2715,6 +2715,64 @@ test('a run opens under the lid of its first cut, however high the ground at the
         'and not driven below the floor of the cut it opens into');
 });
 
+// The other edge of that band, which the case above cannot reach: its ridge is
+// low enough that lowering to the lid still leaves air under the aircraft. The
+// lid is a bound on the cut, and the opening is a whole spacing from the cut,
+// so nothing holds the ground at the opening under that lid - and once it
+// stands over `first.ceiling - OPENING_CLEARANCE`, lowering to the lid is
+// lowering into the hill. `GROUND_CLEARANCE` is 5 units and the opening is
+// flying at 105 knots, so an opening below the ground is a wreck handed to the
+// pilot rather than a stage.
+test('a run is not lowered into the ground to get it under its first lid', () => {
+    const state = createRunState();
+    startRun(state, CANYON_RUN);
+
+    const stage   = currentStage(state);
+    const spacing = stage.corridor.spacing;
+
+    const first = {
+        index: 0, x: 0, z: 0,
+        floor: 0, crest: 0, ceiling: 400, y: 400,
+        halfWidth: stage.corridor.halfWidth, dirX: 0, dirZ: 1
+    };
+
+    const slack = startField('altitudeFeet').step / FEET_PER_UNIT;
+
+    // Standing over the lid itself, which is the case the two bounds cannot
+    // both be met in. Reachable on the stages as they ship: `THE SLOT` lays a
+    // 230 unit cut and opens 1450 units back from it, and over the ground that
+    // mode's own preset draws the ridge behind the first cut clears the lid on
+    // more seeds than it does not.
+    const ridge  = first.ceiling + 80;
+    const ground = (unusedX, z) => (z < -spacing / 2 ? ridge : 0);
+
+    const { start, position } = stageStart(state, { corridor: [first], sampleHeight: ground });
+    const altitude = start.altitudeFeet / FEET_PER_UNIT;
+
+    assert.equal(ground(position.x, position.z), ridge,
+        'the run opens over the ridge, which is the case being read');
+    assert.ok(ridge > first.ceiling - MIN_HEADROOM / 2,
+        'and the ridge stands inside the lid\'s own clearance, or the two bounds do not cross');
+
+    assert.ok(altitude > ridge,
+        `opened at ${altitude} over ground standing at ${ridge}, which is inside the hill`);
+
+    // Off the ground by the same clearance the lid is held by, rather than by
+    // whatever the subtraction happened to leave: the ground is the bound that
+    // wins here, so it is owed the room the bound names.
+    assert.ok(altitude - ridge >= MIN_HEADROOM / 2 - slack,
+        `opened ${altitude - ridge} over the ground it is put above, wanting ${MIN_HEADROOM / 2}`);
+
+    // And the lid still wins wherever it can, so this is the band giving way at
+    // the one place it has to rather than the cap being dropped.
+    const clear = stageStart(state, {
+        corridor: [first],
+        sampleHeight: (unusedX, z) => (z < -spacing / 2 ? 150 : 0)
+    });
+    assert.ok(clear.start.altitudeFeet / FEET_PER_UNIT < first.ceiling,
+        'ground the lid can be honoured over still opens under the lid');
+});
+
 // The case above is laid by hand, so it says the rule holds without saying the
 // rule is ever reached. This one is the four stages as they are actually
 // flown - each over its own world, at the segment count the simulator lays its

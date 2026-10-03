@@ -5,6 +5,90 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0-alpha] - 2026-10-03
+
+A canyon run is held under the lid of its first cut as well as over the ground
+beneath it, which is the half of that guard that was never written. The other
+three are readings that agreed with the code without being able to disagree
+with it: the lid rule was pinned by two bounds a materially different rule
+cleared more generously, and the landing that closes a circuit was matched
+against a method body rather than against the guard inside it.
+
+### Added
+
+- **`HEADROOM_SAMPLES` is published through `js/api/index.js`.** The constant
+  was exported from `js/corridor.js` and read by the suite, and the entry point
+  a host imports did not carry it. Documenting it is what surfaced that: the
+  check in `test/docs.test.js` holds every name the reference presents as an
+  export to one the API actually publishes, and it refused the row until the
+  export was there.
+
+### Fixed
+
+- **A run opens under the lid of its first cut, not only over the ground.**
+  `corridorOpening` in `js/game-modes.js` put the aircraft at
+  `Math.max(first.floor, ground) + margin`, which is the floor side of a guard
+  with no ceiling side: the ground at the opening raises the height wanted and
+  leaves the lid where it is, so ground standing higher over the cut's floor
+  than half the cut's air opens the run above the ceiling it is meant to be
+  flown under, with the first section already failed. The two are now a band,
+  `Math.min(first.ceiling - OPENING_CLEARANCE, ...)`, and the clearance is half
+  of `MIN_HEADROOM` rather than a figure of its own - no cut is laid with less
+  air in it than `MIN_HEADROOM`, so the cap can never ask for a height below
+  the cut's own floor. Flown as it stood, all four stages were fine; `THE SLOT`
+  opened 22.1 units under its first lid against a margin of 115.0, and the
+  remaining 22.9 was the seed's to spend.
+- **A band held at both edges, so the cap cannot lower a run into the hill
+  behind its first cut.** `MIN_HEADROOM` bounds the lid against the ground
+  *under the cut*, and the opening is a whole spacing back from that cut, so
+  nothing holds the ground at the opening below the same lid. Where it stands
+  within `OPENING_CLEARANCE` of that lid, the band the entry above describes
+  has no width left and lowering to the lid put the aircraft underground: with
+  `GROUND_CLEARANCE` at 5 units and the opening flying at 105 knots, that is a
+  wreck on the frame the pilot is handed rather than a stage. The opening is now
+  held `OPENING_CLEARANCE` over whichever is higher of the cut's floor and the
+  ground beneath it as well as that far under the lid, and where the two cannot
+  both be met the ground takes it - a run opened over its first lid has the
+  whole spacing in which to come down. Reachable on the stages as they ship
+  rather than only in principle: over the preset `CANYON RUN` draws its ground
+  from, `THE SLOT` opened below the terrain on 204 of the first 400 world seeds
+  and by as much as 453 units, and `THE RIM` on 29 of them. The mode's own seed
+  is not one of them, which is why the suite stayed green.
+- **The lid rule is pinned against itself rather than against bounds it
+  clears.** `test/corridor.test.js` read the lid three ways and none of them
+  separated `Math.max(floor + plan.ceiling, crest + MIN_HEADROOM)` from the
+  rule that measures both halves off the crest - the level-ground case runs
+  where `crest === floor` and every candidate agrees, and the other two assert
+  floors the crest version clears more generously while standing hundreds of
+  units too high on the steeper cuts. Substituting it ran the suite green. A
+  case over rolling and over steep ground now asserts the formula itself, with
+  a count on each side so both halves of the `Math.max` are shown to win
+  somewhere.
+- **The landing that closes a circuit is matched inside the guard that counts
+  it.** `the landing closes the final leg, and reports the circuit with it` in
+  `test/pattern.test.js` matched `this.closeFinalLeg();` against the whole
+  `onLanding` body under a message about the guard, so it said nothing about
+  where in the method the call sat. Moved above
+  `if (recordLanding(this.run, runway))` it still matched, and a landing the
+  run refuses by design - the takeoff roll, or a pass down the strip left by a
+  go-around - would have closed `FINAL` and reported a circuit the pilot never
+  flew out. The span is now bounded to the guard with `[^}]*?`, the way
+  `test/input-map.test.js` bounds its spans.
+- **Two enumerations in `docs/api.md` carry what was added to them.** The leg
+  shape gains `onStrip`, the one field a host has to read to draw a circuit
+  without standing a mast on the runway, and which the prose two paragraphs
+  below already described; the corridor module's constants row gains
+  `HEADROOM_SAMPLES` and a phrase saying what it is. Both propagate to
+  `docs/api-reference.html`. The `1.22.0-alpha` entry's sentence about
+  `patternScore` was also missing its last word.
+- **A dash that began a line is no longer read as a bullet.** The new
+  `stageStart` paragraph in `docs/api.md` wrapped a parenthetical so that its
+  closing ` - ` fell at the start of a line, which is a list marker in
+  markdown: `tools/build-api-reference.mjs` split the paragraph there and
+  `docs/api-reference.html` shipped a sentence ending mid-clause with no stop,
+  followed by a one-item `<ul>` opening with the word "and". Reflowed so the
+  dashes sit inside their lines, and the page regenerated.
+
 ## [1.22.0-alpha] - 2026-10-02
 
 Five fixes in the two newest modes, four of them about a reading taken in one
@@ -49,7 +133,7 @@ The fifth is an assertion that was matching a dot against any character.
   `BASE`, and nothing at all for `FINAL`. The landing now closes it, which is
   the one event that means the circuit was flown out rather than crossed over,
   and `circuitNotice` reports the leg's mark and the circuit's together -
-  `patternScore` was a published export the game never asked.
+  `patternScore` was a published export the game never asked for.
 - **A cut's headroom is measured across the span the cut is open over.**
   `MIN_HEADROOM` in `js/corridor.js` is the least room a stage may leave between
   the ceiling and the ground under a section, and `buildCorridor` applied it

@@ -28,7 +28,7 @@ import {
 } from './units.js';
 import { GLIDE_SPEED } from './flight-model.js';
 import { buildPattern, legCrossed, PATTERN_LEGS, FINAL_LEG } from './pattern.js';
-import { buildCorridor, corridorCrossing, missedBy } from './corridor.js';
+import { buildCorridor, corridorCrossing, missedBy, MIN_HEADROOM } from './corridor.js';
 import { buildSurvey, shotFor, shotFault, landmarkBrief } from './survey.js';
 
 export const RUNWAY_LANDING = 'runway-landing';
@@ -1884,6 +1884,30 @@ const OPENING_THROTTLE = 55;
 const GLIDE_KNOTS = GLIDE_SPEED * KNOTS_PER_UNIT;
 
 /**
+ * The least room a run is opened with between it and the lid of its first cut,
+ * in world units. The opening is the one height in a run that is placed rather
+ * than flown to, so it is the one height that can be placed wrong: a run put
+ * level with its own lid opens with the first section already failed, and a
+ * pilot who has not touched the stick yet has nothing to do about it.
+ *
+ * Half of `MIN_HEADROOM`, and tied to it rather than chosen beside it. That is
+ * what keeps this bound and the cut's own floor from ever crossing: no cut is
+ * laid with less air in it than `MIN_HEADROOM`, so holding the opening this
+ * far under the lid can never ask for a height below the cut's own floor. A
+ * clearance picked independently would be a number that happened to work on
+ * the stages as they are written today.
+ *
+ * It is the room owed at the other edge of the band as well, over whatever the
+ * aircraft is actually put above. The cut's floor and the lid over it cannot
+ * cross, but the ground at the opening is a whole spacing away from that cut
+ * and nothing holds it under that lid - so where the two bounds genuinely
+ * cannot both be met, the ground is the one that wins. A run opened over its
+ * first lid has a spacing in which to come down; a run opened inside a hill is
+ * a wreck on the frame it is handed to the pilot.
+ */
+const OPENING_CLEARANCE = MIN_HEADROOM / 2;
+
+/**
  * Where a stage opens, by what it is asking for: out on the approach to the
  * first strip, back down the line of the first gate, or at the middle of the
  * world a search is briefed from.
@@ -1950,6 +1974,13 @@ function patternOpening(runway) {
  * `sampleHeight` is the terrain contract `stageStart` is handed. Without one
  * there is no second reading to take, so the cut's own floor stands in for the
  * ground at the opening and the height is the one it has always been.
+ *
+ * Reading the ground is what makes the lid a bound in its own right. The
+ * ground at the opening raises the height wanted and leaves the lid where it
+ * was, so the two are held as a band - never nearer the lid or the ground than
+ * `OPENING_CLEARANCE` - rather than as a floor with nothing over it. Where the
+ * ground at the opening stands high enough that the band has no width left,
+ * the ground takes it: see `OPENING_CLEARANCE`.
  */
 function corridorOpening(stage, corridor, sampleHeight) {
     const first = corridor?.[0];
@@ -1972,11 +2003,28 @@ function corridorOpening(stage, corridor, sampleHeight) {
     // rather than at one of them.
     const margin = (first.ceiling - first.floor) / 2;
 
+    // A band rather than a floor. The margin above says how high the opening
+    // wants to be; the lid says how high it may be, and the ground at the
+    // opening moves the first of those without moving the second. Taking the
+    // lower of the two is what stops ground standing well over the cut's floor
+    // from carrying the opening up through the lid it is meant to stay under.
+    const under   = Math.max(first.floor, ground);
+    const wanted  = under + margin;
+    const highest = first.ceiling - OPENING_CLEARANCE;
+
+    // And a band has to hold at both edges. The lid is a bound on the cut,
+    // which is a spacing from here, so ground at the opening standing near or
+    // above that lid leaves the two edges crossed - and lowering to the lid
+    // then puts the aircraft in the hill. Held off the ground by the same
+    // clearance instead: over the lid at the opening is a height the pilot has
+    // the whole spacing to lose, and under the ground is not a height at all.
+    const altitude = Math.max(under + OPENING_CLEARANCE, Math.min(highest, wanted));
+
     return {
         x,
         z,
         headingDegrees: directionToBearing(first.dirX, first.dirZ),
-        altitudeFeet: (Math.max(first.floor, ground) + margin) * FEET_PER_UNIT,
+        altitudeFeet: altitude * FEET_PER_UNIT,
         airspeedKnots: OPENING_KNOTS,
         throttlePercent: OPENING_THROTTLE
     };
