@@ -504,6 +504,13 @@ test('the landing closes the final leg, and reports the circuit with it', () => 
     // circuit was flown out rather than crossed over.
     const landing = mainSource.match(/^ {4}onLanding\(runway, contact\)\s*\{([\s\S]*?)^ {4}\}/m);
     assert.ok(landing, 'js/main.js should still take a landing in one place');
-    assert.match(landing[1], /this\.closeFinalLeg\(\);/,
+    // Bounded to the guard rather than to the method, with `[^}]*?` the way
+    // `test/input-map.test.js` bounds its spans. Matched against the whole body
+    // the assertion says nothing about where in it the call sits: moved above
+    // `recordLanding`, a landing the run refuses by design - the takeoff roll,
+    // or a pass down the strip left by a go-around - would close `FINAL` and
+    // report a circuit the pilot never flew out, with this still green.
+    assert.match(landing[1],
+        /recordLanding\(this\.run, runway\)\)\s*\{[^}]*?this\.closeFinalLeg\(\);/,
         'the final leg is closed by the arrival, inside the guard that counts it');
 });

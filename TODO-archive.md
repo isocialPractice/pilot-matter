@@ -1699,3 +1699,43 @@ still be found by name.
     order is pinned by the held-mark reading in `test/page.test.js` rather than
     only by the comment. `index.html` is otherwise sound and needs no edit
   - From: UI/UX Override - the chart's held readings
+
+## Archived 10-03-26
+
+- [x] Nothing in the suite reaches the line that opens the run an address asks
+  for
+  - **Issue**: `openingRun` itself is covered - `test/game-modes.test.js` runs
+    five cases over it and four more over `startRun`'s new stage argument - but
+    nothing in the project reaches `js/main.js`, where the feature is actually
+    connected to the page. The call at `js/main.js:302`,
+    `this.openRequestedRun(window.location.search)`, and the
+    `openRequestedRun` method at `js/main.js:981` are named by no test.
+    Replacing line 302 with a comment and running `npm test` was tried this
+    review: it reports 1049 of 1049 passing, the same count as with the line
+    there. So the whole feature can be disconnected - `?mode=cargo-run&stage=2`
+    silently opening free flight at stage 1 - with the suite reporting a clean
+    run. That line is the one the completed item exists for, since a check
+    reaching a later stage reaches it through that call and nothing else, and
+    the pure function below it passing is no evidence the page ever asks.
+    `js/main.js` imports Three.js and cannot be constructed in Node, which is
+    why four test files already read it as source text through a `mainSource`
+    regex: `test/landing-score.test.js:258`, `test/minimap.test.js:332`,
+    `test/page.test.js:1306` and `test/world-tiles.test.js:120`
+  - **Goal**: Pin the wiring the way the rest of `js/main.js` is pinned, in the
+    `mainSource` idiom those four files use - that the constructor calls
+    `openRequestedRun` with `window.location.search`, that the method hands
+    `openingRun`'s `modeId` and `stageIndex` to `startRun`, and that a request
+    carrying a `problem` is refused rather than opened. Bound each source span
+    with `[^}]*?` the way `test/input-map.test.js` bounds its spans, so neither
+    can run past the method it is anchored on
+  - From: Code Review Override - the address opener's wiring
+- [x] **Traffic Pattern**: a full circuit flown to a pattern - takeoff, climb
+  out, downwind, base, and final - judged on holding each leg's altitude and
+  heading rather than only on the landing at the end of it
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Canyon Run**: fly the length of a canyon under a ceiling and between
+  its walls, with the ceiling coming down and the cut narrowing stage by stage
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Photo Survey**: photograph a list of named landmarks, each counting
+  only when it is caught from inside a height, range, and heading window
+  - From: Game Modes UI/UX `->` New Game Modes

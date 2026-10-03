@@ -127,7 +127,7 @@ export {
 
 export {
     buildCorridor, sectionOffset, corridorCrossing, sectionPassed, sectionMissed,
-    missedBy, CORRIDOR_REACH, MIN_HEADROOM
+    missedBy, CORRIDOR_REACH, MIN_HEADROOM, HEADROOM_SAMPLES
 } from '../corridor.js';
 
 export {

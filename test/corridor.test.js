@@ -142,6 +142,50 @@ test('the lid clears the highest ground across the cut, not the ground at its ce
         'and over ground that climbs across the cut the lid is raised past the stage\'s own figure');
 });
 
+/**
+ * The lid against the rule itself rather than against a bound it clears.
+ *
+ * Everything above reads one side of it. The level-ground case runs where
+ * `crest === floor`, which is the one world in which every candidate rule
+ * agrees. The crest case asserts a least room over the highest ground and more
+ * air than the stage asked for, and both of those are floors - a lid measuring
+ * the stage's own headroom off the crest instead of off the centre line clears
+ * them more generously than the rule as written, while standing hundreds of
+ * units too high on the steeper cuts.
+ *
+ * So this reads the formula on ground that is not level across the cut, where
+ * the two halves are measured off different numbers and the difference shows.
+ */
+test('the lid is the stage\'s headroom over the floor or the least room over the crest, whichever is higher', () => {
+    const headroom = PLAN.corridor.ceiling;
+    const lid = (section) => Math.max(section.floor + headroom, section.crest + MIN_HEADROOM);
+
+    // Rolling ground, with the stage's own figure well clear of what the slope
+    // asks for, so the floor half is the winning one and the lid is read off
+    // the centre line. Measured off the crest instead, every cut here sits
+    // `crest - floor` too high.
+    let overFloor = 0;
+    for (const section of buildCorridor(PLAN, ROLLING)) {
+        assert.ok(Math.abs(section.ceiling - lid(section)) < 1e-9,
+            `cut ${section.index} has a lid of ${section.ceiling}, wanting ${lid(section)}`);
+        if (section.crest > section.floor + 1e-9) overFloor++;
+    }
+    assert.ok(overFloor > 0,
+        'the ground has to climb across some cut, or floor and crest are one reading and this pins nothing');
+
+    // Ground steep enough that the least room over the crest is the winning
+    // half instead, so both sides of the rule are read rather than whichever
+    // one the gentler ground happens to reach.
+    let overCrest = 0;
+    for (const section of buildCorridor(PLAN, STEEP)) {
+        assert.ok(Math.abs(section.ceiling - lid(section)) < 1e-9,
+            `cut ${section.index} has a lid of ${section.ceiling}, wanting ${lid(section)}`);
+        if (section.crest + MIN_HEADROOM > section.floor + headroom + 1e-9) overCrest++;
+    }
+    assert.ok(overCrest > 0,
+        'and the crest half has to win on some cut, or only one half of the rule is ever read');
+});
+
 // A cut the aircraft cannot fit through is not a hard cut, it is an
 // impossible one, so the plan is held off the ground rather than honoured.
 test('a stage cannot ask for a cut with no air in it', () => {
