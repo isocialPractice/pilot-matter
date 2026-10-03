@@ -121,7 +121,7 @@ import {
     buildPattern, PATTERN_LEGS, FINAL_LEG, createPatternState, completeLeg,
     patternScore, samplePattern
 } from '../js/pattern.js';
-import { buildCorridor } from '../js/corridor.js';
+import { buildCorridor, MIN_HEADROOM } from '../js/corridor.js';
 import { buildSurvey } from '../js/survey.js';
 import {
     isStartValue, START_FIELD_IDS, START_FLYING, START_TAKEOFF, startField
@@ -130,7 +130,7 @@ import {
     buildEnvironment, getEnvironment, MODE_ENVIRONMENTS, isEnvironmentId
 } from '../js/environment/presets.js';
 import {
-    sampleHeight, runwayThresholds, runwayDirection, runwayOffsets
+    sampleHeight, runwayThresholds, runwayDirection, runwayOffsets, DEFAULT_SEGMENTS
 } from '../js/environment/elements.js';
 import { FEET_PER_UNIT, KNOTS_PER_UNIT, headingToYaw } from '../js/units.js';
 import {
@@ -2636,7 +2636,11 @@ test('a run opens over the ground at its opening, not the ground at the first cu
         halfWidth: stage.corridor.halfWidth, dirX: 0, dirZ: 1
     };
 
-    const ridge = 900;
+    // High enough over the cut's floor to tell the two readings apart, and low
+    // enough that the height it asks for is still under the lid. The ridge that
+    // carries the opening up through the ceiling is the case below, which is a
+    // reading of the other bound rather than of this one.
+    const ridge = 150;
     const ground = (unusedX, z) => (z < -spacing / 2 ? ridge : 0);
 
     const { start, position } = stageStart(state, { corridor: [first], sampleHeight: ground });
@@ -2661,6 +2665,112 @@ test('a run opens over the ground at its opening, not the ground at the first cu
     const level = stageStart(state, { corridor: [first], sampleHeight: () => 0 });
     assert.ok(Math.abs(level.start.altitudeFeet / FEET_PER_UNIT - margin) <= slack,
         'over level ground the opening is the middle of the air at the cut, as before');
+});
+
+// The ground at the opening moves the height wanted and leaves the lid where
+// it is, so ground standing far enough over the cut's floor asks for an
+// opening above the ceiling the run is flown under. The lid has to win there:
+// a run put level with its own lid opens with the first section already
+// failed, before the pilot has touched the stick.
+test('a run opens under the lid of its first cut, however high the ground at the opening', () => {
+    const state = createRunState();
+    startRun(state, CANYON_RUN);
+
+    const stage   = currentStage(state);
+    const spacing = stage.corridor.spacing;
+
+    const first = {
+        index: 0, x: 0, z: 0,
+        floor: 0, crest: 0, ceiling: 400, y: 400,
+        halfWidth: stage.corridor.halfWidth, dirX: 0, dirZ: 1
+    };
+
+    const margin = (first.ceiling - first.floor) / 2;
+    const slack  = startField('altitudeFeet').step / FEET_PER_UNIT;
+
+    // Standing higher over the cut's floor than the margin the opening is
+    // given, which is what makes the floor-only rule open this one over its
+    // own ceiling rather than under it.
+    const ridge  = margin + 120;
+    const ground = (unusedX, z) => (z < -spacing / 2 ? ridge : 0);
+
+    const { start, position } = stageStart(state, { corridor: [first], sampleHeight: ground });
+    const altitude = start.altitudeFeet / FEET_PER_UNIT;
+
+    assert.equal(ground(position.x, position.z), ridge,
+        'the run opens over the ridge, which is the case being read');
+    assert.ok(ridge + margin > first.ceiling,
+        'and the ground side on its own would put it over the lid, or this pins nothing');
+
+    assert.ok(altitude < first.ceiling,
+        `opened at ${altitude} under a lid at ${first.ceiling}`);
+
+    // Against the bound rather than against something it clears: the clearance
+    // is half of MIN_HEADROOM, which is what keeps it from ever being asked for
+    // more air than the cut is laid with.
+    assert.ok(Math.abs(altitude - (first.ceiling - MIN_HEADROOM / 2)) <= slack,
+        `opened ${first.ceiling - altitude} under the lid, wanting ${MIN_HEADROOM / 2}`);
+
+    assert.ok(altitude > first.floor,
+        'and not driven below the floor of the cut it opens into');
+});
+
+// The case above is laid by hand, so it says the rule holds without saying the
+// rule is ever reached. This one is the four stages as they are actually
+// flown - each over its own world, at the segment count the simulator lays its
+// ground at - and on one of them the ground behind the first cut stands high
+// enough that the lid is what sets the opening. That stage is the whole reason
+// the bound exists, and it is a stage a pilot can open from the menu rather
+// than a corridor a test wrote.
+test('a run opens under the lid on the world each stage is actually flown over', () => {
+    const state = createRunState();
+    startRun(state, CANYON_RUN);
+
+    const slack = startField('altitudeFeet').step / FEET_PER_UNIT;
+    const held  = [];
+
+    do {
+        const stage = currentStage(state);
+        const world = stageWorld(state);
+
+        // The ground the page lays, at the count the page lays it with: the
+        // terrain is sampled off the mesh, so a coarser field is a different
+        // world rather than the same world read roughly.
+        const field  = buildEnvironment(getEnvironment(world.environment), {
+            segments: DEFAULT_SEGMENTS, seed: world.seed, base: world.base,
+            runway: world.runway, elements: world.elements ?? undefined
+        });
+        const ground = (x, z) => sampleHeight(field, x, z);
+
+        const corridor = buildCorridor(stage,
+            { seed: world.seed, size: field.size, sampleHeight: ground });
+        const { start, position } = stageStart(state, { corridor, sampleHeight: ground });
+
+        const first    = corridor[0];
+        const altitude = start.altitudeFeet / FEET_PER_UNIT;
+        const margin   = (first.ceiling - first.floor) / 2;
+        const wanted   = Math.max(first.floor, ground(position.x, position.z)) + margin;
+
+        assert.ok(altitude > first.floor && altitude < first.ceiling,
+            `${stage.label} opens at ${Math.round(altitude)}, outside a cut `
+          + `between ${Math.round(first.floor)} and ${Math.round(first.ceiling)}`);
+
+        assert.ok(first.ceiling - altitude >= MIN_HEADROOM / 2 - slack,
+            `${stage.label} opens ${Math.round(first.ceiling - altitude)} under its lid, `
+          + `wanting ${MIN_HEADROOM / 2}`);
+
+        assert.ok(altitude - ground(position.x, position.z) > 0,
+            `${stage.label} opens under the ground it is put over`);
+
+        held.push({ label: stage.label, bound: wanted > first.ceiling - MIN_HEADROOM / 2 });
+    } while (advanceStage(state));
+
+    // A run where the margin won on every stage would pass everything above
+    // with the lid bound deleted, which is a test that holds its shape and
+    // measures nothing.
+    assert.ok(held.some(stage => stage.bound),
+        'no stage of the run is one the lid actually bounds, so this pins nothing: '
+      + held.map(stage => stage.label).join(', '));
 });
 
 // Without a sampler there is no second reading to take, so the cut's own floor
