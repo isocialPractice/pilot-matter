@@ -24,6 +24,12 @@ import {
     SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION,
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
+import {
+    createControlSettingsState, openControlSettings, closeControlSettings,
+    controlSettingsShowing, chooseControlSetting, adjustControlSetting,
+    controlAxes, fullRotationWanted, isControlSettingsCloseKey,
+    CONTROL_SETTINGS_BACK_ID, CONTROL_REFERENCE_ID, AXIS_GROUP, ATTITUDE_GROUP
+} from './control-settings.js';
 import { runwayWanted } from './config.js';
 import { headingDegrees, altitudeToFeet, feetToAltitude } from './units.js';
 import {
@@ -132,6 +138,12 @@ class FlightSimulator {
 
         this.settings = createSettingsState(defaultStorage());
 
+        // What the keys mean and how far the attitude may go, which is the
+        // Control Settings entry's panel. Held apart from the settings panel
+        // because they are a different question and remembered under a key of
+        // their own: how a pilot flies outlives which world they were flying.
+        this.controlSettings = createControlSettingsState(defaultStorage());
+
         // The world the settings panel is holding, as the elements it was
         // assembled from, so a range can be moved and the ground drawn again
         // from the algorithm rather than from another preset.
@@ -202,6 +214,7 @@ class FlightSimulator {
         this.startMenuState = createMenuState(START_MENU_ENTRIES);
         this.pauseMenuState = createMenuState(PAUSE_MENU_ENTRIES);
         this.settingsState  = createMenuState(this.settings.entries);
+        this.controlState   = createMenuState(this.controlSettings.entries);
         this.editorState    = createMenuState(this.editor.entries);
         this.modesState     = createMenuState(gameModeEntries());
         this.helpState      = createHelpState();
@@ -256,6 +269,7 @@ class FlightSimulator {
             title:     document.getElementById('title-screen'),
             paused:    document.getElementById('paused'),
             settings:  document.getElementById('settings'),
+            controls:  document.getElementById('control-settings'),
             editor:    document.getElementById('element-editor'),
             gameModes: document.getElementById('game-modes'),
             objective: document.getElementById('game-mode'),
@@ -315,14 +329,36 @@ class FlightSimulator {
             (index, choose, step) => this.onSettingsPointer(index, choose, step)
         );
 
-        // The control list is the one thing the Controls entry puts on screen,
-        // so it is also the way back off it for a pilot working the menus with
-        // the mouse: clicking the list collapses it, and clicking what is left
-        // opens it again.
+        // And the control panel the same way: the axes under one heading, the
+        // attitude under the next, and the reference list and the way out under
+        // the last, walked as the one list the cursor already treats them as.
+        this.controlAxesMenu = new MenuList(
+            document.getElementById('control-settings-axes'), this.controlState,
+            entry => entry.group === AXIS_GROUP
+        );
+        this.controlAttitudeMenu = new MenuList(
+            document.getElementById('control-settings-attitude'), this.controlState,
+            entry => entry.group === ATTITUDE_GROUP
+        );
+        this.controlReferenceMenu = new MenuList(
+            document.getElementById('control-settings-reference'), this.controlState,
+            entry => entry.group !== AXIS_GROUP && entry.group !== ATTITUDE_GROUP
+        );
+
+        followPointers(
+            [this.controlAxesMenu, this.controlAttitudeMenu, this.controlReferenceMenu],
+            (index, choose, step) => this.onControlSettingsPointer(index, choose, step)
+        );
+
+        // The control list is what the panel's Control Reference row puts on
+        // screen, so it is also the way back off it for a pilot working the
+        // menus with the mouse: clicking the list collapses it, and clicking
+        // what is left opens it again.
         this.overlays.help.addEventListener('click', () => this.onHelpClick());
 
         this.setupKeys();
         this.applySettings();
+        this.applyControlSettings();
 
         // And then whatever the address asked for, which is the one way into a
         // stage past the first. It goes after the settings because it builds a
@@ -657,6 +693,7 @@ class FlightSimulator {
     menuShowing() {
         return this.modesOpen
             || settingsShowing(this.settings)
+            || controlSettingsShowing(this.controlSettings)
             || editorShowing(this.editor)
             || this.pauseState.paused;
     }
@@ -703,6 +740,11 @@ class FlightSimulator {
 
         if (settingsShowing(this.settings)) {
             this.onSettingsKey(e);
+            return;
+        }
+
+        if (controlSettingsShowing(this.controlSettings)) {
+            this.onControlSettingsKey(e);
             return;
         }
 
@@ -757,11 +799,11 @@ class FlightSimulator {
                 this.openGameModesPanel();
                 break;
             case 'controls':
-                // The same entry the pause menu carries, showing the same list.
-                // On the start screen it is also the way back off it: there is
-                // no flight yet for the H key to be part of.
-                this.titleHelp = !this.titleHelp;
-                if (this.titleHelp) expandHelp(this.helpState);
+                // The same entry the pause menu carries, opening the same panel.
+                // The reference list it used to show is a row inside that panel
+                // now, so the entry answers "what do I want the keys to do" and
+                // the list it opens answers "which key does what".
+                this.openControlSettingsPanel();
                 break;
             case 'settings':
                 this.openSettingsPanel();
@@ -797,6 +839,11 @@ class FlightSimulator {
 
         if (settingsShowing(this.settings)) {
             this.onSettingsKey(e);
+            return;
+        }
+
+        if (controlSettingsShowing(this.controlSettings)) {
+            this.onControlSettingsKey(e);
             return;
         }
 
@@ -854,7 +901,7 @@ class FlightSimulator {
                 this.openGameModesPanel();
                 break;
             case 'controls':
-                expandHelp(this.helpState);
+                this.openControlSettingsPanel();
                 break;
             case 'settings':
                 this.openSettingsPanel();
@@ -880,7 +927,8 @@ class FlightSimulator {
      * pilot working the menus with the keyboard.
      *
      * Over the title screen the list is not a toggle but a panel the start menu
-     * opened, so a click there closes it the way choosing Controls again would.
+     * opened, so a click there closes it the way choosing the Control Reference
+     * row again would.
      */
     onHelpClick() {
         if (titleShowing(this.titleState)) this.titleHelp = false;
@@ -948,6 +996,95 @@ class FlightSimulator {
         // together, so a new world resets the flight, a new start waits for
         // one, and nothing here has to know which kind of choice was made.
         this.applySettings();
+    }
+
+    // --- The control settings panel ---------------------------------------
+
+    openControlSettingsPanel() {
+        this.modesOpen = false;
+        closeSettings(this.settings);
+        closeEditor(this.editor);
+        openControlSettings(this.controlSettings);
+        resetSelection(this.controlState);
+    }
+
+    /**
+     * Hands what the control panel holds to the things they drive. Called once at
+     * start-up so a stored choice is in force on the first frame, and again
+     * whenever one of them is changed.
+     *
+     * Nothing here touches the world or the start state, which is why it is its
+     * own step rather than part of `applySettings`: an axis turned over should
+     * not rebuild the ground under the aircraft.
+     */
+    applyControlSettings() {
+        this.aircraft.setAxes(controlAxes(this.controlSettings));
+        this.aircraft.setFullRotation(fullRotationWanted(this.controlSettings));
+    }
+
+    /**
+     * The control panel under the mouse, read the way the settings panel's rows
+     * are: the left of a row steps its value down and the right steps it up.
+     */
+    onControlSettingsPointer(index, choose, step = 1) {
+        const chosen = applyMenuPointer(this.controlState, index, choose);
+        if (chosen) this.chooseControlSettingsEntry(chosen, step);
+        this.syncOverlays();
+    }
+
+    onControlSettingsKey(e) {
+        if (isControlSettingsCloseKey(e.code)) {
+            closeControlSettings(this.controlSettings);
+            this.syncOverlays();
+            return;
+        }
+
+        // An axis is stepped where a row is chosen, so the roll keys move a
+        // setting along its own list rather than the cursor down the panel.
+        if (isMenuAdjustKey(e.code)) {
+            e.preventDefault();
+            const adjusted = adjustControlSetting(
+                this.controlSettings, selectedId(this.controlState), menuAdjustStep(e.code)
+            );
+            if (adjusted) this.applyControlSettings();
+            this.syncOverlays();
+            return;
+        }
+
+        if (!isMenuKey(e.code)) return;
+        e.preventDefault();
+
+        const chosen = applyMenuKey(this.controlState, e.code, true, e.repeat);
+        if (chosen) this.chooseControlSettingsEntry(chosen);
+        this.syncOverlays();
+    }
+
+    chooseControlSettingsEntry(id, step = 1) {
+        const applied = chooseControlSetting(this.controlSettings, id, step);
+        if (!applied || applied === CONTROL_SETTINGS_BACK_ID) return;
+
+        // The reference list is read against the world rather than against the
+        // panel, so the panel has already closed itself by here and all that is
+        // left is to put the list on screen. Over a flight it is the list the H
+        // key collapses, opened back up.
+        //
+        // On the start screen the row is also the way back off the list, which
+        // is why it turns it over rather than only opening it: there is no
+        // flight yet for the H key to be part of, so a list that only ever went
+        // on would be one a pilot working the menus from the keyboard could not
+        // take off again.
+        if (applied === CONTROL_REFERENCE_ID) {
+            if (titleShowing(this.titleState)) {
+                this.titleHelp = !this.titleHelp;
+                if (this.titleHelp) expandHelp(this.helpState);
+                return;
+            }
+
+            expandHelp(this.helpState);
+            return;
+        }
+
+        this.applyControlSettings();
     }
 
     // --- The element editor ----------------------------------------------
@@ -1469,8 +1606,9 @@ class FlightSimulator {
         const onTitle  = !photo && titleShowing(this.titleState);
         const modes    = !photo && this.modesOpen;
         const settings = !photo && !modes && settingsShowing(this.settings);
-        const editor   = !photo && !modes && !settings && editorShowing(this.editor);
-        const panel    = modes || settings || editor;
+        const controls = !photo && !modes && !settings && controlSettingsShowing(this.controlSettings);
+        const editor   = !photo && !modes && !settings && !controls && editorShowing(this.editor);
+        const panel    = modes || settings || controls || editor;
         const paused   = !photo && !onTitle && this.pauseState.paused;
         const chrome   = !photo && !onTitle && !panel && this.hudVisibility.visible;
         // The pads belong to a flight being flown, the same as the instruments,
@@ -1487,6 +1625,7 @@ class FlightSimulator {
 
         this.overlays.title.style.display     = onTitle && !panel ? 'flex' : 'none';
         this.overlays.settings.style.display  = settings ? 'block' : 'none';
+        this.overlays.controls.style.display  = controls ? 'block' : 'none';
         this.overlays.editor.style.display    = editor ? 'block' : 'none';
         this.overlays.gameModes.style.display = modes ? 'block' : 'none';
         this.overlays.paused.style.display    = paused && !panel ? 'block' : 'none';
@@ -1528,6 +1667,9 @@ class FlightSimulator {
         this.settingsMenu.render(this.settingsState);
         this.settingsStart.render(this.settingsState);
         this.settingsOptions.render(this.settingsState);
+        this.controlAxesMenu.render(this.controlState);
+        this.controlAttitudeMenu.render(this.controlState);
+        this.controlReferenceMenu.render(this.controlState);
         this.editorMenu.render(this.editorState);
     }
 

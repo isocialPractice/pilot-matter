@@ -5,6 +5,94 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0-alpha] - 2026-10-04
+
+What the keys mean is a setting now. The menu entry that showed the reference
+list of every key opens a panel instead, holding the two things a pilot most
+wants to change about how an aircraft is flown: which way round each attitude
+axis reads, and whether the nose and the wings may go all the way round. The
+list is still there, one row down the panel.
+
+### Added
+
+- **A control settings panel, in `js/control-settings.js`.** The
+  `CONTROL SETTINGS` entry on the start screen and in the pause menu opens it,
+  and it is modal over the flight the way the other three panels are. It is a
+  keyboard menu like them, drawn and stepped by the same functions
+  `js/settings.js` already exposes - `optionEntryText`, `optionValueLabel`,
+  `cycleOptionValue`, `isOptionValue`, all of which take the options they work
+  on - rather than by a second set written to look like them. What is not shared
+  is the storage key and the list of options, because those are what make it a
+  different panel rather than a second copy of one. Three rows and a way through
+  to the list: `PITCH AXIS`, `ROLL AXIS`, `FULL ROTATION`, `CONTROL REFERENCE`.
+- **Pitch and roll read either way round, independently.** `DIRECTIONAL` points
+  the key where the aircraft goes and `INVERTED` points it where a stick would,
+  and either axis takes either setting, so all four combinations are available.
+  The turning over happens in one place - `axisControl` in `js/input-map.js`,
+  which answers with the control a key actually works - so both spellings of the
+  input turn over together. `WASD` and the arrow keys are two names for one
+  control rather than two control schemes, and there is no state in which one of
+  them is inverted and the other is not. Changing an axis also releases both of
+  its controls, through `releaseAxisControls`: a key held while its axis turns
+  over would otherwise be released by the other end of its pair when it came up,
+  leaving the end that was pressed held for the rest of the flight.
+- **A full turn in pitch and in roll, for a pilot who asks for it.**
+  `boundAttitude` in `js/attitude.js` takes both angles and the setting and
+  hands both back bounded. Clamped, it is exactly the pair of clamps it replaced
+  in `js/aircraft.js`: the nose short of the vertical and the wings at half a
+  turn, which is the thing that makes ordinary flight readable. Opened up, the
+  angle crosses the limit and comes round the other side rather than stopping
+  dead, so a loop and a barrel roll both carry on. It wraps rather than
+  reflecting the angle back off the pole, and that is the whole of why the keys
+  stay honest: a reflection is the same attitude written differently, and
+  writing it differently is what turns the pitch keys over at the top of a
+  loop. One call for both angles, because a bound written per key is how two
+  keys come to disagree about which way is up at 180 degrees.
+- **The coordinated turn a bank carries round reverses over the top**, through
+  `turnSign` in `js/attitude.js`: past the vertical the lift the wings are
+  turning on points the other way, and so does the turn. Inside the clamp it is
+  1 on every frame, so a flight flown with `FULL ROTATION` off is the flight
+  that was flown before any of this existed.
+- **A page for the panel**, at `docs/controls/control-settings.html`, spliced
+  into the Controls group between Settings and Game modes. `test/site.test.js`
+  now holds it to `CONTROL_OPTIONS` the way it holds the settings page to
+  `START_FIELDS`, so an option added to the panel and not to the page fails.
+
+### Changed
+
+- **The `CONTROLS` menu entry is `CONTROL SETTINGS`, on both screens.** It
+  answered "which key does what" and left "what do I want the keys to do" with
+  no answer anywhere in the game. Both menus carry it under the same id, so the
+  rename is one label in two places rather than two names for one thing, and the
+  reference list it used to show is reached from the `CONTROL REFERENCE` row
+  inside the panel. Choosing that row closes the panel, because the list is read
+  against the world rather than against the rows that were covering it - which
+  over a flight is the list `H` collapses, opened back up, and on the start
+  screen is the one place it is shown at all. On the start screen the row also
+  turns the list over rather than only opening it, which is what the `CONTROLS`
+  entry did: there is no flight yet for `H` to be part of, so a row that only
+  ever put the list on would leave a pilot working the menus from the keyboard
+  with it over the title for the rest of the session.
+- **The control list is headed `CONTROL REFERENCE`** rather than `CONTROLS`, so
+  the row that opens it and the list it opens are named the same thing.
+- **The attitude bound left `js/aircraft.js`.** The two
+  `THREE.MathUtils.clamp` calls on `rotation.x` and `rotation.z` are one
+  `boundAttitude` call, and the limits are `ATTITUDE_PITCH_LIMIT` and
+  `ATTITUDE_ROLL_LIMIT` in `js/attitude.js` rather than `Math.PI / 2.2` and
+  `Math.PI` written at the point of use.
+- **`applyKeyToInput` takes the axes**, after the keymap, defaulting to both
+  axes directional - so a host flying the Pilot API, which passes neither, reads
+  its keys exactly as it always did.
+
+### Queued
+
+- **Seven control settings, as items under `## Flight Controls`.** Each is
+  something already configurable in `js/input-map.js`, `js/controls-help.js` or
+  `js/tilt-controls.js` and offered nowhere in the interface: the keymap, the
+  axis settings reaching the tilt input, whether tilt flies at all, the tilt
+  deadzone, which controls end a level off, the two keys that are not control
+  surfaces, and whether the reference list is remembered open.
+
 ## [1.23.0-alpha] - 2026-10-03
 
 A canyon run is held under the lid of its first cut as well as over the ground

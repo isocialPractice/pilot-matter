@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Control settings - Pilot Matter</title>
+    <meta name="description" content="The control settings panel: which way each axis reads its keys, how far the attitude may go, and the reference list inside it.">
+    <link rel="icon" href="../../favicon.png">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script src="../assets/site.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="topbar">
+        <button class="topbar-button menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">Menu</button>
+        <a class="brand" href="../index.html">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                <defs><clipPath id="pm-mark-disc"><circle cx="16" cy="16" r="15"/></clipPath></defs>
+                <circle cx="16" cy="16" r="15" fill="#87CEEB"/>
+                <g clip-path="url(#pm-mark-disc)">
+                    <path d="M-2 30 L8 15 L14 23 L21 11 L34 30 Z" fill="#8B7355"/>
+                    <path d="M14 23 L21 11 L28.5 23 Z" fill="#A0826D"/>
+                    <rect x="-2" y="25.5" width="36" height="9" fill="#90C090"/>
+                </g>
+                <g fill="#133059">
+                    <rect x="14.9" y="3.2" width="2.2" height="14" rx="1.1"/>
+                    <rect x="5" y="8.4" width="22" height="2.4" rx="1.2"/>
+                    <rect x="11.6" y="14" width="8.8" height="1.9" rx="0.95"/>
+                </g>
+            </svg>
+            Pilot Matter <span class="brand-sub">Docs</span>
+        </a>
+        <span class="topbar-spacer"></span>
+        <a class="topbar-button" href="../../index.html">Play</a>
+        <button class="topbar-button" type="button" data-theme-toggle>Dark</button>
+    </header>
+
+    <div class="scrim" data-scrim></div>
+
+    <nav class="sidebar" id="menu" aria-label="Documentation">
+            <h2>Pilot Matter</h2>
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../quickstart.html">Quickstart</a></li>
+                <li><a href="../getting-started.html">Getting started</a></li>
+                <li><a href="../features.html">Features</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Flying</h2>
+            <ul>
+                <li>
+                    <details class="nav-group" open>
+                        <summary>Controls</summary>
+                        <ul>
+                    <li><a href="../controls/index.html">The keys</a></li>
+                    <li><a href="../controls/loading.html">Loading</a></li>
+                    <li><a href="../controls/starting-a-flight.html">Starting a flight</a></li>
+                    <li><a href="../controls/pausing.html">Pausing</a></li>
+                    <li><a href="../controls/settings.html">Settings</a></li>
+                    <li><a href="../controls/control-settings.html">Control settings</a></li>
+                    <li><a href="../controls/game-modes.html">Game modes</a></li>
+                    <li><a href="../controls/sound.html">Sound</a></li>
+                    <li><a href="../controls/clearing-the-screen.html">Clearing the screen</a></li>
+                    <li><a href="../controls/photo-mode.html">Photo mode</a></li>
+                    <li><a href="../controls/instruments.html">Instruments</a></li>
+                        </ul>
+                    </details>
+                </li>
+                <li><a href="../flight-model.html">The flight model</a></li>
+                <li><a href="../terrain.html">The terrain</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Building on it</h2>
+            <ul>
+                <li><a href="../api.html">Simulator API</a></li>
+                <li><a href="../api-reference.html">API reference</a></li>
+                <li><a href="../project-structure.html">Project structure</a></li>
+                <li><a href="../testing.html">Testing</a></li>
+            </ul>
+            <hr class="nav-sep">
+            <h2>Reference</h2>
+            <ul>
+                <li><a href="../cheatsheet.html">Cheatsheet</a></li>
+                <li><a href="../about.html">Tech stack and license</a></li>
+            </ul>
+        </nav>
+
+    <main class="page" id="content">
+        <article class="content">
+            <p class="breadcrumb"><a href="../index.html">Documentation</a> / <a href="../controls/index.html">Controls</a> / Control settings</p>
+            <h1>Control settings</h1>
+
+<p>The <code>CONTROL SETTINGS</code> entry on the <a href="../controls/starting-a-flight.html">start screen</a> and in the <a href="../controls/pausing.html">pause menu</a> opens this panel. It used to be called <code>CONTROLS</code> and showed the reference list of every key, which answered which key does what and left what do I want the keys to do with no answer anywhere in the game. The list is still here, one row down the panel, because a pilot setting an axis is exactly the pilot who wants to read the keys it belongs to.</p>
+
+<p>The panel is a keyboard menu like the <a href="../controls/settings.html">settings panel</a> and is worked the same way: one cursor walks every row whichever heading it sits under, a click does whatever choosing that row does, and a row drawn with a mark either side of its reading is stepped by which half of it the click landed in. Nothing here touches the world or the start state, so a setting changed mid-flight is in force on the next frame rather than at the next reset.</p>
+
+<h2 id="axes">Axes</h2>
+
+<p>Under <code>AXES</code> is which way each of the two attitude axes reads the keys bound to it. The two are independent settings rather than one list of four schemes, because the four states a pilot wants are the four combinations of two separate questions:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Steps through</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>PITCH AXIS</code></td><td><code>DIRECTIONAL</code>, <code>INVERTED</code></td><td><code>DIRECTIONAL</code></td></tr>
+        <tr><td><code>ROLL AXIS</code></td><td><code>DIRECTIONAL</code>, <code>INVERTED</code></td><td><code>DIRECTIONAL</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>DIRECTIONAL</code> means the key points where the aircraft goes: up raises the nose and right drops the right wing. <code>INVERTED</code> means the key points where a stick would go, which is the other way round on both counts - up lowers the nose and right turns left - and is what a pilot coming from a yoke reaches for. Either axis can be set either way, so pitch inverted with roll directional is as available as both inverted.</p>
+
+<p>An axis is turned over in one place, which is the control the key is read as rather than the key itself. Both spellings of the input therefore turn over together: <kbd>W</kbd> and <kbd>&uarr;</kbd> are two names for one control rather than two control schemes, and there is no state in which one of them is inverted and the other is not. The menus are not affected either way, because the cursor reads the keys before the flight behind it does.</p>
+
+<p>Turning an axis over also lets go of both of its controls. A key held down while its axis turns over would otherwise be released by the other end of its pair when it finally came up, which leaves the end that was pressed held for the rest of the flight - an aircraft rolling on its own with nothing on the keyboard that stops it. The cost is the press the pilot was in the middle of, which is a key they are about to let go of anyway.</p>
+
+<h2 id="attitude">Attitude</h2>
+
+<p>Under <code>ATTITUDE</code> is one box:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Says</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>FULL ROTATION</code></td><td>Whether the nose and the wings may go all the way round</td><td>Off</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Unchecked, the attitude is clamped: the nose stops short of the vertical and the wings stop at half a turn, which is the thing that makes ordinary flight readable. Past the vertical, up stops meaning up, and a pilot who has not asked for that should not be handed it - so this is off by default and nothing about a flight flown with the box unchecked is different from a flight flown before the box existed.</p>
+
+<p>Checked, the angle crosses the limit and comes round the other side instead of stopping dead, so a loop and a barrel roll both carry on. Coming round the other side is what keeps the keys honest: the angle past the limit is the angle it would have been, so the key that was carrying the nose up at 179 degrees is still carrying it up at 181. Both angles are bounded in one place rather than one clamp per key, which is what stops two keys disagreeing about which way is up at the top of a loop.</p>
+
+<p>The coordinated turn a bank carries round reverses with the aircraft while the box is checked, because over the top the lift the wings are turning on points the other way. Inside the clamp the nose can never get past the vertical, so that reversal can never be reached with the box unchecked.</p>
+
+<h2 id="reference">Reference</h2>
+
+<p>Under <code>REFERENCE</code> are two rows:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Does</th></tr></thead>
+    <tbody>
+        <tr><td><code>CONTROL REFERENCE</code></td><td>Closes the panel and puts the list of every key on screen, or takes the list back off when it is already up over the title</td></tr>
+        <tr><td><code>BACK</code></td><td>Closes the panel</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The reference list is the one this entry used to show on its own, and it is read against the world rather than against the rows that were covering it - so choosing it closes the panel over it. Over a flight that is the list <kbd>H</kbd> collapses, opened back up; on the start screen it is the one place the list is shown at all, there being no flight yet for <kbd>H</kbd> to be part of. That is also why the row turns the list over rather than only opening it: with no <kbd>H</kbd> to collapse it, choosing the row again is the way back off a list already up over the title, and clicking the list itself does the same for a pilot working the menus with the mouse. <a href="../controls/clearing-the-screen.html">Clearing the screen</a> is where the list itself is described.</p>
+
+<h2 id="walking-the-panel">Walking the panel</h2>
+
+<p><kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> moves the cursor over all three parts as though they were one list. <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> steps the row under the cursor, and <kbd>Enter</kbd> steps it on as well, because a setting with two states has no single thing to choose.</p>
+
+<p>Every choice is stored in <code>localStorage</code>, under a key of its own rather than inside the settings panel's: how a pilot flies outlives which world they were flying. A setting from a version that had one this one does not reads as the default on its own, without costing the others their memory, and a browser that refuses storage costs the choices their memory and nothing else.</p>
+
+<p><kbd>Esc</kbd> or <kbd>Backspace</kbd> closes the panel, as does its own <code>BACK</code> row.</p>
+
+            <nav class="page-nav" aria-label="Nearby pages">
+                <a href="../controls/settings.html" rel="prev">&#8592; Settings</a>
+                <a href="../controls/game-modes.html" rel="next">Game modes &#8594;</a>
+            </nav>
+        </article>
+        <svg class="ridge" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 48 L150 13 L280 40 L430 7 L580 34 L720 11 L880 38 L1030 15 L1200 43 L1200 48 Z" fill="#A0826D" opacity="0.45"/>
+            <path d="M0 48 L120 26 L260 46 L410 21 L560 44 L700 23 L860 46 L1010 27 L1200 48 Z" fill="#8B7355" opacity="0.5"/>
+        </svg>
+    </main>
+
+    <footer class="site-footer">
+        <p>Pilot Matter is published under the MIT licence. <a href="../../index.html">Play it</a>, or read the <a href="../api-reference.html">full API reference</a>.</p>
+        <p>Built with no build step: ES modules, an import map, and one renderer.</p>
+    </footer>
+</body>
+</html>
