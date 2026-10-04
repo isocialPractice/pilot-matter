@@ -77,6 +77,53 @@ its context survives being archived.
     rather than a plain Node construction. Worth doing in the same pass as
     **Roll Sense 1**, whose fix it is the check for.
   - From: UI/UX Override - the roll axis reads the wrong way round
+- [ ] The collapsed reference list still carries the name the expanded one gave
+  up
+  - **Issue**: `HELP_HINT` in `js/controls-help.js` is `H - CONTROLS`, and
+    `index.html` writes the same string into `#controls-help-hint`, while the
+    expanded list it collapses to is now headed `CONTROL REFERENCE`. The stated
+    point of the rename was that the row which opens the list and the list it
+    opens are named the same thing, and the collapsed form of that same list is
+    the one place still naming it `CONTROLS` - so a pilot who collapses the list
+    sees it change its own name. `docs/controls/clearing-the-screen.html`
+    documents the `H - CONTROLS` line as it stands, and
+    `the collapsed controls list leaves the hint that reopens it` in
+    `test/page.test.js` asserts `index.html` carries `HELP_HINT`, so the
+    constant, the markup, that page and the test all move together.
+  - **Goal**: Name the collapsed hint for the list it reopens, and carry the new
+    wording into `docs/controls/clearing-the-screen.html`. Keep the key at the
+    front of it - the hint exists to say which key brings the list back - and
+    keep it short enough for the corner it is drawn in.
+  - From: UI/UX Override - the roll axis reads the wrong way round
+- [ ] Three of the four panel openers do not close the new panel
+  - **Issue**: `openControlSettingsPanel` in `js/main.js` closes the other three
+    panels, which is the convention `openSettingsPanel`, `openEditorPanel` and
+    `openGameModesPanel` already keep with each other. None of those three was
+    taught to close the control settings panel, so the set is no longer mutually
+    exclusive in code - it is only exclusive because `syncOverlays` ranks
+    `controls` below `modes` and `settings` and because every key that opens a
+    panel is swallowed by the open one. Nothing reaches it today, which is why
+    this is not filed as a defect: the control panel takes every key before the
+    open keys are read, and the menus that could be clicked are display:none
+    behind it. The next panel, or the next open key, is what makes it reachable,
+    and the failure then is a panel that reappears when the one over it closes.
+  - **Goal**: Add `closeControlSettings(this.controlSettings)` to the other three
+    openers, so the exclusion is stated in each of them rather than resting on
+    the order `syncOverlays` happens to rank them in.
+  - From: UI/UX Override - the roll axis reads the wrong way round
+- [ ] The docs page twin of the README's menu paragraph was left behind
+  - **Issue**: `README.md` was updated this run to read "In the settings panel,
+    the control settings panel and the element editor, `A`/`D` or the arrows
+    step the value under the cursor". `docs/controls/index.html` carries the
+    same sentence under **Working a menu** and still names only the settings
+    panel and the element editor, so the published page says the control
+    settings panel's rows cannot be stepped while the README says they can. The
+    same paragraph's `Esc` sentence is right either way.
+  - **Goal**: Bring the **Working a menu** paragraph in
+    `docs/controls/index.html` into line with the README's. Its key table is
+    complete as it stands - the panel has no open key of its own - so the
+    paragraph is the whole of it.
+  - From: UI/UX Override - the roll axis reads the wrong way round
 
 ## Game UI/UX
 
