@@ -29,6 +29,89 @@ export const DEGREES_PER_RADIAN = 180 / Math.PI;
 export function toDegrees(radians) { return radians * DEGREES_PER_RADIAN; }
 export function toRadians(degrees) { return degrees / DEGREES_PER_RADIAN; }
 
+// --- How far the attitude may go -------------------------------------------
+
+/**
+ * The bound the nose and the wings are flown inside, in radians.
+ *
+ * Here rather than with the flight model because it is a statement about
+ * attitude - the same quantity the ladder above is drawn against - rather than
+ * about lift or airspeed. Nothing below reads an aircraft, so both the bound and
+ * the carry past it are testable without one.
+ */
+export const ATTITUDE_PITCH_LIMIT = Math.PI / 2.2;
+export const ATTITUDE_ROLL_LIMIT  = Math.PI;
+
+/** Half a turn, which is as far from level as an attitude ever has to be read. */
+const HALF_TURN = Math.PI;
+const FULL_TURN = Math.PI * 2;
+
+/**
+ * An angle brought back inside half a turn either side of level, so an attitude
+ * that has gone all the way round reads as where it arrived rather than as how
+ * many turns it took to get there.
+ *
+ * Half a turn itself stays at the positive end, because the two spellings of it
+ * are the same attitude and a reading needs one of them.
+ */
+export function wrapAngle(radians) {
+    if (!Number.isFinite(radians)) return 0;
+
+    const shifted = (radians + HALF_TURN) % FULL_TURN;
+    return (shifted <= 0 ? shifted + FULL_TURN : shifted) - HALF_TURN;
+}
+
+/** True once the nose has gone past the vertical, which is an aircraft over. */
+export function pastVertical(pitchRadians) {
+    return Math.abs(wrapAngle(pitchRadians)) > HALF_TURN / 2;
+}
+
+/**
+ * Which way a banked aircraft turns, as a sign on the heading its bank carries
+ * round. Upright it is the bank's own direction; over the top the lift the wings
+ * are turning on points the other way, and so does the turn.
+ *
+ * Inside the clamp this is always 1, so a pilot who has not opened the attitude
+ * up flies exactly what they flew before any of this existed.
+ */
+export function turnSign(pitchRadians) {
+    return pastVertical(pitchRadians) ? -1 : 1;
+}
+
+function clampAngle(radians, limit) {
+    if (!Number.isFinite(radians)) return 0;
+    return Math.min(Math.max(radians, -limit), limit);
+}
+
+/**
+ * The attitude an aircraft is left at once the controls have moved it, bounded
+ * the way the pilot asked for.
+ *
+ * Clamped, the nose and the wings stop at the limit, which is the thing that
+ * makes ordinary flight readable: past the vertical "up" stops meaning up, and a
+ * pilot who has not asked for that should not be handed it. Opened up, the angle
+ * crosses the limit and comes round the other side instead of stopping dead, so
+ * a loop and a barrel roll both carry on and the keys mean at 181 degrees what
+ * they meant at 179.
+ *
+ * Coming round the other side is what keeps the input honest, and it is why this
+ * wraps rather than reflecting the angle back off the pole. A reflection is the
+ * same attitude written differently, and writing it differently is exactly what
+ * turns the pitch keys over at the top of a loop; carrying the frame round with
+ * the aircraft leaves both keys pointing where they pointed on the way in.
+ *
+ * Both angles go through this one function, which is the whole point of it: a
+ * bound written per key is how two keys come to disagree about which way is up.
+ */
+export function boundAttitude(pitch, roll, full = false, limits = {}) {
+    if (full) return { pitch: wrapAngle(pitch), roll: wrapAngle(roll) };
+
+    return {
+        pitch: clampAngle(pitch, limits.pitch ?? ATTITUDE_PITCH_LIMIT),
+        roll:  clampAngle(roll,  limits.roll  ?? ATTITUDE_ROLL_LIMIT)
+    };
+}
+
 /**
  * The pitch angle the instrument reads, in degrees, from the vertical part of
  * the direction the nose points. Positive is nose above the horizon.

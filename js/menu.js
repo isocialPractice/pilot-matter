@@ -10,17 +10,18 @@
 export const START_MENU_ENTRIES = [
     { id: 'start',    label: 'START FLIGHT' },
     { id: 'modes',    label: 'GAME MODES' },
-    { id: 'controls', label: 'CONTROLS' },
+    { id: 'controls', label: 'CONTROL SETTINGS' },
     { id: 'settings', label: 'SETTINGS' }
 ];
 
-// The menu over a paused flight. Game Modes, Controls, and Settings answer to
-// the same ids the start menu uses, so both screens open the same thing.
+// The menu over a paused flight. Game Modes, Control Settings, and Settings
+// answer to the same ids the start menu uses, so both screens open the same
+// thing.
 export const PAUSE_MENU_ENTRIES = [
     { id: 'resume',   label: 'RESUME' },
     { id: 'reset',    label: 'RESET FLIGHT' },
     { id: 'modes',    label: 'GAME MODES' },
-    { id: 'controls', label: 'CONTROLS' },
+    { id: 'controls', label: 'CONTROL SETTINGS' },
     { id: 'settings', label: 'SETTINGS' }
 ];
 

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {
     createInputState, applyKeyToInput, isResetKey, isLevelOffKey, wantsVerticalChange,
-    DEFAULT_KEYMAP
+    releaseAxisControls, resolveAxes, DEFAULT_KEYMAP
 } from './input-map.js';
+import { boundAttitude, turnSign } from './attitude.js';
 import { createFlightState } from './flight-state.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY, LEVEL_OFF_SECONDS,
@@ -64,6 +65,14 @@ export class Aircraft {
         this.crash  = createCrashState();
         this.input  = options.input ?? createInputState();
         this.keymap = options.keymap ?? DEFAULT_KEYMAP;
+
+        // Which way each axis reads the keys bound to it, and whether the nose
+        // and the wings may go all the way round. Both are the pilot's, so both
+        // arrive from the panel that holds them - and both have a default a host
+        // flying the Pilot API gets without asking for anything: the keys point
+        // where the aircraft goes, and the attitude stays inside the clamp.
+        this.axes = resolveAxes(options.axes);
+        this.fullRotation = options.fullRotation === true;
 
         this.reset();
         this.createModel(options.model ?? null, options.anchor ?? null);
@@ -179,6 +188,37 @@ export class Aircraft {
         return this.rates;
     }
 
+    /**
+     * Which way the pitch and roll keys read, as the pair `js/input-map.js`
+     * works in. Resolved rather than taken as given, so a setting from a stored
+     * choice or a host's options cannot land an axis on a value the input map
+     * has never heard of.
+     *
+     * Every control either axis works is let go of on the way through. A key
+     * held while its axis turns over would otherwise be released by the other
+     * end of its pair when it finally came up, leaving the end that was pressed
+     * held down for the rest of the flight.
+     *
+     * Returns the axes now in force.
+     */
+    setAxes(axes) {
+        this.axes = resolveAxes(axes);
+        releaseAxisControls(this.input);
+        return this.axes;
+    }
+
+    /**
+     * Whether the nose and the wings may go all the way round, or stop at the
+     * limit that keeps ordinary flight readable. Off unless something asks, so
+     * nobody is handed a loop they did not go looking for.
+     *
+     * Returns what is now in force.
+     */
+    setFullRotation(full) {
+        this.fullRotation = full === true;
+        return this.fullRotation;
+    }
+
     createModel(external = null, anchor = null) {
         this.group = new THREE.Group();
 
@@ -214,7 +254,7 @@ export class Aircraft {
     }
 
     onKey(e, down) {
-        const changed = applyKeyToInput(this.input, e.code, down, this.keymap);
+        const changed = applyKeyToInput(this.input, e.code, down, this.keymap, this.axes);
         if (down && (changed === 'throttleUp' || changed === 'throttleDown')) {
             e.preventDefault();
         }
@@ -343,7 +383,6 @@ export class Aircraft {
         // the same reason. Raising it here flew W into a dive.
         if (this.input.pitchUp)   this.rotation.x -= this.rates.pitch * dt;
         if (this.input.pitchDown) this.rotation.x += this.rates.pitch * dt;
-        this.rotation.x = THREE.MathUtils.clamp(this.rotation.x, -Math.PI / 2.2, Math.PI / 2.2);
 
         // The nose settling to level, which is the other half of a level off.
         // The vertical speed goes to zero on the press and the attitude follows
@@ -363,7 +402,20 @@ export class Aircraft {
         // Roll
         if (this.input.rollLeft)  this.rotation.z += this.rates.roll * dt;
         if (this.input.rollRight) this.rotation.z -= this.rates.roll * dt;
-        this.rotation.z = THREE.MathUtils.clamp(this.rotation.z, -Math.PI, Math.PI);
+
+        // How far the nose and the wings are allowed to have gone, decided once
+        // for both of them by `boundAttitude` in js/attitude.js rather than per
+        // key. A clamp written per key is how two keys come to disagree about
+        // which way is up at 180 degrees; one call takes both angles and hands
+        // both back, so there is no per-key reading of the limit to get wrong.
+        //
+        // Inside the clamp this is exactly the pair of clamps it replaced. Opened
+        // up, the angle comes round the other side instead of stopping dead,
+        // which is what carries a loop or a barrel roll past the vertical with
+        // the keys still meaning what they meant on the way in.
+        const bounded = boundAttitude(this.rotation.x, this.rotation.z, this.fullRotation);
+        this.rotation.x = bounded.pitch;
+        this.rotation.z = bounded.roll;
 
         // Roll auto-levels slowly when no input
         if (!this.input.rollLeft && !this.input.rollRight) {
@@ -374,8 +426,12 @@ export class Aircraft {
         if (this.input.yawLeft)  this.rotation.y += this.rates.yaw * dt;
         if (this.input.yawRight) this.rotation.y -= this.rates.yaw * dt;
 
-        // Banking roll causes yaw (coordinated turn)
-        this.rotation.y -= Math.sin(this.rotation.z) * 1.2 * dt;
+        // Banking roll causes yaw (coordinated turn), the way round the wings
+        // are actually turning. Over the top the lift they turn on points the
+        // other way and so does the turn, which `turnSign` is the whole of:
+        // inside the clamp it is 1 on every frame, so a pilot who has not opened
+        // the attitude up flies the coordinated turn they always flew.
+        this.rotation.y -= Math.sin(this.rotation.z) * 1.2 * dt * turnSign(this.rotation.x);
 
         // Move forward in the direction the aircraft faces, over the ground.
         // The vertical comes off the flight model below rather than out of the

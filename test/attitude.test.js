@@ -15,8 +15,16 @@ import {
     rungOffset,
     horizonOffset,
     bankMarkAngles,
-    bankMarkPoint
+    bankMarkPoint,
+    ATTITUDE_PITCH_LIMIT,
+    ATTITUDE_ROLL_LIMIT,
+    wrapAngle,
+    pastVertical,
+    turnSign,
+    boundAttitude
 } from '../js/attitude.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { headingDegrees } from '../js/hud.js';
 import {
     CRUISE_SPEED, LEVEL_OFF_SECONDS, pitchForClimb, pitchLevellingOff
@@ -376,4 +384,176 @@ test('the horizon comes down with the nose and both arrive at level', () => {
     assert.ok(Math.abs(rest.degrees) < 1, 'well inside the degree the item asks for');
     assert.equal(rest.horizon, 'translate(0 0.00)', 'and the horizon is centred on the face');
     assert.equal(rest.ball, start.ball, 'the level off never touched the roll');
+});
+
+// --- How far the attitude may go -------------------------------------------
+
+// js/aircraft.js imports Three.js, so what it does with the bound is read off
+// its source rather than by flying one.
+const aircraftSource = readFileSync(
+    fileURLToPath(new URL('../js/aircraft.js', import.meta.url)),
+    'utf8'
+);
+
+const HALF_TURN = Math.PI;
+
+test('an angle is wrapped to where it arrived rather than to how far it went', () => {
+    close(wrapAngle(0), 0);
+    close(wrapAngle(1), 1);
+    close(wrapAngle(-1), -1);
+    close(wrapAngle(HALF_TURN), HALF_TURN, 1e-12);
+    // The two spellings of half a turn are one attitude, so a reading needs one.
+    close(wrapAngle(-HALF_TURN), HALF_TURN, 1e-12);
+    close(wrapAngle(HALF_TURN * 2), 0, 1e-12);
+    close(wrapAngle(HALF_TURN * 1.5), -HALF_TURN / 2, 1e-12);
+    close(wrapAngle(-HALF_TURN * 1.5), HALF_TURN / 2, 1e-12);
+});
+
+test('every wrapped angle lands inside half a turn of level', () => {
+    for (let turns = -3; turns <= 3; turns += 0.125) {
+        const wrapped = wrapAngle(turns * HALF_TURN * 2);
+        assert.ok(wrapped > -HALF_TURN - 1e-9 && wrapped <= HALF_TURN + 1e-9,
+            `${turns} turns wrapped to ${wrapped}, which is outside half a turn`);
+    }
+});
+
+test('an angle that is not a number reads as level rather than as nothing', () => {
+    assert.equal(wrapAngle(NaN), 0);
+    assert.equal(wrapAngle(Infinity), 0);
+    assert.equal(wrapAngle(undefined), 0);
+});
+
+test('the nose is past the vertical once it is more than a quarter turn from level', () => {
+    assert.equal(pastVertical(0), false);
+    assert.equal(pastVertical(toRadians(89)), false);
+    assert.equal(pastVertical(toRadians(90)), false, 'straight up is the vertical, not past it');
+    assert.equal(pastVertical(toRadians(91)), true);
+    assert.equal(pastVertical(toRadians(-91)), true);
+    assert.equal(pastVertical(toRadians(180)), true);
+    assert.equal(pastVertical(toRadians(271)), false, 'three quarters round is a quarter turn short');
+});
+
+// The sign is what carries the frame round with the aircraft: over the top the
+// lift the wings turn on points the other way, and so does the turn.
+test('a bank turns its own way upright and the other way over the top', () => {
+    assert.equal(turnSign(0), 1);
+    assert.equal(turnSign(toRadians(45)), 1);
+    assert.equal(turnSign(toRadians(120)), -1);
+    assert.equal(turnSign(toRadians(-120)), -1);
+    assert.equal(turnSign(toRadians(180)), -1);
+});
+
+// The clamp bounds the pitch well inside the vertical, so a pilot who has not
+// opened the attitude up can never reach the frame that is carried round.
+test('nothing inside the clamp is ever past the vertical', () => {
+    assert.ok(ATTITUDE_PITCH_LIMIT < HALF_TURN / 2,
+        'the clamp should stop the nose short of straight up');
+    assert.equal(pastVertical(ATTITUDE_PITCH_LIMIT), false);
+    assert.equal(turnSign(ATTITUDE_PITCH_LIMIT), 1);
+    assert.equal(turnSign(-ATTITUDE_PITCH_LIMIT), 1);
+});
+
+test('the clamp stops the nose and the wings at the limit', () => {
+    const over = boundAttitude(HALF_TURN, HALF_TURN * 1.5);
+    close(over.pitch, ATTITUDE_PITCH_LIMIT);
+    close(over.roll, ATTITUDE_ROLL_LIMIT);
+
+    const under = boundAttitude(-HALF_TURN, -HALF_TURN * 1.5);
+    close(under.pitch, -ATTITUDE_PITCH_LIMIT);
+    close(under.roll, -ATTITUDE_ROLL_LIMIT);
+});
+
+test('an attitude inside the clamp is handed back exactly as it came', () => {
+    for (const pitch of [0, 0.3, -0.3, ATTITUDE_PITCH_LIMIT, -ATTITUDE_PITCH_LIMIT]) {
+        for (const roll of [0, 1, -1, ATTITUDE_ROLL_LIMIT, -ATTITUDE_ROLL_LIMIT]) {
+            const bounded = boundAttitude(pitch, roll);
+            close(bounded.pitch, pitch);
+            close(bounded.roll, roll);
+        }
+    }
+});
+
+/**
+ * The item this exists for: the attitude goes all the way round without the
+ * controls breaking at the limit. Coming round the other side is what keeps the
+ * input honest - the angle past the limit is the angle it would have been, so a
+ * key that was carrying the nose up carries on carrying it up.
+ */
+test('opened up, the attitude crosses the limit and comes round the other side', () => {
+    const past = boundAttitude(toRadians(181), toRadians(181), true);
+    close(past.pitch, toRadians(-179), 1e-9);
+    close(past.roll, toRadians(-179), 1e-9);
+
+    // And it keeps going, rather than stopping one turn out.
+    const round = boundAttitude(toRadians(540), toRadians(-540), true);
+    close(round.pitch, HALF_TURN, 1e-9);
+    close(round.roll, HALF_TURN, 1e-9);
+});
+
+/**
+ * A loop, flown one step at a time the way the aircraft flies it: the pitch key
+ * moves the nose by a fixed amount every frame, and the bound is asked what the
+ * attitude is afterwards. Opened up, the nose comes all the way round to where
+ * it started, and every step of the way is a step in the same direction.
+ */
+test('a loop flown a step at a time comes round to where it started', () => {
+    const step = toRadians(5);
+    const seen = [];
+    let pitch = 0;
+
+    for (let i = 0; i < 72; i++) {
+        pitch = boundAttitude(pitch - step, 0, true).pitch;
+        seen.push(pitch);
+    }
+
+    // Seventy-two steps of five degrees is one full turn.
+    close(pitch, 0, 1e-9);
+    assert.equal(new Set(seen.map(angle => angle.toFixed(6))).size, 72,
+        'no two frames of a loop should read as the same attitude');
+
+    // Every step moved the nose the same way, counting the one crossing where the
+    // reading comes round the other side.
+    const crossings = seen.filter((angle, i) => i > 0 && angle > seen[i - 1]).length;
+    assert.equal(crossings, 1, 'the nose should only appear to go back once, at the crossing');
+});
+
+test('the same loop stops dead at the limit while the clamp is in force', () => {
+    const step = toRadians(5);
+    let pitch = 0;
+
+    for (let i = 0; i < 72; i++) pitch = boundAttitude(pitch - step, 0).pitch;
+
+    // The clamp is what makes ordinary flight readable, so it still holds.
+    close(pitch, -ATTITUDE_PITCH_LIMIT);
+});
+
+test('a bound attitude that is not a number reads as level', () => {
+    const broken = boundAttitude(NaN, undefined);
+    assert.equal(broken.pitch, 0);
+    assert.equal(broken.roll, 0);
+
+    const wrapped = boundAttitude(NaN, undefined, true);
+    assert.equal(wrapped.pitch, 0);
+    assert.equal(wrapped.roll, 0);
+});
+
+test('a caller can bound the attitude to limits of its own', () => {
+    const bounded = boundAttitude(1, 2, false, { pitch: 0.5, roll: 1 });
+    close(bounded.pitch, 0.5);
+    close(bounded.roll, 1);
+});
+
+/**
+ * One call for both angles is the point of the function: a bound written per key
+ * is how two keys come to disagree about which way is up at 180 degrees. Read
+ * off the source, which is the only place that can be seen.
+ */
+test('the aircraft bounds both angles in one call rather than one clamp per key', () => {
+    assert.ok(/boundAttitude\(this\.rotation\.x, this\.rotation\.z, this\.fullRotation\)/
+        .test(aircraftSource),
+        'the aircraft should hand both angles to boundAttitude at once');
+    assert.ok(!/MathUtils\.clamp\(this\.rotation\./.test(aircraftSource),
+        'and should hold no clamp of its own on either of them');
+    assert.ok(/turnSign\(this\.rotation\.x\)/.test(aircraftSource),
+        'and should turn the coordinated turn the way the wings are actually turning');
 });

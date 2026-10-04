@@ -4,6 +4,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, posix, relative, resolve } from 'node:path';
 import { START_FIELDS } from '../js/config.js';
+import { CONTROL_OPTIONS } from '../js/control-settings.js';
 import { ENVIRONMENTS, MODE_ENVIRONMENTS } from '../js/environment/presets.js';
 import { GAME_MODES } from '../js/game-modes.js';
 import { renderApiReference, PAGE } from '../tools/build-api-reference.mjs';
@@ -464,6 +465,7 @@ test('CHEATSHEET.md and its page say the same things', () => {
  */
 const CARRIES = [
     ['docs/controls/settings.html',   'start field', START_FIELDS.map(field => field.label)],
+    ['docs/controls/control-settings.html', 'control setting', CONTROL_OPTIONS.map(option => option.label)],
     ['docs/terrain.html',             'environment', [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(world => world.label)],
     ['docs/cheatsheet.html',          'environment', [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(world => world.label)],
     ['docs/controls/game-modes.html', 'game mode',   GAME_MODES.map(mode => mode.label)],

@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
     createInputState, applyKeyToInput, isLevelOffKey, isResetKey,
-    wantsVerticalChange, LEVEL_OFF_KEYS, VERTICAL_CONTROLS, CONTROL_NAMES
+    wantsVerticalChange, LEVEL_OFF_KEYS, VERTICAL_CONTROLS, CONTROL_NAMES,
+    AXIS_DIRECTIONAL, AXIS_INVERTED, AXIS_CONTROLS, AXIS_NAMES, AXIS_CONTROL_NAMES,
+    DEFAULT_AXES, DEFAULT_KEYMAP, controlAxis, isAxisInverted, axisControl,
+    resolveAxes, releaseAxisControls
 } from '../js/input-map.js';
 import { MENU_SELECT_KEYS } from '../js/menu.js';
 import { LEVEL_OFF_SECONDS } from '../js/flight-model.js';
@@ -220,4 +223,162 @@ test('the level off is described where it is bound as the ease it is', () => {
         assert.ok(!comment.includes(String(LEVEL_OFF_SECONDS)),
             `and name it rather than writing ${LEVEL_OFF_SECONDS} out, which goes stale when the interval moves`);
     }
+});
+
+// --- Which way an axis reads its keys --------------------------------------
+
+test('both axes read the way the key is drawn until a pilot asks otherwise', () => {
+    assert.deepEqual({ ...DEFAULT_AXES }, { pitch: AXIS_DIRECTIONAL, roll: AXIS_DIRECTIONAL });
+    for (const axis of AXIS_NAMES) {
+        assert.equal(isAxisInverted(DEFAULT_AXES, axis), false, `${axis} should open directional`);
+    }
+});
+
+// An axis is a pair of ends rather than a name with a rule applied to it, so
+// every control the flight model reads is either on one axis or on neither.
+test('each axis is two of the controls, and no control is on two axes', () => {
+    for (const axis of AXIS_NAMES) {
+        assert.equal(AXIS_CONTROLS[axis].length, 2, `${axis} is flown with two controls`);
+        for (const name of AXIS_CONTROLS[axis]) {
+            assert.ok(CONTROL_NAMES.includes(name), `${name} should be a control the flight model reads`);
+            assert.equal(controlAxis(name), axis);
+        }
+    }
+
+    assert.equal(new Set(AXIS_CONTROL_NAMES).size, AXIS_CONTROL_NAMES.length);
+    for (const name of ['yawLeft', 'yawRight', 'throttleUp', 'throttleDown']) {
+        assert.equal(controlAxis(name), null, `${name} is not on an axis a pilot can turn over`);
+    }
+});
+
+test('a directional axis leaves its keys alone and an inverted one exchanges them', () => {
+    for (const axis of AXIS_NAMES) {
+        const [low, high] = AXIS_CONTROLS[axis];
+        const inverted = { ...DEFAULT_AXES, [axis]: AXIS_INVERTED };
+
+        assert.equal(axisControl(low, DEFAULT_AXES), low);
+        assert.equal(axisControl(high, DEFAULT_AXES), high);
+        assert.equal(axisControl(low, inverted), high);
+        assert.equal(axisControl(high, inverted), low);
+    }
+});
+
+// The whole point of the two settings being two settings: all four states fall
+// out of them, and turning one over says nothing about the other.
+test('the two axes are turned over independently, and make four states between them', () => {
+    const states = [];
+
+    for (const pitch of [AXIS_DIRECTIONAL, AXIS_INVERTED]) {
+        for (const roll of [AXIS_DIRECTIONAL, AXIS_INVERTED]) {
+            const axes = { pitch, roll };
+            states.push([axisControl('pitchUp', axes), axisControl('rollLeft', axes)].join('+'));
+        }
+    }
+
+    assert.deepEqual(states, [
+        'pitchUp+rollLeft', 'pitchUp+rollRight', 'pitchDown+rollLeft', 'pitchDown+rollRight'
+    ]);
+});
+
+// WASD and the arrow keys are two spellings of one control rather than two
+// control schemes, so an axis turned over turns over for both of them at once.
+test('an inverted axis reads both spellings of its input the same way', () => {
+    const axes = { pitch: AXIS_INVERTED, roll: AXIS_INVERTED };
+
+    for (const [control, codes] of Object.entries(DEFAULT_KEYMAP)) {
+        const axis = controlAxis(control);
+        if (!axis) continue;
+
+        const expected = axisControl(control, axes);
+        for (const code of codes) {
+            const input = createInputState();
+            assert.equal(applyKeyToInput(input, code, true, DEFAULT_KEYMAP, axes), expected,
+                `${code} should work ${expected} while ${axis} is inverted`);
+            assert.equal(input[expected], true);
+            assert.equal(input[control], false, `and should leave ${control} alone`);
+        }
+    }
+});
+
+test('an axis nobody turned over writes exactly what it always wrote', () => {
+    for (const [control, codes] of Object.entries(DEFAULT_KEYMAP)) {
+        for (const code of codes) {
+            const input = createInputState();
+            assert.equal(applyKeyToInput(input, code, true), control);
+            assert.equal(input[control], true);
+        }
+    }
+});
+
+test('a key the keymap does not bind writes nothing, whichever way the axes read', () => {
+    const input = createInputState();
+    assert.equal(applyKeyToInput(input, 'KeyZ', true, DEFAULT_KEYMAP, { pitch: AXIS_INVERTED }), null);
+    assert.ok(CONTROL_NAMES.every(name => input[name] === false));
+});
+
+test('an axis setting from somewhere else falls back on its own', () => {
+    assert.deepEqual(resolveAxes(), { ...DEFAULT_AXES });
+    assert.deepEqual(resolveAxes({ pitch: AXIS_INVERTED, roll: 'sideways' }),
+        { pitch: AXIS_INVERTED, roll: AXIS_DIRECTIONAL });
+    assert.deepEqual(resolveAxes({ pitch: null }), { ...DEFAULT_AXES });
+    assert.deepEqual(resolveAxes('inverted'), { ...DEFAULT_AXES },
+        'a setting that is not a pair of axes is no setting at all');
+});
+
+/**
+ * The failure this exists for: a key held down while its axis is turned over is
+ * released by the other end of its pair when it finally comes up, which leaves
+ * the end that was pressed held for the rest of the flight. An aircraft rolling
+ * on its own with nothing on the keyboard that stops it.
+ */
+test('turning an axis over lets go of what it was holding', () => {
+    const input = createInputState();
+
+    applyKeyToInput(input, 'KeyW', true);
+    applyKeyToInput(input, 'KeyA', true);
+    assert.equal(input.pitchUp, true);
+    assert.equal(input.rollLeft, true);
+
+    releaseAxisControls(input);
+    for (const name of AXIS_CONTROL_NAMES) {
+        assert.equal(input[name], false, `${name} should have been let go of`);
+    }
+
+    // The key coming up on the other end of the pair now releases a control that
+    // is already released, which is the harmless half of the problem.
+    applyKeyToInput(input, 'KeyW', false, DEFAULT_KEYMAP, { pitch: AXIS_INVERTED });
+    assert.ok(AXIS_CONTROL_NAMES.every(name => input[name] === false));
+});
+
+test('letting go of the axes leaves every other control where it was', () => {
+    const input = createInputState();
+
+    applyKeyToInput(input, 'KeyQ', true);
+    applyKeyToInput(input, 'ShiftLeft', true);
+    releaseAxisControls(input);
+
+    assert.equal(input.yawLeft, true, 'yaw is not on an axis a pilot can turn over');
+    assert.equal(input.throttleUp, true, 'and neither is the lever');
+});
+
+test('letting go of the axes adds nothing to an input state that has no such field', () => {
+    const input = { pitchUp: true };
+    releaseAxisControls(input);
+
+    assert.deepEqual(Object.keys(input), ['pitchUp']);
+    assert.equal(input.pitchUp, false);
+});
+
+/**
+ * The aircraft hands its own axes to the input map rather than taking the
+ * default, and lets go of the four controls when they change. Read off the
+ * source because js/aircraft.js imports Three.js and cannot be built in Node.
+ */
+test('the aircraft reads its keys through the axes the pilot set', () => {
+    assert.ok(/applyKeyToInput\(this\.input, e\.code, down, this\.keymap, this\.axes\)/
+        .test(aircraftSource),
+        'the aircraft should pass its own axes to the input map');
+    assert.ok(/setAxes\([^)]*\)\s*\{[^}]*?releaseAxisControls\(this\.input\)/
+        .test(aircraftSource),
+        'and let go of both ends of both axes when they change');
 });

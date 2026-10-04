@@ -14,6 +14,10 @@ import { LOADING_STEPS, LOADING_FADE_MS } from '../js/loading.js';
 import { MUTE_KEY } from '../js/audio.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
+import {
+    CONTROL_SETTINGS_TITLE, CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING,
+    CONTROL_REFERENCE_HEADING, CONTROL_REFERENCE_LABEL
+} from '../js/control-settings.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 import { TOUCH_PADS, TOUCH_CELLS, TOUCH_LEFT, TOUCH_RIGHT } from '../js/touch-controls.js';
 import {
@@ -289,7 +293,14 @@ const CARD_LINE_CEILINGS = {
 // three lists one panel is split across.
 const MENU_LISTS = [
     'start-menu', 'pause-menu', 'game-modes-menu', 'element-editor-menu',
-    'settings-menu', 'settings-start', 'settings-options'
+    'settings-menu', 'settings-start', 'settings-options',
+    'control-settings-axes', 'control-settings-attitude', 'control-settings-reference'
+];
+
+// The three lists the control settings panel is split across, which are held to
+// the same rules the settings panel's three are.
+const CONTROL_LISTS = [
+    'control-settings-axes', 'control-settings-attitude', 'control-settings-reference'
 ];
 
 // The browser tab shows the title next to the favicon, so the two should
@@ -494,7 +505,7 @@ test('the warning overlays start hidden and wait for the flight to trip them', (
 // screen. Starting hidden means a page whose scripts never arrive shows an
 // honest nothing rather than a HUD reading zero over an empty world.
 test('the overlays the simulator places start hidden and wait to be placed', () => {
-    for (const id of ['title-screen', 'paused', 'settings', 'game-modes', 'element-editor',
+    for (const id of ['title-screen', 'paused', 'settings', 'control-settings', 'game-modes', 'element-editor',
         'game-mode', 'game-mode-report', 'hud', 'attitude', 'minimap', 'audio-muted',
         'controls-help', 'controls-help-hint', 'touch-controls']) {
         const rule = styleRule(indexHtml, id);
@@ -531,10 +542,47 @@ test('the settings panel is titled and says what it is setting', () => {
 });
 
 test('every menu the panel splits its entries across has a list to be drawn into', () => {
-    for (const id of ['settings-menu', 'settings-start', 'settings-options']) {
+    for (const id of ['settings-menu', 'settings-start', 'settings-options', ...CONTROL_LISTS]) {
         assert.ok(new RegExp(`<ul id="${id}">\\s*</ul>`).test(indexHtml),
             `the entries are drawn from js/menu.js, so the page should leave #${id} empty`);
     }
+});
+
+// The entry that opens this panel used to show the reference list instead, so the
+// panel has to be on the page for the rename to have led anywhere.
+test('the control settings panel is titled and says what it is setting', () => {
+    assert.ok(indexHtml.includes(CONTROL_SETTINGS_TITLE), 'the panel should carry its title');
+    for (const heading of [CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING, CONTROL_REFERENCE_HEADING]) {
+        assert.ok(new RegExp(`<h3>${heading}</h3>`).test(indexHtml),
+            `the panel should name what its ${heading} list changes`);
+    }
+});
+
+// The panel says how it is worked, the way the settings panel does: a row that is
+// stepped rather than chosen is not something a pilot guesses at.
+test('the control settings panel says which keys step a row and which close it', () => {
+    const panel = indexHtml.slice(
+        indexHtml.indexOf('id="control-settings"'),
+        indexHtml.indexOf('id="game-modes"')
+    );
+    assert.ok(panel.length > 0, 'index.html should carry the control settings panel');
+
+    const hint = panel.match(/<small>([\s\S]*?)<\/small>/);
+    assert.ok(hint, 'the panel should say how it is worked');
+    for (const word of ['SELECT', 'ADJUST', 'CHOOSE', 'CLOSE']) {
+        assert.ok(hint[1].includes(word), `the hint should say which keys ${word.toLowerCase()}`);
+    }
+});
+
+/**
+ * The reference list is a row of the panel now, so the row and the list it opens
+ * should be named the same thing. They were two names for one thing for exactly
+ * as long as the entry was called Controls.
+ */
+test('the reference list is headed with the name of the row that opens it', () => {
+    const list = indexHtml.match(/<div id="controls-help-list">\s*<h3>([^<]*)<\/h3>/);
+    assert.ok(list, 'the control list should be headed');
+    assert.equal(list[1].trim(), CONTROL_REFERENCE_LABEL);
 });
 
 // The instruments are read on whichever scale the panel is set to, so the
@@ -603,11 +651,36 @@ test('the control list names the keys the flight is worked with', () => {
 // Every list under the panel's headings is styled the same way, so a heading
 // added to the markup and not to the stylesheet is a list drawn as bullets.
 test('every list the panel is split across is styled as a menu rather than a list', () => {
-    for (const id of ['settings-menu', 'settings-start', 'settings-options']) {
+    for (const id of ['settings-menu', 'settings-start', 'settings-options', ...CONTROL_LISTS]) {
         assert.ok(new RegExp(`#${id}[,\\s]`).test(indexHtml), `index.html should style #${id}`);
         assert.ok(new RegExp(`#${id} li[,\\s]`).test(indexHtml), `and the entries drawn into #${id}`);
         assert.ok(new RegExp(`#${id} li\\.selected[,\\s]`).test(indexHtml),
             `and the cursor when it is over #${id}`);
+    }
+});
+
+/**
+ * A panel added to the markup and not to the stylesheet is a card with no card
+ * around it: the rows draw as bullets over the world and the title has no box.
+ */
+test('the control settings panel is styled as a card like the panels beside it', () => {
+    const rule = styleRule(indexHtml, 'control-settings');
+    assert.ok(rule, 'index.html should style #control-settings');
+    assert.ok(/display:\s*none/.test(rule), 'and it should start hidden');
+    assert.ok(/position:\s*fixed/.test(rule), 'and lie over the flight rather than in the page');
+    assert.ok(/overflow-y:\s*auto/.test(rule),
+        'and scroll rather than running off the bottom of a short window');
+
+    for (const selector of ['#control-settings h2', '#control-settings h3', '#control-settings small']) {
+        assert.ok(new RegExp(`${selector}[,\\s]`).test(indexHtml), `index.html should style ${selector}`);
+    }
+});
+
+// Every row says what it changes under it, the way the settings panel's rows do.
+test('the note under a control settings row is drawn', () => {
+    for (const id of CONTROL_LISTS) {
+        assert.ok(new RegExp(`#${id} li\\[data-note\\]::after[,\\s]`).test(indexHtml),
+            `index.html should draw the note under a row of #${id}`);
     }
 });
 

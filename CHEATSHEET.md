@@ -140,6 +140,24 @@ never set.
 
 Everything above is stored in `localStorage` and reopens with the next session.
 
+## Control settings
+
+The `CONTROL SETTINGS` entry, on the start screen and in the pause menu. Stored
+under a key of its own, so how a pilot flies outlives which world they flew.
+
+| Row | Steps through | Opens on |
+|-----|---------------|----------|
+| `PITCH AXIS` | `DIRECTIONAL`, `INVERTED` | `DIRECTIONAL` |
+| `ROLL AXIS` | `DIRECTIONAL`, `INVERTED` | `DIRECTIONAL` |
+| `FULL ROTATION` | On, off | Off |
+| `CONTROL REFERENCE` | Closes the panel and shows the list of every key | - |
+
+`DIRECTIONAL` points the key where the aircraft goes; `INVERTED` points it where
+a stick would. Each axis is set on its own, and both spellings of an input turn
+over together. `FULL ROTATION` off clamps the nose short of the vertical and the
+wings at half a turn; on, either angle crosses the limit and comes round the
+other side, so a loop and a barrel roll carry on.
+
 ## Worlds
 
 | Environment | Id | Is |

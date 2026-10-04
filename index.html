@@ -683,6 +683,7 @@
         }
 
         #settings,
+        #control-settings,
         #game-modes,
         #element-editor {
             display: none;
@@ -707,6 +708,7 @@
         }
 
         #settings h2,
+        #control-settings h2,
         #game-modes h2,
         #element-editor h2 {
             font-size: 26px;
@@ -718,6 +720,7 @@
            against the rows beneath them, so a panel long enough to scroll is
            read as three sections rather than as one run of entries. */
         #settings h3,
+        #control-settings h3,
         #element-editor h3 {
             margin-top: 14px;
             color: #f0f2f3;
@@ -730,6 +733,7 @@
         }
 
         #settings small,
+        #control-settings small,
         #game-modes small,
         #element-editor small,
         #paused small {
@@ -769,7 +773,10 @@
         #element-editor-menu,
         #settings-menu,
         #settings-start,
-        #settings-options {
+        #settings-options,
+        #control-settings-axes,
+        #control-settings-attitude,
+        #control-settings-reference {
             list-style: none;
             margin: 18px 0 14px;
         }
@@ -780,7 +787,10 @@
         #element-editor-menu li,
         #settings-menu li,
         #settings-start li,
-        #settings-options li {
+        #settings-options li,
+        #control-settings-axes li,
+        #control-settings-attitude li,
+        #control-settings-reference li {
             margin: 4px 0;
             padding: 5px 10px;
             color: #f0f2f3;
@@ -803,7 +813,10 @@
         #element-editor-menu li.selected,
         #settings-menu li.selected,
         #settings-start li.selected,
-        #settings-options li.selected {
+        #settings-options li.selected,
+        #control-settings-axes li.selected,
+        #control-settings-attitude li.selected,
+        #control-settings-reference li.selected {
             color: #000;
             background: #0f0;
             border-color: #0f0;
@@ -828,6 +841,9 @@
         #settings-menu,
         #settings-start,
         #settings-options,
+        #control-settings-axes,
+        #control-settings-attitude,
+        #control-settings-reference,
         #element-editor-menu {
             margin: 10px 0 8px;
         }
@@ -835,6 +851,9 @@
         #settings-menu li,
         #settings-start li,
         #settings-options li,
+        #control-settings-axes li,
+        #control-settings-attitude li,
+        #control-settings-reference li,
         #element-editor-menu li {
             margin: 2px 0;
         }
@@ -872,6 +891,9 @@
         #settings-menu li[data-note]::after,
         #settings-start li[data-note]::after,
         #settings-options li[data-note]::after,
+        #control-settings-axes li[data-note]::after,
+        #control-settings-attitude li[data-note]::after,
+        #control-settings-reference li[data-note]::after,
         #element-editor-menu li[data-note]::after,
         #game-modes-menu li[data-note]::after {
             content: attr(data-note);
@@ -1311,6 +1333,17 @@
         <small>W/S OR ↑/↓ TO SELECT &middot; A/D OR ←/→ TO ADJUST &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
+    <div id="control-settings">
+        <h2>CONTROL SETTINGS</h2>
+        <h3>AXES</h3>
+        <ul id="control-settings-axes"></ul>
+        <h3>ATTITUDE</h3>
+        <ul id="control-settings-attitude"></ul>
+        <h3>REFERENCE</h3>
+        <ul id="control-settings-reference"></ul>
+        <small>W/S OR &uarr;/&darr; TO SELECT &middot; A/D OR &larr;/&rarr; TO ADJUST &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
+    </div>
+
     <div id="game-modes">
         <h2>GAME MODES</h2>
         <ul id="game-modes-menu"></ul>
@@ -1396,7 +1429,7 @@
 
     <div id="controls-help">
         <div id="controls-help-list">
-            <h3>CONTROLS</h3>
+            <h3>CONTROL REFERENCE</h3>
             W/S or ↑/↓ - Pitch<br>
             A/D or ←/→ - Roll<br>
             Q/E - Yaw<br>

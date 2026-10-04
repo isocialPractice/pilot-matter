@@ -109,10 +109,17 @@ stick for pitch and roll. Neither is offered to a machine that has keys.
 
 In any menu, `W`/`S` or `↑`/`↓` move between entries and `Enter` or `Space`
 chooses one. The mouse works the menus too: the pointer moves the cursor and a
-click chooses. In the settings panel and the element editor, `A`/`D` or `←`/`→`
-step the value under the cursor through its settings, and a click on a row
-holding a value steps it the way the click reads: left of the middle steps it
-back, right of it steps it on. `Esc` backs out.
+click chooses. In the settings panel, the control settings panel and the element
+editor, `A`/`D` or `←`/`→` step the value under the cursor through its settings,
+and a click on a row holding a value steps it the way the click reads: left of
+the middle steps it back, right of it steps it on. `Esc` backs out.
+
+What the keys mean is itself a setting. The `CONTROL SETTINGS` entry, on the
+start screen and in the pause menu, reads each attitude axis either way round -
+`DIRECTIONAL` points the key where the aircraft goes, `INVERTED` points it where
+a stick would - and opens the attitude up to a full turn in pitch and in roll
+for a pilot who wants to fly a loop. Both are off by default, and the list of
+every key is a row inside that panel.
 
 **Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft
 with the throttle set at 20%. That airspeed is the stall speed itself, so the
@@ -120,8 +127,9 @@ wing is carrying with nothing in hand: opening the throttle is the first thing
 to do. The rules behind all of it are written out in
 [How the flight model works](https://isocialpractice.github.io/pilot-matter/docs/flight-model.html).
 
-The [loading screen, the menus, the settings panel, the game modes, the sound,
-the photo mode, and the instruments](https://isocialpractice.github.io/pilot-matter/docs/controls/index.html)
+The [loading screen, the menus, the settings panel, the control settings, the
+game modes, the sound, the photo mode, and the
+instruments](https://isocialpractice.github.io/pilot-matter/docs/controls/index.html)
 each have a page of their own.
 
 ## [How It Works](https://isocialpractice.github.io/pilot-matter/docs/flight-model.html)
