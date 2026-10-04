@@ -11,17 +11,72 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] Rename the **Controls** entry to **Control Settings**, and make what it
-  opens a panel of settings rather than a list
-  - From: Simulator Configuration
-- [ ] Toggle pitch and roll between inverted and directional, independently
+- [ ] Remember whether the control reference list is open
   - From: Flight Controls
-- [ ] Allow a full 360 in pitch and in roll, without breaking the controls at
-  the limit
+- [ ] Choose which controls hand the aircraft back after a level off
   - From: Flight Controls
-- [ ] Propose seven control settings worth having, as items in the **Flight
-  Controls** section
+- [ ] Read tilt through the axis settings the keys are read through
   - From: Flight Controls
+- [ ] Rebind any control to a key of the pilot's own
+  - From: Flight Controls
+- [ ] Rebind the keys that are not control surfaces
+  - From: Flight Controls
+
+### UI/UX Override - the roll axis reads the wrong way round
+
+#### Resolve Issues
+
+- [ ] Roll Sense 1
+  - **Issue**: The **ROLL AXIS** row offers its two settings the wrong way
+    round, so the default names the behaviour of the other setting. Flown in
+    Chromium with real key presses, reading the wings off the group's own world
+    matrix rather than off an angle or a reading: with `ROLL AXIS` on its
+    default of `DIRECTIONAL`, holding `A` puts the left tip at `+6.76` and the
+    right at `-6.76` and carries the heading from 0 to `32.6` - the right wing
+    down and a right turn - while `D` does the mirror of it and turns to
+    `326.4`. Stepping the row to `INVERTED` reverses both, giving `A` a left tip
+    of `-6.64` and a heading of `327.5`, which is the left wing down and a left
+    turn. So `INVERTED` is what this repository calls directional and
+    `DIRECTIONAL` is what it calls inverted. Three statements disagree with the
+    default: `js/input-map.js` over `AXIS_DIRECTIONAL` ("right drops the right
+    wing"), the **Flight Controls** roadmap item itself ("inverted means [...]
+    right turns left"), and `CHEATSHEET.md`, `README.md` and
+    `docs/cheatsheet.html`, which all list `A` as **Roll left** with no setting
+    named. The **PITCH AXIS** row is correct and wants no change, and neither
+    does `js/input-map.js`, which was confirmed to write `rollLeft` for `A` on
+    `DIRECTIONAL` and `rollRight` for `A` on `INVERTED`. The sign is the two
+    roll lines of `Aircraft.update` in `js/aircraft.js`, where `rollLeft` raises
+    `rotation.z` and a raised `rotation.z` drops the right wing - the mirror of
+    the fault the pitch keys four lines above already carry a comment about.
+    Everything else about the item verified: the two axes step independently,
+    `WASD` and the arrow keys turn over together rather than apart, the menus
+    still walk the same way with an axis inverted, the choice is stored, and an
+    axis turned over under a held key leaves nothing stuck on.
+  - **Goal**: Resolve to [roll-sense.prompt.md](.claude/prompts/roll-sense.prompt.md)
+  - From: Flight Controls
+
+#### Found Issues
+
+- [ ] Nothing pins which way an input actually rolls or pitches the aircraft
+  - **Issue**: The suite has no test that reads which way the aircraft
+    physically goes for a given input. `test/input-map.test.js` pins which field
+    a key writes, `test/tilt-controls.test.js` pins which field a tilt writes,
+    and `test/flight-state.test.js` touches `rotation.z` only as a value carried
+    or zeroed. That is the gap that let the roll sign above sit unnoticed
+    through every run to here, and it is the same gap the pitch keys fell into
+    once before, which their own comment records as "Raising it here flew W into
+    a dive." Measuring it needs a browser today, which is why only this agent
+    has ever measured it.
+  - **Goal**: Pin the direction of all four pitch and roll controls off the
+    attitude rather than off the Euler angle behind it, so the assertion states
+    what a pilot would notice: `pitchUp` raises `getAttitude().forwardY`,
+    `rollLeft` raises `getAttitude().rightY` - the right wing up, which is the
+    left wing down - `rollRight` lowers it, and the coordinated turn follows the
+    dropped wing, with `rollLeft` carrying `-rotation.y` down. `Aircraft`
+    imports Three.js, so use the idiom the project already has for such modules
+    rather than a plain Node construction. Worth doing in the same pass as
+    **Roll Sense 1**, whose fix it is the check for.
+  - From: UI/UX Override - the roll axis reads the wrong way round
 
 ## Game UI/UX
 
@@ -185,9 +240,9 @@ this section applies a minor version update.
 - [ ] Make Reset Flight restore the configured start state instead of
   hardcoded values
 - [ ] Add a start screen menu built on the keyboard menu in `js/menu.js`,
-  with **Controls** and **Settings** entries
-- [ ] Show the controls list under the start screen **Controls** entry, so it
-  matches the pause menu entry of the same name
+  with **Control Settings** and **Settings** entries
+- [ ] Reach the control reference list from the start screen **Control
+  Settings** entry, so it matches the pause menu entry of the same name
 - [ ] Rename the **Controls** entry to **Control Settings**, and make what it
       opens a panel of settings rather than a list
   - Four sites carry the name today: the start screen and pause menu entries in
@@ -251,6 +306,64 @@ change. Completing items in this section applies a minor version update.
   - Seven items, each one thing a pilot would change and a reason they would
     change it. Anything that is really a flight-model constant belongs under
     **Simulator Configuration** instead.
+- [ ] Rebind any control to a key of the pilot's own
+  - `DEFAULT_KEYMAP` in `js/input-map.js` is already a plain map from a control
+    to the codes that work it, and `applyKeyToInput` takes the map rather than
+    reading the constant - which is exactly what the Pilot API lets a host
+    replace. The game offers none of it.
+  - A row per control, showing the key it is on and taking the next key pressed
+    as the new one. Two controls on one key is the state worth refusing, and a
+    pilot who has bound themselves out of the panel needs the way back: a row
+    that puts the whole map back as it was.
+- [ ] Read tilt through the axis settings the keys are read through
+  - `tiltToInput` in `js/tilt-controls.js` writes the four axis controls itself
+    and says so in as many words - "neither needs inverting, and neither should
+    be" - which was right while nothing could invert them. Now a pilot can set
+    pitch inverted and find it applies to the keys and not to the device.
+  - One setting rather than two more: whether the axis settings reach the tilt
+    input as well. Off is the behaviour the comment describes and the reason for
+    it, which is that the device is the aircraft; on is a pilot who thinks of it
+    as a stick.
+- [ ] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
+  the machine has
+  - `createTiltState(enabled)` takes the answer, and `js/main.js` hands it
+    `isTouchOnly()` once at start-up with nothing able to change it afterwards.
+    A tablet with a keyboard cannot turn tilt on and a phone cannot turn it off,
+    though both are perfectly capable of the other.
+  - The sensor may still refuse, so the setting is what is wanted rather than
+    what is happening: `tiltFlying` already tells those two apart, and the pads
+    stay on the glass for a tilt that was asked for and never arrived.
+- [ ] Set how far the device is turned before it asks for anything
+  - `TILT_DEADZONE` in `js/tilt-controls.js` is 7 degrees, and `tiltToInput`
+    takes it as an argument that nothing passes. How still a hand is varies more
+    between two pilots than almost anything else here, and a deadzone too narrow
+    means an aircraft that will not fly straight.
+  - A few labelled positions rather than a range of degrees, the way the other
+    options in the settings panel are offered, so no combination of keys lands
+    it between two of them.
+- [ ] Choose which controls hand the aircraft back after a level off
+  - `VERTICAL_CONTROLS` in `js/input-map.js` is the list `wantsVerticalChange`
+    takes, and the throttle is in it: a nudge of the lever on an approach drops
+    the altitude hold the pilot set it up with. Roll and yaw are deliberately
+    out, and the reasoning for that is written where the list is.
+  - A box per control rather than a list to pick from, since the question is
+    whether each one counts and the answers are independent.
+- [ ] Rebind the keys that are not control surfaces
+  - `RESET_KEYS` and `LEVEL_OFF_KEYS` in `js/input-map.js` are kept out of the
+    input state on purpose - one is an instruction and the other is a trim - so
+    the keymap above will not reach them. `R` ends a flight on one press with
+    nothing between, and `Space` is also the key a menu is chosen with, which
+    `js/input-map.js` says is the reason it is bound apart.
+  - Both rebindable, and reset allowed to be bound to nothing at all, for a
+    pilot flying a long route who would rather reach for the pause menu.
+- [ ] Remember whether the control reference list is open
+  - `createHelpState(expanded = true)` in `js/controls-help.js` takes the state
+    the list opens in and `js/main.js` passes nothing, so every session opens
+    with the list over the corner of the window and the `H` key's answer is
+    forgotten at the end of it.
+  - Stored beside the other control settings rather than as a third thing: it is
+    the same question the panel is already asking, which is how this pilot wants
+    the controls to behave.
 
 ## Pause: Interactive Build Mode
 
@@ -277,72 +390,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 154 earlier items in `TODO-archive.md`, newest last.
+> 158 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Drop the stand-down branch at the top of the ignore-rules check in
-  `test/site.test.js` so the guard applies on every tree, now that the user has
-  tracked `.gitignore`, and say in that run's changelog entry that the rules
-  reach a clone
-  - From: Documentation & Polish
-- [x] The chart's wiring test matches a character it meant to match literally
-  - **Issue**: `test/minimap.test.js` builds its `runWorld` assertions as
-    `new RegExp(` plus a template literal reading `${mark}: this\.${mark}`.
-    Inside a template literal `\.` is not an escape, so it collapses to a bare
-    `.` before the `RegExp` constructor ever sees it, and the pattern reads
-    `course: this.course` with the dot matching any character. The assertion
-    passes on text it was written to reject - `course: thisXcourse` satisfies it
-    - and every other span in the file is escaped correctly, so this one reads as
-    a slip rather than a choice.
-  - **Goal**: Escape the dot, `this\\.`, or use a regex literal the way the rest
-    of the file does.
-  - From: Code Review Override - the circuit's masts and the corridor's air
-- [x] **Traffic Pattern 1**: a mast stands on the runway at both ends of the
-  strip
-  - **Issue**: `standingMarks` in `js/main.js` maps every leg of the circuit onto
-    a mast, and two of the five legs end on the strip itself - `TAKEOFF` at the
-    departure threshold and `FINAL` at the approach threshold, which is what `a
-    circuit closes on the threshold it opened from` in `test/pattern.test.js`
-    pins. Built in Node off the mode's own seed, so this is the strip the stage
-    actually lays: `TRAFFIC PATTERN` / `WIDE CIRCUIT` puts its runway at
-    (-6766, -619) on heading 304, and the takeoff and final masts stand 0.0 units
-    from its two thresholds, 130 units tall with a lit head on each. The takeoff
-    roll ends at one of them and the landing is flown onto the other. Nothing
-    crashes - `js/crash.js` reads the terrain height and knows nothing about
-    meshes, so the aircraft passes through the pole rather than into it - but the
-    reason the code gives for the mast, that "a turn in a circuit is a place in
-    empty air with nothing drawn at it", is true of the three middle turns and
-    false of these two, which are the ends of a drawn strip the approach guidance
-    already marks.
-  - **Goal**: Put masts only at the turns that are not on the strip. The catch is
-    `beacon.setNext`, which is handed `chartNext(this.run)` - for a circuit that
-    is `nextLeg`, a leg index - while `RescueMarker.setNext` lights `this.heads`
-    by position, so dropping two marks lights the wrong head from then on. Decide
-    that first: either carry the leg index on the mark and light by it, or keep
-    five entries and let a mark say it draws nothing.
-  - From: Game Modes UI/UX `->` New Game Modes
-- [x] **Traffic Pattern 2**: the final leg is read every frame and the reading is
-  thrown away
-  - **Issue**: the item asked for a circuit judged on holding each leg, and four
-    of the five are. `trackPattern` in `js/main.js` samples whatever
-    `nextLeg(this.run)` answers, which is `FINAL_LEG` for the whole of the
-    approach, so `this.pattern.legs[4]` fills up with the height and heading
-    error flown down final. Nothing ever closes it: `trackLegs` returns on
-    `!step.turned`, and `recordPatternLeg` refuses the final leg by design, so
-    `completeLeg` is never called for index 4 and `state.flown[4]` stays empty.
-    The pilot gets `HELD n` on the card for `TAKEOFF`, `CLIMB OUT`, `DOWNWIND`
-    and `BASE`, and nothing at all for `FINAL`. `patternScore` and `flownLegs` -
-    the two functions that say what the whole circuit came to - are called by
-    `test/pattern.test.js` and by nothing in `js/`, so the circuit never reports
-    a mark of its own either.
-  - **Goal**: Decide which of the two the mode means and make it say so. If the
-    landing score is the final leg's mark, as `js/pattern.js`'s own header
-    implies when it calls the landing "the last fifth" of the circuit, stop
-    sampling the final leg rather than filling a tally nothing reads. If the
-    approach is held like the other four, close it where `recordLanding` closes
-    the leg - in `onLanding` - and report it. Either way the circuit wants
-    somewhere to show `patternScore`, which today is a published export the game
-    never asks.
-  - From: Game Modes UI/UX `->` New Game Modes
 - [x] **Canyon Run 1**: the least-air guard is measured at the middle of a cut
   and the walls are where the air runs out
   - **Issue**: `MIN_HEADROOM` in `js/corridor.js` is declared as the least room a
@@ -489,3 +538,15 @@ how the simulator got here rather than as a list still to be worked.
     corridor whose opening ground stands higher over the floor than half the
     cut's air, which today opens above the ceiling and should not.
   - From: UI/UX Override - the corridor's opening and its lid
+- [x] Rename the **Controls** entry to **Control Settings**, and make what it
+  opens a panel of settings rather than a list
+  - From: Simulator Configuration
+- [x] **Roll Sense**: Toggle pitch and roll between inverted and directional,
+  independently
+  - From: Flight Controls
+- [x] Allow a full 360 in pitch and in roll, without breaking the controls at
+  the limit
+  - From: Flight Controls
+- [x] Propose seven control settings worth having, as items in the **Flight
+  Controls** section
+  - From: Flight Controls
