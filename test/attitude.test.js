@@ -9,6 +9,7 @@ import {
     FACE_RADIUS,
     toDegrees,
     toRadians,
+    attitudeFrom,
     pitchFromForward,
     bankFromWing,
     pitchLadderRungs,
@@ -127,6 +128,39 @@ test('a banked climb reads as both, not as one or the other', () => {
     const attitude = attitudeFromEuler({ x: -toRadians(20), z: toRadians(45), y: 1.1 });
     assert.ok(pitchOf(attitude) > 5, 'the climb should still be on the ladder');
     assert.ok(bankOf(attitude) > 5, 'and the bank should still be on the rim');
+});
+
+/**
+ * `attitudeFrom` against the frame it stands in for.
+ *
+ * The aircraft used to read its attitude by turning three unit vectors with its
+ * own quaternion, and now asks `js/attitude.js` for the same three numbers out
+ * of two angles instead - which is what lets a test say which way a control
+ * flies it without loading Three.js. The closed form is only worth that if it
+ * is the frame it replaced, so it is checked against the rotation above rather
+ * than trusted to be the same arithmetic written shorter.
+ *
+ * The yaw is where a closed form would come apart, because it is the one angle
+ * the short version drops: it is applied outermost about the world's own up, so
+ * it swings all three directions round the horizon without raising or lowering
+ * any of them. A yaw that reached the vertical part of an attitude would show
+ * up here as a disagreement at every heading but zero.
+ */
+test('the attitude read off the angles is the attitude the frame turns to', () => {
+    for (const pitch of [-1.4, -1, -0.3, 0, 0.3, 1, 1.4]) {
+        for (const roll of [-3, -1.6, -0.7, 0, 0.7, 1.6, 3]) {
+            for (const yaw of [-2.2, -1.1, 0, 1.1, 2.2, 4]) {
+                const closed = attitudeFrom(pitch, roll);
+                const turned = attitudeFromEuler({ x: pitch, y: yaw, z: roll });
+
+                for (const reading of ['forwardY', 'rightY', 'upY']) {
+                    assert.ok(Math.abs(closed[reading] - turned[reading]) < 1e-12,
+                        `${reading} reads ${closed[reading]} off the angles and ${turned[reading]}`
+                        + ` off the frame at pitch ${pitch}, roll ${roll}, yaw ${yaw}`);
+                }
+            }
+        }
+    }
 });
 
 // --- The pitch ladder ---
