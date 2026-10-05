@@ -9,7 +9,13 @@ export const HELP_KEY = 'KeyH';
 
 // What the collapsed list leaves on screen: enough to find the key that
 // brings the rest of it back.
-export const HELP_HINT = 'H - CONTROLS';
+//
+// Named for the list it reopens, which is CONTROL REFERENCE - the heading the
+// expanded list carries and the label on the control settings panel row that
+// also opens it. One name for one list, so collapsing it does not look like
+// swapping it for something else. The key stays at the front because saying
+// which key brings the list back is the whole reason the line is left behind.
+export const HELP_HINT = 'H - CONTROL REFERENCE';
 
 export function createHelpState(expanded = true) {
     return { expanded };

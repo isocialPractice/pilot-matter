@@ -940,6 +940,7 @@ class FlightSimulator {
     openSettingsPanel() {
         this.modesOpen = false;
         closeEditor(this.editor);
+        closeControlSettings(this.controlSettings);
         openSettings(this.settings);
         resetSelection(this.settingsState);
     }
@@ -1120,6 +1121,7 @@ class FlightSimulator {
     openEditorPanel() {
         closeSettings(this.settings);
         this.modesOpen = false;
+        closeControlSettings(this.controlSettings);
         openEditor(this.editor);
         this.redrawEditor();
         resetSelection(this.editorState);
@@ -1190,6 +1192,7 @@ class FlightSimulator {
     openGameModesPanel() {
         closeSettings(this.settings);
         closeEditor(this.editor);
+        closeControlSettings(this.controlSettings);
         this.modesOpen = true;
         resetSelection(this.modesState);
     }

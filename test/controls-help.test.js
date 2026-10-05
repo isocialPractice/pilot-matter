@@ -10,14 +10,27 @@ import {
     applyHelpKey
 } from '../js/controls-help.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
+import { CONTROL_REFERENCE_LABEL } from '../js/control-settings.js';
 
 test('the control list starts open, where a first flight needs it', () => {
     assert.equal(createHelpState().expanded, true);
 });
 
 test('the collapsed list still names the key that brings it back', () => {
-    assert.ok(HELP_HINT.includes('H'), 'the hint should name the H key');
-    assert.ok(HELP_HINT.length < 20, 'the hint is a line, not a list');
+    assert.ok(HELP_HINT.startsWith('H'), 'the hint should open with the H key');
+    // Long enough to name the list, short enough to stay the one line the
+    // collapse exists to leave behind. The shortest row of the list it
+    // replaces is longer than this.
+    assert.ok(HELP_HINT.length <= 24, 'the hint is a line, not a list');
+});
+
+// The row that opens the list, the heading the list carries and the line the
+// collapsed list leaves behind are three sightings of one thing, so they are
+// spelt one way. Collapsing a list should not look like swapping it for a
+// different one.
+test('the collapsed list is named for the list it reopens', () => {
+    assert.ok(HELP_HINT.includes(CONTROL_REFERENCE_LABEL),
+        `the hint "${HELP_HINT}" should name the ${CONTROL_REFERENCE_LABEL} list it brings back`);
 });
 
 test('isHelpKey matches only the H key code', () => {

@@ -1806,3 +1806,120 @@ still be found by name.
     somewhere to show `patternScore`, which today is a published export the game
     never asks.
   - From: Game Modes UI/UX `->` New Game Modes
+
+## Archived 10-05-26
+
+- [x] **Canyon Run 1**: the least-air guard is measured at the middle of a cut
+  and the walls are where the air runs out
+  - **Issue**: `MIN_HEADROOM` in `js/corridor.js` is declared as the least room a
+    stage may leave between the ceiling and the ground under a section, and
+    `buildCorridor` applies it as `floor + Math.max(plan.ceiling, MIN_HEADROOM)`
+    where `floor` is `sample(x, z)` at the section's centre line and nowhere
+    else. A cut whose centre falls in a gully gets its lid measured off the gully
+    floor while the ground at the posts is far higher. Built in Node off the
+    mode's own seed: `CANYON RUN` / `THE SLOT`, cut 5 sits at (-1599, 336) with a
+    centre floor of -152.4 and a lid at 77.6, and the ground at the left post -
+    155 units across, which is that stage's `halfWidth` - stands at 37.2. That is
+    40.4 units between the ground and the beam, against a declared minimum of 70.
+    It is flyable, because the middle of that cut has 225 units of air in it, and
+    nothing in the formula stops the number going negative on another seed, which
+    is the impossible cut the constant exists to refuse.
+  - **Goal**: Measure the headroom across the span the cut is actually open over
+    rather than at one point on its centre line, and raise the lid to clear the
+    worst of it. Note what it costs: `the ceiling is held over the ground under
+    each section rather than at one height` and `a stage cannot ask for a cut
+    with no air in it` in `test/corridor.test.js` both read the ceiling off the
+    centre floor, so both want rewriting against whatever the new rule is, and
+    the shipped stages' numbers move with it.
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] **Canyon Run 2**: a run opens at a height read off ground a full spacing
+  away from where it opens
+  - **Issue**: `corridorOpening` in `js/game-modes.js` puts the aircraft at
+    `first.x - first.dirX * run`, a full `spacing` back from the first cut, and
+    sets its altitude to `(first.floor + first.ceiling) / 2` - the midpoint of
+    the air at the cut, over ground sampled at the cut. The two places are a
+    whole spacing apart and the ground between them is not flat. Built in Node
+    off the mode's own seed: `CANYON RUN` / `THE SLOT` opens at (6980, -805)
+    where the ground is 259.3, at an altitude of 283.5 units, which is 24.3 units
+    of clearance - and `GROUND_CLEARANCE` in `js/crash.js` is 5, so the stage
+    opens about four of its own clearances off the deck at cruise speed. The
+    first cut's floor is 167.1, 92 units below the ground the aircraft is
+    actually put over, and that difference is the whole of the error. All four
+    shipped stages clear the ground today - the other three by 161 units or more
+    - so nothing fails, but the sign of the margin is up to the seed.
+  - **Goal**: Read the opening height against the ground at the opening point as
+    well as at the first cut, and take whichever is higher. `corridorOpening` is
+    handed only `stage` and `corridor` today, so a height sampler has to reach
+    it - `stageStart`'s `world` is the one place it could come from, and that is
+    an interface `docs/api.md` describes, so decide how it is threaded before
+    changing the formula.
+  - From: Game Modes UI/UX `->` New Game Modes
+- [x] Nothing tells the lid rule's two halves apart
+  - **Issue**: `buildCorridor` in `js/corridor.js` now holds the lid at
+    `Math.max(floor + plan.ceiling, crest + MIN_HEADROOM)` - the stage's own
+    headroom over the centre line, or the least room over the highest ground the
+    cut is open over, whichever is higher. `docs/api.md:1087` states that rule in
+    as many words, and the comment over the formula gives it as the reason the
+    gully case was wrong. No test distinguishes it from
+    `Math.max(crest + plan.ceiling, crest + MIN_HEADROOM)`, which measures both
+    halves off the crest and is a materially different canyon: over the test
+    file's own `STEEP` ground it raises every lid by `crest - floor`, hundreds of
+    units on the steeper cuts. Confirmed by making that substitution and running
+    the suite: 1160 passing, 0 failing, with the probe then reverted. The three
+    tests that read the lid each stop short of it - `over level ground the
+    stage's headroom is the whole of the lid` runs on a world where
+    `crest === floor`, so the two rules agree; `the lid clears the highest ground
+    across the cut` asserts `ceiling - height >= MIN_HEADROOM` and
+    `ceiling - floor > 400`, both of which the crest version satisfies more
+    generously; and `a stage cannot ask for a cut with no air in it` runs with
+    `ceiling: 1`, where `MIN_HEADROOM` wins on both sides. The completed item
+    `Canyon Run 1` asked for those first two to be "rewritten against whatever
+    the new rule is" - they were rewritten, and what they pin is the crest half
+    and the level-ground case rather than the rule.
+  - **Goal**: One case over ground that is not level across the cut, asserting
+    the lid against the formula rather than against a bound it clears -
+    `assert.ok(Math.abs(section.ceiling - Math.max(section.floor + 400, section.crest + MIN_HEADROOM)) < 1e-9)`
+    over `ROLLING` or `STEEP`, which fails on the crest version wherever
+    `floor + 400` is the winning half. Worth a plan whose `ceiling` is large
+    enough against the slope that the floor half wins on at least one cut, since
+    on `STEEP` as it stands the crest half may win everywhere and the assertion
+    would hold for both rules.
+  - From: UI/UX Override - the corridor's opening and its lid
+- [x] Two of `docs/api.md`'s enumerations do not carry what this run added to them
+  - **Issue**: the file lists each module's exports in a table and each shape's
+    fields inline, and both listings are exhaustive everywhere else. `docs/api.md:1029`
+    gives a leg as `{index, label, fromX, fromZ, fromFeet, x, z, altitudeFeet,
+    heading, dirX, dirZ, run}` and `buildPattern` now puts `onStrip` on every leg
+    - the one field a host has to read to draw the circuit without standing a
+    mast on the runway, and the prose two paragraphs below describes it. The
+    corridor section's parallel listing at `:1084` was updated with `crest`, so
+    the two shapes now document themselves to different standards. `docs/api.md:856`
+    gives the corridor module's constants as `CORRIDOR_REACH`, `MIN_HEADROOM`,
+    and `HEADROOM_SAMPLES` is now exported beside them and imported by
+    `test/corridor.test.js`. Both propagate to the published page through
+    `tools/build-api-reference.mjs`.
+  - **Goal**: Add `onStrip` to the leg shape at `docs/api.md:1029` and
+    `HEADROOM_SAMPLES` to the constants row at `:856` with a phrase saying what
+    it is - how many points across a cut the ground under it is read at - then
+    `npm run docs:api` to carry both to `docs/api-reference.html`. While in the
+    entry, the `1.22.0-alpha` sentence in `CHANGELOG.md` reading "`patternScore`
+    was a published export the game never asked" is missing its last word.
+  - From: UI/UX Override - the corridor's opening and its lid
+- [x] A source-text assertion claims a bound its span does not have
+  - **Issue**: `the landing closes the final leg, and reports the circuit with it`
+    in `test/pattern.test.js` ends by matching `onLanding` for
+    `/this\.closeFinalLeg\(\);/` under the message "the final leg is closed by
+    the arrival, inside the guard that counts it". The span is the whole method
+    body, so it says nothing about the guard. Moved above
+    `if (recordLanding(this.run, runway))` in `js/main.js` the call still
+    matches, and a landing anywhere earlier in the circuit - the takeoff roll, or
+    a pass down the strip a go-around leaves, both of which `recordLanding`
+    refuses by design - would close `FINAL` and report a circuit the pilot never
+    flew out, with the suite green. The sibling assertions in the same file bound
+    their spans to one method for exactly this reason.
+  - **Goal**: Anchor the assertion on the guard rather than on the method:
+    match `recordLanding\(this\.run, runway\)\)\s*\{[^}]*?this\.closeFinalLeg\(\);`
+    against the `onLanding` body, bounded with `[^}]*?` the way
+    `test/input-map.test.js` bounds its spans, so the call has to sit inside the
+    block that counts the arrival.
+  - From: UI/UX Override - the corridor's opening and its lid

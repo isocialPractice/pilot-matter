@@ -113,6 +113,33 @@ export function boundAttitude(pitch, roll, full = false, limits = {}) {
 }
 
 /**
+ * Where the nose, the right wing and the aircraft's own up are pointing, as the
+ * vertical part of each direction, worked out from the two angles that decide
+ * it.
+ *
+ * Written here rather than inside the aircraft so that the code which moves the
+ * angles and the code which reads them cannot come to disagree about which way
+ * either angle runs - which is the whole of how a control ends up flying the
+ * opposite way to its own label. The aircraft turns on a `YXZ` Euler, where the
+ * heading is applied outermost about the world's own up: it swings all three
+ * directions round the horizon without raising or lowering any of them, so the
+ * vertical part of an attitude is the pitch and the bank and nothing else.
+ *
+ * The signs are the model's own. It flies nose-first along `+Z`, which carries
+ * its right wing on `-X`, so a positive pitch angle puts the nose down and a
+ * positive bank drops the right wing. That is why the control which raises the
+ * nose and the control which drops the left wing are both the ones that lower
+ * their angle.
+ */
+export function attitudeFrom(pitch, roll) {
+    return {
+        forwardY: -Math.sin(pitch),
+        rightY:   -Math.cos(pitch) * Math.sin(roll),
+        upY:       Math.cos(pitch) * Math.cos(roll)
+    };
+}
+
+/**
  * The pitch angle the instrument reads, in degrees, from the vertical part of
  * the direction the nose points. Positive is nose above the horizon.
  *

@@ -5,6 +5,101 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.1-alpha] - 2026-10-05
+
+`A` rolls left. The `ROLL AXIS` row shipped last version offering its two
+settings the wrong way round, so the `DIRECTIONAL` default flew what this
+repository calls inverted: held from level, `A` dropped the right wing and
+turned right. The row itself was sound and so was the binding behind it - the
+sign was two lines of the flight model that predate the setting, and nothing in
+the suite could see them, because nothing in the suite had ever read which way
+the aircraft physically goes for a given input. That test exists now, for all
+four pitch and roll controls.
+
+### Fixed
+
+- **`A` drops the left wing and turns left on the default axis, and `D` the
+  mirror of it.** The two roll lines of `Aircraft.update` in `js/aircraft.js`
+  had `rollLeft` raising `rotation.z`, and a raised `rotation.z` drops the right
+  wing: the model flies nose-first along `+Z`, which carries its right wing on
+  `-X`. So the control named for the left wing was attached to the end of the
+  flight model that banks right, and the coordinated turn below rode the same
+  sign the whole way round. The signs are swapped, with the reason written
+  beside them the way the pitch keys four lines above already carry it - that
+  pair fell into this same hole once, and their comment still records it as
+  "Raising it here flew W into a dive."
+
+  Nothing else moved with it. `js/input-map.js` was already correct and is
+  untouched; the tilt and the touch pads write `rollLeft` and `rollRight` rather
+  than the angle, so they come right for free; and `CHEATSHEET.md`, `README.md`,
+  `docs/cheatsheet.html` and `docs/controls/control-settings.html` all already
+  described this behaviour, so they become true rather than wanting an edit.
+- **The controls page no longer contradicts the README about stepping a value.**
+  **Working a menu** in `docs/controls/index.html` named only the settings panel
+  and the element editor, so the published page said the control settings
+  panel's rows could not be stepped while `README.md` said they could. The
+  paragraph names all three now, and links the panel's own page.
+
+### Added
+
+- **`test/control-sense.test.js` pins which way every pitch and roll control
+  flies the aircraft.** This is the gap that let the sign above sit here: the
+  suite pinned which input field a key writes (`test/input-map.test.js`), which
+  field a tilt writes (`test/tilt-controls.test.js`) and `rotation.z` as a value
+  carried or zeroed (`test/flight-state.test.js`), and none of that can tell a
+  field wired to the wrong end of the flight model from one wired to the right
+  end. The fifteen tests here read the attitude instead - where the nose and the
+  right wing are actually pointing - so they state what a pilot would notice and
+  stay true whichever way the model signs its Euler: `pitchUp` raises
+  `forwardY`, `rollLeft` raises `rightY`, `rollRight` lowers it, and the
+  coordinated turn follows the dropped wing. Both settings of both axes are
+  flown on real key presses through `applyKeyToInput`, so the test that would
+  have caught this one is the one asserting `A` rolls left on the default.
+
+  `js/aircraft.js` imports Three.js and wants a scene, so the frame's rotation
+  steps are mirrored out of the same shared functions it calls, in the same
+  order - the idiom `test/flight-model.test.js` already flies a glide with. Two
+  of the tests read `js/aircraft.js` as source text to hold that mirror honest,
+  so a sign changed in the frame and not in the mirror fails rather than passing
+  against a copy nobody flies.
+- **`attitudeFrom` in `js/attitude.js`.** Where the nose, the right wing and the
+  aircraft's own up are pointing, as the vertical part of each direction, from
+  the pitch and the bank that decide it. `Aircraft.getAttitude` read the same
+  three directions off its own quaternion and now asks this for them, which is
+  what lets a test state which way a control flies the aircraft: the frame
+  cannot be run in Node, but the answer it is reaching for can be. It also puts
+  the code that moves an angle and the code that reads it in one file instead of
+  two, which is the whole of how a control ends up flying the opposite way to
+  its own label. The heading drops out of the arithmetic rather than being
+  ignored by it: the aircraft turns on a `YXZ` Euler, where the heading is
+  applied outermost about the world's own up and so swings all three directions
+  round the horizon without raising or lowering any of them.
+
+### Changed
+
+- **The collapsed control list is named for the list it reopens.** `HELP_HINT`
+  in `js/controls-help.js` was `H - CONTROLS`, while the expanded list it
+  collapses to is headed `CONTROL REFERENCE` - which is also the label on the
+  control settings panel row that opens it. The point of that rename was that
+  the row and the list are named the same thing, and the collapsed form was the
+  one place still naming it something else, so a pilot who collapsed the list
+  saw it change its own name. It reads `H - CONTROL REFERENCE` now, in
+  `js/controls-help.js`, in `index.html` and in
+  `docs/controls/clearing-the-screen.html`, with the key still at the front
+  because saying which key brings the list back is the whole reason the line is
+  left behind. `test/controls-help.test.js` pins the hint against
+  `CONTROL_REFERENCE_LABEL` rather than against a second spelling of it.
+- **Every panel opener closes the other three.** `openControlSettingsPanel` in
+  `js/main.js` closed the other three, but none of `openSettingsPanel`,
+  `openEditorPanel` or `openGameModesPanel` had been taught to close it, so the
+  set was mutually exclusive only because `syncOverlays` ranks `controls` below
+  `modes` and `settings` and because an open panel swallows every key that would
+  open another. Nothing reached it, which is why this is not filed as a fix: the
+  next panel, or the next open key, is what would have made a closed panel
+  reappear from under the one over it. Each opener states what it closes now
+  rather than resting on the order something else happens to rank them in, and
+  `test/control-settings.test.js` reads the exclusion across all four of them.
+
 ## [1.24.0-alpha] - 2026-10-04
 
 What the keys mean is a setting now. The menu entry that showed the reference

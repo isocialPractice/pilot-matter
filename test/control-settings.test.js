@@ -417,6 +417,44 @@ test('opening the panel closes whatever other panel was over the flight', () => 
 });
 
 /**
+ * The exclusion read both ways. The panel closing the other three is only half
+ * of a set that is mutually exclusive: for a while the other three did not
+ * close this one, and the set held together only because `syncOverlays` ranks
+ * `controls` below `modes` and `settings` and because an open panel swallows
+ * every key that would open another. Nothing reached it, so nothing broke - and
+ * the next panel, or the next open key, is what would have made a closed panel
+ * reappear from under the one over it.
+ *
+ * So each opener states what it closes, rather than resting on the order
+ * something else happens to rank them in.
+ */
+test('every panel opener closes the other three', () => {
+    const CLOSES = {
+        settings: 'closeSettings(this.settings)',
+        editor:   'closeEditor(this.editor)',
+        modes:    'this.modesOpen = false',
+        controls: 'closeControlSettings(this.controlSettings)'
+    };
+    const OPENERS = {
+        openSettingsPanel:        'settings',
+        openEditorPanel:          'editor',
+        openGameModesPanel:       'modes',
+        openControlSettingsPanel: 'controls'
+    };
+
+    for (const [opener, panel] of Object.entries(OPENERS)) {
+        const body = mainSource.match(new RegExp(`${opener}\\(\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        assert.ok(body, `js/main.js should define ${opener}()`);
+
+        for (const [other, closing] of Object.entries(CLOSES)) {
+            if (other === panel) continue;
+            assert.ok(body[0].includes(closing),
+                `${opener}() should ${closing} so the ${other} panel cannot reappear behind it`);
+        }
+    }
+});
+
+/**
  * The start screen has no H key to collapse the list with, so the row that put
  * the list on screen has to be able to take it off again. Opening it with no way
  * back leaves a pilot working the menus from the keyboard with the list over the

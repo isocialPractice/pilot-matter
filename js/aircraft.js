@@ -3,7 +3,7 @@ import {
     createInputState, applyKeyToInput, isResetKey, isLevelOffKey, wantsVerticalChange,
     releaseAxisControls, resolveAxes, DEFAULT_KEYMAP
 } from './input-map.js';
-import { boundAttitude, turnSign } from './attitude.js';
+import { boundAttitude, turnSign, attitudeFrom } from './attitude.js';
 import { createFlightState } from './flight-state.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, GRAVITY, CONTROL_SENSITIVITY, LEVEL_OFF_SECONDS,
@@ -399,9 +399,21 @@ export class Aircraft {
             if (this.levelling.elapsed >= LEVEL_OFF_SECONDS) this.levelling = null;
         }
 
-        // Roll
-        if (this.input.rollLeft)  this.rotation.z += this.rates.roll * dt;
-        if (this.input.rollRight) this.rotation.z -= this.rates.roll * dt;
+        // Roll: A = left wing down, D = right wing down, which is what the
+        // pads, the control list and the documentation all say it is.
+        //
+        // The control that drops the left wing is the one that lowers the
+        // angle, for the same reason the pitch keys above read the way they
+        // do: the model flies nose-first along +Z, which carries its right
+        // wing on -X, so a positive rotation about +Z drops that right wing.
+        // The coordinated turn below rides on the same sign, so the heading
+        // follows the dropped wing without a second correction.
+        //
+        // Raised here, A dropped the right wing and turned right - so the
+        // DIRECTIONAL setting flew what the repository calls INVERTED, and
+        // the row offered its two settings the wrong way round.
+        if (this.input.rollLeft)  this.rotation.z -= this.rates.roll * dt;
+        if (this.input.rollRight) this.rotation.z += this.rates.roll * dt;
 
         // How far the nose and the wings are allowed to have gone, decided once
         // for both of them by `boundAttitude` in js/attitude.js rather than per
@@ -661,14 +673,16 @@ export class Aircraft {
      * ladder shows what the aircraft is doing rather than what it was asked
      * to do. The model is built with its nose along +Z, which puts the right
      * wing along -X.
+     *
+     * The arithmetic is `attitudeFrom` in js/attitude.js, which is the same
+     * three directions this used to read off its own quaternion. Asking that
+     * module for them is what lets a test state which way a control flies the
+     * aircraft: the frame above cannot be run in Node, but the answer it is
+     * reaching for can be, and the control that moves an angle and the reading
+     * that interprets it are then one statement instead of two.
      */
     getAttitude() {
-        const quat = this.getQuaternion();
-        return {
-            forwardY: new THREE.Vector3(0, 0, 1).applyQuaternion(quat).y,
-            rightY:   new THREE.Vector3(-1, 0, 0).applyQuaternion(quat).y,
-            upY:      new THREE.Vector3(0, 1, 0).applyQuaternion(quat).y
-        };
+        return attitudeFrom(this.rotation.x, this.rotation.z);
     }
 }
 
