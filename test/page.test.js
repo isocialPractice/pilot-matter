@@ -585,6 +585,29 @@ test('the reference list is headed with the name of the row that opens it', () =
     assert.equal(list[1].trim(), CONTROL_REFERENCE_LABEL);
 });
 
+/**
+ * The heading above is only half of it. The row that collapses the list sits
+ * inside the list, and it read `H - Hide Controls` for as long as the heading
+ * read `CONTROLS` - so renaming the heading and the hint left the list calling
+ * itself by the old name in its own body, which is the exact reading those
+ * renames were made to stop. The row says what the key does instead, and this
+ * holds it there: the list may not carry a second name for itself anywhere in
+ * it.
+ */
+test('the row that collapses the list names the action rather than the list', () => {
+    const list = indexHtml.match(/<div id="controls-help-list">([\s\S]*?)<\/div>/);
+    assert.ok(list, 'index.html should carry the control list');
+
+    const row = list[1].match(/(?:^|>|\s)H - ([^<\r\n]*)/m);
+    assert.ok(row, 'the list should name the H key');
+
+    const action = row[1].trim();
+    assert.match(action, /^Collapse\b/i,
+        `the H row "${action}" should say the list collapses, as README.md and CHEATSHEET.md do`);
+    assert.doesNotMatch(action, /controls?/i,
+        `the H row "${action}" should not name the list a second time`);
+});
+
 // The instruments are read on whichever scale the panel is set to, so the
 // units beside the numbers have to be something the HUD can rewrite.
 test('every readout with a scale has the scale in an element of its own', () => {

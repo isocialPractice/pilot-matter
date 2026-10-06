@@ -1923,3 +1923,38 @@ still be found by name.
     `test/input-map.test.js` bounds its spans, so the call has to sit inside the
     block that counts the arrival.
   - From: UI/UX Override - the corridor's opening and its lid
+
+## Archived 10-06-26
+
+- [x] A corridor opening is held clear of the ground under it and nothing holds
+  it clear of the lid over it
+  - **Issue**: `corridorOpening` in `js/game-modes.js` now puts the aircraft at
+    `(Math.max(first.floor, ground) + margin)` where `margin` is half the air at
+    the first cut. The `Math.max` is the floor side of the guard and there is no
+    ceiling side, so the opening rises with the ground at the opening while the
+    lid it has to stay under does not move. The module's own header says what
+    that would cost in as many words - "a run that opened over the lid it is
+    meant to stay under would open with its first section already failed" - and
+    nothing now stops it. Read in Chromium off the corridor each stage actually
+    drew, with `stageStart` handed that corridor: `OPEN REACH` opens 281.7 units
+    under its first lid, `NARROWS` 225.8, `THE RIM` 158.5 and `THE SLOT` 22.1.
+    The three roomy ones are the three whose opening ground sits at or below the
+    first cut's floor; `THE SLOT` is the one where it stands above it, by 92.1
+    units against a margin of 115.0. The remaining 22.9 is the whole of the
+    clearance, and it is the seed's to decide: ground 115 units over that floor
+    instead of 92 opens the stage level with its own lid, and anything above
+    that opens over it. Flown this run, all four stages are fine - every cut of
+    every stage was counted and `THE SLOT` was flown out to `MODE COMPLETE` - so
+    this is the guard being half there rather than a stage that fails today.
+  - **Goal**: Hold the opening under the first cut as well as over the ground,
+    so the two bounds are a band rather than one floor. Something of the shape
+    `Math.min(first.ceiling - clearance, Math.max(first.floor, ground) + margin)`
+    - the height wanted, but never nearer the lid than a stated clearance. State
+    what that clearance is and why, the way `MIN_HEADROOM` states its own, and
+    note that a cut with less air in it than the clearance asks for is already
+    refused by `MIN_HEADROOM`, so the two cannot fight. `a run opens over the
+    ground at its opening, not the ground at the first cut` in
+    `test/game-modes.test.js` is where the new bound wants a case of its own: a
+    corridor whose opening ground stands higher over the floor than half the
+    cut's air, which today opens above the ceiling and should not.
+  - From: UI/UX Override - the corridor's opening and its lid

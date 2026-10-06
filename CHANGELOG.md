@@ -5,6 +5,58 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.2-alpha] - 2026-10-06
+
+The control list no longer calls itself `Controls` in its own body. Last
+version renamed the heading above the list and the hint the list collapses to,
+so that the row which opens it, the list itself and the line left behind were
+one name - and the row inside the list that does the collapsing was missed, so
+the list went on offering `Hide Controls` nine lines under its own
+`CONTROL REFERENCE` heading. Nothing failed, because nothing in the suite had
+ever read the rows of that list for what they say; it read the heading and it
+read the hint. It reads a row now.
+
+### Changed
+
+- **The `H` row of the control list says what the key does rather than naming
+  the list again.** `index.html` drew `H - Hide Controls` as the ninth row of
+  `#controls-help-list`, which put the word the renames were made to retire
+  back inside the list those renames had just given one name. The row reads
+  `H - Collapse List` now, which is the action rather than a second name for
+  the list, and it is the wording `README.md`, `CHEATSHEET.md`,
+  `docs/cheatsheet.html` and `docs/controls/index.html` were already describing
+  the key with - all four say the key collapses the control list, so the row
+  joins them rather than asking them to change. The rest of the rows are
+  untouched: they name actions already, which is the idiom the row was the one
+  exception to.
+- **The `1.24.1-alpha` entry above no longer says the collapsed hint was the
+  only place still reading `CONTROLS`.** It was one of two, and the row fixed
+  here was the other, so the entry recorded a rename as finished a version
+  before it was. The claim is corrected in place and points at this version for
+  the rest of it, rather than being quietly dropped - a changelog that edits
+  away what it got wrong leaves a reader no way to tell the two states apart.
+
+### Added
+
+- **`test/page.test.js` reads what a row of the control list says, not just
+  which key it names.** Three tests already reach this list, and the gap the row
+  sat in for a version runs between them: `the reference list is headed with the
+  name of the row that opens it` pins the `<h3>`, `the collapsed controls list
+  leaves the hint that reopens it` pins `HELP_HINT`, and `the control list names
+  the keys the flight is worked with` walks the rows for the keys - `C`, `Tab`,
+  `H`, `P`, `R` and the four it imports from the modules that own them - but
+  matches each as `X -` and stops at the dash. So the suite knew the `H` row
+  existed and had never read a word of what it offered. The new test pulls the
+  `H` row out of the list body and holds two things about it: that it opens with
+  `Collapse`, so it keeps saying what the key does in the words the
+  documentation uses, and that it contains no form of `control` at all, so no
+  later edit can reintroduce a second name for the list by any spelling. The
+  test was then run with `H - Hide Controls` put back in `index.html`, to see it
+  fail on the wording it was written for rather than only pass on the wording
+  that replaced it: it fails the first assertion, naming the row it read. The
+  row is matched with `[^<\r\n]*`, so the span cannot run past the `<br>` that
+  ends it into the rows either side.
+
 ## [1.24.1-alpha] - 2026-10-05
 
 `A` rolls left. The `ROLL AXIS` row shipped last version offering its two
@@ -81,9 +133,11 @@ four pitch and roll controls.
   in `js/controls-help.js` was `H - CONTROLS`, while the expanded list it
   collapses to is headed `CONTROL REFERENCE` - which is also the label on the
   control settings panel row that opens it. The point of that rename was that
-  the row and the list are named the same thing, and the collapsed form was the
-  one place still naming it something else, so a pilot who collapsed the list
-  saw it change its own name. It reads `H - CONTROL REFERENCE` now, in
+  the row and the list are named the same thing, and the collapsed form was one
+  of two places still naming it something else, so a pilot who collapsed the
+  list saw it change its own name. (This entry claimed it was the only one. The
+  `H` row inside the list still read `H - Hide Controls`, and `1.24.2-alpha`
+  below is where that was caught.) It reads `H - CONTROL REFERENCE` now, in
   `js/controls-help.js`, in `index.html` and in
   `docs/controls/clearing-the-screen.html`, with the key still at the front
   because saying which key brings the list back is the whole reason the line is
