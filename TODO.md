@@ -22,63 +22,57 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the list guard reads one row, and comments name a retired entry
+### Code Review Override - the widened guard's own reach, and one more comment naming the start menu
 
-- [ ] The guard on the control list holds one row rather than the list
+- [ ] The list guard reads to the first `</div>` rather than to the end of the list
   - **Issue**: `the row that collapses the list names the action rather than the
-    list` in `test/page.test.js:597` captures the whole body of
-    `#controls-help-list` and then narrows to the `H` row before judging it, so
-    `assert.doesNotMatch(action, /controls?/i)` at `:607` is scoped to the text
-    after `H - ` and to nothing else. The list may therefore still name itself
-    `Controls` in any other row with the suite green. Verified: adding
-    `X - Show Controls<br>` under `index.html:1441` and running `npm test`
-    leaves all 1245 tests passing, this new one included. That is the same gap
-    that let this version's defect stand for a version - the suite read the
-    heading and it read the hint and it never read a row - narrowed from the
-    whole list to one row rather than closed. The test's own docstring states
-    the wider bound it does not hold, "the list may not carry a second name for
-    itself anywhere in it".
-  - **Goal**: Hold the bound the docstring already states. Run the `doesNotMatch`
-    over the captured list body rather than over the one row's action, with the
-    `<h3>CONTROL REFERENCE</h3>` heading sliced off the span first so the list's
-    own correct name is not read as the thing being forbidden - that heading is
-    pinned already by `the reference list is headed with the name of the row that
-    opens it` at `:582`, so nothing is lost by excluding it. Leave the
-    `^Collapse` assertion on the `H` row, which is the one part of the test that
-    is genuinely about that row's wording. Then re-run with
-    `X - Show Controls<br>` in place to see it fail, the way this test was
-    already checked against `H - Hide Controls`.
-  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
-- [ ] Four comments still say the `Controls` entry is what puts the list on screen
-  - **Issue**: the entry was renamed to `CONTROL SETTINGS` and no longer opens
-    the reference list at all - `js/menu.js:13` carries
-    `{ id: 'controls', label: 'CONTROL SETTINGS' }`, and `js/main.js:801` sends
-    that entry to `openControlSettingsPanel()`, with the list reached one level
-    in from there by the `CONTROL REFERENCE` row at `js/main.js:1077`. The
-    comment at `js/main.js:802` says so in as many words: "the reference list it
-    used to show is a row inside that panel now". Four other comments were not
-    brought along and still assert the old causal chain in the present tense:
-    `index.html:88` ("it is what the Controls entry puts on screen"),
-    `js/main.js:237` ("the start screen's Controls entry puts the control list
-    on screen"), `js/main.js:924` ("it is what the Controls entry puts on
-    screen") and `test/page.test.js:765` ("the list is what the Controls entry
-    puts on screen"). Two of the four are in the files this run edited, and
-    `js/main.js` contradicts itself twice over inside one module. Nothing
-    executes a comment, so nothing fails; the cost is that a reader sent to
-    `js/main.js:924` to learn why the list takes the pointer is told it is
-    answering for an entry that has not opened it since `1.23.0-alpha`.
-  - **Goal**: Say in all four that the list is opened by the `CONTROL REFERENCE`
-    row of the control settings panel, and that it is also collapsed by `H` over
-    a flight, which is the arrangement `js/main.js:802` and
-    `docs/controls/clearing-the-screen.html:94` already describe. Keep each
-    comment's point intact rather than rewriting it - `index.html:88` and
-    `test/page.test.js:765` exist to say why the list takes the pointer, and
-    `js/main.js:237` is about the start screen specifically, where the row
-    toggles rather than only opens. Leave
-    `test/control-settings.test.js:461` exactly as it is: it names the entry in
-    the past tense on purpose, "before this panel was between them", and is the
-    one of the five that is already correct.
-  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
+    list` now runs its `doesNotMatch` over the whole captured body, which is the
+    bound its docstring states - but the capture it reads is
+    `/<div id="controls-help-list">([\s\S]*?)<\/div>/` at `test/page.test.js:598`,
+    non-greedy to the *first* `</div>`. The body of `#controls-help-list` happens
+    to carry no nested element today, so the capture happens to reach the end of
+    the list, and nothing in the suite holds that it does. Verified against the
+    same capture with one row group added: a list reading
+    `<div class="group">W/S or arrows - Pitch<br></div>` followed by
+    `X - Show Controls<br>` captures only as far as the group's close, and
+    `/controls?/i` over that span returns false - the guard goes blind to the
+    second name exactly as it did before this version widened it. The companion
+    test at `:664` would catch a wrapper placed around most of the rows, since
+    the keys it looks for would fall outside the capture, but not one placed
+    after the last key row, which is where a footnote or a group of trailing rows
+    would go. So the gap is narrowed again rather than closed: from one row of
+    fifteen to everything before the first nested close.
+  - **Goal**: Make the span the guard reads the span the docstring claims. Either
+    capture the list body by balancing its close rather than taking the first one
+    - matching to the `</div>` that precedes `<div id="controls-help-hint">`, which
+    is the sibling that already marks the end of the list - or hold the list free
+    of nested elements in a test of its own so the non-greedy capture is sound by
+    something stated rather than by accident. Shared with `:664`, which takes the
+    same capture and has the same reach. Then re-run with a row group added ahead
+    of an `X - Show Controls<br>` row to see it fail, the way the widened guard
+    was already checked against a plain trailing row.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+- [ ] A fifth comment still says the start menu is what opens the control list
+  - **Issue**: the four comments this version corrected were the four the item
+    named, and the second paragraph of the one at `js/main.js:926` was not among
+    them. It still reads "Over the title screen the list is not a toggle but a
+    panel the start menu opened" at `js/main.js:933`, three lines below the
+    paragraph that was rewritten to say the `CONTROL REFERENCE` row is what puts
+    the list on screen. The start menu does not open the list: its
+    `CONTROL SETTINGS` entry opens the control settings panel, and the row inside
+    that panel sets `titleHelp` at `js/main.js:1083`, so the menu is two levels
+    removed from it. That is the same stale chain the item existed to remove, and
+    it now sits in the same docblock as its own correction, which reads as the two
+    halves disagreeing about what opens the list. The clause after it is already
+    right - it names the `Control Reference` row - so only the attribution is
+    wrong.
+  - **Goal**: Say the list over the title screen is a panel the `CONTROL REFERENCE`
+    row opened, rather than one the start menu opened, keeping the paragraph's
+    point intact: that over the title the list is a panel rather than a toggle, so
+    a click closes it the way choosing that row again would. Leave the rest of the
+    docblock as this version left it. While there, check the same docblock reads as
+    one account of the list rather than two.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
 
 ## Game UI/UX
 
@@ -392,14 +386,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 164 earlier items in `TODO-archive.md`, newest last.
+> 166 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Rename the **Controls** entry to **Control Settings**, and make what it
-  opens a panel of settings rather than a list
-  - From: Simulator Configuration
-- [x] **Roll Sense**: Toggle pitch and roll between inverted and directional,
-  independently
-  - From: Flight Controls
 - [x] Allow a full 360 in pitch and in roll, without breaking the controls at
   the limit
   - From: Flight Controls
@@ -527,3 +515,58 @@ how the simulator got here rather than as a list still to be worked.
     the way `the reference list is headed with the name of the row that opens it`
     pins the heading.
   - From: Code Review Override - the reference list still calls itself Controls on its own H row
+- [x] The guard on the control list holds one row rather than the list
+  - **Issue**: `the row that collapses the list names the action rather than the
+    list` in `test/page.test.js:597` captures the whole body of
+    `#controls-help-list` and then narrows to the `H` row before judging it, so
+    `assert.doesNotMatch(action, /controls?/i)` at `:607` is scoped to the text
+    after `H - ` and to nothing else. The list may therefore still name itself
+    `Controls` in any other row with the suite green. Verified: adding
+    `X - Show Controls<br>` under `index.html:1441` and running `npm test`
+    leaves all 1245 tests passing, this new one included. That is the same gap
+    that let this version's defect stand for a version - the suite read the
+    heading and it read the hint and it never read a row - narrowed from the
+    whole list to one row rather than closed. The test's own docstring states
+    the wider bound it does not hold, "the list may not carry a second name for
+    itself anywhere in it".
+  - **Goal**: Hold the bound the docstring already states. Run the `doesNotMatch`
+    over the captured list body rather than over the one row's action, with the
+    `<h3>CONTROL REFERENCE</h3>` heading sliced off the span first so the list's
+    own correct name is not read as the thing being forbidden - that heading is
+    pinned already by `the reference list is headed with the name of the row that
+    opens it` at `:582`, so nothing is lost by excluding it. Leave the
+    `^Collapse` assertion on the `H` row, which is the one part of the test that
+    is genuinely about that row's wording. Then re-run with
+    `X - Show Controls<br>` in place to see it fail, the way this test was
+    already checked against `H - Hide Controls`.
+  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
+- [x] Four comments still say the `Controls` entry is what puts the list on screen
+  - **Issue**: the entry was renamed to `CONTROL SETTINGS` and no longer opens
+    the reference list at all - `js/menu.js:13` carries
+    `{ id: 'controls', label: 'CONTROL SETTINGS' }`, and `js/main.js:801` sends
+    that entry to `openControlSettingsPanel()`, with the list reached one level
+    in from there by the `CONTROL REFERENCE` row at `js/main.js:1077`. The
+    comment at `js/main.js:802` says so in as many words: "the reference list it
+    used to show is a row inside that panel now". Four other comments were not
+    brought along and still assert the old causal chain in the present tense:
+    `index.html:88` ("it is what the Controls entry puts on screen"),
+    `js/main.js:237` ("the start screen's Controls entry puts the control list
+    on screen"), `js/main.js:924` ("it is what the Controls entry puts on
+    screen") and `test/page.test.js:765` ("the list is what the Controls entry
+    puts on screen"). Two of the four are in the files this run edited, and
+    `js/main.js` contradicts itself twice over inside one module. Nothing
+    executes a comment, so nothing fails; the cost is that a reader sent to
+    `js/main.js:924` to learn why the list takes the pointer is told it is
+    answering for an entry that has not opened it since `1.23.0-alpha`.
+  - **Goal**: Say in all four that the list is opened by the `CONTROL REFERENCE`
+    row of the control settings panel, and that it is also collapsed by `H` over
+    a flight, which is the arrangement `js/main.js:802` and
+    `docs/controls/clearing-the-screen.html:94` already describe. Keep each
+    comment's point intact rather than rewriting it - `index.html:88` and
+    `test/page.test.js:765` exist to say why the list takes the pointer, and
+    `js/main.js:237` is about the start screen specifically, where the row
+    toggles rather than only opens. Leave
+    `test/control-settings.test.js:461` exactly as it is: it names the entry in
+    the past tense on purpose, "before this panel was between them", and is the
+    one of the five that is already correct.
+  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
