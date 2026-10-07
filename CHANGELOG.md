@@ -5,6 +5,55 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.3-alpha] - 2026-10-07
+
+The control list's self-name guard holds the whole list rather than one row of
+it. `1.24.2-alpha` added `the row that collapses the list names the action
+rather than the list` to close the gap that had let the `H` row read
+`Hide Controls` for a version - but the test captured the body of
+`#controls-help-list`, narrowed the span to the `H` row, and then ran both of
+its assertions on the text after `H - `. The list could therefore still carry a
+second name for itself in any of its other fourteen rows with all 1245 tests
+passing, which was verified by adding one. The gap was narrowed from the whole
+list to one row rather than closed, and the test's own docstring stated the
+wider bound it did not hold.
+
+### Changed
+
+- **`test/page.test.js` reads the whole control list for a second name rather
+  than the `H` row.** The `doesNotMatch` for `/controls?/i` runs over the
+  captured list body now, with the `<h3>CONTROL REFERENCE</h3>` heading sliced
+  off the span first so the list's own correct name is not read as the thing
+  being forbidden - that heading is held to that name by `the reference list is
+  headed with the name of the row that opens it` a few lines above, so excluding
+  it loses nothing. The `^Collapse` assertion stays on the `H` row, which is the
+  one part of the test genuinely about that row's wording. The failure names the
+  offending row rather than printing the whole body, so a reader is sent to the
+  line. Re-run with `X - Show Controls<br>` added under the last row it fails on
+  the row it read, the way the test was already checked against
+  `H - Hide Controls`; the suite is otherwise green at 1245.
+- **Four comments say the `CONTROL REFERENCE` row opens the control list, rather
+  than the retired `Controls` entry.** That entry was renamed `CONTROL SETTINGS`
+  in `1.23.0-alpha` and sends to `openControlSettingsPanel()`, with the list one
+  level in from there, but `index.html`, two comments in `js/main.js` and one in
+  `test/page.test.js` were not brought along and went on asserting the old chain
+  in the present tense - leaving `js/main.js` contradicting itself twice inside
+  one module, since the comment beside the entry already said the list "is a row
+  inside that panel now". All four now name the row that opens the list and the
+  `H` key that collapses it over a flight, which is the arrangement that comment
+  and `docs/controls/clearing-the-screen.html` already describe. Each keeps the
+  point it was written to make: the two about `#controls-help` taking the pointer
+  still say why it takes it, and the one on `titleHelp` is still about the start
+  screen, where the row turns the list over rather than only opening it. The
+  comment in `test/control-settings.test.js` is untouched - it names the entry in
+  the past tense on purpose, "before this panel was between them", and was the
+  one of the five already correct.
+- **The `1.24.2-alpha` entry below no longer says its new test stops a second
+  name "by any spelling".** It held that bound over the `H` row only, so the
+  claim covered one row of fifteen - the same shape of overclaim as the
+  `1.24.1-alpha` sentence that entry itself corrected. The claim is corrected in
+  place and points at this version for the rest of it.
+
 ## [1.24.2-alpha] - 2026-10-06
 
 The control list no longer calls itself `Controls` in its own body. Last
@@ -49,8 +98,9 @@ read the hint. It reads a row now.
   existed and had never read a word of what it offered. The new test pulls the
   `H` row out of the list body and holds two things about it: that it opens with
   `Collapse`, so it keeps saying what the key does in the words the
-  documentation uses, and that it contains no form of `control` at all, so no
-  later edit can reintroduce a second name for the list by any spelling. The
+  documentation uses, and that it contains no form of `control` at all. That
+  bound is held over the `H` row alone, so it stops a second name in that row
+  rather than anywhere in the list; `1.24.3-alpha` above widens it to the list. The
   test was then run with `H - Hide Controls` put back in `index.html`, to see it
   fail on the wording it was written for rather than only pass on the wording
   that replaced it: it fails the first assertion, naming the row it read. The

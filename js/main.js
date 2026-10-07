@@ -234,8 +234,10 @@ class FlightSimulator {
         // when the sensor comes to life rather than every frame it stays alive.
         this.padsTilted = null;
 
-        // The start screen's Controls entry puts the control list on screen
-        // over the title, where nothing else would have shown it yet.
+        // Whether the control settings panel's CONTROL REFERENCE row has put the
+        // control list on screen over the title, where nothing else would have
+        // shown it yet. The row turns it over there rather than only opening it,
+        // there being no H key over a title screen to collapse it with.
         this.titleHelp = false;
 
         // The panel of modes, which is modal over whatever it was opened from
@@ -921,10 +923,12 @@ class FlightSimulator {
     }
 
     /**
-     * The control list under the mouse. It is what the Controls entry puts on
-     * screen, so it is also the way back off it: a click collapses the list to
-     * its hint line and another opens it again, which is the H key's job for a
-     * pilot working the menus with the keyboard.
+     * The control list under the mouse. The CONTROL REFERENCE row of the control
+     * settings panel is what puts it on screen, and H is what collapses it over
+     * a flight, so a click has to be the way off it for a pilot working the
+     * menus with the mouse: a click collapses the list to its hint line and
+     * another opens it again, which is the H key's job for a pilot working them
+     * with the keyboard.
      *
      * Over the title screen the list is not a toggle but a panel the start menu
      * opened, so a click there closes it the way choosing the Control Reference

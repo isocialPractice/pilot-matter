@@ -1958,3 +1958,12 @@ still be found by name.
     corridor whose opening ground stands higher over the floor than half the
     cut's air, which today opens above the ceiling and should not.
   - From: UI/UX Override - the corridor's opening and its lid
+
+## Archived 10-07-26
+
+- [x] Rename the **Controls** entry to **Control Settings**, and make what it
+  opens a panel of settings rather than a list
+  - From: Simulator Configuration
+- [x] **Roll Sense**: Toggle pitch and roll between inverted and directional,
+  independently
+  - From: Flight Controls

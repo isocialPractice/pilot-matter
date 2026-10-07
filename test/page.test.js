@@ -604,8 +604,14 @@ test('the row that collapses the list names the action rather than the list', ()
     const action = row[1].trim();
     assert.match(action, /^Collapse\b/i,
         `the H row "${action}" should say the list collapses, as README.md and CHEATSHEET.md do`);
-    assert.doesNotMatch(action, /controls?/i,
-        `the H row "${action}" should not name the list a second time`);
+
+    // The heading is the list's own name and is the correct one, held there by
+    // the test above, so it comes off the span before the rest of the body is
+    // read for a second one.
+    const rows   = list[1].replace(/<h3>[\s\S]*?<\/h3>/, '');
+    const second = rows.match(/[^<>\r\n]*controls?[^<>\r\n]*/i);
+    assert.doesNotMatch(rows, /controls?/i,
+        `the row "${second ? second[0].trim() : ''}" should not name the list a second time`);
 });
 
 // The instruments are read on whichever scale the panel is set to, so the
@@ -762,8 +768,9 @@ test('every menu is read down its left edge rather than about its middle', () =>
     }
 });
 
-// The list is what the Controls entry puts on screen, so it is also the way
-// back off it for a pilot working the menus with the mouse.
+// The CONTROL REFERENCE row of the control settings panel is what puts the list
+// on screen, and H is what collapses it over a flight, so a click has to be the
+// way off it for a pilot working the menus with the mouse.
 test('the control list takes the pointer rather than passing it to the flight', () => {
     const rule = styleRule(indexHtml, 'controls-help') ?? '';
     assert.ok(!/pointer-events:\s*none/.test(rule),

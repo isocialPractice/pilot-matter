@@ -84,10 +84,12 @@
             stroke-linejoin: round;
         }
 
-        /* The list takes the pointer back from the flight behind it, because it
-           is what the Controls entry puts on screen and so is also the way back
-           off it: a click collapses it to its hint line, and a click on what is
-           left opens it again. */
+        /* The list takes the pointer back from the flight behind it, because a
+           pilot working the menus with the mouse needs a way off it: the CONTROL
+           REFERENCE row of the control settings panel is what puts it on screen,
+           and H is what collapses it over a flight. A click does both - it
+           collapses the list to its hint line, and a click on what is left opens
+           it again. */
         #controls-help {
             display: none;
             position: fixed;
