@@ -92,6 +92,44 @@ its context survives being archived.
     the page happens to use.
   - From: Code Review Override - what the balanced span promises, and markup read as a row
 
+### Version Scheme Override - re-express the pre-release before the next bump
+
+- [ ] Move the version into the nested pre-release form
+  - **The core is doing the suffix's job.** `package.json` reads
+    `1.24.4-alpha`, which claims twenty-four minor releases of a package that
+    is not on a registry, while the `-alpha` says it is not released at all.
+    Every run climbs a release number nothing has released.
+  - **Write `1.0.0-alpha.1.24.4`.** The core becomes the release being worked
+    towards and stops moving until the suffix is dropped; the old core moves
+    into the suffix, where it keeps the record of how far the project has
+    come. The inner triple then moves the way the core used to: a patch to
+    `1.0.0-alpha.1.24.5`, a minor to `1.0.0-alpha.1.25.0`, a major to
+    `1.0.0-alpha.2.0.0`. `### Version Schemes` in the automation instructions
+    is the standing rule.
+  - **This is not a release.** It re-expresses the version the project is
+    already at, so it earns no step of its own. Items completed alongside it
+    earn their step from the corrected form, in one entry under one version.
+  - **Change it in `package.json` and in this run's `CHANGELOG.md` heading,
+    and nowhere else.** Every other mention of `1.24.4` in the repository is
+    history - a past entry, a note, a heading naming the release some work
+    belonged to - and history is not corrected. In particular, do not rewrite
+    an override heading or a `- From:` line that names an old version: a
+    `From:` line has to match its heading word for word, and editing one of
+    the pair breaks the item mid-run.
+  - **Say in the entry why the version looks smaller than yesterday's.** The
+    new version sorts below the last one published, and a reader who meets
+    that with no explanation beside it goes looking for a mistake. Name the
+    old form and the new one, and say the switch was deliberate.
+  - **Leave the three existing tags alone.** They record releases that
+    happened. Do not delete one, do not move one, and do not re-tag to make
+    the ordering look right - the next releases pass them.
+  - **Two traps.** `1.0.0-alpha.1.02.0` is not valid semver, so nothing pads
+    an identifier and nothing tidies one. And `npm version patch` is the
+    wrong command here: it strips the pre-release and yields a bare `1.0.0`.
+    Only the last identifier has a command at all, `npm version prerelease`;
+    an inner minor or major is a hand edit.
+  - From: Version Scheme Override - re-express the pre-release before the next bump
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
