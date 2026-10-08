@@ -22,57 +22,75 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+### Code Review Override - what the balanced span promises, and markup read as a row
 
-- [ ] The list guard reads to the first `</div>` rather than to the end of the list
+#### Resolve Issues
+
+- [ ] Balanced Span 1
+  - **Issue**: `elementBody()` at `test/page.test.js:603` keeps its documented
+    promise in one direction only. Its docstring says the span is "null again
+    when its tags do not balance", but the loop returns at the first point the
+    depth reaches zero, so only the unclosed direction - a missing `</div>`,
+    where the depth never returns and the loop falls through to `return null` -
+    is reported. An element carrying one `</div>` too many returns a truncated
+    span instead, silently. Verified against a list reading
+    `W/S - Pitch<br></div>` on the third line followed by
+    `H - Show Controls<br>` and `F2 - Photo`: the reader returns only
+    `<h3>CONTROL REFERENCE</h3>` and the first row, and `/Show Controls/` over
+    that span is false. That is the same blindness the item coined
+    **Balanced Span** existed to end - a guard reading a span shorter than the
+    one its docstring states, passing because it cannot see the row that would
+    fail it - arriving now through a stray close rather than through a nested
+    one. The `assert.ok(list, 'index.html should carry the control list')` in
+    both callers cannot tell the two apart either: on a genuine null it names a
+    list that is carried, and on an element whose body is empty the reader
+    returns `''`, which is falsy, so a present-but-empty list is reported as a
+    missing one too.
+  - **Goal**: Make the function's behaviour and its docstring say the same
+    thing. Either detect the over-closed direction and return null for it -
+    the depth going negative before the element's own close is the signal, and
+    it means the markup cannot be read rather than that the element is short -
+    or narrow the docstring to the direction the loop actually reports and say
+    plainly that a stray close truncates the span. Prefer the first: a test
+    reading a short span and passing is the failure mode of the last three
+    versions. While there, separate "no such element" from "cannot be read"
+    well enough that a caller can say which it hit, so the
+    `should carry the control list` message stops being the answer to three
+    different conditions, and decide whether an empty body is a null or an
+    empty string. Then extend
+    `a list body is read past a nested close rather than up to the first one`
+    to hold whichever contract is chosen, since nothing in the suite exercises
+    either unbalanced direction today.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+
+#### Found Issues
+
+- [ ] The self-name guard reads a wrapper's own attribute as a row
   - **Issue**: `the row that collapses the list names the action rather than the
-    list` now runs its `doesNotMatch` over the whole captured body, which is the
-    bound its docstring states - but the capture it reads is
-    `/<div id="controls-help-list">([\s\S]*?)<\/div>/` at `test/page.test.js:598`,
-    non-greedy to the *first* `</div>`. The body of `#controls-help-list` happens
-    to carry no nested element today, so the capture happens to reach the end of
-    the list, and nothing in the suite holds that it does. Verified against the
-    same capture with one row group added: a list reading
-    `<div class="group">W/S or arrows - Pitch<br></div>` followed by
-    `X - Show Controls<br>` captures only as far as the group's close, and
-    `/controls?/i` over that span returns false - the guard goes blind to the
-    second name exactly as it did before this version widened it. The companion
-    test at `:664` would catch a wrapper placed around most of the rows, since
-    the keys it looks for would fall outside the capture, but not one placed
-    after the last key row, which is where a footnote or a group of trailing rows
-    would go. So the gap is narrowed again rather than closed: from one row of
-    fifteen to everything before the first nested close.
-  - **Goal**: Make the span the guard reads the span the docstring claims. Either
-    capture the list body by balancing its close rather than taking the first one
-    - matching to the `</div>` that precedes `<div id="controls-help-hint">`, which
-    is the sibling that already marks the end of the list - or hold the list free
-    of nested elements in a test of its own so the non-greedy capture is sound by
-    something stated rather than by accident. Shared with `:664`, which takes the
-    same capture and has the same reach. Then re-run with a row group added ahead
-    of an `X - Show Controls<br>` row to see it fail, the way the widened guard
-    was already checked against a plain trailing row.
-  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
-- [ ] A fifth comment still says the start menu is what opens the control list
-  - **Issue**: the four comments this version corrected were the four the item
-    named, and the second paragraph of the one at `js/main.js:926` was not among
-    them. It still reads "Over the title screen the list is not a toggle but a
-    panel the start menu opened" at `js/main.js:933`, three lines below the
-    paragraph that was rewritten to say the `CONTROL REFERENCE` row is what puts
-    the list on screen. The start menu does not open the list: its
-    `CONTROL SETTINGS` entry opens the control settings panel, and the row inside
-    that panel sets `titleHelp` at `js/main.js:1083`, so the menu is two levels
-    removed from it. That is the same stale chain the item existed to remove, and
-    it now sits in the same docblock as its own correction, which reads as the two
-    halves disagreeing about what opens the list. The clause after it is already
-    right - it names the `Control Reference` row - so only the attribution is
-    wrong.
-  - **Goal**: Say the list over the title screen is a panel the `CONTROL REFERENCE`
-    row opened, rather than one the start menu opened, keeping the paragraph's
-    point intact: that over the title the list is a panel rather than a toggle, so
-    a click closes it the way choosing that row again would. Leave the rest of the
-    docblock as this version left it. While there, check the same docblock reads as
-    one account of the list rather than two.
-  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+    list` at `test/page.test.js:659` runs `assert.doesNotMatch(rows, /controls?/i)`
+    over the list body with only the `<h3>` heading removed, so the body it
+    scans is markup as well as text. Every nested element's tag is in that scan.
+    Verified against a list whose first row is wrapped in
+    `<div class="controls-row">`: `/controls?/i` matches, the test fails, and
+    the row it names in the failure message is `div class="controls-row"` -
+    an attribute, while the same span with its tags stripped carries no row
+    naming the list at all. So the guard reports a second name that does not
+    exist and points the reader at a tag. The exposure is not new - the capture
+    this version replaced also held a nested element's opening tag - but it now
+    covers every nested element in the list rather than only those ahead of the
+    first close, and a wrapper named after the panel it sits in is the likely
+    name for one. The new test's own example wrapper, `<div class="group">`,
+    happens to carry no `control` and so does not show this.
+  - **Goal**: Scan the rows rather than the markup: take the tags off the span
+    before looking for a second name, so a class or id carrying the list's name
+    is not read as a row and the failure message quotes row text. Keep the
+    `<h3>` removal ahead of it, since the heading is the list's own correct name
+    and is held by the test above. Then state the new bound with a case the page
+    cannot show - a row wrapped in an element whose attribute carries `control`
+    passing, alongside a genuine `X - Show Controls` row still failing - so this
+    guard's reach is held by something written rather than by the wrapper names
+    the page happens to use.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
 
 ## Game UI/UX
 
@@ -386,14 +404,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 166 earlier items in `TODO-archive.md`, newest last.
+> 168 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Allow a full 360 in pitch and in roll, without breaking the controls at
-  the limit
-  - From: Flight Controls
-- [x] Propose seven control settings worth having, as items in the **Flight
-  Controls** section
-  - From: Flight Controls
 - [x] Roll Sense 1
   - **Issue**: The **ROLL AXIS** row offers its two settings the wrong way
     round, so the default names the behaviour of the other setting. Flown in
@@ -570,3 +582,52 @@ how the simulator got here rather than as a list still to be worked.
     the past tense on purpose, "before this panel was between them", and is the
     one of the five that is already correct.
   - From: Code Review Override - the list guard reads one row, and comments name a retired entry
+- [x] **Balanced Span**: The list guard reads to the first `</div>` rather than to the end of the list
+  - **Issue**: `the row that collapses the list names the action rather than the
+    list` now runs its `doesNotMatch` over the whole captured body, which is the
+    bound its docstring states - but the capture it reads is
+    `/<div id="controls-help-list">([\s\S]*?)<\/div>/` at `test/page.test.js:598`,
+    non-greedy to the *first* `</div>`. The body of `#controls-help-list` happens
+    to carry no nested element today, so the capture happens to reach the end of
+    the list, and nothing in the suite holds that it does. Verified against the
+    same capture with one row group added: a list reading
+    `<div class="group">W/S or arrows - Pitch<br></div>` followed by
+    `X - Show Controls<br>` captures only as far as the group's close, and
+    `/controls?/i` over that span returns false - the guard goes blind to the
+    second name exactly as it did before this version widened it. The companion
+    test at `:664` would catch a wrapper placed around most of the rows, since
+    the keys it looks for would fall outside the capture, but not one placed
+    after the last key row, which is where a footnote or a group of trailing rows
+    would go. So the gap is narrowed again rather than closed: from one row of
+    fifteen to everything before the first nested close.
+  - **Goal**: Make the span the guard reads the span the docstring claims. Either
+    capture the list body by balancing its close rather than taking the first one
+    - matching to the `</div>` that precedes `<div id="controls-help-hint">`, which
+    is the sibling that already marks the end of the list - or hold the list free
+    of nested elements in a test of its own so the non-greedy capture is sound by
+    something stated rather than by accident. Shared with `:664`, which takes the
+    same capture and has the same reach. Then re-run with a row group added ahead
+    of an `X - Show Controls<br>` row to see it fail, the way the widened guard
+    was already checked against a plain trailing row.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+- [x] A fifth comment still says the start menu is what opens the control list
+  - **Issue**: the four comments this version corrected were the four the item
+    named, and the second paragraph of the one at `js/main.js:926` was not among
+    them. It still reads "Over the title screen the list is not a toggle but a
+    panel the start menu opened" at `js/main.js:933`, three lines below the
+    paragraph that was rewritten to say the `CONTROL REFERENCE` row is what puts
+    the list on screen. The start menu does not open the list: its
+    `CONTROL SETTINGS` entry opens the control settings panel, and the row inside
+    that panel sets `titleHelp` at `js/main.js:1083`, so the menu is two levels
+    removed from it. That is the same stale chain the item existed to remove, and
+    it now sits in the same docblock as its own correction, which reads as the two
+    halves disagreeing about what opens the list. The clause after it is already
+    right - it names the `Control Reference` row - so only the attribution is
+    wrong.
+  - **Goal**: Say the list over the title screen is a panel the `CONTROL REFERENCE`
+    row opened, rather than one the start menu opened, keeping the paragraph's
+    point intact: that over the title the list is a panel rather than a toggle, so
+    a click closes it the way choosing that row again would. Leave the rest of the
+    docblock as this version left it. While there, check the same docblock reads as
+    one account of the list rather than two.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
