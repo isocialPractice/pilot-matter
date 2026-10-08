@@ -5,6 +5,52 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.4-alpha] - 2026-10-08
+
+The control list's self-name guard reads the list's own close rather than the
+first one after it. `1.24.3-alpha` widened the guard from the `H` row to the
+whole captured body, which is the bound its docstring states - but the capture
+it read was `/<div id="controls-help-list">([\s\S]*?)<\/div>/`, non-greedy to
+the *first* `</div>`. The list happens to carry no nested element today, so
+that capture happens to reach the end of the list and nothing held that it
+did. The gap was narrowed again rather than closed: from one row of fifteen to
+everything before the first nested close.
+
+### Changed
+
+- **`test/page.test.js` reads an element's body to the close that balances its
+  open.** A new `elementBody(html, id)` counts `<div` and `</div` as they go by
+  and returns the span at depth zero, so a row group or a footnote wrapper
+  written inside the list no longer cuts the span off at that group's close.
+  Both checks that read the whole list body take it - `the row that collapses
+  the list names the action rather than the list` and `the control list names
+  the keys the flight is worked with`, which shared the old capture and shared
+  its reach. The heading-only capture a few lines above is left alone: it is
+  anchored to `<h3>` rather than reading a body. Verified the way the override
+  asked: with `<div class="group">` wrapped around the first row and an
+  `X - Show Controls<br>` row added after the last, the guard fails and names
+  the row it read, while the capture it replaced sees no second name at all and
+  passes the same markup.
+- **A test states that reach, rather than leaving the page to demonstrate it by
+  accident.** `a list body is read past a nested close rather than up to the
+  first one` runs `elementBody` over markup that does nest, and holds both
+  bounds - the span reaches a row written after a nested group, and stops at
+  the list's own close rather than running on into the
+  `#controls-help-hint` beside it. Today's markup can show neither, which is
+  how a guard written to read the whole list read one row of it for a version
+  and then everything-before-the-first-nested-close for another.
+- **The fifth comment naming the start menu as what opens the control list.**
+  The four `1.24.3-alpha` corrected were the four that version's item named,
+  and the second paragraph of the docblock on `onHelpClick()` was not among
+  them - it still read "a panel the start menu opened" three lines below the
+  paragraph rewritten to say the `CONTROL REFERENCE` row is what puts the list
+  on screen, so the two halves of one docblock disagreed about what opens it.
+  The menu is two levels removed: its `CONTROL SETTINGS` entry opens the
+  control settings panel, and the row inside that panel sets `titleHelp`. The
+  paragraph now names that same row and keeps its point - over the title the
+  list is a panel rather than a toggle, so a click closes it the way choosing
+  the row again would.
+
 ## [1.24.3-alpha] - 2026-10-07
 
 The control list's self-name guard holds the whole list rather than one row of
@@ -20,7 +66,7 @@ wider bound it did not hold.
 
 ### Changed
 
-- **`test/page.test.js` reads the whole control list for a second name rather
+- **`test/page.test.js` reads the captured list body for a second name rather
   than the `H` row.** The `doesNotMatch` for `/controls?/i` runs over the
   captured list body now, with the `<h3>CONTROL REFERENCE</h3>` heading sliced
   off the span first so the list's own correct name is not read as the thing
@@ -31,7 +77,10 @@ wider bound it did not hold.
   offending row rather than printing the whole body, so a reader is sent to the
   line. Re-run with `X - Show Controls<br>` added under the last row it fails on
   the row it read, the way the test was already checked against
-  `H - Hide Controls`; the suite is otherwise green at 1245.
+  `H - Hide Controls`; the suite is otherwise green at 1245. The captured body
+  was not the whole list, though it was that day: the capture ran to the first
+  `</div>` and the list carried no nested element to stop it short. See
+  `1.24.4-alpha` for the rest of it.
 - **Four comments say the `CONTROL REFERENCE` row opens the control list, rather
   than the retired `Controls` entry.** That entry was renamed `CONTROL SETTINGS`
   in `1.23.0-alpha` and sends to `openControlSettingsPanel()`, with the list one

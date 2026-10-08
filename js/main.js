@@ -930,9 +930,9 @@ class FlightSimulator {
      * another opens it again, which is the H key's job for a pilot working them
      * with the keyboard.
      *
-     * Over the title screen the list is not a toggle but a panel the start menu
-     * opened, so a click there closes it the way choosing the Control Reference
-     * row again would.
+     * Over the title screen the list is not a toggle but a panel that same
+     * CONTROL REFERENCE row opened, so a click there closes it the way choosing
+     * the row again would.
      */
     onHelpClick() {
         if (titleShowing(this.titleState)) this.titleHelp = false;

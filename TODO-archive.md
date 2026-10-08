@@ -1967,3 +1967,12 @@ still be found by name.
 - [x] **Roll Sense**: Toggle pitch and roll between inverted and directional,
   independently
   - From: Flight Controls
+
+## Archived 10-08-26
+
+- [x] Allow a full 360 in pitch and in roll, without breaking the controls at
+  the limit
+  - From: Flight Controls
+- [x] Propose seven control settings worth having, as items in the **Flight
+  Controls** section
+  - From: Flight Controls

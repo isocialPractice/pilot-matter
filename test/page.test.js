@@ -586,6 +586,69 @@ test('the reference list is headed with the name of the row that opens it', () =
 });
 
 /**
+ * The body of a `<div>` carrying an id, read to the `</div>` that balances its
+ * own open rather than to the first one after it.
+ *
+ * A non-greedy capture is the obvious way to ask for this and it is only right
+ * while the element holds no nested `<div>`: the first row group or footnote
+ * wrapper written inside one cuts the span off at that group's close, and every
+ * check reading the span goes quietly blind to everything past it. Counting the
+ * opens and closes as they go by puts the end of the span where the element
+ * ends, whatever is nested in it.
+ *
+ * Null when the page carries no such element, and null again when its tags do
+ * not balance - a span that cannot be read is better reported by the caller's
+ * own `assert.ok` than guessed at.
+ */
+function elementBody(html, id) {
+    const open = `<div id="${id}">`;
+    const start = html.indexOf(open);
+    if (start === -1) return null;
+
+    let depth = 0;
+
+    // Only `<div` and `</div` move the depth, so a nested element of any other
+    // name - a list, a span, the `<br>` the rows are broken on - is read as part
+    // of the body, which is what it is.
+    for (const tag of html.slice(start).matchAll(/<(\/?)div\b/g)) {
+        depth += tag[1] ? -1 : 1;
+        if (depth === 0) return html.slice(start + open.length, start + tag.index);
+    }
+
+    return null;
+}
+
+/**
+ * The two checks below read the whole body of the control list, and what they
+ * are worth rests on the span reaching the list's own close. Today's markup
+ * cannot show that: the list carries no nested element, so a span that stopped
+ * at the first `</div>` would stop in the right place anyway, which is how a
+ * guard written to read the whole list read one row of it for a version and
+ * then everything-before-the-first-nested-close for another. So the reach is
+ * stated against markup that does nest rather than left to the page to
+ * demonstrate by accident.
+ */
+test('a list body is read past a nested close rather than up to the first one', () => {
+    const nested = [
+        '<div id="controls-help-list">',
+        '    <h3>CONTROL REFERENCE</h3>',
+        '    <div class="group">W/S or arrows - Pitch<br></div>',
+        '    X - Show Controls<br>',
+        '</div>',
+        '<div id="controls-help-hint">H - CONTROL REFERENCE</div>'
+    ].join('\n');
+
+    const body = elementBody(nested, 'controls-help-list');
+    assert.ok(body, 'the reader should find the list');
+    assert.match(body, /X - Show Controls/,
+        'the span should reach the rows written after a nested group rather than stop at its close');
+    assert.doesNotMatch(body, /controls-help-hint/,
+        'and should stop at the list\'s own close rather than run on into the hint beside it');
+    assert.equal(elementBody(nested, 'controls-help-nothing'), null,
+        'and should say so rather than guess when the page carries no such element');
+});
+
+/**
  * The heading above is only half of it. The row that collapses the list sits
  * inside the list, and it read `H - Hide Controls` for as long as the heading
  * read `CONTROLS` - so renaming the heading and the hint left the list calling
@@ -595,10 +658,10 @@ test('the reference list is headed with the name of the row that opens it', () =
  * it.
  */
 test('the row that collapses the list names the action rather than the list', () => {
-    const list = indexHtml.match(/<div id="controls-help-list">([\s\S]*?)<\/div>/);
+    const list = elementBody(indexHtml, 'controls-help-list');
     assert.ok(list, 'index.html should carry the control list');
 
-    const row = list[1].match(/(?:^|>|\s)H - ([^<\r\n]*)/m);
+    const row = list.match(/(?:^|>|\s)H - ([^<\r\n]*)/m);
     assert.ok(row, 'the list should name the H key');
 
     const action = row[1].trim();
@@ -608,7 +671,7 @@ test('the row that collapses the list names the action rather than the list', ()
     // The heading is the list's own name and is the correct one, held there by
     // the test above, so it comes off the span before the rest of the body is
     // read for a second one.
-    const rows   = list[1].replace(/<h3>[\s\S]*?<\/h3>/, '');
+    const rows   = list.replace(/<h3>[\s\S]*?<\/h3>/, '');
     const second = rows.match(/[^<>\r\n]*controls?[^<>\r\n]*/i);
     assert.doesNotMatch(rows, /controls?/i,
         `the row "${second ? second[0].trim() : ''}" should not name the list a second time`);
@@ -661,20 +724,20 @@ test('the fade the screen is taken off by is the one the script waits out', () =
 
 // A key with nothing on screen naming it is a key nobody presses.
 test('the control list names the keys the flight is worked with', () => {
-    const list = indexHtml.match(/<div id="controls-help-list">([\s\S]*?)<\/div>/);
+    const list = elementBody(indexHtml, 'controls-help-list');
     assert.ok(list, 'index.html should carry the control list');
 
     for (const key of ['C', 'Tab', 'H', 'P', 'R']) {
-        assert.ok(new RegExp(`(^|>|\\s)${key} -`, 'm').test(list[1]), `the list should name the ${key} key`);
+        assert.ok(new RegExp(`(^|>|\\s)${key} -`, 'm').test(list), `the list should name the ${key} key`);
     }
-    assert.ok(list[1].includes(`${MUTE_KEY.replace('Key', '')} -`), 'including the one that mutes the sound');
+    assert.ok(list.includes(`${MUTE_KEY.replace('Key', '')} -`), 'including the one that mutes the sound');
     for (const code of SETTINGS_OPEN_KEYS) {
-        assert.ok(list[1].includes(`${code.replace('Key', '')} -`), 'and the one that opens the settings');
+        assert.ok(list.includes(`${code.replace('Key', '')} -`), 'and the one that opens the settings');
     }
     for (const code of EDITOR_OPEN_KEYS) {
-        assert.ok(list[1].includes(`${code.replace('Key', '')} -`), 'and the one that opens the element editor');
+        assert.ok(list.includes(`${code.replace('Key', '')} -`), 'and the one that opens the element editor');
     }
-    assert.ok(list[1].includes(`${PHOTO_KEY} -`), 'and the one that takes a picture');
+    assert.ok(list.includes(`${PHOTO_KEY} -`), 'and the one that takes a picture');
 });
 
 // Every list under the panel's headings is styled the same way, so a heading
