@@ -5,6 +5,90 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.24.5] - 2026-10-09
+
+**This version is written in a different shape from the `1.24.4-alpha` below
+it, and the change is deliberate rather than a slip.** The old form had the
+core doing the suffix's job: a `1.24` claims twenty-four minor releases of a
+package that is on no registry, while the `-alpha` beside it says the project
+is not released at all, so every run climbed a release number nothing had
+released. The core is now the release being worked towards and stops moving
+until the `-alpha` is dropped, and the number it used to carry has moved into
+the pre-release, where it keeps the record of how far the project has come.
+`1.24.4-alpha` is therefore `1.0.0-alpha.1.24.4`, and the patch this entry
+earns makes it `1.0.0-alpha.1.24.5`. It sorts below every version published
+before it, which is the cost of the correction and not a mistake to go looking
+for: the three tags already on the remote record releases that happened and are
+left exactly where they are, and the next releases pass them. The inner triple
+moves from here the way the core used to - a patch to `1.0.0-alpha.1.24.6`, a
+minor to `1.0.0-alpha.1.25.0`, a major to `1.0.0-alpha.2.0.0` - and no
+identifier is ever padded, since `1.0.0-alpha.1.02.0` is not valid semver.
+Re-expressing the version earns no step of its own; the patch belongs to the
+two guards below.
+
+The control list's two guards read what they say they read, in both directions.
+`1.24.4-alpha` gave them `elementBody()`, which counts `<div` and `</div` so a
+span reaches the list's own close rather than the first one after it, and
+promised null for a span whose tags do not balance. It kept that promise for
+the unclosed direction and not for the over-closed one: a stray `</div>` inside
+the body is indistinguishable from the element's own close when the count
+starts at the element, so the reader returned a truncated span and said
+nothing - the same blindness, a guard reading less than its docstring claims
+and passing because it cannot see the row that would fail it, arriving through
+a stray close rather than a nested one. The guard built on top of it had a
+second reach of its own: it scanned the list body for a second name with the
+tags still in it, so every nested element's attributes were in the scan.
+
+### Changed
+
+- **`test/page.test.js` reports a stray close as markup it cannot read, rather
+  than as a short list.** `elementBody()` counts over the whole page instead of
+  from the element's own open, which is what makes the over-closed direction
+  visible at all: the stray reads as the element's close from the inside, and
+  only gives itself away further down the page as a close with nothing open
+  ahead of it. Verified against the case the item named - `index.html` with a
+  `</div>` added after `W/S or ↑/↓ - Pitch<br>` on the third row - where the
+  reader this replaced hands back 74 characters - the `<h3>` heading and the
+  first of the fifteen rows, with the fourteen below it outside the span - and
+  the new one reports `unbalanced`. The page itself is unaffected: its `<div>` tags balance at 35
+  opens and 35 closes and never go negative, so the list still reads as all
+  fifteen rows.
+- **The reader says which of three conditions it hit, rather than `null` for
+  all of them.** It returns `{ body, fault }` with one of the two set, and
+  `fault` is `null`, `'missing'` or `'unbalanced'`, so the
+  `should carry the control list` message in both callers stops being the
+  answer to three different questions - a list that is genuinely absent, a list
+  whose markup cannot be counted through, and a list written empty. The last of
+  those was the quietest: `''` is falsy, so an element holding nothing was
+  reported as an element that is not there. An empty body is now `''` with no
+  fault, which is the element being present and empty, and the two callers
+  assert on `fault` and name what the reader reported.
+- **The self-name guard scans the rows rather than the markup they are written
+  in.** A new `listRows()` takes the `<h3>` heading off the span as before and
+  then takes the tags off what is left, turning each into a line break so the
+  `<br>` the rows are broken on keeps them apart. Verified against the case the
+  item named - `index.html` with its first row wrapped in
+  `<div class="controls-row">` - where the scan this replaced matches
+  `/controls?/i` on the class, fails, and quotes `div class="controls-row"` at
+  the reader as the offending row, while the same span with its tags stripped
+  carries no second name at all. The `^Collapse` assertion stays on the `H` row
+  read from the raw body, which is the one part of the test genuinely about that
+  row's wording.
+- **Both new bounds are stated in tests rather than left to the page to
+  demonstrate by accident.** `a list body is read past a nested close rather
+  than up to the first one` now holds all three of the reader's answers,
+  including both unbalanced directions, which nothing in the suite exercised
+  while a short span, an unreadable one and an absent element were all `null`.
+  A new `a list is scanned for a second name by its rows rather than by its
+  markup` holds the other: a row wrapped in an element whose attribute carries
+  `control` passes, and a genuine `X - Show Controls` row is still caught and
+  quoted as row text rather than as a tag. Those are two fixtures rather than
+  one, so the case that puts a `control` in a tag and a `control` in a row
+  inside the same span - where the quote has to land on the row - is not stated
+  yet. Today's page can show none of it: its rows are bare text between
+  `<br>`s, and the one wrapper nested in the suite's other fixtures happens to
+  carry no `control`. The suite is green at 1247, one test up from 1246.
+
 ## [1.24.4-alpha] - 2026-10-08
 
 The control list's self-name guard reads the list's own close rather than the

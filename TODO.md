@@ -22,113 +22,44 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - what the balanced span promises, and markup read as a row
+### Code Review Override - the row scan's own bound
 
 #### Resolve Issues
 
-- [ ] Balanced Span 1
-  - **Issue**: `elementBody()` at `test/page.test.js:603` keeps its documented
-    promise in one direction only. Its docstring says the span is "null again
-    when its tags do not balance", but the loop returns at the first point the
-    depth reaches zero, so only the unclosed direction - a missing `</div>`,
-    where the depth never returns and the loop falls through to `return null` -
-    is reported. An element carrying one `</div>` too many returns a truncated
-    span instead, silently. Verified against a list reading
-    `W/S - Pitch<br></div>` on the third line followed by
-    `H - Show Controls<br>` and `F2 - Photo`: the reader returns only
-    `<h3>CONTROL REFERENCE</h3>` and the first row, and `/Show Controls/` over
-    that span is false. That is the same blindness the item coined
-    **Balanced Span** existed to end - a guard reading a span shorter than the
-    one its docstring states, passing because it cannot see the row that would
-    fail it - arriving now through a stray close rather than through a nested
-    one. The `assert.ok(list, 'index.html should carry the control list')` in
-    both callers cannot tell the two apart either: on a genuine null it names a
-    list that is carried, and on an element whose body is empty the reader
-    returns `''`, which is falsy, so a present-but-empty list is reported as a
-    missing one too.
-  - **Goal**: Make the function's behaviour and its docstring say the same
-    thing. Either detect the over-closed direction and return null for it -
-    the depth going negative before the element's own close is the signal, and
-    it means the markup cannot be read rather than that the element is short -
-    or narrow the docstring to the direction the loop actually reports and say
-    plainly that a stray close truncates the span. Prefer the first: a test
-    reading a short span and passing is the failure mode of the last three
-    versions. While there, separate "no such element" from "cannot be read"
-    well enough that a caller can say which it hit, so the
-    `should carry the control list` message stops being the answer to three
-    different conditions, and decide whether an empty body is a null or an
-    empty string. Then extend
-    `a list body is read past a nested close rather than up to the first one`
-    to hold whichever contract is chosen, since nothing in the suite exercises
-    either unbalanced direction today.
-  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
-
-#### Found Issues
-
-- [ ] The self-name guard reads a wrapper's own attribute as a row
-  - **Issue**: `the row that collapses the list names the action rather than the
-    list` at `test/page.test.js:659` runs `assert.doesNotMatch(rows, /controls?/i)`
-    over the list body with only the `<h3>` heading removed, so the body it
-    scans is markup as well as text. Every nested element's tag is in that scan.
-    Verified against a list whose first row is wrapped in
-    `<div class="controls-row">`: `/controls?/i` matches, the test fails, and
-    the row it names in the failure message is `div class="controls-row"` -
-    an attribute, while the same span with its tags stripped carries no row
-    naming the list at all. So the guard reports a second name that does not
-    exist and points the reader at a tag. The exposure is not new - the capture
-    this version replaced also held a nested element's opening tag - but it now
-    covers every nested element in the list rather than only those ahead of the
-    first close, and a wrapper named after the panel it sits in is the likely
-    name for one. The new test's own example wrapper, `<div class="group">`,
-    happens to carry no `control` and so does not show this.
-  - **Goal**: Scan the rows rather than the markup: take the tags off the span
-    before looking for a second name, so a class or id carrying the list's name
-    is not read as a row and the failure message quotes row text. Keep the
-    `<h3>` removal ahead of it, since the heading is the list's own correct name
-    and is held by the test above. Then state the new bound with a case the page
-    cannot show - a row wrapped in an element whose attribute carries `control`
-    passing, alongside a genuine `X - Show Controls` row still failing - so this
-    guard's reach is held by something written rather than by the wrapper names
-    the page happens to use.
+- [ ] Row Scan 1
+  - **Issue**: `a list is scanned for a second name by its rows rather than by
+    its markup` at `test/page.test.js:774` splits the bound across two fixtures,
+    and the half that needed stating cannot fail. The item asked for a wrapper
+    whose attribute carries `control` to pass *alongside* a genuine
+    `X - Show Controls` row still failing - one span holding both - but
+    `wrapped` carries the wrapper with no named row and `named` carries the row
+    with no wrapper. Nothing in `named` is a tag, so
+    `named.match(/[^\r\n]*controls?[^\r\n]*/i)[0]` can only be the row, and the
+    assertion that a failure quotes the row "rather than a tag" has no tag
+    available to quote. Verified by cutting the tag strip out of `listRows`
+    entirely, leaving the `<h3>` removal alone: both `named` assertions still
+    pass and only the `wrapped` half fails, so that half of the test holds
+    nothing about tags at all. The `wrapped` half does catch a strip removed
+    outright, so this is a bound left unstated rather than a guard that does not
+    work. The test also restates the guard's own capture,
+    `/[^\r\n]*controls?[^\r\n]*/i` at `test/page.test.js:760`, rather than
+    reading it from one place, so changing what the guard quotes with leaves the
+    test green against the old pattern.
+  - **Goal**: State the bound in one span, as the item asked: a fixture with
+    `<div class="controls-row">` wrapped round a row and a genuine
+    `X - Show Controls` row beside it, asserting both that `/controls?/i` still
+    matches - the real row is caught - and that the quoted match is
+    `X - Show Controls` rather than the class. That arrangement is the only one
+    in which quoting a tag is possible at all, which is what makes it the case
+    worth writing. Confirmed to behave over that combined span, where
+    `listRows` quotes `X - Show Controls`. Keep the existing `wrapped` fixture,
+    which is what catches a tag strip removed outright. While there, have the
+    guard and the test read one capture pattern rather than two copies of it, so
+    the quote the guard makes and the quote the test checks cannot drift apart.
+    The last `Changed` bullet of the `1.0.0-alpha.1.24.5` entry in
+    `CHANGELOG.md` names this gap as open; correct that sentence once the case
+    is stated.
   - From: Code Review Override - what the balanced span promises, and markup read as a row
-
-### Version Scheme Override - re-express the pre-release before the next bump
-
-- [ ] Move the version into the nested pre-release form
-  - **The core is doing the suffix's job.** `package.json` reads
-    `1.24.4-alpha`, which claims twenty-four minor releases of a package that
-    is not on a registry, while the `-alpha` says it is not released at all.
-    Every run climbs a release number nothing has released.
-  - **Write `1.0.0-alpha.1.24.4`.** The core becomes the release being worked
-    towards and stops moving until the suffix is dropped; the old core moves
-    into the suffix, where it keeps the record of how far the project has
-    come. The inner triple then moves the way the core used to: a patch to
-    `1.0.0-alpha.1.24.5`, a minor to `1.0.0-alpha.1.25.0`, a major to
-    `1.0.0-alpha.2.0.0`. `### Version Schemes` in the automation instructions
-    is the standing rule.
-  - **This is not a release.** It re-expresses the version the project is
-    already at, so it earns no step of its own. Items completed alongside it
-    earn their step from the corrected form, in one entry under one version.
-  - **Change it in `package.json` and in this run's `CHANGELOG.md` heading,
-    and nowhere else.** Every other mention of `1.24.4` in the repository is
-    history - a past entry, a note, a heading naming the release some work
-    belonged to - and history is not corrected. In particular, do not rewrite
-    an override heading or a `- From:` line that names an old version: a
-    `From:` line has to match its heading word for word, and editing one of
-    the pair breaks the item mid-run.
-  - **Say in the entry why the version looks smaller than yesterday's.** The
-    new version sorts below the last one published, and a reader who meets
-    that with no explanation beside it goes looking for a mistake. Name the
-    old form and the new one, and say the switch was deliberate.
-  - **Leave the three existing tags alone.** They record releases that
-    happened. Do not delete one, do not move one, and do not re-tag to make
-    the ordering look right - the next releases pass them.
-  - **Two traps.** `1.0.0-alpha.1.02.0` is not valid semver, so nothing pads
-    an identifier and nothing tidies one. And `npm version patch` is the
-    wrong command here: it strips the pre-release and yields a bare `1.0.0`.
-    Only the last identifier has a command at all, `npm version prerelease`;
-    an inner minor or major is a hand edit.
-  - From: Version Scheme Override - re-express the pre-release before the next bump
 
 ## Game UI/UX
 
@@ -442,74 +373,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 168 earlier items in `TODO-archive.md`, newest last.
+> 171 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Roll Sense 1
-  - **Issue**: The **ROLL AXIS** row offers its two settings the wrong way
-    round, so the default names the behaviour of the other setting. Flown in
-    Chromium with real key presses, reading the wings off the group's own world
-    matrix rather than off an angle or a reading: with `ROLL AXIS` on its
-    default of `DIRECTIONAL`, holding `A` puts the left tip at `+6.76` and the
-    right at `-6.76` and carries the heading from 0 to `32.6` - the right wing
-    down and a right turn - while `D` does the mirror of it and turns to
-    `326.4`. Stepping the row to `INVERTED` reverses both, giving `A` a left tip
-    of `-6.64` and a heading of `327.5`, which is the left wing down and a left
-    turn. So `INVERTED` is what this repository calls directional and
-    `DIRECTIONAL` is what it calls inverted. Three statements disagree with the
-    default: `js/input-map.js` over `AXIS_DIRECTIONAL` ("right drops the right
-    wing"), the **Flight Controls** roadmap item itself ("inverted means [...]
-    right turns left"), and `CHEATSHEET.md`, `README.md` and
-    `docs/cheatsheet.html`, which all list `A` as **Roll left** with no setting
-    named. The **PITCH AXIS** row is correct and wants no change, and neither
-    does `js/input-map.js`, which was confirmed to write `rollLeft` for `A` on
-    `DIRECTIONAL` and `rollRight` for `A` on `INVERTED`. The sign is the two
-    roll lines of `Aircraft.update` in `js/aircraft.js`, where `rollLeft` raises
-    `rotation.z` and a raised `rotation.z` drops the right wing - the mirror of
-    the fault the pitch keys four lines above already carry a comment about.
-    Everything else about the item verified: the two axes step independently,
-    `WASD` and the arrow keys turn over together rather than apart, the menus
-    still walk the same way with an axis inverted, the choice is stored, and an
-    axis turned over under a held key leaves nothing stuck on.
-  - **Goal**: Resolve to [roll-sense.prompt.md](.claude/prompts/roll-sense.prompt.md)
-  - From: Flight Controls
-- [x] Nothing pins which way an input actually rolls or pitches the aircraft
-  - **Issue**: The suite has no test that reads which way the aircraft
-    physically goes for a given input. `test/input-map.test.js` pins which field
-    a key writes, `test/tilt-controls.test.js` pins which field a tilt writes,
-    and `test/flight-state.test.js` touches `rotation.z` only as a value carried
-    or zeroed. That is the gap that let the roll sign above sit unnoticed
-    through every run to here, and it is the same gap the pitch keys fell into
-    once before, which their own comment records as "Raising it here flew W into
-    a dive." Measuring it needs a browser today, which is why only this agent
-    has ever measured it.
-  - **Goal**: Pin the direction of all four pitch and roll controls off the
-    attitude rather than off the Euler angle behind it, so the assertion states
-    what a pilot would notice: `pitchUp` raises `getAttitude().forwardY`,
-    `rollLeft` raises `getAttitude().rightY` - the right wing up, which is the
-    left wing down - `rollRight` lowers it, and the coordinated turn follows the
-    dropped wing, with `rollLeft` carrying `-rotation.y` down. `Aircraft`
-    imports Three.js, so use the idiom the project already has for such modules
-    rather than a plain Node construction. Worth doing in the same pass as
-    **Roll Sense 1**, whose fix it is the check for.
-  - From: UI/UX Override - the roll axis reads the wrong way round
-- [x] The collapsed reference list still carries the name the expanded one gave
-  up
-  - **Issue**: `HELP_HINT` in `js/controls-help.js` is `H - CONTROLS`, and
-    `index.html` writes the same string into `#controls-help-hint`, while the
-    expanded list it collapses to is now headed `CONTROL REFERENCE`. The stated
-    point of the rename was that the row which opens the list and the list it
-    opens are named the same thing, and the collapsed form of that same list is
-    the one place still naming it `CONTROLS` - so a pilot who collapses the list
-    sees it change its own name. `docs/controls/clearing-the-screen.html`
-    documents the `H - CONTROLS` line as it stands, and
-    `the collapsed controls list leaves the hint that reopens it` in
-    `test/page.test.js` asserts `index.html` carries `HELP_HINT`, so the
-    constant, the markup, that page and the test all move together.
-  - **Goal**: Name the collapsed hint for the list it reopens, and carry the new
-    wording into `docs/controls/clearing-the-screen.html`. Keep the key at the
-    front of it - the hint exists to say which key brings the list back - and
-    keep it short enough for the corner it is drawn in.
-  - From: UI/UX Override - the roll axis reads the wrong way round
 - [x] Three of the four panel openers do not close the new panel
   - **Issue**: `openControlSettingsPanel` in `js/main.js` closes the other three
     panels, which is the convention `openSettingsPanel`, `openEditorPanel` and
@@ -669,3 +534,100 @@ how the simulator got here rather than as a list still to be worked.
     docblock as this version left it. While there, check the same docblock reads as
     one account of the list rather than two.
   - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+- [x] Balanced Span 1
+  - **Issue**: `elementBody()` at `test/page.test.js:603` keeps its documented
+    promise in one direction only. Its docstring says the span is "null again
+    when its tags do not balance", but the loop returns at the first point the
+    depth reaches zero, so only the unclosed direction - a missing `</div>`,
+    where the depth never returns and the loop falls through to `return null` -
+    is reported. An element carrying one `</div>` too many returns a truncated
+    span instead, silently. Verified against a list reading
+    `W/S - Pitch<br></div>` on the third line followed by
+    `H - Show Controls<br>` and `F2 - Photo`: the reader returns only
+    `<h3>CONTROL REFERENCE</h3>` and the first row, and `/Show Controls/` over
+    that span is false. That is the same blindness the item coined
+    **Balanced Span** existed to end - a guard reading a span shorter than the
+    one its docstring states, passing because it cannot see the row that would
+    fail it - arriving now through a stray close rather than through a nested
+    one. The `assert.ok(list, 'index.html should carry the control list')` in
+    both callers cannot tell the two apart either: on a genuine null it names a
+    list that is carried, and on an element whose body is empty the reader
+    returns `''`, which is falsy, so a present-but-empty list is reported as a
+    missing one too.
+  - **Goal**: Make the function's behaviour and its docstring say the same
+    thing. Either detect the over-closed direction and return null for it -
+    the depth going negative before the element's own close is the signal, and
+    it means the markup cannot be read rather than that the element is short -
+    or narrow the docstring to the direction the loop actually reports and say
+    plainly that a stray close truncates the span. Prefer the first: a test
+    reading a short span and passing is the failure mode of the last three
+    versions. While there, separate "no such element" from "cannot be read"
+    well enough that a caller can say which it hit, so the
+    `should carry the control list` message stops being the answer to three
+    different conditions, and decide whether an empty body is a null or an
+    empty string. Then extend
+    `a list body is read past a nested close rather than up to the first one`
+    to hold whichever contract is chosen, since nothing in the suite exercises
+    either unbalanced direction today.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+- [x] **Row Scan**: The self-name guard reads a wrapper's own attribute as a row
+  - **Issue**: `the row that collapses the list names the action rather than the
+    list` at `test/page.test.js:659` runs `assert.doesNotMatch(rows, /controls?/i)`
+    over the list body with only the `<h3>` heading removed, so the body it
+    scans is markup as well as text. Every nested element's tag is in that scan.
+    Verified against a list whose first row is wrapped in
+    `<div class="controls-row">`: `/controls?/i` matches, the test fails, and
+    the row it names in the failure message is `div class="controls-row"` -
+    an attribute, while the same span with its tags stripped carries no row
+    naming the list at all. So the guard reports a second name that does not
+    exist and points the reader at a tag. The exposure is not new - the capture
+    this version replaced also held a nested element's opening tag - but it now
+    covers every nested element in the list rather than only those ahead of the
+    first close, and a wrapper named after the panel it sits in is the likely
+    name for one. The new test's own example wrapper, `<div class="group">`,
+    happens to carry no `control` and so does not show this.
+  - **Goal**: Scan the rows rather than the markup: take the tags off the span
+    before looking for a second name, so a class or id carrying the list's name
+    is not read as a row and the failure message quotes row text. Keep the
+    `<h3>` removal ahead of it, since the heading is the list's own correct name
+    and is held by the test above. Then state the new bound with a case the page
+    cannot show - a row wrapped in an element whose attribute carries `control`
+    passing, alongside a genuine `X - Show Controls` row still failing - so this
+    guard's reach is held by something written rather than by the wrapper names
+    the page happens to use.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [x] Move the version into the nested pre-release form
+  - **The core is doing the suffix's job.** `package.json` reads
+    `1.24.4-alpha`, which claims twenty-four minor releases of a package that
+    is not on a registry, while the `-alpha` says it is not released at all.
+    Every run climbs a release number nothing has released.
+  - **Write `1.0.0-alpha.1.24.4`.** The core becomes the release being worked
+    towards and stops moving until the suffix is dropped; the old core moves
+    into the suffix, where it keeps the record of how far the project has
+    come. The inner triple then moves the way the core used to: a patch to
+    `1.0.0-alpha.1.24.5`, a minor to `1.0.0-alpha.1.25.0`, a major to
+    `1.0.0-alpha.2.0.0`. `### Version Schemes` in the automation instructions
+    is the standing rule.
+  - **This is not a release.** It re-expresses the version the project is
+    already at, so it earns no step of its own. Items completed alongside it
+    earn their step from the corrected form, in one entry under one version.
+  - **Change it in `package.json` and in this run's `CHANGELOG.md` heading,
+    and nowhere else.** Every other mention of `1.24.4` in the repository is
+    history - a past entry, a note, a heading naming the release some work
+    belonged to - and history is not corrected. In particular, do not rewrite
+    an override heading or a `- From:` line that names an old version: a
+    `From:` line has to match its heading word for word, and editing one of
+    the pair breaks the item mid-run.
+  - **Say in the entry why the version looks smaller than yesterday's.** The
+    new version sorts below the last one published, and a reader who meets
+    that with no explanation beside it goes looking for a mistake. Name the
+    old form and the new one, and say the switch was deliberate.
+  - **Leave the three existing tags alone.** They record releases that
+    happened. Do not delete one, do not move one, and do not re-tag to make
+    the ordering look right - the next releases pass them.
+  - **Two traps.** `1.0.0-alpha.1.02.0` is not valid semver, so nothing pads
+    an identifier and nothing tidies one. And `npm version patch` is the
+    wrong command here: it strips the pre-release and yields a bare `1.0.0`.
+    Only the last identifier has a command at all, `npm version prerelease`;
+    an inner minor or major is a hand edit.
+  - From: Version Scheme Override - re-express the pre-release before the next bump
