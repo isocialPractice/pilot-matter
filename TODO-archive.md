@@ -1976,3 +1976,72 @@ still be found by name.
 - [x] Propose seven control settings worth having, as items in the **Flight
   Controls** section
   - From: Flight Controls
+
+## Archived 10-09-26
+
+- [x] Roll Sense 1
+  - **Issue**: The **ROLL AXIS** row offers its two settings the wrong way
+    round, so the default names the behaviour of the other setting. Flown in
+    Chromium with real key presses, reading the wings off the group's own world
+    matrix rather than off an angle or a reading: with `ROLL AXIS` on its
+    default of `DIRECTIONAL`, holding `A` puts the left tip at `+6.76` and the
+    right at `-6.76` and carries the heading from 0 to `32.6` - the right wing
+    down and a right turn - while `D` does the mirror of it and turns to
+    `326.4`. Stepping the row to `INVERTED` reverses both, giving `A` a left tip
+    of `-6.64` and a heading of `327.5`, which is the left wing down and a left
+    turn. So `INVERTED` is what this repository calls directional and
+    `DIRECTIONAL` is what it calls inverted. Three statements disagree with the
+    default: `js/input-map.js` over `AXIS_DIRECTIONAL` ("right drops the right
+    wing"), the **Flight Controls** roadmap item itself ("inverted means [...]
+    right turns left"), and `CHEATSHEET.md`, `README.md` and
+    `docs/cheatsheet.html`, which all list `A` as **Roll left** with no setting
+    named. The **PITCH AXIS** row is correct and wants no change, and neither
+    does `js/input-map.js`, which was confirmed to write `rollLeft` for `A` on
+    `DIRECTIONAL` and `rollRight` for `A` on `INVERTED`. The sign is the two
+    roll lines of `Aircraft.update` in `js/aircraft.js`, where `rollLeft` raises
+    `rotation.z` and a raised `rotation.z` drops the right wing - the mirror of
+    the fault the pitch keys four lines above already carry a comment about.
+    Everything else about the item verified: the two axes step independently,
+    `WASD` and the arrow keys turn over together rather than apart, the menus
+    still walk the same way with an axis inverted, the choice is stored, and an
+    axis turned over under a held key leaves nothing stuck on.
+  - **Goal**: Resolve to [roll-sense.prompt.md](.claude/prompts/roll-sense.prompt.md)
+  - From: Flight Controls
+- [x] Nothing pins which way an input actually rolls or pitches the aircraft
+  - **Issue**: The suite has no test that reads which way the aircraft
+    physically goes for a given input. `test/input-map.test.js` pins which field
+    a key writes, `test/tilt-controls.test.js` pins which field a tilt writes,
+    and `test/flight-state.test.js` touches `rotation.z` only as a value carried
+    or zeroed. That is the gap that let the roll sign above sit unnoticed
+    through every run to here, and it is the same gap the pitch keys fell into
+    once before, which their own comment records as "Raising it here flew W into
+    a dive." Measuring it needs a browser today, which is why only this agent
+    has ever measured it.
+  - **Goal**: Pin the direction of all four pitch and roll controls off the
+    attitude rather than off the Euler angle behind it, so the assertion states
+    what a pilot would notice: `pitchUp` raises `getAttitude().forwardY`,
+    `rollLeft` raises `getAttitude().rightY` - the right wing up, which is the
+    left wing down - `rollRight` lowers it, and the coordinated turn follows the
+    dropped wing, with `rollLeft` carrying `-rotation.y` down. `Aircraft`
+    imports Three.js, so use the idiom the project already has for such modules
+    rather than a plain Node construction. Worth doing in the same pass as
+    **Roll Sense 1**, whose fix it is the check for.
+  - From: UI/UX Override - the roll axis reads the wrong way round
+- [x] The collapsed reference list still carries the name the expanded one gave
+  up
+  - **Issue**: `HELP_HINT` in `js/controls-help.js` is `H - CONTROLS`, and
+    `index.html` writes the same string into `#controls-help-hint`, while the
+    expanded list it collapses to is now headed `CONTROL REFERENCE`. The stated
+    point of the rename was that the row which opens the list and the list it
+    opens are named the same thing, and the collapsed form of that same list is
+    the one place still naming it `CONTROLS` - so a pilot who collapses the list
+    sees it change its own name. `docs/controls/clearing-the-screen.html`
+    documents the `H - CONTROLS` line as it stands, and
+    `the collapsed controls list leaves the hint that reopens it` in
+    `test/page.test.js` asserts `index.html` carries `HELP_HINT`, so the
+    constant, the markup, that page and the test all move together.
+  - **Goal**: Name the collapsed hint for the list it reopens, and carry the new
+    wording into `docs/controls/clearing-the-screen.html`. Keep the key at the
+    front of it - the hint exists to say which key brings the list back - and
+    keep it short enough for the corner it is drawn in.
+  - From: UI/UX Override - the roll axis reads the wrong way round

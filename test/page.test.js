@@ -596,26 +596,59 @@ test('the reference list is headed with the name of the row that opens it', () =
  * opens and closes as they go by puts the end of the span where the element
  * ends, whatever is nested in it.
  *
- * Null when the page carries no such element, and null again when its tags do
- * not balance - a span that cannot be read is better reported by the caller's
- * own `assert.ok` than guessed at.
+ * Returns `{ body, fault }`, with exactly one of the two set. Three conditions
+ * a reader can hit are three answers, and one `null` for all of them makes a
+ * caller's `assert.ok` say the same sentence about each:
+ *
+ * - `fault` is `null` and `body` is the span - `''` for an element written
+ *   empty. An element holding nothing is there and empty rather than absent,
+ *   and `''` is falsy, so those two were one answer for as long as the span
+ *   alone was the return.
+ * - `fault` is `'missing'` when the page carries no `<div id="...">` at all.
+ * - `fault` is `'unbalanced'` when the `<div>` tags cannot be counted through.
+ *   Both directions reach it. An open the page never closes leaves the count
+ *   above zero at the end. A stray close is the harder one: from inside the
+ *   element it is indistinguishable from the element's own close, and it only
+ *   gives itself away further down the page as a close with nothing open ahead
+ *   of it - which is why the count runs over the whole document rather than
+ *   from the element's own open. A document that does not balance anywhere
+ *   therefore reports unbalanced everywhere, and that is the honest answer: a
+ *   depth count that is one out is measuring some other span and cannot say
+ *   which.
  */
 function elementBody(html, id) {
-    const open = `<div id="${id}">`;
+    const open  = `<div id="${id}">`;
     const start = html.indexOf(open);
-    if (start === -1) return null;
+    if (start === -1) return { body: null, fault: 'missing' };
 
-    let depth = 0;
+    let depth  = 0;
+    let inside = null;
+    let body   = null;
 
     // Only `<div` and `</div` move the depth, so a nested element of any other
     // name - a list, a span, the `<br>` the rows are broken on - is read as part
     // of the body, which is what it is.
-    for (const tag of html.slice(start).matchAll(/<(\/?)div\b/g)) {
-        depth += tag[1] ? -1 : 1;
-        if (depth === 0) return html.slice(start + open.length, start + tag.index);
+    for (const tag of html.matchAll(/<(\/?)div\b/g)) {
+        const closing = Boolean(tag[1]);
+
+        // A close with nothing open ahead of it. Every depth past this point is
+        // one out, so whatever span was measured before it is a guess rather
+        // than a reading, and saying so beats handing back the short one.
+        if (closing && depth === 0) return { body: null, fault: 'unbalanced' };
+
+        depth += closing ? -1 : 1;
+
+        // The element's own close is the one that takes the depth back to what
+        // it was before its open, wherever on the page that open sits.
+        if (tag.index === start) inside = depth;
+        else if (body === null && inside !== null && depth === inside - 1) {
+            body = html.slice(start + open.length, tag.index);
+        }
     }
 
-    return null;
+    return depth === 0 && body !== null
+        ? { body, fault: null }
+        : { body: null, fault: 'unbalanced' };
 }
 
 /**
@@ -627,6 +660,12 @@ function elementBody(html, id) {
  * then everything-before-the-first-nested-close for another. So the reach is
  * stated against markup that does nest rather than left to the page to
  * demonstrate by accident.
+ *
+ * The three answers the reader can give are held here too. Nothing exercised
+ * either unbalanced direction while a short span, an unreadable one and an
+ * absent element were all `null`, and the docstring promising to report
+ * unbalanced tags described only the direction that runs off the end of the
+ * page - the other handed back a truncated span and said nothing.
  */
 test('a list body is read past a nested close rather than up to the first one', () => {
     const nested = [
@@ -638,15 +677,63 @@ test('a list body is read past a nested close rather than up to the first one', 
         '<div id="controls-help-hint">H - CONTROL REFERENCE</div>'
     ].join('\n');
 
-    const body = elementBody(nested, 'controls-help-list');
-    assert.ok(body, 'the reader should find the list');
+    const { body, fault } = elementBody(nested, 'controls-help-list');
+    assert.equal(fault, null, 'the reader should find the list');
     assert.match(body, /X - Show Controls/,
         'the span should reach the rows written after a nested group rather than stop at its close');
     assert.doesNotMatch(body, /controls-help-hint/,
         'and should stop at the list\'s own close rather than run on into the hint beside it');
-    assert.equal(elementBody(nested, 'controls-help-nothing'), null,
+
+    assert.deepEqual(elementBody(nested, 'controls-help-nothing'), { body: null, fault: 'missing' },
         'and should say so rather than guess when the page carries no such element');
+
+    // One close too many, which is the direction the reader used to answer with
+    // a short span: the stray reads as the list's own close, the two rows below
+    // it fall outside the span, and a guard over that span cannot see the row
+    // that would fail it.
+    const overClosed = [
+        '<div id="controls-help-list">',
+        '    <h3>CONTROL REFERENCE</h3>',
+        '    W/S or arrows - Pitch<br></div>',
+        '    X - Show Controls<br>',
+        '    F2 - Photo',
+        '</div>',
+        '<div id="controls-help-hint">H - CONTROL REFERENCE</div>'
+    ].join('\n');
+    assert.deepEqual(elementBody(overClosed, 'controls-help-list'), { body: null, fault: 'unbalanced' },
+        'a list carrying a stray close cannot be read rather than being short');
+
+    const unclosed = [
+        '<div id="controls-help-list">',
+        '    <h3>CONTROL REFERENCE</h3>',
+        '    W/S or arrows - Pitch<br>',
+        '    X - Show Controls<br>'
+    ].join('\n');
+    assert.deepEqual(elementBody(unclosed, 'controls-help-list'), { body: null, fault: 'unbalanced' },
+        'and neither can one the page never closes');
+
+    assert.deepEqual(elementBody('<div id="controls-help-list"></div>', 'controls-help-list'),
+        { body: '', fault: null },
+        'while a list written empty is there and empty rather than missing');
 });
+
+/**
+ * The rows of a list body, as text: the heading off, the tags off, one line per
+ * row.
+ *
+ * The heading is the list's own name and the correct one, held where it is by
+ * the test above, so it comes off before the body is read for a second one. The
+ * tags come off because an attribute is not a row. A wrapper named after the
+ * panel it sits in - `<div class="controls-row">` is the likely one - reads as
+ * the list naming itself again to anything scanning markup, and gets quoted
+ * back at the reader as a row, while the same span with its tags stripped
+ * carries no second name at all. Tags become line breaks rather than nothing,
+ * so the `<br>` the rows are broken on keeps them apart and a failure can quote
+ * the one row that is wrong instead of the whole list run together.
+ */
+function listRows(body) {
+    return body.replace(/<h3>[\s\S]*?<\/h3>/, '').replace(/<[^>]*>/g, '\n');
+}
 
 /**
  * The heading above is only half of it. The row that collapses the list sits
@@ -658,8 +745,9 @@ test('a list body is read past a nested close rather than up to the first one', 
  * it.
  */
 test('the row that collapses the list names the action rather than the list', () => {
-    const list = elementBody(indexHtml, 'controls-help-list');
-    assert.ok(list, 'index.html should carry the control list');
+    const { body: list, fault } = elementBody(indexHtml, 'controls-help-list');
+    assert.equal(fault, null,
+        `index.html should carry a control list the reader can read - it reported "${fault}"`);
 
     const row = list.match(/(?:^|>|\s)H - ([^<\r\n]*)/m);
     assert.ok(row, 'the list should name the H key');
@@ -668,13 +756,39 @@ test('the row that collapses the list names the action rather than the list', ()
     assert.match(action, /^Collapse\b/i,
         `the H row "${action}" should say the list collapses, as README.md and CHEATSHEET.md do`);
 
-    // The heading is the list's own name and is the correct one, held there by
-    // the test above, so it comes off the span before the rest of the body is
-    // read for a second one.
-    const rows   = list.replace(/<h3>[\s\S]*?<\/h3>/, '');
-    const second = rows.match(/[^<>\r\n]*controls?[^<>\r\n]*/i);
+    const rows   = listRows(list);
+    const second = rows.match(/[^\r\n]*controls?[^\r\n]*/i);
     assert.doesNotMatch(rows, /controls?/i,
         `the row "${second ? second[0].trim() : ''}" should not name the list a second time`);
+});
+
+/**
+ * The guard above scans the list for a second name, and what it is worth rests
+ * on scanning the rows rather than the markup they are written in. Today's page
+ * cannot show the difference: its rows are bare text between `<br>`s, so there
+ * is no attribute in the span to misread, and the one wrapper nested anywhere
+ * in the suite - the `<div class="group">` in the test above - happens to carry
+ * no `control`. So the bound is written here rather than left to the wrapper
+ * names the page happens to use.
+ */
+test('a list is scanned for a second name by its rows rather than by its markup', () => {
+    const wrapped = listRows([
+        '<h3>CONTROL REFERENCE</h3>',
+        '<div class="controls-row">W/S or arrows - Pitch<br></div>',
+        'H - Collapse List<br>'
+    ].join('\n'));
+    assert.doesNotMatch(wrapped, /controls?/i,
+        'a wrapper named after the panel it sits in is a class rather than a second name');
+    assert.match(wrapped, /W\/S or arrows - Pitch/, 'and the row written inside it is still read');
+
+    const named = listRows([
+        '<h3>CONTROL REFERENCE</h3>',
+        'W/S or arrows - Pitch<br>',
+        'X - Show Controls<br>'
+    ].join('\n'));
+    assert.match(named, /controls?/i, 'while a row that does name the list a second time is still caught');
+    assert.match(named.match(/[^\r\n]*controls?[^\r\n]*/i)[0], /X - Show Controls/,
+        'and the row is what a failure quotes, rather than a tag');
 });
 
 // The instruments are read on whichever scale the panel is set to, so the
@@ -724,8 +838,9 @@ test('the fade the screen is taken off by is the one the script waits out', () =
 
 // A key with nothing on screen naming it is a key nobody presses.
 test('the control list names the keys the flight is worked with', () => {
-    const list = elementBody(indexHtml, 'controls-help-list');
-    assert.ok(list, 'index.html should carry the control list');
+    const { body: list, fault } = elementBody(indexHtml, 'controls-help-list');
+    assert.equal(fault, null,
+        `index.html should carry a control list the reader can read - it reported "${fault}"`);
 
     for (const key of ['C', 'Tab', 'H', 'P', 'R']) {
         assert.ok(new RegExp(`(^|>|\\s)${key} -`, 'm').test(list), `the list should name the ${key} key`);
