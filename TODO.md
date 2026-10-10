@@ -22,43 +22,39 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the row scan's own bound
+### Code Review Override - the capture follows the name only halfway
 
 #### Resolve Issues
 
-- [ ] Row Scan 1
-  - **Issue**: `a list is scanned for a second name by its rows rather than by
-    its markup` at `test/page.test.js:774` splits the bound across two fixtures,
-    and the half that needed stating cannot fail. The item asked for a wrapper
-    whose attribute carries `control` to pass *alongside* a genuine
-    `X - Show Controls` row still failing - one span holding both - but
-    `wrapped` carries the wrapper with no named row and `named` carries the row
-    with no wrapper. Nothing in `named` is a tag, so
-    `named.match(/[^\r\n]*controls?[^\r\n]*/i)[0]` can only be the row, and the
-    assertion that a failure quotes the row "rather than a tag" has no tag
-    available to quote. Verified by cutting the tag strip out of `listRows`
-    entirely, leaving the `<h3>` removal alone: both `named` assertions still
-    pass and only the `wrapped` half fails, so that half of the test holds
-    nothing about tags at all. The `wrapped` half does catch a strip removed
-    outright, so this is a bound left unstated rather than a guard that does not
-    work. The test also restates the guard's own capture,
-    `/[^\r\n]*controls?[^\r\n]*/i` at `test/page.test.js:760`, rather than
-    reading it from one place, so changing what the guard quotes with leaves the
-    test green against the old pattern.
-  - **Goal**: State the bound in one span, as the item asked: a fixture with
-    `<div class="controls-row">` wrapped round a row and a genuine
-    `X - Show Controls` row beside it, asserting both that `/controls?/i` still
-    matches - the real row is caught - and that the quoted match is
-    `X - Show Controls` rather than the class. That arrangement is the only one
-    in which quoting a tag is possible at all, which is what makes it the case
-    worth writing. Confirmed to behave over that combined span, where
-    `listRows` quotes `X - Show Controls`. Keep the existing `wrapped` fixture,
-    which is what catches a tag strip removed outright. While there, have the
-    guard and the test read one capture pattern rather than two copies of it, so
-    the quote the guard makes and the quote the test checks cannot drift apart.
-    The last `Changed` bullet of the `1.0.0-alpha.1.24.5` entry in
-    `CHANGELOG.md` names this gap as open; correct that sentence once the case
-    is stated.
+- [ ] Row Scan 2
+  - **Issue**: `SECOND_NAME_ROW` at `test/page.test.js:751` takes the pattern
+    text from `SECOND_NAME` but respells everything else about it, so the pair
+    the item set out to stop drifting still drifts in two of the three ways the
+    name can be edited. The flags are written out again as `'i'` rather than
+    read from `SECOND_NAME.flags`: tighten the name to `/Controls?/` on the
+    view that a row always capitalises it, and the guard's
+    `assert.doesNotMatch(rows, SECOND_NAME)` passes a row reading
+    `X - show controls` while `SECOND_NAME_ROW` goes on matching that same row,
+    so the guard and its own capture disagree about one row. And the name is
+    interpolated unparenthesised, so widening it to an alternation breaks the
+    row context out of the pattern: with `SECOND_NAME` set to
+    `/controls?|key list/i`, `SECOND_NAME_ROW` builds as
+    `/[^\r\n]*controls?|key list[^\r\n]*/i`, and a row `H - Hide Key List` is
+    quoted as the bare fragment `Key List` instead of the whole row - which is
+    the one thing the capture exists to do rather than matching the name alone.
+    Both measured against the live definitions. Nothing fails today, because
+    `/controls?/i` is a bare sequence carrying the single flag that happens to
+    be respelled correctly, so the next edit to the name is what reaches it.
+    The `1.0.0-alpha.1.24.6` entry in `CHANGELOG.md` states the opposite as
+    already achieved: "Widening either reaches both callers."
+  - **Goal**: Build the capture from the whole of `SECOND_NAME` rather than
+    from its `source` alone. Wrap the interpolation in a non-capturing group so
+    an alternation cannot reach past it, and pass `SECOND_NAME.flags` in place
+    of the literal `'i'` so the case rule has one definition too. Both
+    measurements above then agree with the guard, and the name becomes editable
+    in the way the entry already claims it is. Correct the "Widening either
+    reaches both callers" sentence in the `1.0.0-alpha.1.24.6` entry of
+    `CHANGELOG.md` to match what is true once the derivation is finished.
   - From: Code Review Override - what the balanced span promises, and markup read as a row
 
 ## Game UI/UX
@@ -373,24 +369,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 171 earlier items in `TODO-archive.md`, newest last.
+> 172 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Three of the four panel openers do not close the new panel
-  - **Issue**: `openControlSettingsPanel` in `js/main.js` closes the other three
-    panels, which is the convention `openSettingsPanel`, `openEditorPanel` and
-    `openGameModesPanel` already keep with each other. None of those three was
-    taught to close the control settings panel, so the set is no longer mutually
-    exclusive in code - it is only exclusive because `syncOverlays` ranks
-    `controls` below `modes` and `settings` and because every key that opens a
-    panel is swallowed by the open one. Nothing reaches it today, which is why
-    this is not filed as a defect: the control panel takes every key before the
-    open keys are read, and the menus that could be clicked are display:none
-    behind it. The next panel, or the next open key, is what makes it reachable,
-    and the failure then is a panel that reappears when the one over it closes.
-  - **Goal**: Add `closeControlSettings(this.controlSettings)` to the other three
-    openers, so the exclusion is stated in each of them rather than resting on
-    the order `syncOverlays` happens to rank them in.
-  - From: UI/UX Override - the roll axis reads the wrong way round
 - [x] The docs page twin of the README's menu paragraph was left behind
   - **Issue**: `README.md` was updated this run to read "In the settings panel,
     the control settings panel and the element editor, `A`/`D` or the arrows
@@ -631,3 +611,37 @@ how the simulator got here rather than as a list still to be worked.
     Only the last identifier has a command at all, `npm version prerelease`;
     an inner minor or major is a hand edit.
   - From: Version Scheme Override - re-express the pre-release before the next bump
+- [x] Row Scan 1
+  - **Issue**: `a list is scanned for a second name by its rows rather than by
+    its markup` at `test/page.test.js:774` splits the bound across two fixtures,
+    and the half that needed stating cannot fail. The item asked for a wrapper
+    whose attribute carries `control` to pass *alongside* a genuine
+    `X - Show Controls` row still failing - one span holding both - but
+    `wrapped` carries the wrapper with no named row and `named` carries the row
+    with no wrapper. Nothing in `named` is a tag, so
+    `named.match(/[^\r\n]*controls?[^\r\n]*/i)[0]` can only be the row, and the
+    assertion that a failure quotes the row "rather than a tag" has no tag
+    available to quote. Verified by cutting the tag strip out of `listRows`
+    entirely, leaving the `<h3>` removal alone: both `named` assertions still
+    pass and only the `wrapped` half fails, so that half of the test holds
+    nothing about tags at all. The `wrapped` half does catch a strip removed
+    outright, so this is a bound left unstated rather than a guard that does not
+    work. The test also restates the guard's own capture,
+    `/[^\r\n]*controls?[^\r\n]*/i` at `test/page.test.js:760`, rather than
+    reading it from one place, so changing what the guard quotes with leaves the
+    test green against the old pattern.
+  - **Goal**: State the bound in one span, as the item asked: a fixture with
+    `<div class="controls-row">` wrapped round a row and a genuine
+    `X - Show Controls` row beside it, asserting both that `/controls?/i` still
+    matches - the real row is caught - and that the quoted match is
+    `X - Show Controls` rather than the class. That arrangement is the only one
+    in which quoting a tag is possible at all, which is what makes it the case
+    worth writing. Confirmed to behave over that combined span, where
+    `listRows` quotes `X - Show Controls`. Keep the existing `wrapped` fixture,
+    which is what catches a tag strip removed outright. While there, have the
+    guard and the test read one capture pattern rather than two copies of it, so
+    the quote the guard makes and the quote the test checks cannot drift apart.
+    The last `Changed` bullet of the `1.0.0-alpha.1.24.5` entry in
+    `CHANGELOG.md` names this gap as open; correct that sentence once the case
+    is stated.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
