@@ -736,6 +736,21 @@ function listRows(body) {
 }
 
 /**
+ * The name a list may not carry a second time, and the span a failure quotes it
+ * out of.
+ *
+ * The guard reports the whole row the name was found in rather than the bare
+ * word, so there is a capture as well as a name - and the capture is built from
+ * the name rather than written out beside it. The two were written out twice for
+ * a while, each spelling the name between a pair of `[^\r\n]` runs: one copy the
+ * quote the guard makes, the other the quote a test checks it against. That is a
+ * pair which can only drift apart silently, since changing what the guard quotes
+ * with left the test green against the pattern the guard had stopped using.
+ */
+const SECOND_NAME = /controls?/i;
+const SECOND_NAME_ROW = new RegExp(`[^\\r\\n]*${SECOND_NAME.source}[^\\r\\n]*`, 'i');
+
+/**
  * The heading above is only half of it. The row that collapses the list sits
  * inside the list, and it read `H - Hide Controls` for as long as the heading
  * read `CONTROLS` - so renaming the heading and the hint left the list calling
@@ -757,8 +772,8 @@ test('the row that collapses the list names the action rather than the list', ()
         `the H row "${action}" should say the list collapses, as README.md and CHEATSHEET.md do`);
 
     const rows   = listRows(list);
-    const second = rows.match(/[^\r\n]*controls?[^\r\n]*/i);
-    assert.doesNotMatch(rows, /controls?/i,
+    const second = rows.match(SECOND_NAME_ROW);
+    assert.doesNotMatch(rows, SECOND_NAME,
         `the row "${second ? second[0].trim() : ''}" should not name the list a second time`);
 });
 
@@ -770,6 +785,15 @@ test('the row that collapses the list names the action rather than the list', ()
  * in the suite - the `<div class="group">` in the test above - happens to carry
  * no `control`. So the bound is written here rather than left to the wrapper
  * names the page happens to use.
+ *
+ * It takes one span holding both to state, and splitting it across two was what
+ * left half of it unable to fail. A wrapper on its own says only that a class is
+ * not read as a row. A named row on its own carries no tag at all once the tags
+ * are off, so asking whether a failure quoted the row "rather than a tag" has
+ * nothing else it could have quoted, and the answer is yes however the stripping
+ * behaves. The span that carries a wrapper and a genuine `X - Show Controls` row
+ * together is the only arrangement in which quoting the class is possible, which
+ * is what makes it the case worth writing.
  */
 test('a list is scanned for a second name by its rows rather than by its markup', () => {
     const wrapped = listRows([
@@ -777,18 +801,20 @@ test('a list is scanned for a second name by its rows rather than by its markup'
         '<div class="controls-row">W/S or arrows - Pitch<br></div>',
         'H - Collapse List<br>'
     ].join('\n'));
-    assert.doesNotMatch(wrapped, /controls?/i,
+    assert.doesNotMatch(wrapped, SECOND_NAME,
         'a wrapper named after the panel it sits in is a class rather than a second name');
     assert.match(wrapped, /W\/S or arrows - Pitch/, 'and the row written inside it is still read');
 
-    const named = listRows([
+    const both = listRows([
         '<h3>CONTROL REFERENCE</h3>',
-        'W/S or arrows - Pitch<br>',
-        'X - Show Controls<br>'
+        '<div class="controls-row">W/S or arrows - Pitch<br></div>',
+        'X - Show Controls<br>',
+        'H - Collapse List<br>'
     ].join('\n'));
-    assert.match(named, /controls?/i, 'while a row that does name the list a second time is still caught');
-    assert.match(named.match(/[^\r\n]*controls?[^\r\n]*/i)[0], /X - Show Controls/,
-        'and the row is what a failure quotes, rather than a tag');
+    assert.match(both, SECOND_NAME,
+        'while a row that does name the list a second time is caught beside that same wrapper');
+    assert.match(both.match(SECOND_NAME_ROW)[0], /X - Show Controls/,
+        'and that row is what a failure quotes, rather than the class it is written inside');
 });
 
 // The instruments are read on whichever scale the panel is set to, so the

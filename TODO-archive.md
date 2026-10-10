@@ -2045,3 +2045,22 @@ still be found by name.
     front of it - the hint exists to say which key brings the list back - and
     keep it short enough for the corner it is drawn in.
   - From: UI/UX Override - the roll axis reads the wrong way round
+
+## Archived 10-10-26
+
+- [x] Three of the four panel openers do not close the new panel
+  - **Issue**: `openControlSettingsPanel` in `js/main.js` closes the other three
+    panels, which is the convention `openSettingsPanel`, `openEditorPanel` and
+    `openGameModesPanel` already keep with each other. None of those three was
+    taught to close the control settings panel, so the set is no longer mutually
+    exclusive in code - it is only exclusive because `syncOverlays` ranks
+    `controls` below `modes` and `settings` and because every key that opens a
+    panel is swallowed by the open one. Nothing reaches it today, which is why
+    this is not filed as a defect: the control panel takes every key before the
+    open keys are read, and the menus that could be clicked are display:none
+    behind it. The next panel, or the next open key, is what makes it reachable,
+    and the failure then is a panel that reappears when the one over it closes.
+  - **Goal**: Add `closeControlSettings(this.controlSettings)` to the other three
+    openers, so the exclusion is stated in each of them rather than resting on
+    the order `syncOverlays` happens to rank them in.
+  - From: UI/UX Override - the roll axis reads the wrong way round

@@ -5,6 +5,51 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.24.6] - 2026-10-10
+
+The bound `1.0.0-alpha.1.24.5` left open is stated, and stating it showed the
+split was not merely incomplete - it was unfalsifiable. `a list is scanned for a
+second name by its rows rather than by its markup` wrote the wrapper case and
+the named-row case as two fixtures, and the named-row half asserted that a
+failure quotes the offending row "rather than a tag" over a fixture holding no
+tag. Once `listRows()` takes the tags off, the only thing left in that span that
+can match is the row, so the assertion was true however the stripping behaved.
+Cutting the tag strip out of `listRows()` entirely, leaving the `<h3>` removal
+alone, failed only the wrapper half and left both named-row assertions green,
+which is the measurement that settles it: that half held nothing about tags.
+
+### Changed
+
+- **The two fixtures become one span that can fail.** The named-row fixture is
+  replaced by a span carrying both at once - a row inside
+  `<div class="controls-row">` and a genuine `X - Show Controls` row beside it -
+  which is the only arrangement in which quoting the class instead of the row is
+  possible, and therefore the only one in which asking which was quoted means
+  anything. It asserts both halves of the bound: the real row is still caught,
+  and the quote lands on `X - Show Controls` rather than on the class it sits
+  inside. Re-measured against the same mutation: with the tag strip removed the
+  span still matches, so the catch is not what breaks, and the quote comes back
+  as `<div class="controls-row">W/S or arrows - Pitch<br></div>` - the class read
+  as a row, which is the failure the guard exists to prevent, now visible in the
+  assertion that names it. The `wrapped` fixture stays as it was; it is what
+  catches a tag strip removed outright, and it is still the first assertion to
+  go when one is.
+- **The guard and the test read one capture rather than two copies of it.** The
+  pattern that quotes the offending row was written out in both places, once as
+  the quote the guard makes and once as the quote the test checks it against, so
+  changing what the guard quotes with left the test green against the pattern
+  the guard had stopped using. Both now read `SECOND_NAME_ROW`, which is built
+  from `SECOND_NAME` - the name itself, `/controls?/i` - rather than spelled
+  beside it, so the name has one definition and the capture is derived from it.
+  Widening either reaches both callers.
+- **The `1.0.0-alpha.1.24.5` entry no longer reports the gap as open.** Its last
+  `Changed` bullet said the combined case "is not stated yet"; it now points at
+  this version and records what stating it turned up, so the history reads as
+  the correction it was rather than as a gap nobody came back to.
+
+The suite is green at 1247, the same count as `1.0.0-alpha.1.24.5` - a fixture
+inside an existing test was replaced rather than a test added.
+
 ## [1.0.0-alpha.1.24.5] - 2026-10-09
 
 **This version is written in a different shape from the `1.24.4-alpha` below
@@ -85,9 +130,13 @@ tags still in it, so every nested element's attributes were in the scan.
   quoted as row text rather than as a tag. Those are two fixtures rather than
   one, so the case that puts a `control` in a tag and a `control` in a row
   inside the same span - where the quote has to land on the row - is not stated
-  yet. Today's page can show none of it: its rows are bare text between
-  `<br>`s, and the one wrapper nested in the suite's other fixtures happens to
-  carry no `control`. The suite is green at 1247, one test up from 1246.
+  here. `1.0.0-alpha.1.24.6` states it, and found that splitting it was worse
+  than leaving it open: the half written without a wrapper had no tag to quote
+  instead of the row, so the assertion that it quoted the row "rather than a
+  tag" could not fail. Today's page can show none of it: its rows are bare text
+  between `<br>`s, and the one wrapper nested in the suite's other fixtures
+  happens to carry no `control`. The suite is green at 1247, one test up from
+  1246.
 
 ## [1.24.4-alpha] - 2026-10-08
 
