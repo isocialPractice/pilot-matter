@@ -22,40 +22,58 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the capture follows the name only halfway
+### Code Review Override - the helper was generalised and its comment was not
 
-#### Resolve Issues
-
-- [ ] Row Scan 2
-  - **Issue**: `SECOND_NAME_ROW` at `test/page.test.js:751` takes the pattern
-    text from `SECOND_NAME` but respells everything else about it, so the pair
-    the item set out to stop drifting still drifts in two of the three ways the
-    name can be edited. The flags are written out again as `'i'` rather than
-    read from `SECOND_NAME.flags`: tighten the name to `/Controls?/` on the
-    view that a row always capitalises it, and the guard's
-    `assert.doesNotMatch(rows, SECOND_NAME)` passes a row reading
-    `X - show controls` while `SECOND_NAME_ROW` goes on matching that same row,
-    so the guard and its own capture disagree about one row. And the name is
-    interpolated unparenthesised, so widening it to an alternation breaks the
-    row context out of the pattern: with `SECOND_NAME` set to
-    `/controls?|key list/i`, `SECOND_NAME_ROW` builds as
-    `/[^\r\n]*controls?|key list[^\r\n]*/i`, and a row `H - Hide Key List` is
-    quoted as the bare fragment `Key List` instead of the whole row - which is
-    the one thing the capture exists to do rather than matching the name alone.
-    Both measured against the live definitions. Nothing fails today, because
-    `/controls?/i` is a bare sequence carrying the single flag that happens to
-    be respelled correctly, so the next edit to the name is what reaches it.
-    The `1.0.0-alpha.1.24.6` entry in `CHANGELOG.md` states the opposite as
-    already achieved: "Widening either reaches both callers."
-  - **Goal**: Build the capture from the whole of `SECOND_NAME` rather than
-    from its `source` alone. Wrap the interpolation in a non-capturing group so
-    an alternation cannot reach past it, and pass `SECOND_NAME.flags` in place
-    of the literal `'i'` so the case rule has one definition too. Both
-    measurements above then agree with the guard, and the name becomes editable
-    in the way the entry already claims it is. Correct the "Widening either
-    reaches both callers" sentence in the `1.0.0-alpha.1.24.6` entry of
-    `CHANGELOG.md` to match what is true once the derivation is finished.
-  - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [ ] The comment on `nameRow()` describes the constant two declarations below it
+  - **Issue**: `test/page.test.js:739` opens "The name a list may not carry a
+    second time, and the span a failure quotes it out of" - which names
+    `SECOND_NAME` and `SECOND_NAME_ROW` at lines 767 and 768 - and that comment
+    now sits above `function nameRow(name)` at line 763, which this run
+    introduced between the two. Its third paragraph describes `nameRow()` in
+    terms the function does not have: "The flags come from `SECOND_NAME.flags`"
+    and "tightening the name to `/Controls?/`" read as statements about one
+    name, while `nameRow()` takes a `name` parameter and never mentions
+    `SECOND_NAME` - the test at line 785 hands it `tightened` and `widened`
+    instead. So the comment forward-references a constant declared after it and
+    documents a generic builder as though it were specific to the one caller.
+    Every other helper in the file is commented on itself directly above itself
+    - `listRows` at 721 to 734, `collectScripts`, `elementBody`, `publishedNames`
+    and `exportTables` in `test/docs.test.js` - so a comment naming a subject
+    two declarations down is this file's one exception rather than its habit.
+    Nothing fails: comments do not run.
+  - **Goal**: Split the comment where its subject changes. Keep the paragraph
+    that describes what `nameRow()` does - the whole of the name rather than its
+    `source`, the flags, the `(?:...)` - directly above `nameRow()`, written
+    about its `name` parameter rather than about `SECOND_NAME`, and move the two
+    paragraphs that describe the name a list may not carry and the pair that
+    drifted down to sit above `const SECOND_NAME`. The two edits the paragraph
+    measures against stay where they are; only which declaration each paragraph
+    is attached to changes.
+  - From: Code Review Override - the helper was generalised and its comment was not
+- [ ] The widened fixture reads `[0]` off a match it never established
+  - **Issue**: `test/page.test.js:793` is
+    `assert.match('H - Hide Key List'.match(nameRow(widened))[0], ...)`, and
+    `String.prototype.match` returns `null` when nothing matches, so `[0]`
+    throws rather than asserting. The state that reaches it is the regression
+    the test exists to catch: drop the flags from `nameRow()` - `name.flags`
+    mistyped as `name.flag`, or hardcoded back to `''` - and
+    `(?:controls?|key list)` no longer matches the capitals in
+    `H - Hide Key List`, `.match()` returns `null`, and the test dies with
+    `TypeError: Cannot read properties of null (reading '0')` instead of its own
+    message, "and a row found by its second branch is still quoted whole rather
+    than as the bare name". Measured: that exact `TypeError` is what `name.flag`
+    produces. The test still fails, so nothing ships broken - what is lost is
+    the sentence that says which of the two derivations gave way, on the one
+    failure where the row is not quoted at all. The same `[0]` at line 860 is
+    guarded, by `assert.match(both, SECOND_NAME, ...)` on line 858 establishing
+    the match first, so this is the only unguarded one in the file.
+  - **Goal**: Establish the match before reading it, the way line 858 does for
+    line 860. Assert the row matches `nameRow(widened)` first, then read `[0]`
+    off it - or hold the result in a `const`, `assert.ok` it with a message
+    naming the dropped flags, and assert on `[0]` after. Either way the two
+    halves of the derivation keep separate messages on every failure, which is
+    what the fixture pair was added for.
+  - From: Code Review Override - the helper was generalised and its comment was not
 
 ## Game UI/UX
 
@@ -369,21 +387,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 172 earlier items in `TODO-archive.md`, newest last.
+> 173 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The docs page twin of the README's menu paragraph was left behind
-  - **Issue**: `README.md` was updated this run to read "In the settings panel,
-    the control settings panel and the element editor, `A`/`D` or the arrows
-    step the value under the cursor". `docs/controls/index.html` carries the
-    same sentence under **Working a menu** and still names only the settings
-    panel and the element editor, so the published page says the control
-    settings panel's rows cannot be stepped while the README says they can. The
-    same paragraph's `Esc` sentence is right either way.
-  - **Goal**: Bring the **Working a menu** paragraph in
-    `docs/controls/index.html` into line with the README's. Its key table is
-    complete as it stands - the panel has no open key of its own - so the
-    paragraph is the whole of it.
-  - From: UI/UX Override - the roll axis reads the wrong way round
 - [x] The row for `H` inside the reference list is the last place naming it
   `Controls`
   - **Issue**: this run renamed `HELP_HINT` to `H - CONTROL REFERENCE` so that
@@ -644,4 +649,34 @@ how the simulator got here rather than as a list still to be worked.
     The last `Changed` bullet of the `1.0.0-alpha.1.24.5` entry in
     `CHANGELOG.md` names this gap as open; correct that sentence once the case
     is stated.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [x] Row Scan 2
+  - **Issue**: `SECOND_NAME_ROW` at `test/page.test.js:751` takes the pattern
+    text from `SECOND_NAME` but respells everything else about it, so the pair
+    the item set out to stop drifting still drifts in two of the three ways the
+    name can be edited. The flags are written out again as `'i'` rather than
+    read from `SECOND_NAME.flags`: tighten the name to `/Controls?/` on the
+    view that a row always capitalises it, and the guard's
+    `assert.doesNotMatch(rows, SECOND_NAME)` passes a row reading
+    `X - show controls` while `SECOND_NAME_ROW` goes on matching that same row,
+    so the guard and its own capture disagree about one row. And the name is
+    interpolated unparenthesised, so widening it to an alternation breaks the
+    row context out of the pattern: with `SECOND_NAME` set to
+    `/controls?|key list/i`, `SECOND_NAME_ROW` builds as
+    `/[^\r\n]*controls?|key list[^\r\n]*/i`, and a row `H - Hide Key List` is
+    quoted as the bare fragment `Key List` instead of the whole row - which is
+    the one thing the capture exists to do rather than matching the name alone.
+    Both measured against the live definitions. Nothing fails today, because
+    `/controls?/i` is a bare sequence carrying the single flag that happens to
+    be respelled correctly, so the next edit to the name is what reaches it.
+    The `1.0.0-alpha.1.24.6` entry in `CHANGELOG.md` states the opposite as
+    already achieved: "Widening either reaches both callers."
+  - **Goal**: Build the capture from the whole of `SECOND_NAME` rather than
+    from its `source` alone. Wrap the interpolation in a non-capturing group so
+    an alternation cannot reach past it, and pass `SECOND_NAME.flags` in place
+    of the literal `'i'` so the case rule has one definition too. Both
+    measurements above then agree with the guard, and the name becomes editable
+    in the way the entry already claims it is. Correct the "Widening either
+    reaches both callers" sentence in the `1.0.0-alpha.1.24.6` entry of
+    `CHANGELOG.md` to match what is true once the derivation is finished.
   - From: Code Review Override - what the balanced span promises, and markup read as a row
