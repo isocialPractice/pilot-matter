@@ -746,9 +746,53 @@ function listRows(body) {
  * quote the guard makes, the other the quote a test checks it against. That is a
  * pair which can only drift apart silently, since changing what the guard quotes
  * with left the test green against the pattern the guard had stopped using.
+ *
+ * Deriving the capture takes the whole of the name rather than its `source`
+ * alone, because the two parts of a pattern that an edit reaches are the text
+ * and the flags. The flags come from `SECOND_NAME.flags`, so tightening the name
+ * to `/Controls?/` on the view that a row always capitalises it tightens the
+ * quote with it; spelled `'i'` here instead, the guard would pass a row reading
+ * `X - show controls` while the capture went on matching that same row, and the
+ * two would disagree about which rows exist. The text goes inside `(?:...)`, so
+ * widening the name to an alternation cannot reach past it: interpolated bare,
+ * `/controls?|key list/i` builds `[^\r\n]*controls?|key list[^\r\n]*`, whose
+ * second branch starts at the name, and a row `H - Hide Key List` is quoted as
+ * the bare fragment `Key List` rather than as the row it was found in - which is
+ * the one thing the capture exists to do that the name does not already do.
  */
+function nameRow(name) {
+    return new RegExp(`[^\\r\\n]*(?:${name.source})[^\\r\\n]*`, name.flags);
+}
+
 const SECOND_NAME = /controls?/i;
-const SECOND_NAME_ROW = new RegExp(`[^\\r\\n]*${SECOND_NAME.source}[^\\r\\n]*`, 'i');
+const SECOND_NAME_ROW = nameRow(SECOND_NAME);
+
+/**
+ * The derivation above is correct and, measured against today's name, unable to
+ * fail: `/controls?/i` is a bare sequence carrying the single flag a hand-written
+ * `'i'` happens to spell correctly, so writing the capture out beside the name
+ * again - either half of it - passes all 1247 tests. What the derivation is worth
+ * shows only against a name somebody has edited, which is the case it exists for,
+ * so the two edits it has to survive are stated here under names of their own
+ * rather than left until one of them is made on the real one.
+ *
+ * Deriving from the name is what the capture is for, so these read it through
+ * `nameRow()` rather than through `SECOND_NAME_ROW`. Asserting against the
+ * built constant could only restate the pattern a second time, which is the
+ * drift the derivation was introduced to end.
+ */
+test('the row a failure quotes is derived from the whole of the name it scans for', () => {
+    const tightened = /Controls?/;
+    assert.doesNotMatch('X - show controls', tightened,
+        'a name tightened to require the capital reads no second name in an uncapitalised row');
+    assert.doesNotMatch('X - show controls', nameRow(tightened),
+        'and its quote agrees, rather than matching a row the guard beside it passed');
+
+    const widened = /controls?|key list/i;
+    assert.match(widened.source, /\|/, 'a name widened to an alternation holds one');
+    assert.match('H - Hide Key List'.match(nameRow(widened))[0], /^H - Hide Key List$/,
+        'and a row found by its second branch is still quoted whole rather than as the bare name');
+});
 
 /**
  * The heading above is only half of it. The row that collapses the list sits

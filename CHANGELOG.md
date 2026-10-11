@@ -5,6 +5,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.24.7] - 2026-10-11
+
+`1.0.0-alpha.1.24.6` gave the name one definition and derived the quote from it,
+and derived it from `SECOND_NAME.source` - the pattern's text, which is one of
+the two parts of it an edit reaches. The flags were spelled `'i'` again beside
+it and the text was interpolated bare, so two of the three ways the name can be
+edited still drifted. Nothing failed, because `/controls?/i` is a bare sequence
+carrying the single flag the hand-written copy spells correctly: the derivation
+was right about today's name and silent about every later one.
+
+### Changed
+
+- **The quote is derived from the whole of the name, not from its text.** The
+  flags come from `SECOND_NAME.flags`, and the text is interpolated inside
+  `(?:...)`. Measured against the two edits that reached past the old form:
+  tightening the name to `/Controls?/`, on the view that a row always
+  capitalises it, left the guard passing a row reading `X - show controls` while
+  the quote went on matching that same row, so the pair disagreed about which
+  rows exist; and widening it to `/controls?|key list/i` built
+  `[^\r\n]*controls?|key list[^\r\n]*`, whose second branch begins at the name,
+  so a row `H - Hide Key List` came back quoted as the bare fragment `Key List`
+  rather than as the row it was found in - which is the one thing the quote does
+  that the name does not already do. Both now agree with the guard.
+- **The derivation is held by a test rather than by the name it was written
+  against.** Today's name cannot fail either half: restoring the literal `'i'`
+  or dropping the group passes all 1247 tests, which is the same silence the
+  two written-out copies kept before `1.0.0-alpha.1.24.6` replaced them. So the
+  derivation is read through a `nameRow()` the test can hand its own names to,
+  and the two edits above are stated as fixtures - a tightened name whose quote
+  must agree with it, and a widened one whose second branch must still be quoted
+  whole. Re-measured by mutation: the literal `'i'` fails the first, the
+  unparenthesised interpolation fails the second, and each fails alone.
+- **The `1.0.0-alpha.1.24.6` entry no longer claims the derivation was
+  finished.** Its `Changed` bullet closed "Widening either reaches both
+  callers"; reaching both callers was true, arriving intact was not, and the
+  sentence now says which of the two it had and points here for the rest.
+
+The suite is green at 1248, one more than `1.0.0-alpha.1.24.6` - the bound on
+the derivation is a test the name it guards cannot provide.
+
 ## [1.0.0-alpha.1.24.6] - 2026-10-10
 
 The bound `1.0.0-alpha.1.24.5` left open is stated, and stating it showed the
@@ -41,7 +81,10 @@ which is the measurement that settles it: that half held nothing about tags.
   the guard had stopped using. Both now read `SECOND_NAME_ROW`, which is built
   from `SECOND_NAME` - the name itself, `/controls?/i` - rather than spelled
   beside it, so the name has one definition and the capture is derived from it.
-  Widening either reaches both callers.
+  An edit to the name reaches both callers; it does not yet survive the trip
+  intact, because the capture is derived from `SECOND_NAME.source` alone and
+  respells the rest. `1.0.0-alpha.1.24.7` finishes the derivation and states
+  what the two unfinished halves cost.
 - **The `1.0.0-alpha.1.24.5` entry no longer reports the gap as open.** Its last
   `Changed` bullet said the combined case "is not stated yet"; it now points at
   this version and records what stating it turned up, so the history reads as

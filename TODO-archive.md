@@ -2064,3 +2064,19 @@ still be found by name.
     openers, so the exclusion is stated in each of them rather than resting on
     the order `syncOverlays` happens to rank them in.
   - From: UI/UX Override - the roll axis reads the wrong way round
+
+## Archived 10-11-26
+
+- [x] The docs page twin of the README's menu paragraph was left behind
+  - **Issue**: `README.md` was updated this run to read "In the settings panel,
+    the control settings panel and the element editor, `A`/`D` or the arrows
+    step the value under the cursor". `docs/controls/index.html` carries the
+    same sentence under **Working a menu** and still names only the settings
+    panel and the element editor, so the published page says the control
+    settings panel's rows cannot be stepped while the README says they can. The
+    same paragraph's `Esc` sentence is right either way.
+  - **Goal**: Bring the **Working a menu** paragraph in
+    `docs/controls/index.html` into line with the README's. Its key table is
+    complete as it stands - the panel has no open key of its own - so the
+    paragraph is the whole of it.
+  - From: UI/UX Override - the roll axis reads the wrong way round
