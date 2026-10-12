@@ -5,6 +5,60 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.24.8] - 2026-10-12
+
+`1.0.0-alpha.1.24.7` generalised the quote into a `nameRow()` the test could
+hand its own names to, and wrote that function between the comment describing
+the name and the constants the comment names. Neither of the two things it left
+behind could fail a test: a comment does not run, and the fixture that read
+past its own guard only read past it in the state the fixture exists to catch.
+Reading the second of those turned up a third of the same kind, left by
+`1.0.0-alpha.1.24.6` at the other end of the file and guarded here beside it.
+
+### Changed
+
+- **The comment above `nameRow()` is about `nameRow()`.** The block sat above
+  the function while naming `SECOND_NAME` and `SECOND_NAME_ROW`, which are
+  declared two lines below it, and documented the generic builder in terms of
+  the one caller: "The flags come from `SECOND_NAME.flags`", on a function whose
+  parameter is `name` and which the test hands `tightened` and `widened`
+  instead. It is split where its subject changes. The paragraph describing the
+  derivation - the whole of the name rather than its `source`, the flags, the
+  `(?:...)` - stays above `nameRow()` and is written about `name`; the two
+  paragraphs describing the name a list may not carry a second time, and the
+  pair of written-out copies that drifted, move down above `const SECOND_NAME`.
+  Every other helper in the file is commented on itself directly above itself,
+  so this is the file's habit restored rather than a new convention.
+- **The widened fixture establishes its match before reading `[0]` off it.**
+  `'H - Hide Key List'.match(nameRow(widened))[0]` read index zero of a value
+  `String.prototype.match` returns as `null` when nothing matches, and nothing
+  matching is exactly the regression the fixture is there for: with the flags
+  dropped from `nameRow()`, `(?:controls?|key list)` no longer reaches the
+  capitals in `H - Hide Key List`. The result is held in a `const`,
+  `assert.ok` names the dropped flags, and `[0]` is read after. Re-measured by
+  mutation: `name.flags` mistyped as `name.flag` now fails with "whose quote
+  carries the flags the name was widened under, rather than dropping them and
+  reading past the capitals" where it previously died with
+  `TypeError: Cannot read properties of null (reading '0')`, so the two halves
+  of the derivation keep separate messages on the one failure where the row is
+  not quoted at all.
+- **The markup fixture establishes its match too.**
+  `both.match(SECOND_NAME_ROW)[0]` at the end of
+  `a list is scanned for a second name by its rows rather than by its markup`
+  was the second unguarded `[0]`, not a guarded one. The `assert.match(both,
+  SECOND_NAME, ...)` above it reads the name, whose own flags the mutation does
+  not touch, rather than the derived `SECOND_NAME_ROW` it then indexes - so
+  with the flags dropped the name still matches, lowercase `controls?` no
+  longer reaches `X - Show Controls`, and the line died with the same
+  `TypeError: Cannot read properties of null (reading '0')` the fixture above
+  had just been given a message for. Measured the same way: under
+  `name.flag` both fixtures now report their own message and the run raises no
+  `TypeError`. Guarded identically - the match is held in a `const`,
+  `assert.ok` names the dropped flags, and `[0]` is read after.
+
+The suite is green at 1248, unchanged - every finding was in what a failure
+says rather than in what passes.
+
 ## [1.0.0-alpha.1.24.7] - 2026-10-11
 
 `1.0.0-alpha.1.24.6` gave the name one definition and derived the quote from it,

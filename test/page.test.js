@@ -736,6 +736,27 @@ function listRows(body) {
 }
 
 /**
+ * The span a failure quotes a name out of: the whole row the name was found in,
+ * built from the name itself rather than written out beside it.
+ *
+ * Deriving the capture takes the whole of `name` rather than its `source` alone,
+ * because the two parts of a pattern that an edit reaches are the text and the
+ * flags. The flags come from `name.flags`, so tightening a name to `/Controls?/`
+ * on the view that a row always capitalises it tightens the quote with it;
+ * spelled `'i'` here instead, the guard would pass a row reading
+ * `X - show controls` while the capture went on matching that same row, and the
+ * two would disagree about which rows exist. The text goes inside `(?:...)`, so
+ * widening a name to an alternation cannot reach past it: interpolated bare,
+ * `/controls?|key list/i` builds `[^\r\n]*controls?|key list[^\r\n]*`, whose
+ * second branch starts at the name, and a row `H - Hide Key List` is quoted as
+ * the bare fragment `Key List` rather than as the row it was found in - which is
+ * the one thing the capture exists to do that the name does not already do.
+ */
+function nameRow(name) {
+    return new RegExp(`[^\\r\\n]*(?:${name.source})[^\\r\\n]*`, name.flags);
+}
+
+/**
  * The name a list may not carry a second time, and the span a failure quotes it
  * out of.
  *
@@ -746,24 +767,7 @@ function listRows(body) {
  * quote the guard makes, the other the quote a test checks it against. That is a
  * pair which can only drift apart silently, since changing what the guard quotes
  * with left the test green against the pattern the guard had stopped using.
- *
- * Deriving the capture takes the whole of the name rather than its `source`
- * alone, because the two parts of a pattern that an edit reaches are the text
- * and the flags. The flags come from `SECOND_NAME.flags`, so tightening the name
- * to `/Controls?/` on the view that a row always capitalises it tightens the
- * quote with it; spelled `'i'` here instead, the guard would pass a row reading
- * `X - show controls` while the capture went on matching that same row, and the
- * two would disagree about which rows exist. The text goes inside `(?:...)`, so
- * widening the name to an alternation cannot reach past it: interpolated bare,
- * `/controls?|key list/i` builds `[^\r\n]*controls?|key list[^\r\n]*`, whose
- * second branch starts at the name, and a row `H - Hide Key List` is quoted as
- * the bare fragment `Key List` rather than as the row it was found in - which is
- * the one thing the capture exists to do that the name does not already do.
  */
-function nameRow(name) {
-    return new RegExp(`[^\\r\\n]*(?:${name.source})[^\\r\\n]*`, name.flags);
-}
-
 const SECOND_NAME = /controls?/i;
 const SECOND_NAME_ROW = nameRow(SECOND_NAME);
 
@@ -790,7 +794,10 @@ test('the row a failure quotes is derived from the whole of the name it scans fo
 
     const widened = /controls?|key list/i;
     assert.match(widened.source, /\|/, 'a name widened to an alternation holds one');
-    assert.match('H - Hide Key List'.match(nameRow(widened))[0], /^H - Hide Key List$/,
+    const secondBranch = 'H - Hide Key List'.match(nameRow(widened));
+    assert.ok(secondBranch,
+        'whose quote carries the flags the name was widened under, rather than dropping them and reading past the capitals');
+    assert.match(secondBranch[0], /^H - Hide Key List$/,
         'and a row found by its second branch is still quoted whole rather than as the bare name');
 });
 
@@ -857,7 +864,10 @@ test('a list is scanned for a second name by its rows rather than by its markup'
     ].join('\n'));
     assert.match(both, SECOND_NAME,
         'while a row that does name the list a second time is caught beside that same wrapper');
-    assert.match(both.match(SECOND_NAME_ROW)[0], /X - Show Controls/,
+    const quoted = both.match(SECOND_NAME_ROW);
+    assert.ok(quoted,
+        'whose quote carries the flags the name was written with, rather than dropping them and missing the capitals');
+    assert.match(quoted[0], /X - Show Controls/,
         'and that row is what a failure quotes, rather than the class it is written inside');
 });
 
