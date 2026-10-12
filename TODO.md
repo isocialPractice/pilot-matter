@@ -22,58 +22,40 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the helper was generalised and its comment was not
+### Code Review Override - a comment measures against a suite one test smaller
 
-- [ ] The comment on `nameRow()` describes the constant two declarations below it
-  - **Issue**: `test/page.test.js:739` opens "The name a list may not carry a
-    second time, and the span a failure quotes it out of" - which names
-    `SECOND_NAME` and `SECOND_NAME_ROW` at lines 767 and 768 - and that comment
-    now sits above `function nameRow(name)` at line 763, which this run
-    introduced between the two. Its third paragraph describes `nameRow()` in
-    terms the function does not have: "The flags come from `SECOND_NAME.flags`"
-    and "tightening the name to `/Controls?/`" read as statements about one
-    name, while `nameRow()` takes a `name` parameter and never mentions
-    `SECOND_NAME` - the test at line 785 hands it `tightened` and `widened`
-    instead. So the comment forward-references a constant declared after it and
-    documents a generic builder as though it were specific to the one caller.
-    Every other helper in the file is commented on itself directly above itself
-    - `listRows` at 721 to 734, `collectScripts`, `elementBody`, `publishedNames`
-    and `exportTables` in `test/docs.test.js` - so a comment naming a subject
-    two declarations down is this file's one exception rather than its habit.
-    Nothing fails: comments do not run.
-  - **Goal**: Split the comment where its subject changes. Keep the paragraph
-    that describes what `nameRow()` does - the whole of the name rather than its
-    `source`, the flags, the `(?:...)` - directly above `nameRow()`, written
-    about its `name` parameter rather than about `SECOND_NAME`, and move the two
-    paragraphs that describe the name a list may not carry and the pair that
-    drifted down to sit above `const SECOND_NAME`. The two edits the paragraph
-    measures against stay where they are; only which declaration each paragraph
-    is attached to changes.
-  - From: Code Review Override - the helper was generalised and its comment was not
-- [ ] The widened fixture reads `[0]` off a match it never established
-  - **Issue**: `test/page.test.js:793` is
-    `assert.match('H - Hide Key List'.match(nameRow(widened))[0], ...)`, and
-    `String.prototype.match` returns `null` when nothing matches, so `[0]`
-    throws rather than asserting. The state that reaches it is the regression
-    the test exists to catch: drop the flags from `nameRow()` - `name.flags`
-    mistyped as `name.flag`, or hardcoded back to `''` - and
-    `(?:controls?|key list)` no longer matches the capitals in
-    `H - Hide Key List`, `.match()` returns `null`, and the test dies with
-    `TypeError: Cannot read properties of null (reading '0')` instead of its own
-    message, "and a row found by its second branch is still quoted whole rather
-    than as the bare name". Measured: that exact `TypeError` is what `name.flag`
-    produces. The test still fails, so nothing ships broken - what is lost is
-    the sentence that says which of the two derivations gave way, on the one
-    failure where the row is not quoted at all. The same `[0]` at line 860 is
-    guarded, by `assert.match(both, SECOND_NAME, ...)` on line 858 establishing
-    the match first, so this is the only unguarded one in the file.
-  - **Goal**: Establish the match before reading it, the way line 858 does for
-    line 860. Assert the row matches `nameRow(widened)` first, then read `[0]`
-    off it - or hold the result in a `const`, `assert.ok` it with a message
-    naming the dropped flags, and assert on `[0]` after. Either way the two
-    halves of the derivation keep separate messages on every failure, which is
-    what the fixture pair was added for.
-  - From: Code Review Override - the helper was generalised and its comment was not
+#### Found Issues
+
+- [ ] The derivation comment states a suite count the file no longer has
+  - **Issue**: `test/page.test.js:778` reads "writing the capture out beside the
+    name again - either half of it - passes all 1247 tests", inside a comment
+    that opens in the present tense: "The derivation above is correct and,
+    measured against today's name, unable to fail". The suite is 1248 and has
+    been since `1.0.0-alpha.1.24.7`, whose own `CHANGELOG.md` entry records it as
+    "green at 1248, one more than `1.0.0-alpha.1.24.6`". Measured both ways:
+    `node --test` reports 1248 at `HEAD` and 1248 in the working tree, and the
+    count of `test(` declarations in this file is identical in the two, so no
+    test was added or removed this turn. 1247 was the count at
+    `1.0.0-alpha.1.24.6`, before the run that wrote the sentence added the test
+    the sentence introduces, so the number is the suite as it stood one test
+    before the comment shipped. It is worse than stale by one: the counterfactual
+    is now false rather than merely out of date, because the two fixtures stated
+    directly below the sentence are the tests that fail under it. Writing the
+    capture out by hand today makes `nameRow(tightened)` return the hand-written
+    pattern, so `assert.doesNotMatch('X - show controls', nameRow(tightened))` at
+    `:792` fails, which is the whole reason those fixtures were added. Nothing
+    fails today: comments do not run.
+  - **Goal**: Put the claim in the tense it is true in. Say that writing the
+    capture out passed all 1247 tests before these two fixtures were added, and
+    that the pair below the sentence is what catches it now. That keeps the point
+    the paragraph is making, which is why a derivation that cannot fail against
+    today's name still needed fixtures of its own, rather than dropping the
+    measurement that makes the point. Consider carrying no number at all, since a
+    bare suite count in a comment goes stale on the next test added and this is
+    the file's only one. Leave the matching 1247 in the `1.0.0-alpha.1.24.7`
+    entry of `CHANGELOG.md` where it is: that entry is a dated record of the state
+    at the time, and the count is correct for the suite it describes.
+  - From: Code Review Override - a comment measures against a suite one test smaller
 
 ## Game UI/UX
 
@@ -387,59 +369,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 173 earlier items in `TODO-archive.md`, newest last.
+> 175 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The row for `H` inside the reference list is the last place naming it
-  `Controls`
-  - **Issue**: this run renamed `HELP_HINT` to `H - CONTROL REFERENCE` so that
-    the row which opens the list, the heading the list carries and the line the
-    collapsed list leaves behind are one name, and `CHANGELOG.md` records the
-    collapsed form as "the one place still naming it something else". It was
-    not. `index.html:1441` draws `H - Hide Controls` as the ninth row of
-    `#controls-help-list`, nine lines under the `<h3>CONTROL REFERENCE</h3>`
-    heading at `:1432` and eight lines over the renamed hint at `:1449`, so the
-    list still calls itself `Controls` in its own body - which is the exact
-    reading the rename was made to stop. The three places that describe the key
-    outside the game all avoid the word: `README.md:101`, `CHEATSHEET.md:24` and
-    `docs/cheatsheet.html:114` each give `H` as collapsing "the control list",
-    so the in-game row is the only outlier left. Nothing fails and nothing is
-    unreachable; the cost is that a pilot reading the list for the key is told
-    the key hides something called `Controls`.
-  - **Goal**: Reword the `H` row of `#controls-help-list` in `index.html` so it
-    names the action rather than a second name for the list - "Collapse List",
-    matching the wording `README.md`, `CHEATSHEET.md` and `docs/cheatsheet.html`
-    already use - and correct the `1.24.1-alpha` **Changed** entry in
-    `CHANGELOG.md`, which claims the collapsed hint was the only place still
-    reading `CONTROLS`. Worth checking `test/page.test.js` first: it reads the
-    list's heading and the hint but not its rows, so the row may want pinning
-    the way `the reference list is headed with the name of the row that opens it`
-    pins the heading.
-  - From: Code Review Override - the reference list still calls itself Controls on its own H row
-- [x] The guard on the control list holds one row rather than the list
-  - **Issue**: `the row that collapses the list names the action rather than the
-    list` in `test/page.test.js:597` captures the whole body of
-    `#controls-help-list` and then narrows to the `H` row before judging it, so
-    `assert.doesNotMatch(action, /controls?/i)` at `:607` is scoped to the text
-    after `H - ` and to nothing else. The list may therefore still name itself
-    `Controls` in any other row with the suite green. Verified: adding
-    `X - Show Controls<br>` under `index.html:1441` and running `npm test`
-    leaves all 1245 tests passing, this new one included. That is the same gap
-    that let this version's defect stand for a version - the suite read the
-    heading and it read the hint and it never read a row - narrowed from the
-    whole list to one row rather than closed. The test's own docstring states
-    the wider bound it does not hold, "the list may not carry a second name for
-    itself anywhere in it".
-  - **Goal**: Hold the bound the docstring already states. Run the `doesNotMatch`
-    over the captured list body rather than over the one row's action, with the
-    `<h3>CONTROL REFERENCE</h3>` heading sliced off the span first so the list's
-    own correct name is not read as the thing being forbidden - that heading is
-    pinned already by `the reference list is headed with the name of the row that
-    opens it` at `:582`, so nothing is lost by excluding it. Leave the
-    `^Collapse` assertion on the `H` row, which is the one part of the test that
-    is genuinely about that row's wording. Then re-run with
-    `X - Show Controls<br>` in place to see it fail, the way this test was
-    already checked against `H - Hide Controls`.
-  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
 - [x] Four comments still say the `Controls` entry is what puts the list on screen
   - **Issue**: the entry was renamed to `CONTROL SETTINGS` and no longer opens
     the reference list at all - `js/menu.js:13` carries
@@ -680,3 +611,53 @@ how the simulator got here rather than as a list still to be worked.
     reaches both callers" sentence in the `1.0.0-alpha.1.24.6` entry of
     `CHANGELOG.md` to match what is true once the derivation is finished.
   - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [x] The comment on `nameRow()` describes the constant two declarations below it
+  - **Issue**: `test/page.test.js:739` opens "The name a list may not carry a
+    second time, and the span a failure quotes it out of" - which names
+    `SECOND_NAME` and `SECOND_NAME_ROW` at lines 767 and 768 - and that comment
+    now sits above `function nameRow(name)` at line 763, which this run
+    introduced between the two. Its third paragraph describes `nameRow()` in
+    terms the function does not have: "The flags come from `SECOND_NAME.flags`"
+    and "tightening the name to `/Controls?/`" read as statements about one
+    name, while `nameRow()` takes a `name` parameter and never mentions
+    `SECOND_NAME` - the test at line 785 hands it `tightened` and `widened`
+    instead. So the comment forward-references a constant declared after it and
+    documents a generic builder as though it were specific to the one caller.
+    Every other helper in the file is commented on itself directly above itself
+    - `listRows` at 721 to 734, `collectScripts`, `elementBody`, `publishedNames`
+    and `exportTables` in `test/docs.test.js` - so a comment naming a subject
+    two declarations down is this file's one exception rather than its habit.
+    Nothing fails: comments do not run.
+  - **Goal**: Split the comment where its subject changes. Keep the paragraph
+    that describes what `nameRow()` does - the whole of the name rather than its
+    `source`, the flags, the `(?:...)` - directly above `nameRow()`, written
+    about its `name` parameter rather than about `SECOND_NAME`, and move the two
+    paragraphs that describe the name a list may not carry and the pair that
+    drifted down to sit above `const SECOND_NAME`. The two edits the paragraph
+    measures against stay where they are; only which declaration each paragraph
+    is attached to changes.
+  - From: Code Review Override - the helper was generalised and its comment was not
+- [x] The widened fixture reads `[0]` off a match it never established
+  - **Issue**: `test/page.test.js:793` is
+    `assert.match('H - Hide Key List'.match(nameRow(widened))[0], ...)`, and
+    `String.prototype.match` returns `null` when nothing matches, so `[0]`
+    throws rather than asserting. The state that reaches it is the regression
+    the test exists to catch: drop the flags from `nameRow()` - `name.flags`
+    mistyped as `name.flag`, or hardcoded back to `''` - and
+    `(?:controls?|key list)` no longer matches the capitals in
+    `H - Hide Key List`, `.match()` returns `null`, and the test dies with
+    `TypeError: Cannot read properties of null (reading '0')` instead of its own
+    message, "and a row found by its second branch is still quoted whole rather
+    than as the bare name". Measured: that exact `TypeError` is what `name.flag`
+    produces. The test still fails, so nothing ships broken - what is lost is
+    the sentence that says which of the two derivations gave way, on the one
+    failure where the row is not quoted at all. The same `[0]` at line 860 is
+    guarded, by `assert.match(both, SECOND_NAME, ...)` on line 858 establishing
+    the match first, so this is the only unguarded one in the file.
+  - **Goal**: Establish the match before reading it, the way line 858 does for
+    line 860. Assert the row matches `nameRow(widened)` first, then read `[0]`
+    off it - or hold the result in a `const`, `assert.ok` it with a message
+    naming the dropped flags, and assert on `[0]` after. Either way the two
+    halves of the derivation keep separate messages on every failure, which is
+    what the fixture pair was added for.
+  - From: Code Review Override - the helper was generalised and its comment was not
