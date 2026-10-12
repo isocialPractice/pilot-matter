@@ -2080,3 +2080,57 @@ still be found by name.
     complete as it stands - the panel has no open key of its own - so the
     paragraph is the whole of it.
   - From: UI/UX Override - the roll axis reads the wrong way round
+
+## Archived 10-12-26
+
+- [x] The row for `H` inside the reference list is the last place naming it
+  `Controls`
+  - **Issue**: this run renamed `HELP_HINT` to `H - CONTROL REFERENCE` so that
+    the row which opens the list, the heading the list carries and the line the
+    collapsed list leaves behind are one name, and `CHANGELOG.md` records the
+    collapsed form as "the one place still naming it something else". It was
+    not. `index.html:1441` draws `H - Hide Controls` as the ninth row of
+    `#controls-help-list`, nine lines under the `<h3>CONTROL REFERENCE</h3>`
+    heading at `:1432` and eight lines over the renamed hint at `:1449`, so the
+    list still calls itself `Controls` in its own body - which is the exact
+    reading the rename was made to stop. The three places that describe the key
+    outside the game all avoid the word: `README.md:101`, `CHEATSHEET.md:24` and
+    `docs/cheatsheet.html:114` each give `H` as collapsing "the control list",
+    so the in-game row is the only outlier left. Nothing fails and nothing is
+    unreachable; the cost is that a pilot reading the list for the key is told
+    the key hides something called `Controls`.
+  - **Goal**: Reword the `H` row of `#controls-help-list` in `index.html` so it
+    names the action rather than a second name for the list - "Collapse List",
+    matching the wording `README.md`, `CHEATSHEET.md` and `docs/cheatsheet.html`
+    already use - and correct the `1.24.1-alpha` **Changed** entry in
+    `CHANGELOG.md`, which claims the collapsed hint was the only place still
+    reading `CONTROLS`. Worth checking `test/page.test.js` first: it reads the
+    list's heading and the hint but not its rows, so the row may want pinning
+    the way `the reference list is headed with the name of the row that opens it`
+    pins the heading.
+  - From: Code Review Override - the reference list still calls itself Controls on its own H row
+- [x] The guard on the control list holds one row rather than the list
+  - **Issue**: `the row that collapses the list names the action rather than the
+    list` in `test/page.test.js:597` captures the whole body of
+    `#controls-help-list` and then narrows to the `H` row before judging it, so
+    `assert.doesNotMatch(action, /controls?/i)` at `:607` is scoped to the text
+    after `H - ` and to nothing else. The list may therefore still name itself
+    `Controls` in any other row with the suite green. Verified: adding
+    `X - Show Controls<br>` under `index.html:1441` and running `npm test`
+    leaves all 1245 tests passing, this new one included. That is the same gap
+    that let this version's defect stand for a version - the suite read the
+    heading and it read the hint and it never read a row - narrowed from the
+    whole list to one row rather than closed. The test's own docstring states
+    the wider bound it does not hold, "the list may not carry a second name for
+    itself anywhere in it".
+  - **Goal**: Hold the bound the docstring already states. Run the `doesNotMatch`
+    over the captured list body rather than over the one row's action, with the
+    `<h3>CONTROL REFERENCE</h3>` heading sliced off the span first so the list's
+    own correct name is not read as the thing being forbidden - that heading is
+    pinned already by `the reference list is headed with the name of the row that
+    opens it` at `:582`, so nothing is lost by excluding it. Leave the
+    `^Collapse` assertion on the `H` row, which is the one part of the test that
+    is genuinely about that row's wording. Then re-run with
+    `X - Show Controls<br>` in place to see it fail, the way this test was
+    already checked against `H - Hide Controls`.
+  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
