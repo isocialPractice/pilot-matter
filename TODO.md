@@ -22,40 +22,32 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - a comment measures against a suite one test smaller
+### Code Review Override - the release note renames the fixtures mid-sentence
 
-#### Found Issues
-
-- [ ] The derivation comment states a suite count the file no longer has
-  - **Issue**: `test/page.test.js:778` reads "writing the capture out beside the
-    name again - either half of it - passes all 1247 tests", inside a comment
-    that opens in the present tense: "The derivation above is correct and,
-    measured against today's name, unable to fail". The suite is 1248 and has
-    been since `1.0.0-alpha.1.24.7`, whose own `CHANGELOG.md` entry records it as
-    "green at 1248, one more than `1.0.0-alpha.1.24.6`". Measured both ways:
-    `node --test` reports 1248 at `HEAD` and 1248 in the working tree, and the
-    count of `test(` declarations in this file is identical in the two, so no
-    test was added or removed this turn. 1247 was the count at
-    `1.0.0-alpha.1.24.6`, before the run that wrote the sentence added the test
-    the sentence introduces, so the number is the suite as it stood one test
-    before the comment shipped. It is worse than stale by one: the counterfactual
-    is now false rather than merely out of date, because the two fixtures stated
-    directly below the sentence are the tests that fail under it. Writing the
-    capture out by hand today makes `nameRow(tightened)` return the hand-written
-    pattern, so `assert.doesNotMatch('X - show controls', nameRow(tightened))` at
-    `:792` fails, which is the whole reason those fixtures were added. Nothing
-    fails today: comments do not run.
-  - **Goal**: Put the claim in the tense it is true in. Say that writing the
-    capture out passed all 1247 tests before these two fixtures were added, and
-    that the pair below the sentence is what catches it now. That keeps the point
-    the paragraph is making, which is why a derivation that cannot fail against
-    today's name still needed fixtures of its own, rather than dropping the
-    measurement that makes the point. Consider carrying no number at all, since a
-    bare suite count in a comment goes stale on the next test added and this is
-    the file's only one. Leave the matching 1247 in the `1.0.0-alpha.1.24.7`
-    entry of `CHANGELOG.md` where it is: that entry is a dated record of the state
-    at the time, and the count is correct for the suite it describes.
-  - From: Code Review Override - a comment measures against a suite one test smaller
+- [ ] The entry's account of what the pair catches has a clause that does not parse
+  - **Issue**: `CHANGELOG.md:25` closes its first sentence with the appositive
+    "the tests that writing the capture out is what fails", which merges two
+    constructions - "the tests that writing the capture out fails" and "writing
+    the capture out is what fails them" - and leaves `fails` with no object, so
+    the clause does not parse. What it is claiming is true: the capture written
+    out in full, as `1.0.0-alpha.1.24.6` shipped it - literal `'i'` and no
+    `(?:...)` group - fails both halves of the pair, measured by mutation. The
+    wording is the only fault, and it has a second part: the clause calls the
+    two halves "the tests" three words after `CHANGELOG.md:23` calls the block
+    "the one test", where the rest of the entry says "fixture" throughout, as
+    `CHANGELOG.md:36` does in "fails the tightened fixture only". A reader
+    meeting "the one test ... the tests" in one breath reads a contradiction in
+    the one sentence whose point is that exactly one test made the difference.
+    Nothing fails: a changelog entry does not run.
+  - **Goal**: Say it once, in the entry's own vocabulary - the pair of fixtures
+    standing directly below the sentence is what writing the capture out fails.
+    Keep "the one test" for the block, since that is the count the suite moved
+    by and the sentence's whole point, and keep "fixture" for the two halves to
+    match the rest of the entry. Leave every number where it is: 1247, 1248,
+    and the mutation results were each checked against `node --test` and by
+    mutating both halves of `nameRow()` against both fixtures, and all of them
+    are correct.
+  - From: Code Review Override - the release note renames the fixtures mid-sentence
 
 ## Game UI/UX
 
@@ -369,38 +361,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 175 earlier items in `TODO-archive.md`, newest last.
+> 176 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Four comments still say the `Controls` entry is what puts the list on screen
-  - **Issue**: the entry was renamed to `CONTROL SETTINGS` and no longer opens
-    the reference list at all - `js/menu.js:13` carries
-    `{ id: 'controls', label: 'CONTROL SETTINGS' }`, and `js/main.js:801` sends
-    that entry to `openControlSettingsPanel()`, with the list reached one level
-    in from there by the `CONTROL REFERENCE` row at `js/main.js:1077`. The
-    comment at `js/main.js:802` says so in as many words: "the reference list it
-    used to show is a row inside that panel now". Four other comments were not
-    brought along and still assert the old causal chain in the present tense:
-    `index.html:88` ("it is what the Controls entry puts on screen"),
-    `js/main.js:237` ("the start screen's Controls entry puts the control list
-    on screen"), `js/main.js:924` ("it is what the Controls entry puts on
-    screen") and `test/page.test.js:765` ("the list is what the Controls entry
-    puts on screen"). Two of the four are in the files this run edited, and
-    `js/main.js` contradicts itself twice over inside one module. Nothing
-    executes a comment, so nothing fails; the cost is that a reader sent to
-    `js/main.js:924` to learn why the list takes the pointer is told it is
-    answering for an entry that has not opened it since `1.23.0-alpha`.
-  - **Goal**: Say in all four that the list is opened by the `CONTROL REFERENCE`
-    row of the control settings panel, and that it is also collapsed by `H` over
-    a flight, which is the arrangement `js/main.js:802` and
-    `docs/controls/clearing-the-screen.html:94` already describe. Keep each
-    comment's point intact rather than rewriting it - `index.html:88` and
-    `test/page.test.js:765` exist to say why the list takes the pointer, and
-    `js/main.js:237` is about the start screen specifically, where the row
-    toggles rather than only opens. Leave
-    `test/control-settings.test.js:461` exactly as it is: it names the entry in
-    the past tense on purpose, "before this panel was between them", and is the
-    one of the five that is already correct.
-  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
 - [x] **Balanced Span**: The list guard reads to the first `</div>` rather than to the end of the list
   - **Issue**: `the row that collapses the list names the action rather than the
     list` now runs its `doesNotMatch` over the whole captured body, which is the
@@ -661,3 +623,33 @@ how the simulator got here rather than as a list still to be worked.
     halves of the derivation keep separate messages on every failure, which is
     what the fixture pair was added for.
   - From: Code Review Override - the helper was generalised and its comment was not
+- [x] The derivation comment states a suite count the file no longer has
+  - **Issue**: `test/page.test.js:778` reads "writing the capture out beside the
+    name again - either half of it - passes all 1247 tests", inside a comment
+    that opens in the present tense: "The derivation above is correct and,
+    measured against today's name, unable to fail". The suite is 1248 and has
+    been since `1.0.0-alpha.1.24.7`, whose own `CHANGELOG.md` entry records it as
+    "green at 1248, one more than `1.0.0-alpha.1.24.6`". Measured both ways:
+    `node --test` reports 1248 at `HEAD` and 1248 in the working tree, and the
+    count of `test(` declarations in this file is identical in the two, so no
+    test was added or removed this turn. 1247 was the count at
+    `1.0.0-alpha.1.24.6`, before the run that wrote the sentence added the test
+    the sentence introduces, so the number is the suite as it stood one test
+    before the comment shipped. It is worse than stale by one: the counterfactual
+    is now false rather than merely out of date, because the two fixtures stated
+    directly below the sentence are the tests that fail under it. Writing the
+    capture out by hand today makes `nameRow(tightened)` return the hand-written
+    pattern, so `assert.doesNotMatch('X - show controls', nameRow(tightened))` at
+    `:792` fails, which is the whole reason those fixtures were added. Nothing
+    fails today: comments do not run.
+  - **Goal**: Put the claim in the tense it is true in. Say that writing the
+    capture out passed all 1247 tests before these two fixtures were added, and
+    that the pair below the sentence is what catches it now. That keeps the point
+    the paragraph is making, which is why a derivation that cannot fail against
+    today's name still needed fixtures of its own, rather than dropping the
+    measurement that makes the point. Consider carrying no number at all, since a
+    bare suite count in a comment goes stale on the next test added and this is
+    the file's only one. Leave the matching 1247 in the `1.0.0-alpha.1.24.7`
+    entry of `CHANGELOG.md` where it is: that entry is a dated record of the state
+    at the time, and the count is correct for the suite it describes.
+  - From: Code Review Override - a comment measures against a suite one test smaller
