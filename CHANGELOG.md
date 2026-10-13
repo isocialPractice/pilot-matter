@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.24.9] - 2026-10-13
+
+`1.0.0-alpha.1.24.7` bound the derivation with a test the name it guards cannot
+provide, and the sentence introducing that test measured the alternative -
+writing the capture out beside the name again - against the suite as it stood
+one test earlier. The measurement was written in the present tense, so adding
+the test the sentence introduces did not date the sentence, it falsified it.
+
+### Changed
+
+- **The derivation comment measures against a suite that exists.** It read
+  "writing the capture out beside the name again - either half of it - passes
+  all 1247 tests", in the present tense its own paragraph opens in: "The
+  derivation above is correct and, measured against today's name, unable to
+  fail". The suite has been 1248 since `1.0.0-alpha.1.24.7`, whose entry records
+  it as "one more than `1.0.0-alpha.1.24.6`", and the one test that made the
+  difference is the pair of fixtures standing directly below the sentence - the
+  tests that writing the capture out is what fails. So the claim was false rather
+  than stale by one: `node --test` reports 1248, and under a hand-written capture
+  `assert.doesNotMatch('X - show controls', nameRow(tightened))` fails, which is
+  the whole reason that fixture was written. The measurement moves to the tense
+  it is true in - it "passed all 1247 tests, which was the suite as it stood
+  before the pair below was added" - and the sentence now names what catches it
+  instead: the literal `'i'` fails the tightened name, the unparenthesised
+  interpolation fails the widened one, and each fails alone. That keeps the point
+  the paragraph is making, which is why a derivation unable to fail against
+  today's name needed fixtures of its own, rather than dropping the measurement
+  the point rests on. Re-measured by mutation, each half against both fixtures:
+  as shipped both pass, the literal `'i'` fails the tightened fixture only, and
+  the bare interpolation fails the widened one only. The matching 1247 in the
+  `1.0.0-alpha.1.24.7` entry stays where it is - that entry is a dated record of
+  the suite it describes, and the count is correct for it.
+
+The suite is green at 1248, unchanged - the finding was in a comment, and a
+comment does not run.
+
 ## [1.0.0-alpha.1.24.8] - 2026-10-12
 
 `1.0.0-alpha.1.24.7` generalised the quote into a `nameRow()` the test could

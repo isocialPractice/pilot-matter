@@ -775,7 +775,10 @@ const SECOND_NAME_ROW = nameRow(SECOND_NAME);
  * The derivation above is correct and, measured against today's name, unable to
  * fail: `/controls?/i` is a bare sequence carrying the single flag a hand-written
  * `'i'` happens to spell correctly, so writing the capture out beside the name
- * again - either half of it - passes all 1247 tests. What the derivation is worth
+ * again - either half of it - passed all 1247 tests, which was the suite as it
+ * stood before the pair below was added. That pair is what catches it now: the
+ * literal `'i'` fails the tightened name, the unparenthesised interpolation
+ * fails the widened one, and each fails alone. What the derivation is worth
  * shows only against a name somebody has edited, which is the case it exists for,
  * so the two edits it has to survive are stated here under names of their own
  * rather than left until one of them is made on the real one.

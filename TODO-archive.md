@@ -2134,3 +2134,36 @@ still be found by name.
     `X - Show Controls<br>` in place to see it fail, the way this test was
     already checked against `H - Hide Controls`.
   - From: Code Review Override - the list guard reads one row, and comments name a retired entry
+
+## Archived 10-13-26
+
+- [x] Four comments still say the `Controls` entry is what puts the list on screen
+  - **Issue**: the entry was renamed to `CONTROL SETTINGS` and no longer opens
+    the reference list at all - `js/menu.js:13` carries
+    `{ id: 'controls', label: 'CONTROL SETTINGS' }`, and `js/main.js:801` sends
+    that entry to `openControlSettingsPanel()`, with the list reached one level
+    in from there by the `CONTROL REFERENCE` row at `js/main.js:1077`. The
+    comment at `js/main.js:802` says so in as many words: "the reference list it
+    used to show is a row inside that panel now". Four other comments were not
+    brought along and still assert the old causal chain in the present tense:
+    `index.html:88` ("it is what the Controls entry puts on screen"),
+    `js/main.js:237` ("the start screen's Controls entry puts the control list
+    on screen"), `js/main.js:924` ("it is what the Controls entry puts on
+    screen") and `test/page.test.js:765` ("the list is what the Controls entry
+    puts on screen"). Two of the four are in the files this run edited, and
+    `js/main.js` contradicts itself twice over inside one module. Nothing
+    executes a comment, so nothing fails; the cost is that a reader sent to
+    `js/main.js:924` to learn why the list takes the pointer is told it is
+    answering for an entry that has not opened it since `1.23.0-alpha`.
+  - **Goal**: Say in all four that the list is opened by the `CONTROL REFERENCE`
+    row of the control settings panel, and that it is also collapsed by `H` over
+    a flight, which is the arrangement `js/main.js:802` and
+    `docs/controls/clearing-the-screen.html:94` already describe. Keep each
+    comment's point intact rather than rewriting it - `index.html:88` and
+    `test/page.test.js:765` exist to say why the list takes the pointer, and
+    `js/main.js:237` is about the start screen specifically, where the row
+    toggles rather than only opens. Leave
+    `test/control-settings.test.js:461` exactly as it is: it names the entry in
+    the past tense on purpose, "before this panel was between them", and is the
+    one of the five that is already correct.
+  - From: Code Review Override - the list guard reads one row, and comments name a retired entry
