@@ -2198,3 +2198,60 @@ still be found by name.
     of an `X - Show Controls<br>` row to see it fail, the way the widened guard
     was already checked against a plain trailing row.
   - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+- [x] A fifth comment still says the start menu is what opens the control list
+  - **Issue**: the four comments this version corrected were the four the item
+    named, and the second paragraph of the one at `js/main.js:926` was not among
+    them. It still reads "Over the title screen the list is not a toggle but a
+    panel the start menu opened" at `js/main.js:933`, three lines below the
+    paragraph that was rewritten to say the `CONTROL REFERENCE` row is what puts
+    the list on screen. The start menu does not open the list: its
+    `CONTROL SETTINGS` entry opens the control settings panel, and the row inside
+    that panel sets `titleHelp` at `js/main.js:1083`, so the menu is two levels
+    removed from it. That is the same stale chain the item existed to remove, and
+    it now sits in the same docblock as its own correction, which reads as the two
+    halves disagreeing about what opens the list. The clause after it is already
+    right - it names the `Control Reference` row - so only the attribution is
+    wrong.
+  - **Goal**: Say the list over the title screen is a panel the `CONTROL REFERENCE`
+    row opened, rather than one the start menu opened, keeping the paragraph's
+    point intact: that over the title the list is a panel rather than a toggle, so
+    a click closes it the way choosing that row again would. Leave the rest of the
+    docblock as this version left it. While there, check the same docblock reads as
+    one account of the list rather than two.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+- [x] Balanced Span 1
+  - **Issue**: `elementBody()` at `test/page.test.js:603` keeps its documented
+    promise in one direction only. Its docstring says the span is "null again
+    when its tags do not balance", but the loop returns at the first point the
+    depth reaches zero, so only the unclosed direction - a missing `</div>`,
+    where the depth never returns and the loop falls through to `return null` -
+    is reported. An element carrying one `</div>` too many returns a truncated
+    span instead, silently. Verified against a list reading
+    `W/S - Pitch<br></div>` on the third line followed by
+    `H - Show Controls<br>` and `F2 - Photo`: the reader returns only
+    `<h3>CONTROL REFERENCE</h3>` and the first row, and `/Show Controls/` over
+    that span is false. That is the same blindness the item coined
+    **Balanced Span** existed to end - a guard reading a span shorter than the
+    one its docstring states, passing because it cannot see the row that would
+    fail it - arriving now through a stray close rather than through a nested
+    one. The `assert.ok(list, 'index.html should carry the control list')` in
+    both callers cannot tell the two apart either: on a genuine null it names a
+    list that is carried, and on an element whose body is empty the reader
+    returns `''`, which is falsy, so a present-but-empty list is reported as a
+    missing one too.
+  - **Goal**: Make the function's behaviour and its docstring say the same
+    thing. Either detect the over-closed direction and return null for it -
+    the depth going negative before the element's own close is the signal, and
+    it means the markup cannot be read rather than that the element is short -
+    or narrow the docstring to the direction the loop actually reports and say
+    plainly that a stray close truncates the span. Prefer the first: a test
+    reading a short span and passing is the failure mode of the last three
+    versions. While there, separate "no such element" from "cannot be read"
+    well enough that a caller can say which it hit, so the
+    `should carry the control list` message stops being the answer to three
+    different conditions, and decide whether an empty body is a null or an
+    empty string. Then extend
+    `a list body is read past a nested close rather than up to the first one`
+    to hold whichever contract is chosen, since nothing in the suite exercises
+    either unbalanced direction today.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu

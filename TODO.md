@@ -22,70 +22,6 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
-
-#### Resolve Issues
-
-- [ ] Pair Antecedent 1
-  - **Issue**: the appositive is gone, but the relative clause that replaced it
-    attaches to the wrong noun. `CHANGELOG.md:54` now reads "the one test that
-    made the difference is the pair of fixtures standing directly below the
-    sentence, which writing the capture out fails", and a comma-introduced
-    relative takes the immediately preceding noun phrase, which is "the
-    sentence" rather than the intended "the pair of fixtures" - separated from
-    it by only the participial "standing directly below". So the default
-    reading is that writing the capture out fails *the sentence*. That
-    misreading is not absurd here, which is what makes it reachable: the same
-    entry's opening paragraph says of this very sentence that adding the test
-    "did not date the sentence, it falsified it" at `CHANGELOG.md:44`, so a
-    reader has already been told the sentence is a thing that fails. The item's
-    own **Goal** supplied phrasing with no such gap - "the pair of fixtures
-    standing directly below the sentence is what writing the capture out
-    fails", where "is what" fixes the pair as the object - and the run chose a
-    relative clause instead. The new entry then asserts the swap was neutral:
-    `CHANGELOG.md:24` says "a relative clause carries the same claim", which
-    under the default parse it does not. Nothing fails: a changelog entry does
-    not run.
-  - **Goal**: Make the pair the object beyond doubt, in the entry's own
-    vocabulary. The cleft the item already wrote is the smallest way - "the
-    pair of fixtures standing directly below the sentence is what writing the
-    capture out fails" - and moving the relative off the noun it should not
-    take would do as well. Then correct the `1.0.0-alpha.1.24.10` entry's
-    account of its own fix at `CHANGELOG.md:24-25`, since it both quotes the
-    relative clause and claims it carries the same claim; whichever wording is
-    chosen, the quote beside it has to be that wording. Leave every number
-    where it is: 1247, 1248, the `test/page.test.js:791` citation and the
-    mutation results were each re-checked this review and are correct, and the
-    suite is green at 1248.
-  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
-
-#### Found Issues
-
-- [ ] The new entry's summary puts the appositive in the file it was not in
-  - **Issue**: `CHANGELOG.md:10-12` opens "`1.0.0-alpha.1.24.9` corrected the
-    suite count a derivation comment measured against, and closed the sentence
-    it corrected on an appositive that merged two constructions". "The sentence
-    it corrected" is the comment sentence in `test/page.test.js`, and that
-    sentence carries no appositive: it reads "writing the capture out beside the
-    name again - either half of it - passed all 1247 tests, which was the suite
-    as it stood before the pair below was added. That pair is what catches it
-    now" at `test/page.test.js:777-779`, which parses cleanly and is what
-    `1.0.0-alpha.1.24.9` left there. The appositive was in the release note's
-    own account of that correction - the sentence the item cited as
-    `CHANGELOG.md:25` when the entry shipped, now at `CHANGELOG.md:53-55` and
-    rewritten by this run. So a reader following the summary goes to the test
-    file to find the fault and finds nothing wrong, in an entry whose whole
-    subject is where a fault was. The `### Changed` bullet below it is
-    correct - it names "the release note's account" in its own first words - so
-    only the summary misplaces it. Nothing fails: a changelog entry does not
-    run.
-  - **Goal**: Say the appositive was in the entry rather than in the comment:
-    that `1.0.0-alpha.1.24.9` corrected the comment's suite count, and closed
-    its own account of that correction on an appositive. Keep the rest of the
-    paragraph, which is accurate - the claim was right, the numbers were right,
-    and the clause both failed to parse and renamed the pair.
-  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -398,65 +334,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 177 earlier items in `TODO-archive.md`, newest last.
+> 179 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A fifth comment still says the start menu is what opens the control list
-  - **Issue**: the four comments this version corrected were the four the item
-    named, and the second paragraph of the one at `js/main.js:926` was not among
-    them. It still reads "Over the title screen the list is not a toggle but a
-    panel the start menu opened" at `js/main.js:933`, three lines below the
-    paragraph that was rewritten to say the `CONTROL REFERENCE` row is what puts
-    the list on screen. The start menu does not open the list: its
-    `CONTROL SETTINGS` entry opens the control settings panel, and the row inside
-    that panel sets `titleHelp` at `js/main.js:1083`, so the menu is two levels
-    removed from it. That is the same stale chain the item existed to remove, and
-    it now sits in the same docblock as its own correction, which reads as the two
-    halves disagreeing about what opens the list. The clause after it is already
-    right - it names the `Control Reference` row - so only the attribution is
-    wrong.
-  - **Goal**: Say the list over the title screen is a panel the `CONTROL REFERENCE`
-    row opened, rather than one the start menu opened, keeping the paragraph's
-    point intact: that over the title the list is a panel rather than a toggle, so
-    a click closes it the way choosing that row again would. Leave the rest of the
-    docblock as this version left it. While there, check the same docblock reads as
-    one account of the list rather than two.
-  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
-- [x] Balanced Span 1
-  - **Issue**: `elementBody()` at `test/page.test.js:603` keeps its documented
-    promise in one direction only. Its docstring says the span is "null again
-    when its tags do not balance", but the loop returns at the first point the
-    depth reaches zero, so only the unclosed direction - a missing `</div>`,
-    where the depth never returns and the loop falls through to `return null` -
-    is reported. An element carrying one `</div>` too many returns a truncated
-    span instead, silently. Verified against a list reading
-    `W/S - Pitch<br></div>` on the third line followed by
-    `H - Show Controls<br>` and `F2 - Photo`: the reader returns only
-    `<h3>CONTROL REFERENCE</h3>` and the first row, and `/Show Controls/` over
-    that span is false. That is the same blindness the item coined
-    **Balanced Span** existed to end - a guard reading a span shorter than the
-    one its docstring states, passing because it cannot see the row that would
-    fail it - arriving now through a stray close rather than through a nested
-    one. The `assert.ok(list, 'index.html should carry the control list')` in
-    both callers cannot tell the two apart either: on a genuine null it names a
-    list that is carried, and on an element whose body is empty the reader
-    returns `''`, which is falsy, so a present-but-empty list is reported as a
-    missing one too.
-  - **Goal**: Make the function's behaviour and its docstring say the same
-    thing. Either detect the over-closed direction and return null for it -
-    the depth going negative before the element's own close is the signal, and
-    it means the markup cannot be read rather than that the element is short -
-    or narrow the docstring to the direction the loop actually reports and say
-    plainly that a stray close truncates the span. Prefer the first: a test
-    reading a short span and passing is the failure mode of the last three
-    versions. While there, separate "no such element" from "cannot be read"
-    well enough that a caller can say which it hit, so the
-    `should carry the control list` message stops being the answer to three
-    different conditions, and decide whether an empty body is a null or an
-    empty string. Then extend
-    `a list body is read past a nested close rather than up to the first one`
-    to hold whichever contract is chosen, since nothing in the suite exercises
-    either unbalanced direction today.
-  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
 - [x] **Row Scan**: The self-name guard reads a wrapper's own attribute as a row
   - **Issue**: `the row that collapses the list names the action rather than the
     list` at `test/page.test.js:659` runs `assert.doesNotMatch(rows, /controls?/i)`
@@ -686,3 +565,59 @@ how the simulator got here rather than as a list still to be worked.
     mutating both halves of `nameRow()` against both fixtures, and all of them
     are correct.
   - From: Code Review Override - the release note renames the fixtures mid-sentence
+- [x] Pair Antecedent 1
+  - **Issue**: the appositive is gone, but the relative clause that replaced it
+    attaches to the wrong noun. `CHANGELOG.md:54` now reads "the one test that
+    made the difference is the pair of fixtures standing directly below the
+    sentence, which writing the capture out fails", and a comma-introduced
+    relative takes the immediately preceding noun phrase, which is "the
+    sentence" rather than the intended "the pair of fixtures" - separated from
+    it by only the participial "standing directly below". So the default
+    reading is that writing the capture out fails *the sentence*. That
+    misreading is not absurd here, which is what makes it reachable: the same
+    entry's opening paragraph says of this very sentence that adding the test
+    "did not date the sentence, it falsified it" at `CHANGELOG.md:44`, so a
+    reader has already been told the sentence is a thing that fails. The item's
+    own **Goal** supplied phrasing with no such gap - "the pair of fixtures
+    standing directly below the sentence is what writing the capture out
+    fails", where "is what" fixes the pair as the object - and the run chose a
+    relative clause instead. The new entry then asserts the swap was neutral:
+    `CHANGELOG.md:24` says "a relative clause carries the same claim", which
+    under the default parse it does not. Nothing fails: a changelog entry does
+    not run.
+  - **Goal**: Make the pair the object beyond doubt, in the entry's own
+    vocabulary. The cleft the item already wrote is the smallest way - "the
+    pair of fixtures standing directly below the sentence is what writing the
+    capture out fails" - and moving the relative off the noun it should not
+    take would do as well. Then correct the `1.0.0-alpha.1.24.10` entry's
+    account of its own fix at `CHANGELOG.md:24-25`, since it both quotes the
+    relative clause and claims it carries the same claim; whichever wording is
+    chosen, the quote beside it has to be that wording. Leave every number
+    where it is: 1247, 1248, the `test/page.test.js:791` citation and the
+    mutation results were each re-checked this review and are correct, and the
+    suite is green at 1248.
+  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
+- [x] The new entry's summary puts the appositive in the file it was not in
+  - **Issue**: `CHANGELOG.md:10-12` opens "`1.0.0-alpha.1.24.9` corrected the
+    suite count a derivation comment measured against, and closed the sentence
+    it corrected on an appositive that merged two constructions". "The sentence
+    it corrected" is the comment sentence in `test/page.test.js`, and that
+    sentence carries no appositive: it reads "writing the capture out beside the
+    name again - either half of it - passed all 1247 tests, which was the suite
+    as it stood before the pair below was added. That pair is what catches it
+    now" at `test/page.test.js:777-779`, which parses cleanly and is what
+    `1.0.0-alpha.1.24.9` left there. The appositive was in the release note's
+    own account of that correction - the sentence the item cited as
+    `CHANGELOG.md:25` when the entry shipped, now at `CHANGELOG.md:53-55` and
+    rewritten by this run. So a reader following the summary goes to the test
+    file to find the fault and finds nothing wrong, in an entry whose whole
+    subject is where a fault was. The `### Changed` bullet below it is
+    correct - it names "the release note's account" in its own first words - so
+    only the summary misplaces it. Nothing fails: a changelog entry does not
+    run.
+  - **Goal**: Say the appositive was in the entry rather than in the comment:
+    that `1.0.0-alpha.1.24.9` corrected the comment's suite count, and closed
+    its own account of that correction on an appositive. Keep the rest of the
+    paragraph, which is accurate - the claim was right, the numbers were right,
+    and the clause both failed to parse and renamed the pair.
+  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
