@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.24.10] - 2026-10-14
+
+`1.0.0-alpha.1.24.9` corrected the suite count a derivation comment measured
+against, and closed the sentence it corrected on an appositive that merged two
+constructions. The claim inside it was right and every number in it was right;
+the clause naming what the pair catches could not be read, and it renamed the
+pair on the way past.
+
+### Changed
+
+- **The release note's account of what the pair catches parses, and calls the
+  pair one thing.** The entry's first sentence ended "the one test that made the
+  difference is the pair of fixtures standing directly below the sentence - the
+  tests that writing the capture out is what fails", an appositive running "the
+  tests that writing the capture out fails" together with "writing the capture
+  out is what fails them", which leaves `fails` with nothing to take. The
+  appositive is gone and a relative clause carries the same claim: the pair
+  "standing directly below the sentence, which writing the capture out fails".
+  That settles the vocabulary with it. The block was called "the one test" and
+  the two halves "the tests" inside a single sentence - the one whose point is
+  that a single test moved the count - while the rest of the entry says
+  "fixture" throughout, as it does four sentences on in "fails the tightened
+  fixture only". "The one test" stays on the block, which is the single
+  `test()` at `test/page.test.js:791` holding both fixtures, and "fixtures"
+  stays on the two halves inside it. Every number is where it was: 1247, 1248,
+  and the mutation results each read as the entry already stated them.
+
+The suite is green at 1248, unchanged - the finding was in a release note, and a
+release note does not run.
+
 ## [1.0.0-alpha.1.24.9] - 2026-10-13
 
 `1.0.0-alpha.1.24.7` bound the derivation with a test the name it guards cannot
@@ -21,9 +51,9 @@ the test the sentence introduces did not date the sentence, it falsified it.
   derivation above is correct and, measured against today's name, unable to
   fail". The suite has been 1248 since `1.0.0-alpha.1.24.7`, whose entry records
   it as "one more than `1.0.0-alpha.1.24.6`", and the one test that made the
-  difference is the pair of fixtures standing directly below the sentence - the
-  tests that writing the capture out is what fails. So the claim was false rather
-  than stale by one: `node --test` reports 1248, and under a hand-written capture
+  difference is the pair of fixtures standing directly below the sentence, which
+  writing the capture out fails. So the claim was false rather than stale by
+  one: `node --test` reports 1248, and under a hand-written capture
   `assert.doesNotMatch('X - show controls', nameRow(tightened))` fails, which is
   the whole reason that fixture was written. The measurement moves to the tense
   it is true in - it "passed all 1247 tests, which was the suite as it stood

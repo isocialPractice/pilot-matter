@@ -2167,3 +2167,34 @@ still be found by name.
     the past tense on purpose, "before this panel was between them", and is the
     one of the five that is already correct.
   - From: Code Review Override - the list guard reads one row, and comments name a retired entry
+
+## Archived 10-14-26
+
+- [x] **Balanced Span**: The list guard reads to the first `</div>` rather than to the end of the list
+  - **Issue**: `the row that collapses the list names the action rather than the
+    list` now runs its `doesNotMatch` over the whole captured body, which is the
+    bound its docstring states - but the capture it reads is
+    `/<div id="controls-help-list">([\s\S]*?)<\/div>/` at `test/page.test.js:598`,
+    non-greedy to the *first* `</div>`. The body of `#controls-help-list` happens
+    to carry no nested element today, so the capture happens to reach the end of
+    the list, and nothing in the suite holds that it does. Verified against the
+    same capture with one row group added: a list reading
+    `<div class="group">W/S or arrows - Pitch<br></div>` followed by
+    `X - Show Controls<br>` captures only as far as the group's close, and
+    `/controls?/i` over that span returns false - the guard goes blind to the
+    second name exactly as it did before this version widened it. The companion
+    test at `:664` would catch a wrapper placed around most of the rows, since
+    the keys it looks for would fall outside the capture, but not one placed
+    after the last key row, which is where a footnote or a group of trailing rows
+    would go. So the gap is narrowed again rather than closed: from one row of
+    fifteen to everything before the first nested close.
+  - **Goal**: Make the span the guard reads the span the docstring claims. Either
+    capture the list body by balancing its close rather than taking the first one
+    - matching to the `</div>` that precedes `<div id="controls-help-hint">`, which
+    is the sibling that already marks the end of the list - or hold the list free
+    of nested elements in a test of its own so the non-greedy capture is sound by
+    something stated rather than by accident. Shared with `:664`, which takes the
+    same capture and has the same reach. Then re-run with a row group added ahead
+    of an `X - Show Controls<br>` row to see it fail, the way the widened guard
+    was already checked against a plain trailing row.
+  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
