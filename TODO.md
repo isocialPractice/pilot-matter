@@ -22,32 +22,69 @@ its context survives being archived.
 - [ ] Rebind the keys that are not control surfaces
   - From: Flight Controls
 
-### Code Review Override - the release note renames the fixtures mid-sentence
+### Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
 
-- [ ] The entry's account of what the pair catches has a clause that does not parse
-  - **Issue**: `CHANGELOG.md:25` closes its first sentence with the appositive
-    "the tests that writing the capture out is what fails", which merges two
-    constructions - "the tests that writing the capture out fails" and "writing
-    the capture out is what fails them" - and leaves `fails` with no object, so
-    the clause does not parse. What it is claiming is true: the capture written
-    out in full, as `1.0.0-alpha.1.24.6` shipped it - literal `'i'` and no
-    `(?:...)` group - fails both halves of the pair, measured by mutation. The
-    wording is the only fault, and it has a second part: the clause calls the
-    two halves "the tests" three words after `CHANGELOG.md:23` calls the block
-    "the one test", where the rest of the entry says "fixture" throughout, as
-    `CHANGELOG.md:36` does in "fails the tightened fixture only". A reader
-    meeting "the one test ... the tests" in one breath reads a contradiction in
-    the one sentence whose point is that exactly one test made the difference.
-    Nothing fails: a changelog entry does not run.
-  - **Goal**: Say it once, in the entry's own vocabulary - the pair of fixtures
-    standing directly below the sentence is what writing the capture out fails.
-    Keep "the one test" for the block, since that is the count the suite moved
-    by and the sentence's whole point, and keep "fixture" for the two halves to
-    match the rest of the entry. Leave every number where it is: 1247, 1248,
-    and the mutation results were each checked against `node --test` and by
-    mutating both halves of `nameRow()` against both fixtures, and all of them
-    are correct.
-  - From: Code Review Override - the release note renames the fixtures mid-sentence
+#### Resolve Issues
+
+- [ ] Pair Antecedent 1
+  - **Issue**: the appositive is gone, but the relative clause that replaced it
+    attaches to the wrong noun. `CHANGELOG.md:54` now reads "the one test that
+    made the difference is the pair of fixtures standing directly below the
+    sentence, which writing the capture out fails", and a comma-introduced
+    relative takes the immediately preceding noun phrase, which is "the
+    sentence" rather than the intended "the pair of fixtures" - separated from
+    it by only the participial "standing directly below". So the default
+    reading is that writing the capture out fails *the sentence*. That
+    misreading is not absurd here, which is what makes it reachable: the same
+    entry's opening paragraph says of this very sentence that adding the test
+    "did not date the sentence, it falsified it" at `CHANGELOG.md:44`, so a
+    reader has already been told the sentence is a thing that fails. The item's
+    own **Goal** supplied phrasing with no such gap - "the pair of fixtures
+    standing directly below the sentence is what writing the capture out
+    fails", where "is what" fixes the pair as the object - and the run chose a
+    relative clause instead. The new entry then asserts the swap was neutral:
+    `CHANGELOG.md:24` says "a relative clause carries the same claim", which
+    under the default parse it does not. Nothing fails: a changelog entry does
+    not run.
+  - **Goal**: Make the pair the object beyond doubt, in the entry's own
+    vocabulary. The cleft the item already wrote is the smallest way - "the
+    pair of fixtures standing directly below the sentence is what writing the
+    capture out fails" - and moving the relative off the noun it should not
+    take would do as well. Then correct the `1.0.0-alpha.1.24.10` entry's
+    account of its own fix at `CHANGELOG.md:24-25`, since it both quotes the
+    relative clause and claims it carries the same claim; whichever wording is
+    chosen, the quote beside it has to be that wording. Leave every number
+    where it is: 1247, 1248, the `test/page.test.js:791` citation and the
+    mutation results were each re-checked this review and are correct, and the
+    suite is green at 1248.
+  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
+
+#### Found Issues
+
+- [ ] The new entry's summary puts the appositive in the file it was not in
+  - **Issue**: `CHANGELOG.md:10-12` opens "`1.0.0-alpha.1.24.9` corrected the
+    suite count a derivation comment measured against, and closed the sentence
+    it corrected on an appositive that merged two constructions". "The sentence
+    it corrected" is the comment sentence in `test/page.test.js`, and that
+    sentence carries no appositive: it reads "writing the capture out beside the
+    name again - either half of it - passed all 1247 tests, which was the suite
+    as it stood before the pair below was added. That pair is what catches it
+    now" at `test/page.test.js:777-779`, which parses cleanly and is what
+    `1.0.0-alpha.1.24.9` left there. The appositive was in the release note's
+    own account of that correction - the sentence the item cited as
+    `CHANGELOG.md:25` when the entry shipped, now at `CHANGELOG.md:53-55` and
+    rewritten by this run. So a reader following the summary goes to the test
+    file to find the fault and finds nothing wrong, in an entry whose whole
+    subject is where a fault was. The `### Changed` bullet below it is
+    correct - it names "the release note's account" in its own first words - so
+    only the summary misplaces it. Nothing fails: a changelog entry does not
+    run.
+  - **Goal**: Say the appositive was in the entry rather than in the comment:
+    that `1.0.0-alpha.1.24.9` corrected the comment's suite count, and closed
+    its own account of that correction on an appositive. Keep the rest of the
+    paragraph, which is accurate - the claim was right, the numbers were right,
+    and the clause both failed to parse and renamed the pair.
+  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
 
 ## Game UI/UX
 
@@ -361,36 +398,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 176 earlier items in `TODO-archive.md`, newest last.
+> 177 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Balanced Span**: The list guard reads to the first `</div>` rather than to the end of the list
-  - **Issue**: `the row that collapses the list names the action rather than the
-    list` now runs its `doesNotMatch` over the whole captured body, which is the
-    bound its docstring states - but the capture it reads is
-    `/<div id="controls-help-list">([\s\S]*?)<\/div>/` at `test/page.test.js:598`,
-    non-greedy to the *first* `</div>`. The body of `#controls-help-list` happens
-    to carry no nested element today, so the capture happens to reach the end of
-    the list, and nothing in the suite holds that it does. Verified against the
-    same capture with one row group added: a list reading
-    `<div class="group">W/S or arrows - Pitch<br></div>` followed by
-    `X - Show Controls<br>` captures only as far as the group's close, and
-    `/controls?/i` over that span returns false - the guard goes blind to the
-    second name exactly as it did before this version widened it. The companion
-    test at `:664` would catch a wrapper placed around most of the rows, since
-    the keys it looks for would fall outside the capture, but not one placed
-    after the last key row, which is where a footnote or a group of trailing rows
-    would go. So the gap is narrowed again rather than closed: from one row of
-    fifteen to everything before the first nested close.
-  - **Goal**: Make the span the guard reads the span the docstring claims. Either
-    capture the list body by balancing its close rather than taking the first one
-    - matching to the `</div>` that precedes `<div id="controls-help-hint">`, which
-    is the sibling that already marks the end of the list - or hold the list free
-    of nested elements in a test of its own so the non-greedy capture is sound by
-    something stated rather than by accident. Shared with `:664`, which takes the
-    same capture and has the same reach. Then re-run with a row group added ahead
-    of an `X - Show Controls<br>` row to see it fail, the way the widened guard
-    was already checked against a plain trailing row.
-  - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
 - [x] A fifth comment still says the start menu is what opens the control list
   - **Issue**: the four comments this version corrected were the four the item
     named, and the second paragraph of the one at `js/main.js:926` was not among
@@ -653,3 +662,27 @@ how the simulator got here rather than as a list still to be worked.
     entry of `CHANGELOG.md` where it is: that entry is a dated record of the state
     at the time, and the count is correct for the suite it describes.
   - From: Code Review Override - a comment measures against a suite one test smaller
+- [x] **Pair Antecedent**: The entry's account of what the pair catches has a clause that does not parse
+  - **Issue**: `CHANGELOG.md:25` closes its first sentence with the appositive
+    "the tests that writing the capture out is what fails", which merges two
+    constructions - "the tests that writing the capture out fails" and "writing
+    the capture out is what fails them" - and leaves `fails` with no object, so
+    the clause does not parse. What it is claiming is true: the capture written
+    out in full, as `1.0.0-alpha.1.24.6` shipped it - literal `'i'` and no
+    `(?:...)` group - fails both halves of the pair, measured by mutation. The
+    wording is the only fault, and it has a second part: the clause calls the
+    two halves "the tests" three words after `CHANGELOG.md:23` calls the block
+    "the one test", where the rest of the entry says "fixture" throughout, as
+    `CHANGELOG.md:36` does in "fails the tightened fixture only". A reader
+    meeting "the one test ... the tests" in one breath reads a contradiction in
+    the one sentence whose point is that exactly one test made the difference.
+    Nothing fails: a changelog entry does not run.
+  - **Goal**: Say it once, in the entry's own vocabulary - the pair of fixtures
+    standing directly below the sentence is what writing the capture out fails.
+    Keep "the one test" for the block, since that is the count the suite moved
+    by and the sentence's whole point, and keep "fixture" for the two halves to
+    match the rest of the entry. Leave every number where it is: 1247, 1248,
+    and the mutation results were each checked against `node --test` and by
+    mutating both halves of `nameRow()` against both fixtures, and all of them
+    are correct.
+  - From: Code Review Override - the release note renames the fixtures mid-sentence
