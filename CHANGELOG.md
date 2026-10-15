@@ -5,6 +5,138 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.25.0] - 2026-10-15
+
+The control settings panel holds the keys now, not only what they mean. A row
+per control and per instruction, each taking the next key pressed as its own; a
+box per control that says whether it hands the aircraft back after a level off;
+one box that carries the axis settings through to a device flown by tilting it;
+and one that remembers whether the reference list is up, which the `H` key had
+been forgetting at the end of every session.
+
+### Added
+
+- **Every key is the pilot's, through a new `js/key-bindings.js`.**
+  `DEFAULT_KEYMAP` in `js/input-map.js` was always a plain map from a control to
+  the codes that work it, and `applyKeyToInput` always took the map rather than
+  reading the constant - which is exactly what the Pilot API lets a host
+  replace, and the game offered none of it. The new module is that map as
+  something a pilot can edit: the eight control surfaces plus `reset` and
+  `levelOff`, which are carried alongside them because a binding is what a key
+  means, while `keymapFor` hands the input state the control surfaces alone. A
+  keymap carrying the two instructions is a keymap that can write one into the
+  input state, and the whole reason those two are bound apart is that neither is
+  a surface.
+- **A `KEYS` section in the panel**, one row per binding, reading
+  `PITCH UP  ·  W/↑`. Choosing a row puts it on the wait - the row reads
+  `PRESS A KEY` - and the next key pressed becomes its key. A control on two
+  keys out of the box is on one afterwards, because the pilot named one.
+- **A key another row already holds is refused, and the row says which row holds
+  it**: `YAW LEFT  ·  I IS PITCH UP`. Two controls on one key is a keyboard
+  flying two things at once with nothing on screen to say which, and "that did
+  not work" is not an answer a pilot can act on. The row stays waiting, so the
+  next key is read as the answer rather than as a fresh start.
+- **`RESTORE DEFAULT KEYS`**, the way back for a pilot who has bound themselves
+  somewhere they cannot get out of. The keys that walk a menu are read before
+  the flight behind them, so the panel itself is reachable from any map at all -
+  but a flight whose pitch is on a key the pilot has forgotten is a flight
+  nobody can fly, and one row puts the whole map back.
+- **Reset and the level off are rows like any other.** `RESET_KEYS` and
+  `LEVEL_OFF_KEYS` were kept out of the input state on purpose, so the keymap
+  could never reach them; they are bindings here instead. `R` ends a flight on
+  one press with nothing in between, so reset is also the one row allowed to be
+  on no key at all - `Delete` or `Backspace` clears it. Every other row needs
+  one and says `NEEDS A KEY` if asked to give it up.
+- **A `LEVEL OFF` section: a box per control that can hand the aircraft back.**
+  `VERTICAL_CONTROLS` is the list `wantsVerticalChange` takes and the throttle
+  is in it, so a nudge of the lever on an approach drops the altitude hold the
+  approach was set up with. Four boxes, all on out of the box, because the
+  question is whether each control counts and the answers are independent. Roll
+  and yaw get no box: they are out of that list deliberately, and the reasoning
+  is written where the list is. Every box can be cleared, which is a level off
+  nothing in the input ends - an answer rather than an oversight, and a reset is
+  the way out of it.
+- **`TILT READS AXES`, one box in the `AXES` section.** `tiltToInput` wrote the
+  four controls itself and said so in as many words - "neither needs inverting,
+  and neither should be: the point of flying by tilt is that the device is the
+  aircraft" - which was right while nothing could invert them. Since
+  `1.24.0-alpha` a pilot can set pitch inverted and find it applies to the keys
+  and not to the device. One box rather than two more: `tiltToInput` now takes
+  the same `axes` pair `applyKeyToInput` takes, and `tiltInputAxes` in
+  `js/control-settings.js` resolves it to the pilot's pair or to the directional
+  one. The inversion stays in `axisControl`, so the device cannot end up turned
+  over on one axis for the keys and not for itself.
+- **`LIST ON SCREEN`, which is where the `H` key's answer now lives.**
+  `createHelpState(expanded = true)` took the state the list opens in and
+  `js/main.js` passed it nothing, so every session opened with the list over the
+  corner of the window. The box and the key write one setting, stored beside the
+  rest of the panel rather than as a third thing of its own: it is the same
+  question the panel is already asking, which is how this pilot wants the
+  controls to behave.
+- **The reference list is written from the map.** `HELP_BINDING_ROWS` in
+  `js/controls-help.js` names the seven rows that carry a movable key, and
+  `helpRowLines` writes each as the keys it is on and what they do - read down
+  the alternatives rather than across the controls, so `W/S or ↑/↓` stays
+  `W/S or ↑/↓` and the two Shift keys stay one `Shift`. `index.html` carries the
+  rows as the game ships them and the script rewrites them, and a test holds
+  those two readings to being one reading on a first flight. A list still naming
+  the keys the game shipped with would be the one thing on screen contradicting
+  the panel that moved them.
+
+### Changed
+
+- **The panel is five sections rather than three**: `AXES`, `ATTITUDE`,
+  `LEVEL OFF`, `KEYS`, `REFERENCE`, with a list in `index.html` under each. The
+  key rows go in ahead of the reference group rather than at the end, because
+  the cursor walks the whole panel as one list while the lists it is drawn into
+  are filtered by group - a group split in two by another one would be drawn
+  under its heading twice.
+- **The aircraft holds all three lists rather than reading the constants.**
+  `setBindings` takes the keymap and the two key lists, `setVerticalControls`
+  takes what ends a level off, and `isResetKey`, `isLevelOffKey` and
+  `wantsVerticalChange` are called with them. All four already took the list as
+  an argument; nothing was passing one. Changing the map lets go of every
+  control through `releaseAxisControls`, for the reason `setAxes` lets go of a
+  pair: a key held while its binding moves would otherwise be released against
+  the new binding when it came up, leaving the control it was pressed on held
+  for the rest of the flight. A host that asks for nothing still flies the
+  bundled map, so the Pilot API is unchanged.
+- **A row waiting for a key is read before anything else that would have read
+  one.** The capture listener in `js/main.js` took only the menu keys while a
+  panel was open and left the rest to the aircraft, which listens on the way
+  back up. A press aimed at a row would therefore also have moved a control
+  surface - and the key that moved it no longer works it by the time it comes
+  back up. While a row is waiting the listener takes every key.
+- **Opening or closing the panel takes any wait off it.** A panel that opened
+  still waiting would take the first thing pressed at it, which is the one press
+  nobody aimed at a row.
+- **A stored map is read binding by binding, and a code an earlier binding has
+  taken is dropped.** One key working two things is the state the panel refuses,
+  and a storage is not a better reason to allow it than a key press is. A
+  binding emptied that way is given back whichever of its own default keys are
+  still free, so what comes out is flyable rather than a map with a hole in it.
+  The map is stored under `pilot-matter.key-bindings`, apart from the panel's
+  values, which are checked against the options the panel declares.
+
+### Fixed
+
+- **A box turned over while a key row waits reaches the aircraft.** The panel
+  hands what it holds to the aircraft where a row is chosen, and choosing a key
+  row hands it nothing on purpose - the key that answers the row has not
+  arrived yet. That was held back on the wait rather than on the row, and the
+  cursor is one list the pointer reaches every row of: clicking `FULL ROTATION`
+  while `ROLL LEFT` waited turned the box over and stored it, and left the
+  aircraft on the clamp it had for the rest of the session. The axis rows and
+  `LIST ON SCREEN` went the same way. Held back on being a key row instead,
+  every other row chosen reaches the aircraft the way it did before there were
+  key rows at all.
+
+The suite is 1314, up from 1248: a new `test/key-bindings.test.js`, and the rest
+spread over the panel, the list, the tilt reading and what `js/aircraft.js` does
+with the three lists it now holds. The browser was driven over the whole of it
+as well - the panel's five lists, a rebind, a refusal, the restore row, and the
+stored answer for the list surviving a reload.
+
 ## [1.0.0-alpha.1.24.10] - 2026-10-14
 
 `1.0.0-alpha.1.24.9` corrected the suite count a derivation comment measured

@@ -12,7 +12,9 @@ import {
     isMenuAdjustKey, isMenuControlKey, menuAdjustStep, setMenuEntries,
     MenuList, followPointers, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
-import { createHelpState, applyHelpKey, expandHelp, toggleHelp } from './controls-help.js';
+import {
+    createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines
+} from './controls-help.js';
 import {
     createHudVisibilityState, applyHudToggleKey, isHudToggleKey, defaultStorage
 } from './hud-visibility.js';
@@ -28,8 +30,12 @@ import {
     createControlSettingsState, openControlSettings, closeControlSettings,
     controlSettingsShowing, chooseControlSetting, adjustControlSetting,
     controlAxes, fullRotationWanted, isControlSettingsCloseKey,
-    CONTROL_SETTINGS_BACK_ID, CONTROL_REFERENCE_ID, AXIS_GROUP, ATTITUDE_GROUP
+    tiltInputAxes, levelOffControls, referenceOpenWanted, rememberReferenceOpen,
+    controlBindings, bindingArmed, bindArmedKey, bindingEntryName,
+    CONTROL_SETTINGS_BACK_ID, CONTROL_REFERENCE_ID,
+    AXIS_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP
 } from './control-settings.js';
+import { aircraftBindings } from './key-bindings.js';
 import { runwayWanted } from './config.js';
 import { headingDegrees, altitudeToFeet, feetToAltitude } from './units.js';
 import {
@@ -75,7 +81,7 @@ import {
     isTouchOnly, touchPads, TouchControls, TOUCH_LEFT, TOUCH_RIGHT
 } from './touch-controls.js';
 import {
-    createTiltState, tiltFlying, tiltToInput, levelTilt, TiltSensor
+    createTiltState, tiltFlying, tiltToInput, levelTilt, TiltSensor, TILT_DEADZONE
 } from './tilt-controls.js';
 import {
     createPhotoState, applyPhotoKey, photoPending, completePhoto,
@@ -217,7 +223,10 @@ class FlightSimulator {
         this.controlState   = createMenuState(this.controlSettings.entries);
         this.editorState    = createMenuState(this.editor.entries);
         this.modesState     = createMenuState(gameModeEntries());
-        this.helpState      = createHelpState();
+        // The list opens the way the pilot last left it, which the control
+        // panel remembers beside the rest of what it holds: the H key's answer
+        // is the same question the panel is already asking.
+        this.helpState      = createHelpState(referenceOpenWanted(this.controlSettings));
         this.hudVisibility  = createHudVisibilityState(defaultStorage());
         this.audioState     = createAudioState(defaultStorage());
         this.audio          = new FlightAudio(this.audioState);
@@ -282,6 +291,10 @@ class FlightSimulator {
             help:      document.getElementById('controls-help'),
             helpList:  document.getElementById('controls-help-list'),
             helpHint:  document.getElementById('controls-help-hint'),
+            // The rows of the list that name a key a pilot can move. The rest
+            // of the list names keys nothing rebinds and is left as the page
+            // writes it.
+            helpRows:  document.querySelectorAll('#controls-help-list [data-help-row]'),
             touch:     document.getElementById('touch-controls')
         };
 
@@ -342,13 +355,26 @@ class FlightSimulator {
             document.getElementById('control-settings-attitude'), this.controlState,
             entry => entry.group === ATTITUDE_GROUP
         );
+        this.controlLevelOffMenu = new MenuList(
+            document.getElementById('control-settings-level-off'), this.controlState,
+            entry => entry.group === LEVEL_OFF_GROUP
+        );
+        this.controlKeysMenu = new MenuList(
+            document.getElementById('control-settings-keys'), this.controlState,
+            entry => entry.group === BINDING_GROUP
+        );
         this.controlReferenceMenu = new MenuList(
             document.getElementById('control-settings-reference'), this.controlState,
-            entry => entry.group !== AXIS_GROUP && entry.group !== ATTITUDE_GROUP
+            entry => ![AXIS_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP].includes(entry.group)
         );
 
+        this.controlMenus = [
+            this.controlAxesMenu, this.controlAttitudeMenu, this.controlLevelOffMenu,
+            this.controlKeysMenu, this.controlReferenceMenu
+        ];
+
         followPointers(
-            [this.controlAxesMenu, this.controlAttitudeMenu, this.controlReferenceMenu],
+            this.controlMenus,
             (index, choose, step) => this.onControlSettingsPointer(index, choose, step)
         );
 
@@ -715,8 +741,13 @@ class FlightSimulator {
             // menu key, and is left to the browser
             if (e.ctrlKey || e.altKey || e.metaKey) return;
 
+            // A key row waiting for a key takes every key, ahead of everything
+            // else that would have read one: the aircraft listens on the way
+            // back up, and a control surface moved by the press that bound it
+            // would be a surface held by a key that no longer works it.
             const onTitle = titleShowing(this.titleState);
-            if (!onTitle && !(this.menuShowing() && isMenuControlKey(e.code))) return;
+            const binding = bindingArmed(this.controlSettings) != null;
+            if (!onTitle && !binding && !(this.menuShowing() && isMenuControlKey(e.code))) return;
 
             if (SWALLOWED_KEYS.includes(e.code)) e.preventDefault();
             if (onTitle) this.onStartKey(e);
@@ -728,6 +759,15 @@ class FlightSimulator {
     }
 
     onStartKey(e) {
+        // A key row waiting for a key is read ahead of everything here too, for
+        // the reason it is in `onKeyDown`: the panel opens from this screen as
+        // well, and a key that did something else while a row waited would be a
+        // key nothing can be bound to on one screen and can be on the other.
+        if (bindingArmed(this.controlSettings)) {
+            this.onControlSettingsKey(e);
+            return;
+        }
+
         // A picture is of the world, whatever is over it, so the key that takes
         // one is read before the screens that would otherwise have swallowed it.
         if (applyPhotoKey(this.photoState, e.code, true, e.repeat)) {
@@ -825,6 +865,16 @@ class FlightSimulator {
     }
 
     onKeyDown(e) {
+        // A key row waiting for a key is read ahead of everything, the shutter
+        // included. A row that waits for any key at all keeps back exactly two -
+        // the way out of the wait and the way to clear - and a third key that
+        // did something else instead would be a third key nothing can be bound
+        // to, with nothing on the row to say why.
+        if (bindingArmed(this.controlSettings)) {
+            this.onControlSettingsKey(e);
+            return;
+        }
+
         // A picture is of the world, whatever is over it, so the key that takes
         // one is read ahead of the panels that are otherwise modal over the rest.
         if (applyPhotoKey(this.photoState, e.code, true, e.repeat)) {
@@ -878,6 +928,7 @@ class FlightSimulator {
             if (chosen) this.chooseMenuEntry(chosen);
             changed = true;
         } else if (applyHelpKey(this.helpState, e.code, true, e.repeat)) {
+            this.rememberHelpState();
             changed = true;
         } else if (isHudToggleKey(e.code)) {
             // Tab would otherwise walk the browser's focus ring off the canvas
@@ -936,7 +987,10 @@ class FlightSimulator {
      */
     onHelpClick() {
         if (titleShowing(this.titleState)) this.titleHelp = false;
-        else toggleHelp(this.helpState);
+        else {
+            toggleHelp(this.helpState);
+            this.rememberHelpState();
+        }
 
         this.syncOverlays();
     }
@@ -1025,6 +1079,36 @@ class FlightSimulator {
     applyControlSettings() {
         this.aircraft.setAxes(controlAxes(this.controlSettings));
         this.aircraft.setFullRotation(fullRotationWanted(this.controlSettings));
+        this.aircraft.setBindings(aircraftBindings(controlBindings(this.controlSettings)));
+        this.aircraft.setVerticalControls(levelOffControls(this.controlSettings));
+
+        // The list is the one setting the panel shares with a key, so the panel
+        // is what the list is read from rather than the other way round: a box
+        // turned over here puts the list on screen, and the H key writes its
+        // answer back through `rememberHelpState` below.
+        this.helpState.expanded = referenceOpenWanted(this.controlSettings);
+        this.syncHelpList();
+    }
+
+    /**
+     * Keeps the answer the H key or a click on the list just gave, so the next
+     * session opens the list the way this one left it.
+     */
+    rememberHelpState() {
+        rememberReferenceOpen(this.controlSettings, this.helpState.expanded);
+    }
+
+    /**
+     * Writes the keys into the rows of the reference list that name one. A list
+     * still naming the keys the game shipped with would be the one thing on
+     * screen contradicting the panel that moved them.
+     */
+    syncHelpList() {
+        const lines = helpRowLines(controlBindings(this.controlSettings));
+        for (const row of this.overlays.helpRows ?? []) {
+            const line = lines[row.dataset.helpRow];
+            if (line != null) row.textContent = line;
+        }
     }
 
     /**
@@ -1038,6 +1122,20 @@ class FlightSimulator {
     }
 
     onControlSettingsKey(e) {
+        // A row waiting for a key reads every key there is, which is the whole
+        // of what waiting for one means: the way out of the wait and the way to
+        // leave an optional binding on nothing are the only two the panel keeps
+        // for itself, and `bindArmedKey` is where that is decided.
+        if (bindingArmed(this.controlSettings)) {
+            e.preventDefault();
+            if (!e.repeat) {
+                const press = bindArmedKey(this.controlSettings, e.code);
+                if (press?.result === 'bound' || press?.result === 'cleared') this.applyControlSettings();
+            }
+            this.syncOverlays();
+            return;
+        }
+
         if (isControlSettingsCloseKey(e.code)) {
             closeControlSettings(this.controlSettings);
             this.syncOverlays();
@@ -1068,6 +1166,15 @@ class FlightSimulator {
         const applied = chooseControlSetting(this.controlSettings, id, step);
         if (!applied || applied === CONTROL_SETTINGS_BACK_ID) return;
 
+        // Choosing a key row only puts it on the wait, so there is nothing yet
+        // to hand to the aircraft - the key that answers it comes next, and
+        // `onControlSettingsKey` is what reads it. The key row is the only row
+        // held back, and is held back by being one rather than by a row waiting
+        // somewhere: a box clicked while a row waits has still changed a
+        // setting, and a setting the aircraft is never handed is one the panel
+        // reads one way and the flight flies the other.
+        if (bindingEntryName(applied) != null) return;
+
         // The reference list is read against the world rather than against the
         // panel, so the panel has already closed itself by here and all that is
         // left is to put the list on screen. Over a flight it is the list the H
@@ -1082,10 +1189,12 @@ class FlightSimulator {
             if (titleShowing(this.titleState)) {
                 this.titleHelp = !this.titleHelp;
                 if (this.titleHelp) expandHelp(this.helpState);
+                this.rememberHelpState();
                 return;
             }
 
             expandHelp(this.helpState);
+            this.rememberHelpState();
             return;
         }
 
@@ -1674,9 +1783,7 @@ class FlightSimulator {
         this.settingsMenu.render(this.settingsState);
         this.settingsStart.render(this.settingsState);
         this.settingsOptions.render(this.settingsState);
-        this.controlAxesMenu.render(this.controlState);
-        this.controlAttitudeMenu.render(this.controlState);
-        this.controlReferenceMenu.render(this.controlState);
+        for (const menu of this.controlMenus) menu.render(this.controlState);
         this.editorMenu.render(this.editorState);
     }
 
@@ -1709,7 +1816,14 @@ class FlightSimulator {
         // The pads that tilt replaces come off the moment it starts reporting,
         // which is a frame nothing else has any reason to notice.
         if (tiltFlying(this.tilt) !== this.padsTilted) this.syncOverlays();
-        if (!frozen) tiltToInput(this.aircraft.input, this.tilt);
+        if (!frozen) {
+            // The device is read through the same pair the keys are, or through
+            // the directional one, which is what the panel's TILT READS AXES
+            // box answers - see `tiltInputAxes` in js/control-settings.js.
+            tiltToInput(
+                this.aircraft.input, this.tilt, TILT_DEADZONE, tiltInputAxes(this.controlSettings)
+            );
+        }
     }
 
     animate() {
