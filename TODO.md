@@ -60,6 +60,69 @@ its context survives being archived.
     itself when it rolls right, with nothing on the row that said so. Refusing
     the key or saying what it costs are both answers; leaving it silent is not.
   - From: UI/UX Override - a control can be bound onto a key the game already reads
+- [ ] Two of the menu keys are the map's to take, and three places say they are
+  not
+  - **Issue**: `Enter` and `NumpadEnter` are `MENU_SELECT_KEYS` in
+    `js/menu.js:32` and are on no binding, so `rebind` in `js/key-bindings.js`
+    takes both - including the `Enter` that armed the row, pressed a second
+    time. Measured over `defaultBindings()`: `rebind` returns `bound` for
+    `Enter` and for `NumpadEnter`, and `taken` for the other seven menu keys,
+    which are refused because another row holds them rather than because they
+    walk a menu. Three places state the opposite.
+    `test/key-bindings.test.js:158` is named "the keys that walk the panel are
+    not the map's to move" and asserts nothing about the map: its loop
+    `for (const code of walking) rebind(bindings, 'yawLeft', code)` leaves
+    `yawLeft` on `['NumpadEnter']`, and the two assertions after it compare
+    `MENU_UP_KEYS` and `MENU_SELECT_KEYS` against written-out lists, so the test
+    passes identically with the loop deleted. `MENU_DOWN_KEYS` is spread into
+    `walking` and never asserted at all. `docs/controls/index.html:122` says
+    "The keys that walk a menu are not among them and never move", and
+    `docs/controls/control-settings.html:189` says "The menu keys are not
+    rebindable and never move". The consequence both draw - that the panel stays
+    reachable from any map - is true, and true for a different reason: the
+    capture listener at `js/main.js:739` reads the menu's own codes ahead of the
+    flight whatever the map says. The release note carried the same premise and
+    has been corrected in place. The suite is green at 1314.
+  - **Goal**: Settle this with the reserved-key question above rather than ahead
+    of it, because its answer decides which sentence is true: if the keys the
+    game reads outside the map become reserved, the menu keys belong in that
+    list and all three statements stand as written; if they do not, the three
+    come out and the test is renamed for what it holds. Either way, give
+    `test/key-bindings.test.js:158` assertions about what `rebind` returns for
+    each menu key rather than about the contents of `MENU_UP_KEYS` and
+    `MENU_SELECT_KEYS`, and either assert `MENU_DOWN_KEYS` or stop spreading it
+    into `walking`. A test named for a guarantee is where the next run looks to
+    find out whether the guarantee holds, and this one answered that question
+    wrongly for the review above.
+  - From: UI/UX Override - a control can be bound onto a key the game already reads
+- [ ] Three keys can never be bound and three comments call it two
+  - **Issue**: `BINDING_CANCEL_KEYS` is `['Escape']` and `BINDING_CLEAR_KEYS` is
+    `['Delete', 'Backspace']` at `js/key-bindings.js:77` and `:78`, so three
+    keys can never be on a row: `bindArmedKey` hands `Backspace` to
+    `clearBinding`, which refuses every row but `RESET FLIGHT` and returns
+    `needed`, so no row can hold it either. Three comments write the count as
+    two. `js/main.js:869` says "a row that waits for any key at all keeps back
+    exactly two - the way out of the wait and the way to clear - and a third key
+    that did something else instead would be a third key nothing can be bound
+    to", and `test/control-settings.test.js:956` repeats it with "a third key
+    that took a picture instead"; `F2` would be the fourth. `js/key-bindings.js:74`
+    says "the reason the two chosen are the two nothing here flies with" and
+    then names `Backspace` in the next sentence, so a reader gathering the
+    reserved keys from the prose rather than the constants misses one - which is
+    exactly what the item above asks a later run to do.
+    `docs/controls/control-settings.html:187` has the count right and the naming
+    wrong: "Those two keys and `Delete` are therefore the three that cannot be
+    bound to anything", where the sentence before it names one key and a row.
+    `test/key-bindings.test.js:134` is the one place that reads both lists
+    instead of a number, and it is correct. Nothing fails - comments do not run.
+  - **Goal**: Say three, or say two roles without calling the next key a third.
+    Which of those the author meant is theirs to pick, so pick one and write it
+    the same way in all four places: `js/main.js:869`,
+    `test/control-settings.test.js:956`, `js/key-bindings.js:74` and
+    `docs/controls/control-settings.html:187`. The doc sentence also needs the
+    keys named rather than counted, since the sentence it leans on names
+    `Esc` and an action rather than two keys.
+  - From: UI/UX Override - a control can be bound onto a key the game already reads
 
 ## Game UI/UX
 
