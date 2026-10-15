@@ -5,7 +5,62 @@
  * rules can be unit tested in Node.
  */
 
+import { DEFAULT_BINDINGS, keyLabel, UNBOUND_LABEL } from './key-bindings.js';
+
 export const HELP_KEY = 'KeyH';
+
+/**
+ * The rows of the list that name a key the pilot can move, as the bindings each
+ * is written from. Every other row names a key nothing rebinds and is left in
+ * the page exactly as it is written there.
+ *
+ * A list that went on naming the keys the game shipped with would be the one
+ * thing on screen contradicting the panel that moved them, and it is the thing
+ * a pilot who has just rebound something reads first.
+ */
+export const HELP_BINDING_ROWS = Object.freeze([
+    { id: 'pitch',        label: 'Pitch',         bindings: Object.freeze(['pitchUp', 'pitchDown']) },
+    { id: 'roll',         label: 'Roll',          bindings: Object.freeze(['rollLeft', 'rollRight']) },
+    { id: 'yaw',          label: 'Yaw',           bindings: Object.freeze(['yawLeft', 'yawRight']) },
+    { id: 'throttleUp',   label: 'Throttle Up',   bindings: Object.freeze(['throttleUp']) },
+    { id: 'throttleDown', label: 'Throttle Down', bindings: Object.freeze(['throttleDown']) },
+    { id: 'levelOff',     label: 'Level Off',     bindings: Object.freeze(['levelOff']) },
+    { id: 'reset',        label: 'Reset Position', bindings: Object.freeze(['reset']) }
+]);
+
+/**
+ * The keys one row names, read down the alternatives rather than across the
+ * controls: `W/S or ↑/↓` is one way to fly the axis and then another, which is
+ * how the list has always been written and how a pilot reads it.
+ *
+ * Two controls bound to a different number of keys simply run out at different
+ * depths, and the shorter one drops out of the later alternatives rather than
+ * leaving a gap. Alternatives that read the same are shown once, which is what
+ * turns the two Shift keys into one `Shift`.
+ */
+export function helpRowKeys(row, bindings = DEFAULT_BINDINGS) {
+    const lists = row.bindings.map(name => bindings?.[name] ?? []);
+    const depth = Math.max(0, ...lists.map(codes => codes.length));
+    const alternatives = [];
+
+    for (let at = 0; at < depth; at++) {
+        const keys = lists.map(codes => codes[at]).filter(Boolean).map(keyLabel);
+        if (keys.length) alternatives.push(keys.join('/'));
+    }
+
+    const read = [...new Set(alternatives)];
+    return read.length ? read.join(' or ') : UNBOUND_LABEL;
+}
+
+/** One row of the list, as the line it is written on screen. */
+export function helpRowText(row, bindings = DEFAULT_BINDINGS) {
+    return `${helpRowKeys(row, bindings)} - ${row.label}`;
+}
+
+/** Every row the bindings write, as the lines they are, keyed by row id. */
+export function helpRowLines(bindings = DEFAULT_BINDINGS) {
+    return Object.fromEntries(HELP_BINDING_ROWS.map(row => [row.id, helpRowText(row, bindings)]));
+}
 
 // What the collapsed list leaves on screen: enough to find the key that
 // brings the rest of it back.

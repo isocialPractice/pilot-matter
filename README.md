@@ -117,9 +117,19 @@ the middle steps it back, right of it steps it on. `Esc` backs out.
 What the keys mean is itself a setting. The `CONTROL SETTINGS` entry, on the
 start screen and in the pause menu, reads each attitude axis either way round -
 `DIRECTIONAL` points the key where the aircraft goes, `INVERTED` points it where
-a stick would - and opens the attitude up to a full turn in pitch and in roll
-for a pilot who wants to fly a loop. Both are off by default, and the list of
-every key is a row inside that panel.
+a stick would - carries that reading through to a device flown by tilting it,
+and opens the attitude up to a full turn in pitch and in roll for a pilot who
+wants to fly a loop. All of those are off by default.
+
+Which key is which is a setting too: the panel has a row per control and per
+instruction, each taking the next key pressed as its own, a refusal for a key
+another row already holds, and one row that puts the whole map back. Reset is
+the one row that may be left on no key at all. The panel also says which
+controls hand the aircraft back after a level off - the throttle is on that
+list out of the box, and a nudge of the lever on an approach is what clearing
+it is for - and whether the list of every key is up, which is where the `H`
+key's answer is now remembered. That list is a row inside the panel, and is
+written from the map rather than from the keys the game shipped with.
 
 **Tip:** Flight begins in the air and already climbing, at 80 knots and 1390 ft
 with the throttle set at 20%. That airspeed is the stall speed itself, so the

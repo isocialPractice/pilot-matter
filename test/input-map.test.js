@@ -179,9 +179,9 @@ test('a turn is not a call for a different altitude', () => {
 test('the aircraft holds the altitude it was levelled at', () => {
     assert.ok(/levelOff\(\)\s*\{/.test(aircraftSource),
         'js/aircraft.js should offer the level off as something it can be asked for');
-    assert.ok(aircraftSource.includes('isLevelOffKey(e.code)'),
+    assert.ok(aircraftSource.includes('isLevelOffKey(e.code, this.levelOffKeys)'),
         'and read it off the binding rather than a key written into the frame loop');
-    assert.ok(aircraftSource.includes('wantsVerticalChange(this.input)'),
+    assert.ok(aircraftSource.includes('wantsVerticalChange(this.input, this.verticalControls)'),
         'and let go of it where the pilot calls for a different vertical state');
     assert.ok(/levelOff\(\)\s*\{[^}]*?this\.levelling = \{/.test(aircraftSource),
         'the one press brings the nose to level as well as trimming the climb out');
@@ -381,4 +381,57 @@ test('the aircraft reads its keys through the axes the pilot set', () => {
     assert.ok(/setAxes\([^)]*\)\s*\{[^}]*?releaseAxisControls\(this\.input\)/
         .test(aircraftSource),
         'and let go of both ends of both axes when they change');
+});
+
+/**
+ * `DEFAULT_KEYMAP` was always a plain map the aircraft took as an argument
+ * rather than read off the constant, which is exactly what the Pilot API lets
+ * a host replace - and the game offered none of it. The same holds for the two
+ * key lists that are not control surfaces and for the list a level off is
+ * handed back on: all three are arguments, and all three are now the pilot's.
+ */
+test('every list the input map takes is one the aircraft can be handed', () => {
+    for (const held of ['keymap', 'resetKeys', 'levelOffKeys', 'verticalControls']) {
+        assert.ok(new RegExp(`this\\.${held} +=`).test(aircraftSource),
+            `js/aircraft.js should hold this.${held} rather than reading a constant where it is used`);
+    }
+
+    assert.ok(/setBindings\(bindings = \{\}\)\s*\{/.test(aircraftSource),
+        'and take a new map for the keys');
+    assert.ok(/setVerticalControls\(controls = VERTICAL_CONTROLS\)\s*\{/.test(aircraftSource),
+        'and a new list for what hands the aircraft back');
+
+    for (const fallback of ['RESET_KEYS', 'LEVEL_OFF_KEYS', 'VERTICAL_CONTROLS']) {
+        assert.ok(aircraftSource.includes(`?? ${fallback}`),
+            `a host that asks for nothing still flies the bundled ${fallback}`);
+    }
+});
+
+/**
+ * A key held while its binding moves would otherwise be released against the
+ * new binding when it finally came up, leaving the control it was pressed on
+ * held for the rest of the flight - the same fault `setAxes` lets go of a pair
+ * for, and the reason this lets go of all of them.
+ */
+test('moving a key lets go of everything the keyboard was holding', () => {
+    assert.ok(/setBindings\(bindings = \{\}\)\s*\{[\s\S]*?releaseAxisControls\(this\.input, CONTROL_NAMES\);/
+        .test(aircraftSource),
+        'js/aircraft.js should let go of every control when the map changes');
+
+    // The same call the axes use, so one helper covers both and a control added
+    // to the input state is let go of by both without either being edited.
+    const input = createInputState();
+    for (const name of CONTROL_NAMES) input[name] = true;
+
+    releaseAxisControls(input, CONTROL_NAMES);
+    assert.deepEqual(input, createInputState());
+});
+
+// A reset the pilot has taken off every key is a key that ends nothing, which
+// is the point of letting it be taken off.
+test('a reset on no key is a reset no key gives', () => {
+    assert.equal(isResetKey('KeyR', []), false);
+    assert.equal(isLevelOffKey('Space', []), false);
+    assert.equal(isResetKey('KeyX', ['KeyX']), true,
+        'and a reset moved is the key it was moved to');
 });

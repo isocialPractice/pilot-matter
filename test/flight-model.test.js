@@ -355,8 +355,9 @@ test('the aircraft eases the model pitch rather than keeping a second copy', () 
     assert.ok(/endLevelOff\(\)\s*\{[\s\S]*?this\.holdingAltitude = false;[\s\S]*?this\.levelling = null;/
         .test(aircraftSource),
         'and let go of the altitude and the nose together when it is handed back');
-    assert.ok(aircraftSource.includes('if (wantsVerticalChange(this.input)) this.endLevelOff();'),
-        'which is what a call for a different vertical state does');
+    assert.ok(aircraftSource.includes(
+        'if (wantsVerticalChange(this.input, this.verticalControls)) this.endLevelOff();'),
+        'which is what a call for a different vertical state does, on the controls the pilot counts');
 });
 
 // Nothing here asks for the wings to be levelled, and a wing-level is a
@@ -386,7 +387,9 @@ test('levelling off moves the nose and nothing else', () => {
 // pilot pulled, and the pull they felt would be the one they made a frame ago.
 // Both lines are in `update`, so only their order says which happens.
 test('the pilot taking the pitch back is answered on that frame, not the next one', () => {
-    const handback = aircraftSource.indexOf('if (wantsVerticalChange(this.input)) this.endLevelOff();');
+    const handback = aircraftSource.indexOf(
+        'if (wantsVerticalChange(this.input, this.verticalControls)) this.endLevelOff();'
+    );
     const ease     = aircraftSource.indexOf('if (this.levelling) {');
 
     assert.ok(handback >= 0, 'the frame loop should read the call for a different vertical state');

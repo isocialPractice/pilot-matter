@@ -149,14 +149,27 @@ under a key of its own, so how a pilot flies outlives which world they flew.
 |-----|---------------|----------|
 | `PITCH AXIS` | `DIRECTIONAL`, `INVERTED` | `DIRECTIONAL` |
 | `ROLL AXIS` | `DIRECTIONAL`, `INVERTED` | `DIRECTIONAL` |
+| `TILT READS AXES` | On, off | Off |
 | `FULL ROTATION` | On, off | Off |
+| `PITCH UP`, `PITCH DOWN`, `THROTTLE UP`, `THROTTLE DOWN` | On, off - whether each hands the aircraft back after a level off | On |
+| A key row per control, plus `RESET FLIGHT` and `LEVEL OFF` | Enter, then the key it should be on | The keys above |
+| `RESTORE DEFAULT KEYS` | Puts every key back where it started | - |
+| `LIST ON SCREEN` | On, off - the same answer `H` gives | On |
 | `CONTROL REFERENCE` | Closes the panel and shows the list of every key | - |
 
 `DIRECTIONAL` points the key where the aircraft goes; `INVERTED` points it where
 a stick would. Each axis is set on its own, and both spellings of an input turn
-over together. `FULL ROTATION` off clamps the nose short of the vertical and the
-wings at half a turn; on, either angle crosses the limit and comes round the
-other side, so a loop and a barrel roll carry on.
+over together. `TILT READS AXES` carries those two settings through to a device
+flown by tilting it; off, the device is the aircraft. `FULL ROTATION` off clamps
+the nose short of the vertical and the wings at half a turn; on, either angle
+crosses the limit and comes round the other side, so a loop and a barrel roll
+carry on.
+
+A key row waits for a key once it is chosen. A key another row holds is refused
+and the row says which row holds it; `Esc` is the way out of the wait; `Delete`
+leaves `RESET FLIGHT` on no key at all, which is the only row allowed to be on
+none. The map is stored under a key of its own, and the reference list is
+written from it.
 
 ## Worlds
 

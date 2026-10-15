@@ -15,7 +15,9 @@ import {
     screenAngle,
     TiltSensor
 } from '../js/tilt-controls.js';
-import { createInputState } from '../js/input-map.js';
+import {
+    createInputState, AXIS_DIRECTIONAL, AXIS_INVERTED, DEFAULT_AXES
+} from '../js/input-map.js';
 
 /** A state that is wanted and already reporting, held at the angle given. */
 function held(beta = 0, gamma = 0, angle = 0) {
@@ -282,4 +284,79 @@ test('a sensor already listening is not listened to twice', async () => {
     assert.equal(await sensor.start(), true, 'the answer is the same');
     assert.equal(sensor.stop(), true);
     assert.equal(sensor.stop(), false);
+});
+
+// --- Reading the device through the axes ------------------------------------
+
+/** A device levelled where it was picked up and then turned off that neutral. */
+function turned(beta = 0, gamma = 0) {
+    const state = held(0, 0);
+    applyTiltReading(state, beta, gamma);
+    return state;
+}
+
+/**
+ * Nose up is the top of the device coming toward the pilot and a wing down is
+ * the same wing down on the device, which is the device being the aircraft.
+ * That is still the default, and still the reason it is: a pilot who has not
+ * asked for anything is flying the device itself rather than a stick.
+ */
+test('the device is the aircraft until a pair says otherwise', () => {
+    for (const [beta, gamma, control] of [
+        [OVER, 0, 'pitchUp'], [-OVER, 0, 'pitchDown'], [0, -OVER, 'rollLeft'], [0, OVER, 'rollRight']
+    ]) {
+        assert.equal(tiltToInput(createInputState(), turned(beta, gamma))[control], true,
+            `${control} should be what the device asks for with no pair handed over`);
+        assert.equal(
+            tiltToInput(createInputState(), turned(beta, gamma), TILT_DEADZONE, DEFAULT_AXES)[control],
+            true,
+            'and the directional pair should be the same answer rather than a second one');
+    }
+});
+
+/**
+ * One setting rather than two more: the inversion is `axisControl`'s to apply
+ * and the pair handed here is the same pair the keys are read through, so the
+ * device cannot end up inverted on one axis for the keys and not for itself.
+ */
+test('an inverted pair turns the device over the way it turns the keys', () => {
+    const axes = { pitch: AXIS_INVERTED, roll: AXIS_DIRECTIONAL };
+
+    assert.equal(tiltToInput(createInputState(), turned(OVER, 0), TILT_DEADZONE, axes).pitchDown, true,
+        'the top of the device coming toward the pilot lowers the nose on an inverted pitch');
+    assert.equal(tiltToInput(createInputState(), turned(-OVER, 0), TILT_DEADZONE, axes).pitchUp, true);
+
+    assert.equal(tiltToInput(createInputState(), turned(0, OVER), TILT_DEADZONE, axes).rollRight, true,
+        'while the axis nobody turned over writes exactly what it always wrote');
+});
+
+test('both pairs turned over turns all four controls over', () => {
+    const axes = { pitch: AXIS_INVERTED, roll: AXIS_INVERTED };
+    const input = tiltToInput(createInputState(), turned(OVER, OVER), TILT_DEADZONE, axes);
+
+    assert.equal(input.pitchDown, true);
+    assert.equal(input.rollLeft, true);
+    assert.equal(input.pitchUp, false);
+    assert.equal(input.rollRight, false);
+});
+
+/**
+ * An axis turned over exchanges the two ends of a pair that are both in
+ * `TILT_CONTROLS`, so the four cleared on the way in cover the same four
+ * whichever way the pair reads - and a device brought back inside the deadzone
+ * lets go of what it was holding either way.
+ */
+test('a device brought back level lets go whichever way the pair reads', () => {
+    const axes = { pitch: AXIS_INVERTED, roll: AXIS_INVERTED };
+    const state = turned(OVER, OVER);
+    const input = createInputState();
+
+    tiltToInput(input, state, TILT_DEADZONE, axes);
+    assert.equal(input.pitchDown, true);
+
+    applyTiltReading(state, 0, 0);
+    tiltToInput(input, state, TILT_DEADZONE, axes);
+    for (const control of TILT_CONTROLS) {
+        assert.equal(input[control], false, `${control} should be let go of`);
+    }
 });

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {
     createInputState, applyKeyToInput, isResetKey, isLevelOffKey, wantsVerticalChange,
-    releaseAxisControls, resolveAxes, DEFAULT_KEYMAP
+    releaseAxisControls, resolveAxes,
+    DEFAULT_KEYMAP, CONTROL_NAMES, RESET_KEYS, LEVEL_OFF_KEYS, VERTICAL_CONTROLS
 } from './input-map.js';
 import { boundAttitude, turnSign, attitudeFrom } from './attitude.js';
 import { createFlightState } from './flight-state.js';
@@ -65,6 +66,15 @@ export class Aircraft {
         this.crash  = createCrashState();
         this.input  = options.input ?? createInputState();
         this.keymap = options.keymap ?? DEFAULT_KEYMAP;
+
+        // The two keys that are not control surfaces, and the controls that
+        // hand the aircraft back after a level off. All three are lists the
+        // input map already takes as arguments rather than reads off its own
+        // constants, so a pilot who has rebound a key or cleared a box changes
+        // what is held here and nothing downstream has to know.
+        this.resetKeys    = options.resetKeys    ?? RESET_KEYS;
+        this.levelOffKeys = options.levelOffKeys ?? LEVEL_OFF_KEYS;
+        this.verticalControls = options.verticalControls ?? VERTICAL_CONTROLS;
 
         // Which way each axis reads the keys bound to it, and whether the nose
         // and the wings may go all the way round. Both are the pilot's, so both
@@ -208,6 +218,45 @@ export class Aircraft {
     }
 
     /**
+     * What each key means: the control surfaces as a keymap, and the two
+     * instructions as the key lists they are read against. Every part is
+     * optional, so a caller changing one of the three leaves the other two
+     * where they are.
+     *
+     * Everything held is let go of on the way through, for the reason
+     * `setAxes` lets go of a pair: a key held while its binding moves would
+     * otherwise be released against the new binding when it finally came up,
+     * leaving the control it was pressed on held for the rest of the flight.
+     *
+     * Returns the bindings now in force.
+     */
+    setBindings(bindings = {}) {
+        if (bindings.keymap)       this.keymap       = bindings.keymap;
+        if (bindings.resetKeys)    this.resetKeys    = bindings.resetKeys;
+        if (bindings.levelOffKeys) this.levelOffKeys = bindings.levelOffKeys;
+
+        releaseAxisControls(this.input, CONTROL_NAMES);
+
+        return {
+            keymap:       this.keymap,
+            resetKeys:    this.resetKeys,
+            levelOffKeys: this.levelOffKeys
+        };
+    }
+
+    /**
+     * Which controls hand the aircraft back after a level off. An empty list is
+     * a hold nothing in the input ends, which is a pilot who has cleared every
+     * box in the panel asking for exactly that.
+     *
+     * Returns the list now in force.
+     */
+    setVerticalControls(controls = VERTICAL_CONTROLS) {
+        this.verticalControls = Array.isArray(controls) ? [...controls] : VERTICAL_CONTROLS;
+        return this.verticalControls;
+    }
+
+    /**
      * Whether the nose and the wings may go all the way round, or stop at the
      * limit that keeps ordinary flight readable. Off unless something asks, so
      * nobody is handed a loop they did not go looking for.
@@ -258,12 +307,12 @@ export class Aircraft {
         if (down && (changed === 'throttleUp' || changed === 'throttleDown')) {
             e.preventDefault();
         }
-        if (down && isResetKey(e.code)) this.reset();
+        if (down && isResetKey(e.code, this.resetKeys)) this.reset();
 
         // Space scrolls a page given the chance, so the key is taken as well as
         // read. Repeats are left alone: the level off is a press rather than a
         // hold, and a held key would keep asking for something already in force.
-        if (down && isLevelOffKey(e.code)) {
+        if (down && isLevelOffKey(e.code, this.levelOffKeys)) {
             e.preventDefault();
             if (!e.repeat) this.levelOff();
         }
@@ -371,7 +420,7 @@ export class Aircraft {
         // Roll and yaw are not that call: an altitude held through a turn is
         // what holding one is for. Read before the nose is moved, so a pilot
         // taking the pitch back this frame flies it themselves this frame.
-        if (wantsVerticalChange(this.input)) this.endLevelOff();
+        if (wantsVerticalChange(this.input, this.verticalControls)) this.endLevelOff();
 
         // Pitch: W = nose up, S = nose down, which is what the pads, the
         // control list and the documentation all say it is.

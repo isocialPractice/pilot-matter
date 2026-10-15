@@ -20,6 +20,8 @@
  * the mapping from a reading to a set of controls can be unit tested in Node.
  */
 
+import { axisControl, DEFAULT_AXES } from './input-map.js';
+
 // How far the device is turned from where it was held before it is asked for
 // anything, in degrees. Wide enough that a hand is not a control input, and
 // narrow enough that a deliberate turn is one.
@@ -121,27 +123,36 @@ export function levelTilt(state) {
  * nothing, which is what lets it be put down flat without the aircraft flying
  * away on its own.
  *
+ * `axes` is read exactly as `applyKeyToInput` reads it, and defaults to the
+ * directional pair, which is the device being the aircraft: nose up is the top
+ * of it coming toward the pilot, the way a stick is pulled, and a wing down is
+ * the same wing down on the device. Neither needs inverting, and that was the
+ * whole answer while nothing could invert anything. A pilot who has since set
+ * an axis the other way round can now be reading the device as a stick instead,
+ * and asks for their pair to reach here as well - which is one setting rather
+ * than two more, because the inversion is `axisControl`'s to apply and the same
+ * pair is already being handed to the keys.
+ *
  * Returns the input state, so it reads the way the other input sources do.
  */
-export function tiltToInput(input, state, deadzone = TILT_DEADZONE) {
+export function tiltToInput(input, state, deadzone = TILT_DEADZONE, axes = DEFAULT_AXES) {
     // A tilt that is not flying writes nothing at all, rather than writing four
     // released controls. The input state is shared with the keys and the pads,
     // and a sensor that has never reported has no business letting go of a
     // control something else is holding.
     if (!tiltFlying(state)) return input;
 
+    // Every control tilt can write is let go of first, whichever way the axes
+    // are read: an axis turned over exchanges the two ends of a pair that are
+    // both in this list, so the clearing covers the same four either way.
     for (const control of TILT_CONTROLS) input[control] = false;
 
     const { pitch, roll } = tiltOffset(state);
 
-    // Nose up is the top of the device coming toward the pilot, which is the
-    // way a stick is pulled, and a wing down is the same wing down on the
-    // device. Neither needs inverting, and neither should be: the point of
-    // flying by tilt is that the device is the aircraft.
-    if (pitch >  deadzone) input.pitchUp   = true;
-    if (pitch < -deadzone) input.pitchDown = true;
-    if (roll  < -deadzone) input.rollLeft  = true;
-    if (roll  >  deadzone) input.rollRight = true;
+    if (pitch >  deadzone) input[axisControl('pitchUp',   axes)] = true;
+    if (pitch < -deadzone) input[axisControl('pitchDown', axes)] = true;
+    if (roll  < -deadzone) input[axisControl('rollLeft',  axes)] = true;
+    if (roll  >  deadzone) input[axisControl('rollRight', axes)] = true;
 
     return input;
 }

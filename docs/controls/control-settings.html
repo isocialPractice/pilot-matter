@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control settings - Pilot Matter</title>
-    <meta name="description" content="The control settings panel: which way each axis reads its keys, how far the attitude may go, and the reference list inside it.">
+    <meta name="description" content="The control settings panel: which way each axis reads its keys, how far the attitude may go, what ends a level off, which key works which control, and the reference list inside it.">
     <link rel="icon" href="../../favicon.png">
     <link rel="stylesheet" href="../assets/site.css">
     <script src="../assets/site.js"></script>
@@ -105,6 +105,7 @@
     <tbody>
         <tr><td><code>PITCH AXIS</code></td><td><code>DIRECTIONAL</code>, <code>INVERTED</code></td><td><code>DIRECTIONAL</code></td></tr>
         <tr><td><code>ROLL AXIS</code></td><td><code>DIRECTIONAL</code>, <code>INVERTED</code></td><td><code>DIRECTIONAL</code></td></tr>
+        <tr><td><code>TILT READS AXES</code></td><td>On, off</td><td>Off</td></tr>
     </tbody>
 </table>
 </div>
@@ -114,6 +115,8 @@
 <p>An axis is turned over in one place, which is the control the key is read as rather than the key itself. Both spellings of the input therefore turn over together: <kbd>W</kbd> and <kbd>&uarr;</kbd> are two names for one control rather than two control schemes, and there is no state in which one of them is inverted and the other is not. The menus are not affected either way, because the cursor reads the keys before the flight behind it does.</p>
 
 <p>Turning an axis over also lets go of both of its controls. A key held down while its axis turns over would otherwise be released by the other end of its pair when it finally came up, which leaves the end that was pressed held for the rest of the flight - an aircraft rolling on its own with nothing on the keyboard that stops it. The cost is the press the pilot was in the middle of, which is a key they are about to let go of anyway.</p>
+
+<p><code>TILT READS AXES</code> is the third row because it answers the same question for the other way of flying. A phone or a tablet with no keys is flown by tilting it, and that reading used to write the four controls itself: nose up is the top of the device coming toward the pilot, a wing down is the same wing down on the device, and neither needs inverting because the device <em>is</em> the aircraft. That was the whole answer while nothing could invert anything. A pilot who has since set an axis the other way round may be holding the device as a stick instead, and this box is the one setting that says so - on, the two rows above reach the tilt input as well; off, the device goes on being the aircraft. It is one box rather than two more because the inversion happens in one place for every input source, so the same pair the keys are read through is simply handed to the tilt reading too.</p>
 
 <h2 id="attitude">Attitude</h2>
 
@@ -134,25 +137,83 @@
 
 <p>The coordinated turn a bank carries round reverses with the aircraft while the box is checked, because over the top the lift the wings are turning on points the other way. Inside the clamp the nose can never get past the vertical, so that reversal can never be reached with the box unchecked.</p>
 
+<h2 id="level-off">Level off</h2>
+
+<p>Under <code>LEVEL OFF</code> is a box per control that can hand the aircraft back after one. A level off trims the climb out and holds the altitude the pilot set it up at; the next call for a different vertical state is them taking it back. Which calls count is what these four answer:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Says</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>PITCH UP</code></td><td>Whether raising the nose hands the aircraft back</td><td>On</td></tr>
+        <tr><td><code>PITCH DOWN</code></td><td>Whether lowering the nose hands it back</td><td>On</td></tr>
+        <tr><td><code>THROTTLE UP</code></td><td>Whether opening the lever hands it back</td><td>On</td></tr>
+        <tr><td><code>THROTTLE DOWN</code></td><td>Whether closing the lever hands it back</td><td>On</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>All four are on out of the box, which is the behaviour the hold has always had. The two worth clearing are the throttle pair: a nudge of the lever on an approach is a speed change rather than a height change, and with the box on it drops the altitude hold the approach was set up with. Clearing both leaves the lever free and the hold in force until the nose asks for something.</p>
+
+<p>Roll and yaw have no box because they are not on the list and are not meant to be: an altitude held through a turn is what holding one is for. The answers are independent, so any combination of the four is reachable - including none of them, which is a level off nothing in the input ends. That is an answer rather than an oversight, and the way out of it is a reset: <kbd>R</kbd>, the pause menu's <code>RESET FLIGHT</code>, or the end of the flight.</p>
+
+<h2 id="keys">Keys</h2>
+
+<p>Under <code>KEYS</code> is a row per control and per instruction, each showing the key it is on. Choosing a row puts it on the wait - the row reads <code>PRESS A KEY</code> - and the next key pressed becomes its key. A control bound to two keys out of the box is on one afterwards, because the pilot named one.</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>PITCH UP</code></td><td><kbd>W</kbd>, <kbd>&uarr;</kbd></td></tr>
+        <tr><td><code>PITCH DOWN</code></td><td><kbd>S</kbd>, <kbd>&darr;</kbd></td></tr>
+        <tr><td><code>ROLL LEFT</code></td><td><kbd>A</kbd>, <kbd>&larr;</kbd></td></tr>
+        <tr><td><code>ROLL RIGHT</code></td><td><kbd>D</kbd>, <kbd>&rarr;</kbd></td></tr>
+        <tr><td><code>YAW LEFT</code></td><td><kbd>Q</kbd></td></tr>
+        <tr><td><code>YAW RIGHT</code></td><td><kbd>E</kbd></td></tr>
+        <tr><td><code>THROTTLE UP</code></td><td><kbd>Shift</kbd></td></tr>
+        <tr><td><code>THROTTLE DOWN</code></td><td><kbd>Ctrl</kbd></td></tr>
+        <tr><td><code>RESET FLIGHT</code></td><td><kbd>R</kbd></td></tr>
+        <tr><td><code>LEVEL OFF</code></td><td><kbd>Space</kbd></td></tr>
+        <tr><td><code>RESTORE DEFAULT KEYS</code></td><td>Puts every row above back where it started</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The last two rows above the restore are the two keys that are not control surfaces. Reset is an instruction - it puts the flight back where it started, on one press with nothing in between - and the level off is a trim rather than a surface held while a key is down. Neither is part of the input state, which is why neither could be reached by a keymap and why both are rows here.</p>
+
+<p>Two things are refused while a row is waiting. A key another row is already on is refused rather than taken from it, and the row says which row has it: two controls on one key is a keyboard flying two things at once with nothing on screen to say so. And <code>RESET FLIGHT</code> is the one row that may be left on no key at all - <kbd>Delete</kbd> or <kbd>Backspace</kbd> clears it, for a pilot flying a long route who would rather reach for the pause menu than risk the key. Every other row needs a key, and says <code>NEEDS A KEY</code> if asked to give one up.</p>
+
+<p><kbd>Esc</kbd> is the way out of the wait, and choosing the waiting row again does the same. Those two keys and <kbd>Delete</kbd> are therefore the three that cannot be bound to anything, which is the trade a panel of this shape makes: a row that waits for any key at all has to keep a key back to stop waiting with.</p>
+
+<p><code>RESTORE DEFAULT KEYS</code> is the way back for a pilot who has bound themselves somewhere they cannot get out of. The menu keys are not rebindable and never move, so the panel itself stays reachable whatever the map says - but a flight whose pitch is on a key the pilot has forgotten is a flight nobody can fly, and one row puts the whole map back.</p>
+
+<p>The map is stored in <code>localStorage</code> under a key of its own. A stored map naming a control this version does not have is read past, and a key the stored map put on two controls is left on the first of them, because one key working two things is the state the panel refuses whether a press or a storage asked for it.</p>
+
+<p>The reference list is written from the map, so a rebound key shows on screen as the key it is now on rather than the one it shipped on.</p>
+
 <h2 id="reference">Reference</h2>
 
-<p>Under <code>REFERENCE</code> are two rows:</p>
+<p>Under <code>REFERENCE</code> are three rows:</p>
 
 <div class="table-wrap">
 <table>
     <thead><tr><th>Row</th><th>Does</th></tr></thead>
     <tbody>
+        <tr><td><code>LIST ON SCREEN</code></td><td>Whether the reference list is up, which is the same answer <kbd>H</kbd> gives. On out of the box</td></tr>
         <tr><td><code>CONTROL REFERENCE</code></td><td>Closes the panel and puts the list of every key on screen, or takes the list back off when it is already up over the title</td></tr>
         <tr><td><code>BACK</code></td><td>Closes the panel</td></tr>
     </tbody>
 </table>
 </div>
 
+<p><code>LIST ON SCREEN</code> is where the list's own state is remembered. <kbd>H</kbd> collapses the list over a flight and brings it back, and that answer used to be forgotten at the end of the session - every flight opened with the list over the corner of the window whatever the pilot had done about it last time. The box and the key write the same setting, so collapsing the list with <kbd>H</kbd> clears the box and the next session opens collapsed. It is stored beside the rest of this panel rather than somewhere of its own, because it is the same question the panel is already asking: how this pilot wants the controls to behave.</p>
+
 <p>The reference list is the one this entry used to show on its own, and it is read against the world rather than against the rows that were covering it - so choosing it closes the panel over it. Over a flight that is the list <kbd>H</kbd> collapses, opened back up; on the start screen it is the one place the list is shown at all, there being no flight yet for <kbd>H</kbd> to be part of. That is also why the row turns the list over rather than only opening it: with no <kbd>H</kbd> to collapse it, choosing the row again is the way back off a list already up over the title, and clicking the list itself does the same for a pilot working the menus with the mouse. <a href="../controls/clearing-the-screen.html">Clearing the screen</a> is where the list itself is described.</p>
 
 <h2 id="walking-the-panel">Walking the panel</h2>
 
-<p><kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> moves the cursor over all three parts as though they were one list. <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> steps the row under the cursor, and <kbd>Enter</kbd> steps it on as well, because a setting with two states has no single thing to choose.</p>
+<p><kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> moves the cursor over all five parts as though they were one list. <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> steps the row under the cursor, and <kbd>Enter</kbd> steps it on as well, because a setting with two states has no single thing to choose.</p>
 
 <p>Every choice is stored in <code>localStorage</code>, under a key of its own rather than inside the settings panel's: how a pilot flies outlives which world they were flying. A setting from a version that had one this one does not reads as the default on its own, without costing the others their memory, and a browser that refuses storage costs the choices their memory and nothing else.</p>
 

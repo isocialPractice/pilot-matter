@@ -117,17 +117,18 @@
 │   ├── world-tiles.js  # Pure grid the endless ground is laid on, and what is drawn of it
 │   ├── world-record.js # Pure record of the world a terrain built, and the ask it is compared against
 │   ├── input-map.js    # Pure keybinding map and keyboard-to-input-state mapping
+│   ├── key-bindings.js # Pure map of which key works which control, and its storage
 │   ├── touch-controls.js # Pure on-screen pad layout for a machine with no keys, and the pads themselves
 │   ├── tilt-controls.js # Pure device-orientation-to-input-state mapping, and the sensor behind it
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── title-screen.js # Pure start rules and the held pre-flight clock
 │   ├── menu.js         # Pure keyboard and pointer menu, and the list any menu is drawn into
 │   ├── settings.js     # Pure settings panel state, its options, and their storage
-│   ├── control-settings.js # Pure control settings panel: the axis settings, the attitude bound, and their storage
+│   ├── control-settings.js # Pure control settings panel: the axes, the attitude bound, what ends a level off, the keys, and their storage
 │   ├── element-editor.js # Pure element editor state: the placed elements and their ranges
 │   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
 │   ├── audio.js        # Pure engine and wind mix, and the graph it is played through
-│   ├── controls-help.js# Pure collapse toggle for the on-screen control list
+│   ├── controls-help.js# Pure collapse toggle for the on-screen control list, and the rows it is written from
 │   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── photo.js        # Pure photo mode state and filename, and the download
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math

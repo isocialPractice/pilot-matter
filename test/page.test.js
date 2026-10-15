@@ -16,6 +16,7 @@ import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
 import {
     CONTROL_SETTINGS_TITLE, CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING,
+    CONTROL_LEVEL_OFF_HEADING, CONTROL_KEYS_HEADING,
     CONTROL_REFERENCE_HEADING, CONTROL_REFERENCE_LABEL
 } from '../js/control-settings.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
@@ -294,13 +295,21 @@ const CARD_LINE_CEILINGS = {
 const MENU_LISTS = [
     'start-menu', 'pause-menu', 'game-modes-menu', 'element-editor-menu',
     'settings-menu', 'settings-start', 'settings-options',
-    'control-settings-axes', 'control-settings-attitude', 'control-settings-reference'
+    'control-settings-axes', 'control-settings-attitude', 'control-settings-level-off',
+    'control-settings-keys', 'control-settings-reference'
 ];
 
-// The three lists the control settings panel is split across, which are held to
+// The five lists the control settings panel is split across, which are held to
 // the same rules the settings panel's three are.
 const CONTROL_LISTS = [
-    'control-settings-axes', 'control-settings-attitude', 'control-settings-reference'
+    'control-settings-axes', 'control-settings-attitude', 'control-settings-level-off',
+    'control-settings-keys', 'control-settings-reference'
+];
+
+// The heading over each of those lists, in the order the panel draws them.
+const CONTROL_HEADINGS = [
+    CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING, CONTROL_LEVEL_OFF_HEADING,
+    CONTROL_KEYS_HEADING, CONTROL_REFERENCE_HEADING
 ];
 
 // The browser tab shows the title next to the favicon, so the two should
@@ -552,7 +561,7 @@ test('every menu the panel splits its entries across has a list to be drawn into
 // panel has to be on the page for the rename to have led anywhere.
 test('the control settings panel is titled and says what it is setting', () => {
     assert.ok(indexHtml.includes(CONTROL_SETTINGS_TITLE), 'the panel should carry its title');
-    for (const heading of [CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING, CONTROL_REFERENCE_HEADING]) {
+    for (const heading of CONTROL_HEADINGS) {
         assert.ok(new RegExp(`<h3>${heading}</h3>`).test(indexHtml),
             `the panel should name what its ${heading} list changes`);
     }

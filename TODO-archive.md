@@ -2255,3 +2255,157 @@ still be found by name.
     to hold whichever contract is chosen, since nothing in the suite exercises
     either unbalanced direction today.
   - From: Code Review Override - the widened guard's own reach, and one more comment naming the start menu
+
+## Archived 10-15-26
+
+- [x] **Row Scan**: The self-name guard reads a wrapper's own attribute as a row
+  - **Issue**: `the row that collapses the list names the action rather than the
+    list` at `test/page.test.js:659` runs `assert.doesNotMatch(rows, /controls?/i)`
+    over the list body with only the `<h3>` heading removed, so the body it
+    scans is markup as well as text. Every nested element's tag is in that scan.
+    Verified against a list whose first row is wrapped in
+    `<div class="controls-row">`: `/controls?/i` matches, the test fails, and
+    the row it names in the failure message is `div class="controls-row"` -
+    an attribute, while the same span with its tags stripped carries no row
+    naming the list at all. So the guard reports a second name that does not
+    exist and points the reader at a tag. The exposure is not new - the capture
+    this version replaced also held a nested element's opening tag - but it now
+    covers every nested element in the list rather than only those ahead of the
+    first close, and a wrapper named after the panel it sits in is the likely
+    name for one. The new test's own example wrapper, `<div class="group">`,
+    happens to carry no `control` and so does not show this.
+  - **Goal**: Scan the rows rather than the markup: take the tags off the span
+    before looking for a second name, so a class or id carrying the list's name
+    is not read as a row and the failure message quotes row text. Keep the
+    `<h3>` removal ahead of it, since the heading is the list's own correct name
+    and is held by the test above. Then state the new bound with a case the page
+    cannot show - a row wrapped in an element whose attribute carries `control`
+    passing, alongside a genuine `X - Show Controls` row still failing - so this
+    guard's reach is held by something written rather than by the wrapper names
+    the page happens to use.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [x] Move the version into the nested pre-release form
+  - **The core is doing the suffix's job.** `package.json` reads
+    `1.24.4-alpha`, which claims twenty-four minor releases of a package that
+    is not on a registry, while the `-alpha` says it is not released at all.
+    Every run climbs a release number nothing has released.
+  - **Write `1.0.0-alpha.1.24.4`.** The core becomes the release being worked
+    towards and stops moving until the suffix is dropped; the old core moves
+    into the suffix, where it keeps the record of how far the project has
+    come. The inner triple then moves the way the core used to: a patch to
+    `1.0.0-alpha.1.24.5`, a minor to `1.0.0-alpha.1.25.0`, a major to
+    `1.0.0-alpha.2.0.0`. `### Version Schemes` in the automation instructions
+    is the standing rule.
+  - **This is not a release.** It re-expresses the version the project is
+    already at, so it earns no step of its own. Items completed alongside it
+    earn their step from the corrected form, in one entry under one version.
+  - **Change it in `package.json` and in this run's `CHANGELOG.md` heading,
+    and nowhere else.** Every other mention of `1.24.4` in the repository is
+    history - a past entry, a note, a heading naming the release some work
+    belonged to - and history is not corrected. In particular, do not rewrite
+    an override heading or a `- From:` line that names an old version: a
+    `From:` line has to match its heading word for word, and editing one of
+    the pair breaks the item mid-run.
+  - **Say in the entry why the version looks smaller than yesterday's.** The
+    new version sorts below the last one published, and a reader who meets
+    that with no explanation beside it goes looking for a mistake. Name the
+    old form and the new one, and say the switch was deliberate.
+  - **Leave the three existing tags alone.** They record releases that
+    happened. Do not delete one, do not move one, and do not re-tag to make
+    the ordering look right - the next releases pass them.
+  - **Two traps.** `1.0.0-alpha.1.02.0` is not valid semver, so nothing pads
+    an identifier and nothing tidies one. And `npm version patch` is the
+    wrong command here: it strips the pre-release and yields a bare `1.0.0`.
+    Only the last identifier has a command at all, `npm version prerelease`;
+    an inner minor or major is a hand edit.
+  - From: Version Scheme Override - re-express the pre-release before the next bump
+- [x] Row Scan 1
+  - **Issue**: `a list is scanned for a second name by its rows rather than by
+    its markup` at `test/page.test.js:774` splits the bound across two fixtures,
+    and the half that needed stating cannot fail. The item asked for a wrapper
+    whose attribute carries `control` to pass *alongside* a genuine
+    `X - Show Controls` row still failing - one span holding both - but
+    `wrapped` carries the wrapper with no named row and `named` carries the row
+    with no wrapper. Nothing in `named` is a tag, so
+    `named.match(/[^\r\n]*controls?[^\r\n]*/i)[0]` can only be the row, and the
+    assertion that a failure quotes the row "rather than a tag" has no tag
+    available to quote. Verified by cutting the tag strip out of `listRows`
+    entirely, leaving the `<h3>` removal alone: both `named` assertions still
+    pass and only the `wrapped` half fails, so that half of the test holds
+    nothing about tags at all. The `wrapped` half does catch a strip removed
+    outright, so this is a bound left unstated rather than a guard that does not
+    work. The test also restates the guard's own capture,
+    `/[^\r\n]*controls?[^\r\n]*/i` at `test/page.test.js:760`, rather than
+    reading it from one place, so changing what the guard quotes with leaves the
+    test green against the old pattern.
+  - **Goal**: State the bound in one span, as the item asked: a fixture with
+    `<div class="controls-row">` wrapped round a row and a genuine
+    `X - Show Controls` row beside it, asserting both that `/controls?/i` still
+    matches - the real row is caught - and that the quoted match is
+    `X - Show Controls` rather than the class. That arrangement is the only one
+    in which quoting a tag is possible at all, which is what makes it the case
+    worth writing. Confirmed to behave over that combined span, where
+    `listRows` quotes `X - Show Controls`. Keep the existing `wrapped` fixture,
+    which is what catches a tag strip removed outright. While there, have the
+    guard and the test read one capture pattern rather than two copies of it, so
+    the quote the guard makes and the quote the test checks cannot drift apart.
+    The last `Changed` bullet of the `1.0.0-alpha.1.24.5` entry in
+    `CHANGELOG.md` names this gap as open; correct that sentence once the case
+    is stated.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [x] Row Scan 2
+  - **Issue**: `SECOND_NAME_ROW` at `test/page.test.js:751` takes the pattern
+    text from `SECOND_NAME` but respells everything else about it, so the pair
+    the item set out to stop drifting still drifts in two of the three ways the
+    name can be edited. The flags are written out again as `'i'` rather than
+    read from `SECOND_NAME.flags`: tighten the name to `/Controls?/` on the
+    view that a row always capitalises it, and the guard's
+    `assert.doesNotMatch(rows, SECOND_NAME)` passes a row reading
+    `X - show controls` while `SECOND_NAME_ROW` goes on matching that same row,
+    so the guard and its own capture disagree about one row. And the name is
+    interpolated unparenthesised, so widening it to an alternation breaks the
+    row context out of the pattern: with `SECOND_NAME` set to
+    `/controls?|key list/i`, `SECOND_NAME_ROW` builds as
+    `/[^\r\n]*controls?|key list[^\r\n]*/i`, and a row `H - Hide Key List` is
+    quoted as the bare fragment `Key List` instead of the whole row - which is
+    the one thing the capture exists to do rather than matching the name alone.
+    Both measured against the live definitions. Nothing fails today, because
+    `/controls?/i` is a bare sequence carrying the single flag that happens to
+    be respelled correctly, so the next edit to the name is what reaches it.
+    The `1.0.0-alpha.1.24.6` entry in `CHANGELOG.md` states the opposite as
+    already achieved: "Widening either reaches both callers."
+  - **Goal**: Build the capture from the whole of `SECOND_NAME` rather than
+    from its `source` alone. Wrap the interpolation in a non-capturing group so
+    an alternation cannot reach past it, and pass `SECOND_NAME.flags` in place
+    of the literal `'i'` so the case rule has one definition too. Both
+    measurements above then agree with the guard, and the name becomes editable
+    in the way the entry already claims it is. Correct the "Widening either
+    reaches both callers" sentence in the `1.0.0-alpha.1.24.6` entry of
+    `CHANGELOG.md` to match what is true once the derivation is finished.
+  - From: Code Review Override - what the balanced span promises, and markup read as a row
+- [x] The comment on `nameRow()` describes the constant two declarations below it
+  - **Issue**: `test/page.test.js:739` opens "The name a list may not carry a
+    second time, and the span a failure quotes it out of" - which names
+    `SECOND_NAME` and `SECOND_NAME_ROW` at lines 767 and 768 - and that comment
+    now sits above `function nameRow(name)` at line 763, which this run
+    introduced between the two. Its third paragraph describes `nameRow()` in
+    terms the function does not have: "The flags come from `SECOND_NAME.flags`"
+    and "tightening the name to `/Controls?/`" read as statements about one
+    name, while `nameRow()` takes a `name` parameter and never mentions
+    `SECOND_NAME` - the test at line 785 hands it `tightened` and `widened`
+    instead. So the comment forward-references a constant declared after it and
+    documents a generic builder as though it were specific to the one caller.
+    Every other helper in the file is commented on itself directly above itself
+    - `listRows` at 721 to 734, `collectScripts`, `elementBody`, `publishedNames`
+    and `exportTables` in `test/docs.test.js` - so a comment naming a subject
+    two declarations down is this file's one exception rather than its habit.
+    Nothing fails: comments do not run.
+  - **Goal**: Split the comment where its subject changes. Keep the paragraph
+    that describes what `nameRow()` does - the whole of the name rather than its
+    `source`, the flags, the `(?:...)` - directly above `nameRow()`, written
+    about its `name` parameter rather than about `SECOND_NAME`, and move the two
+    paragraphs that describe the name a list may not carry and the pair that
+    drifted down to sit above `const SECOND_NAME`. The two edits the paragraph
+    measures against stay where they are; only which declaration each paragraph
+    is attached to changes.
+  - From: Code Review Override - the helper was generalised and its comment was not

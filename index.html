@@ -778,6 +778,8 @@
         #settings-options,
         #control-settings-axes,
         #control-settings-attitude,
+        #control-settings-level-off,
+        #control-settings-keys,
         #control-settings-reference {
             list-style: none;
             margin: 18px 0 14px;
@@ -792,6 +794,8 @@
         #settings-options li,
         #control-settings-axes li,
         #control-settings-attitude li,
+        #control-settings-level-off li,
+        #control-settings-keys li,
         #control-settings-reference li {
             margin: 4px 0;
             padding: 5px 10px;
@@ -818,6 +822,8 @@
         #settings-options li.selected,
         #control-settings-axes li.selected,
         #control-settings-attitude li.selected,
+        #control-settings-level-off li.selected,
+        #control-settings-keys li.selected,
         #control-settings-reference li.selected {
             color: #000;
             background: #0f0;
@@ -845,6 +851,8 @@
         #settings-options,
         #control-settings-axes,
         #control-settings-attitude,
+        #control-settings-level-off,
+        #control-settings-keys,
         #control-settings-reference,
         #element-editor-menu {
             margin: 10px 0 8px;
@@ -855,6 +863,8 @@
         #settings-options li,
         #control-settings-axes li,
         #control-settings-attitude li,
+        #control-settings-level-off li,
+        #control-settings-keys li,
         #control-settings-reference li,
         #element-editor-menu li {
             margin: 2px 0;
@@ -895,6 +905,8 @@
         #settings-options li[data-note]::after,
         #control-settings-axes li[data-note]::after,
         #control-settings-attitude li[data-note]::after,
+        #control-settings-level-off li[data-note]::after,
+        #control-settings-keys li[data-note]::after,
         #control-settings-reference li[data-note]::after,
         #element-editor-menu li[data-note]::after,
         #game-modes-menu li[data-note]::after {
@@ -1341,6 +1353,10 @@
         <ul id="control-settings-axes"></ul>
         <h3>ATTITUDE</h3>
         <ul id="control-settings-attitude"></ul>
+        <h3>LEVEL OFF</h3>
+        <ul id="control-settings-level-off"></ul>
+        <h3>KEYS</h3>
+        <ul id="control-settings-keys"></ul>
         <h3>REFERENCE</h3>
         <ul id="control-settings-reference"></ul>
         <small>W/S OR &uarr;/&darr; TO SELECT &middot; A/D OR &larr;/&rarr; TO ADJUST &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
@@ -1432,12 +1448,12 @@
     <div id="controls-help">
         <div id="controls-help-list">
             <h3>CONTROL REFERENCE</h3>
-            W/S or ↑/↓ - Pitch<br>
-            A/D or ←/→ - Roll<br>
-            Q/E - Yaw<br>
-            Shift - Throttle Up<br>
-            Ctrl - Throttle Down<br>
-            Space - Level Off<br>
+            <span data-help-row="pitch">W/S or ↑/↓ - Pitch</span><br>
+            <span data-help-row="roll">A/D or ←/→ - Roll</span><br>
+            <span data-help-row="yaw">Q/E - Yaw</span><br>
+            <span data-help-row="throttleUp">Shift - Throttle Up</span><br>
+            <span data-help-row="throttleDown">Ctrl - Throttle Down</span><br>
+            <span data-help-row="levelOff">Space - Level Off</span><br>
             C - Cycle Camera<br>
             Tab - Toggle HUD<br>
             H - Collapse List<br>
@@ -1445,7 +1461,7 @@
             O - Settings<br>
             L - Element Editor<br>
             P - Pause<br>
-            R - Reset Position<br>
+            <span data-help-row="reset">R - Reset Position</span><br>
             F2 - Photo
         </div>
         <div id="controls-help-hint">H - CONTROL REFERENCE</div>
