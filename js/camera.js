@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import {
-    CHASE_POSITION_LAMBDA, CHASE_TARGET_LAMBDA, ORBIT_RATE,
+    CHASE_POSITION_LAMBDA, CHASE_TARGET_LAMBDA, ORBIT_RATE, CAMERA_CYCLE_KEY,
     CAMERA_MODES, modeIndexOf, damp, shouldSnap, orbitStep
 } from './camera-math.js';
 
-export { CAMERA_MODES, modeIndexOf, ORBIT_RATE, ORBIT_RATES } from './camera-math.js';
+export { CAMERA_MODES, modeIndexOf, ORBIT_RATE, ORBIT_RATES, CAMERA_CYCLE_KEY } from './camera-math.js';
 
 export class CameraController {
     constructor(camera, aircraft, mode = CAMERA_MODES[0]) {
@@ -22,7 +22,7 @@ export class CameraController {
         this.chaseTarget   = null;
 
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyC') this.cycleMode();
+            if (e.code === CAMERA_CYCLE_KEY) this.cycleMode();
         });
     }
 

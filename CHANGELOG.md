@@ -5,6 +5,81 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.26.0] - 2026-10-16
+
+`1.0.0-alpha.1.25.0` gave the pilot every key, and gave away eight the game was
+already reading. The panel refused a key another row held and nothing else, so a
+control surface could be bound onto `P` and one press then rolled the aircraft
+and paused the flight - taken with nothing said, which is the part that made it
+a defect rather than a choice. A row refuses those keys now and says what each
+one already does.
+
+### Added
+
+- **A reserved-key guard, in a new `js/reserved-keys.js`.** `rebind` checked the
+  ten bindings in the map, which is every key the panel knows about and not every
+  key the game reads: `Tab`, `P`, `H`, `M`, `O`, `L`, `F2` and `C` are read by
+  listeners of their own, and were invisible to the refusal. Two listeners read
+  one press and neither knows of the other, so the guard belongs where the
+  binding is accepted rather than in either handler, and `rebind` now returns a
+  `reserved` result naming what the key is already doing.
+- **The eight keys are imported from the modules that work them**, not written
+  out again. A second copy of `'KeyP'` is how such a list comes to disagree with
+  `js/pause.js`, and it disagrees silently, which is the failure the guard is
+  about. The list is built on first use rather than at module load:
+  `js/controls-help.js` reads `js/key-bindings.js` for its key labels and
+  `js/key-bindings.js` reads the guard, so the three are a cycle, and a top-level
+  list naming `HELP_KEY` dies on `Cannot access 'HELP_KEY' before
+  initialization` whenever `js/controls-help.js` is entered first - which the
+  suite does.
+- **`CAMERA_CYCLE_KEY` in `js/camera-math.js`**, beside the mode names it
+  cycles. `C` was the one key of the eight with no constant to import - a literal
+  inside the camera's own `keydown` listener - and a list built from constants
+  cannot see a key that is not one, which is why the first reading of the problem
+  counted seven. `js/camera.js` reads the constant now, and cannot be the one
+  that holds it because it pulls in a renderer and the guard may not.
+
+### Changed
+
+- **A refused row says what has the key, whichever list holds it.** `P IS PAUSE`
+  and `TAB IS INSTRUMENTS` are written the way `W IS PITCH UP` already was, so a
+  pilot reads one sentence in both cases and the row keeps waiting either way.
+  The two refusals are one rule read against two lists: a row holds the key or
+  the game holds it, and it does not matter which of the two meanings came first.
+- **A stored map putting a control on one of those keys is read past**, on the
+  same grounds a stored map putting one key on two controls already was. A pilot
+  who had already bound `ROLL RIGHT` to `P` has that collision written down, and
+  reading it back unchanged would hand them the pausing aircraft on every load of
+  the version that refuses to let them build it.
+- **The menu keys are the map's, and three places said they were not.**
+  `Enter` and `NumpadEnter` are `MENU_SELECT_KEYS` and are on no binding, so the
+  map takes both - including the `Enter` that armed the row. The other nine menu
+  keys are refused because a row holds them, which is because they are the keys
+  the aircraft is flown with, and not because they walk a menu. Reserving them
+  was the alternative and was not taken: `W` has to stay bindable for the axis
+  settings that read it as both a cursor key and a pitch key, so reserving the
+  rest would have bought a half-rule for two keys a pilot may want. What keeps
+  `RESTORE DEFAULT KEYS` reachable from any map is the capture listener reading
+  the menu's own codes ahead of the flight, which is true whatever the map says.
+- **`test/key-bindings.test.js` asserts what `rebind` returns for each menu key.**
+  The test named "the keys that walk the panel are not the map's to move" asserted
+  nothing about the map: its loop left `yawLeft` on `['NumpadEnter']` and the two
+  assertions after it compared `MENU_UP_KEYS` and `MENU_SELECT_KEYS` against
+  written-out lists, so it passed identically with the loop deleted - and it
+  answered the question wrongly for the review that went looking. It is renamed
+  for what it holds, and `MENU_DOWN_KEYS` is now asserted rather than spread into
+  the loop and forgotten.
+- **Three keys can never be bound, and three comments called it two.**
+  `BINDING_CANCEL_KEYS` is `Escape` and `BINDING_CLEAR_KEYS` is `Delete` and
+  `Backspace`, so three keys can be on no row - `bindArmedKey` hands `Backspace`
+  to `clearBinding`, which refuses every row but `RESET FLIGHT`. `js/main.js`,
+  `test/control-settings.test.js` and `js/key-bindings.js` wrote the count as
+  two, the last of them naming `Backspace` in the next sentence, so a reader
+  gathering the reserved keys from the prose rather than the constants missed
+  one. All three say three now, and
+  `docs/controls/control-settings.html` names the three keys rather than leaning
+  on a sentence that named one key and an action.
+
 ## [1.0.0-alpha.1.25.0] - 2026-10-15
 
 The control settings panel holds the keys now, not only what they mean. A row

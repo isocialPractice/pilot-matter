@@ -22,6 +22,9 @@
 import {
     DEFAULT_KEYMAP, CONTROL_NAMES, RESET_KEYS, LEVEL_OFF_KEYS
 } from './input-map.js';
+import { isReservedKey, reservedRole } from './reserved-keys.js';
+
+export { reservedKeys, reservedRole, isReservedKey } from './reserved-keys.js';
 
 export const KEY_BINDINGS_STORAGE_KEY = 'pilot-matter.key-bindings';
 
@@ -68,12 +71,16 @@ export const BINDING_LABELS = Object.freeze({
 /** What a binding on no key at all reads as. */
 export const UNBOUND_LABEL = 'NONE';
 
-// The keys a row waiting for one does not take as a binding. Escape is the way
-// out of the wait and Delete is the way to leave an optional binding on nothing,
-// so neither can be bound to anything - which is the trade every panel of this
-// shape makes, and the reason the two chosen are the two nothing here flies
-// with. Backspace clears as well, because it is the other key the panel already
-// closes on and a pilot reaching to erase a binding reaches for it first.
+// The keys a row waiting for one does not take as a binding. There are three of
+// them and no row can hold any of the three: Escape is the way out of the wait,
+// and Delete and Backspace are both the way to leave an optional binding on
+// nothing - Backspace because it is the other key the panel already closes on,
+// and a pilot reaching to erase a binding reaches for it first. Keeping a key
+// back to stop waiting with is the trade every panel of this shape makes, and
+// the reason these three were chosen is that nothing here flies with any of
+// them. The keys the game reads for itself are kept off the map too, by
+// `js/reserved-keys.js` rather than by these lists, because they are the game's
+// own keys rather than the wait's.
 export const BINDING_CANCEL_KEYS = Object.freeze(['Escape']);
 export const BINDING_CLEAR_KEYS  = Object.freeze(['Delete', 'Backspace']);
 
@@ -179,6 +186,12 @@ export function cloneBindings(bindings = DEFAULT_BINDINGS) {
  * whichever of its own default keys are still free, which is what turns a
  * half-read map back into something flyable rather than something with a hole
  * in it.
+ *
+ * A key the game reads for itself is dropped on the same grounds, and that is
+ * what carries the refusal back over a map stored before there was one. A pilot
+ * who had already put `ROLL RIGHT` on `P` has that collision written down, and
+ * reading it back unchanged would hand them the pausing aircraft on every load
+ * of a version that refuses to let them build it.
  */
 export function resolveBindings(values = {}) {
     const bindings = {};
@@ -187,7 +200,9 @@ export function resolveBindings(values = {}) {
     for (const name of BINDING_NAMES) {
         const stored = Array.isArray(values?.[name]) ? values[name] : DEFAULT_BINDINGS[name];
         const codes = [...new Set(
-            stored.filter(code => typeof code === 'string' && code.length > 0 && !taken.has(code))
+            stored.filter(code =>
+                typeof code === 'string' && code.length > 0 &&
+                !taken.has(code) && !isReservedKey(code))
         )];
 
         if (codes.length === 0 && !bindingOptional(name)) {
@@ -218,14 +233,25 @@ export function bindingKeys(bindings = DEFAULT_BINDINGS, name) {
  * because the pilot named one.
  *
  * Returns what the press came to: `bound` for a binding that moved, `held` for a
- * key already on this very binding, and `taken` for one already on another -
- * with `conflict` naming which. A key on something else is refused rather than
- * stolen from it, because two controls on one key is a keyboard that flies two
- * things at once and nothing on screen to say which.
+ * key already on this very binding, `taken` for one already on another - with
+ * `conflict` naming which - and `reserved` for a key the game reads for itself,
+ * with `conflict` naming what it reads it for. A key on something else is
+ * refused rather than stolen from it, because two controls on one key is a
+ * keyboard that flies two things at once and nothing on screen to say which.
+ *
+ * The two refusals are one rule read against two lists. A row holds a key, or
+ * the game holds it; either way the press is refused and the row keeps waiting,
+ * because a key that means two things is the state this panel exists to prevent
+ * and it does not matter which of the two meanings came first.
  */
 export function rebind(bindings, name, code) {
     if (!BINDING_NAMES.includes(name)) return { result: 'unknown', conflict: null };
     if (typeof code !== 'string' || code.length === 0) return { result: 'unknown', conflict: null };
+
+    // Ahead of the map, because a reserved key is on no binding to be found
+    // there: the answer a pilot needs is what the key already does, not the
+    // `bound` they would otherwise get.
+    if (isReservedKey(code)) return { result: 'reserved', conflict: reservedRole(code) };
 
     const holder = boundTo(bindings, code);
     if (holder === name) return { result: 'held', conflict: null };

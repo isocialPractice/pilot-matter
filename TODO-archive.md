@@ -2409,3 +2409,84 @@ still be found by name.
     measures against stay where they are; only which declaration each paragraph
     is attached to changes.
   - From: Code Review Override - the helper was generalised and its comment was not
+
+## Archived 10-16-26
+
+- [x] The widened fixture reads `[0]` off a match it never established
+  - **Issue**: `test/page.test.js:793` is
+    `assert.match('H - Hide Key List'.match(nameRow(widened))[0], ...)`, and
+    `String.prototype.match` returns `null` when nothing matches, so `[0]`
+    throws rather than asserting. The state that reaches it is the regression
+    the test exists to catch: drop the flags from `nameRow()` - `name.flags`
+    mistyped as `name.flag`, or hardcoded back to `''` - and
+    `(?:controls?|key list)` no longer matches the capitals in
+    `H - Hide Key List`, `.match()` returns `null`, and the test dies with
+    `TypeError: Cannot read properties of null (reading '0')` instead of its own
+    message, "and a row found by its second branch is still quoted whole rather
+    than as the bare name". Measured: that exact `TypeError` is what `name.flag`
+    produces. The test still fails, so nothing ships broken - what is lost is
+    the sentence that says which of the two derivations gave way, on the one
+    failure where the row is not quoted at all. The same `[0]` at line 860 is
+    guarded, by `assert.match(both, SECOND_NAME, ...)` on line 858 establishing
+    the match first, so this is the only unguarded one in the file.
+  - **Goal**: Establish the match before reading it, the way line 858 does for
+    line 860. Assert the row matches `nameRow(widened)` first, then read `[0]`
+    off it - or hold the result in a `const`, `assert.ok` it with a message
+    naming the dropped flags, and assert on `[0]` after. Either way the two
+    halves of the derivation keep separate messages on every failure, which is
+    what the fixture pair was added for.
+  - From: Code Review Override - the helper was generalised and its comment was not
+- [x] The derivation comment states a suite count the file no longer has
+  - **Issue**: `test/page.test.js:778` reads "writing the capture out beside the
+    name again - either half of it - passes all 1247 tests", inside a comment
+    that opens in the present tense: "The derivation above is correct and,
+    measured against today's name, unable to fail". The suite is 1248 and has
+    been since `1.0.0-alpha.1.24.7`, whose own `CHANGELOG.md` entry records it as
+    "green at 1248, one more than `1.0.0-alpha.1.24.6`". Measured both ways:
+    `node --test` reports 1248 at `HEAD` and 1248 in the working tree, and the
+    count of `test(` declarations in this file is identical in the two, so no
+    test was added or removed this turn. 1247 was the count at
+    `1.0.0-alpha.1.24.6`, before the run that wrote the sentence added the test
+    the sentence introduces, so the number is the suite as it stood one test
+    before the comment shipped. It is worse than stale by one: the counterfactual
+    is now false rather than merely out of date, because the two fixtures stated
+    directly below the sentence are the tests that fail under it. Writing the
+    capture out by hand today makes `nameRow(tightened)` return the hand-written
+    pattern, so `assert.doesNotMatch('X - show controls', nameRow(tightened))` at
+    `:792` fails, which is the whole reason those fixtures were added. Nothing
+    fails today: comments do not run.
+  - **Goal**: Put the claim in the tense it is true in. Say that writing the
+    capture out passed all 1247 tests before these two fixtures were added, and
+    that the pair below the sentence is what catches it now. That keeps the point
+    the paragraph is making, which is why a derivation that cannot fail against
+    today's name still needed fixtures of its own, rather than dropping the
+    measurement that makes the point. Consider carrying no number at all, since a
+    bare suite count in a comment goes stale on the next test added and this is
+    the file's only one. Leave the matching 1247 in the `1.0.0-alpha.1.24.7`
+    entry of `CHANGELOG.md` where it is: that entry is a dated record of the state
+    at the time, and the count is correct for the suite it describes.
+  - From: Code Review Override - a comment measures against a suite one test smaller
+- [x] **Pair Antecedent**: The entry's account of what the pair catches has a clause that does not parse
+  - **Issue**: `CHANGELOG.md:25` closes its first sentence with the appositive
+    "the tests that writing the capture out is what fails", which merges two
+    constructions - "the tests that writing the capture out fails" and "writing
+    the capture out is what fails them" - and leaves `fails` with no object, so
+    the clause does not parse. What it is claiming is true: the capture written
+    out in full, as `1.0.0-alpha.1.24.6` shipped it - literal `'i'` and no
+    `(?:...)` group - fails both halves of the pair, measured by mutation. The
+    wording is the only fault, and it has a second part: the clause calls the
+    two halves "the tests" three words after `CHANGELOG.md:23` calls the block
+    "the one test", where the rest of the entry says "fixture" throughout, as
+    `CHANGELOG.md:36` does in "fails the tightened fixture only". A reader
+    meeting "the one test ... the tests" in one breath reads a contradiction in
+    the one sentence whose point is that exactly one test made the difference.
+    Nothing fails: a changelog entry does not run.
+  - **Goal**: Say it once, in the entry's own vocabulary - the pair of fixtures
+    standing directly below the sentence is what writing the capture out fails.
+    Keep "the one test" for the block, since that is the count the suite moved
+    by and the sentence's whole point, and keep "fixture" for the two halves to
+    match the rest of the entry. Leave every number where it is: 1247, 1248,
+    and the mutation results were each checked against `node --test` and by
+    mutating both halves of `nameRow()` against both fixtures, and all of them
+    are correct.
+  - From: Code Review Override - the release note renames the fixtures mid-sentence

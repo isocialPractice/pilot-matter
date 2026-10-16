@@ -29,13 +29,28 @@ import {
     keymapFor,
     aircraftBindings,
     readKeyBindings,
-    writeKeyBindings
+    writeKeyBindings,
+    reservedKeys,
+    reservedRole,
+    isReservedKey
 } from '../js/key-bindings.js';
 import {
     DEFAULT_KEYMAP, CONTROL_NAMES, RESET_KEYS, LEVEL_OFF_KEYS,
     createInputState, applyKeyToInput
 } from '../js/input-map.js';
 import { MENU_UP_KEYS, MENU_DOWN_KEYS, MENU_SELECT_KEYS } from '../js/menu.js';
+
+// The keys the game reads for itself, imported from the modules that read them
+// rather than written out here. A code copied into this file would pass against
+// itself for ever, which is the one thing these tests must not do.
+import { HUD_TOGGLE_KEY }    from '../js/hud-visibility.js';
+import { PAUSE_KEY }         from '../js/pause.js';
+import { HELP_KEY }          from '../js/controls-help.js';
+import { MUTE_KEY }          from '../js/audio.js';
+import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
+import { EDITOR_OPEN_KEYS }  from '../js/element-editor.js';
+import { PHOTO_KEY }         from '../js/photo.js';
+import { CAMERA_CYCLE_KEY }  from '../js/camera-math.js';
 
 // A storage that remembers, for the map to be written into and read back out.
 function fakeStorage(initial = {}) {
@@ -149,21 +164,112 @@ test('the way out of the wait and the way to clear are not keys to bind', () => 
 });
 
 /**
+ * A key the game reads for itself is not the map's to take. Two listeners read
+ * one press and neither knows of the other, so a control surface bound onto one
+ * of these is an aircraft that pauses itself when it rolls right - and the key
+ * was taken with nothing said, which is the part that made it a defect rather
+ * than a choice.
+ *
+ * The list is read off the modules that own the keys, so a key renamed in its
+ * own module fails here rather than dropping silently out of the guard.
+ */
+test('the keys the game reads for itself are not the map\'s to take', () => {
+    const owned = [
+        HUD_TOGGLE_KEY, PAUSE_KEY, HELP_KEY, MUTE_KEY,
+        ...SETTINGS_OPEN_KEYS, ...EDITOR_OPEN_KEYS, PHOTO_KEY, CAMERA_CYCLE_KEY
+    ];
+
+    assert.deepEqual([...reservedKeys()].sort(), [...new Set(owned)].sort(),
+        'the reserved list is those modules\' own keys and nothing else');
+
+    for (const code of owned) {
+        assert.equal(isReservedKey(code), true, `${code} is read by the game`);
+        assert.ok(reservedRole(code), `${code} says what it is already doing`);
+    }
+
+    for (const code of reservedKeys()) {
+        const bindings = defaultBindings();
+
+        assert.deepEqual(rebind(bindings, 'rollRight', code),
+            { result: 'reserved', conflict: reservedRole(code) },
+            `${code} is refused, and the refusal says what the key already does`);
+        assert.deepEqual(bindings.rollRight, [...DEFAULT_BINDINGS.rollRight],
+            'the row that asked is left on the key it was already on');
+        assert.equal(boundTo(bindings, code), null,
+            `and nothing anywhere in the map holds ${code}`);
+    }
+
+    // Nothing ships on one of them, so reserving them costs a pilot nothing out
+    // of the box.
+    for (const code of reservedKeys()) {
+        assert.equal(boundTo(DEFAULT_BINDINGS, code), null,
+            `${code} is the game's, so no binding may ship on it`);
+    }
+
+    assert.equal(isReservedKey('KeyZ'), false);
+    assert.equal(reservedRole('KeyZ'), null);
+});
+
+/**
+ * A map stored before the keys above were reserved still has the collision
+ * written down, so reading it back unchanged would hand a pilot the pausing
+ * aircraft on every load of the version that refuses to let them build it.
+ */
+test('a stored map putting a control on a key the game reads is read past', () => {
+    const bindings = resolveBindings({ rollRight: [PAUSE_KEY], yawLeft: [HUD_TOGGLE_KEY] });
+
+    assert.deepEqual(bindings.rollRight, [...DEFAULT_BINDINGS.rollRight],
+        'the binding is given its own keys back rather than left with the collision');
+    assert.deepEqual(bindings.yawLeft, [...DEFAULT_BINDINGS.yawLeft]);
+    assert.equal(boundTo(bindings, PAUSE_KEY), null);
+    assert.equal(boundTo(bindings, HUD_TOGGLE_KEY), null);
+});
+
+/**
  * The cursor is worked with the keys the aircraft is flown with, so a pilot who
  * has bound a control onto a menu key can still reach the panel that undoes it.
  * The menu reads its keys before the flight behind it does, and the map has no
  * say in that - which is what makes `RESTORE DEFAULT KEYS` reachable from any
  * map at all.
+ *
+ * So the menu keys are not reserved, and this test is named for what it holds
+ * rather than for a guarantee the map does not give. Nine of the eleven are
+ * refused because a row already holds them - they are the keys the aircraft is
+ * flown with, which is the whole point of choosing them - and `Enter` and
+ * `NumpadEnter` are on no binding and bind like any other free key. Reserving
+ * them was the alternative and was not taken: `W` has to stay bindable for the
+ * axis settings that read it as both a cursor key and a pitch key, so reserving
+ * the rest would buy a half-rule in exchange for two keys a pilot may want.
  */
-test('the keys that walk the panel are not the map\'s to move', () => {
-    const walking = [...MENU_UP_KEYS, ...MENU_DOWN_KEYS, ...MENU_SELECT_KEYS];
-    const bindings = defaultBindings();
+test('the keys that walk the panel are the map\'s, and the menu reads them first', () => {
+    const walking = [
+        ...MENU_UP_KEYS, ...MENU_DOWN_KEYS, ...MENU_SELECT_KEYS
+    ];
 
-    for (const code of walking) rebind(bindings, 'yawLeft', code);
+    for (const code of walking) {
+        const bindings = defaultBindings();
+        const holder = boundTo(DEFAULT_BINDINGS, code);
+        const { result, conflict } = rebind(bindings, 'yawLeft', code);
 
-    assert.deepEqual(MENU_UP_KEYS, ['ArrowUp', 'KeyW'], 'the cursor keys are fixed');
-    assert.deepEqual(MENU_SELECT_KEYS, ['Enter', 'NumpadEnter', 'Space'],
-        'and so are the keys that choose a row');
+        if (holder == null) {
+            assert.equal(result, 'bound',
+                `${code} is on no binding, so the map takes it like any other free key`);
+            assert.deepEqual(bindings.yawLeft, [code]);
+        } else {
+            assert.deepEqual({ result, conflict }, { result: 'taken', conflict: holder },
+                `${code} is refused because ${holder} holds it, not because it walks a menu`);
+            assert.deepEqual(bindings.yawLeft, [...DEFAULT_BINDINGS.yawLeft]);
+        }
+
+        assert.equal(isReservedKey(code), false,
+            `${code} is not reserved: the menu reading it first is what protects it`);
+    }
+
+    // The two that are free, named so that a default map which put a control on
+    // one of them has to come through here.
+    assert.deepEqual(walking.filter(code => boundTo(DEFAULT_BINDINGS, code) == null),
+        ['Enter', 'NumpadEnter'],
+        'the keys that choose a row are the only menu keys the map can take');
 });
 
 test('a key put on a binding is the key it is on, and the keys before it are let go', () => {

@@ -866,10 +866,12 @@ class FlightSimulator {
 
     onKeyDown(e) {
         // A key row waiting for a key is read ahead of everything, the shutter
-        // included. A row that waits for any key at all keeps back exactly two -
-        // the way out of the wait and the way to clear - and a third key that
-        // did something else instead would be a third key nothing can be bound
-        // to, with nothing on the row to say why.
+        // included. A row that waits for any key at all keeps back three keys -
+        // Escape leaves the wait, Delete and Backspace clear the row - and a key
+        // that did something else while a row waited would be one more key
+        // nothing can be bound to, with nothing on the row to say why. The keys
+        // the game reads for itself are kept off the map as well, but a row
+        // refuses those out loud and says what the key already does.
         if (bindingArmed(this.controlSettings)) {
             this.onControlSettingsKey(e);
             return;

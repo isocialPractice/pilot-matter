@@ -15,6 +15,16 @@
 // them without pulling in a renderer.
 export const CAMERA_MODES = ['CHASE', 'COCKPIT', 'ORBIT'];
 
+/**
+ * The key that cycles them, here for the same reason the names are: the
+ * reserved-key guard has to read it to keep a control surface off it, and it
+ * cannot pull in a renderer to do that. It was a literal inside the camera's
+ * own listener until the guard went in, which is exactly why it was the one key
+ * of its kind the first pass missed - a list built from constants cannot see a
+ * key that is not one.
+ */
+export const CAMERA_CYCLE_KEY = 'KeyC';
+
 /** Where a named mode sits in the cycle, falling back to the first one. */
 export function modeIndexOf(mode) {
     const index = CAMERA_MODES.indexOf(mode);

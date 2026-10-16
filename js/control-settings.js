@@ -603,11 +603,11 @@ function refuseBinding(state, name, text) {
  *
  * Returns what the press came to, as `{ result, binding, conflict }`:
  * `bound` for a key taken, `cleared` for a binding left on no key, `held` for
- * the key it was already on, `cancelled` for the way out, and `taken` or
- * `needed` for a press refused - the first because the key works something
- * else, the second because the binding may not be left on nothing. A refused
- * press leaves the row waiting, so the next key is read as the answer rather
- * than as a fresh start.
+ * the key it was already on, `cancelled` for the way out, and `taken`,
+ * `reserved` or `needed` for a press refused - the first because another row
+ * works the key, the second because the game itself reads it, the third because
+ * the binding may not be left on nothing. A refused press leaves the row
+ * waiting, so the next key is read as the answer rather than as a fresh start.
  *
  * Null when no row is waiting, which is every press the panel reads normally.
  */
@@ -629,7 +629,12 @@ export function bindArmedKey(state, code) {
 
     const { result, conflict } = rebind(state.bindings, name, code);
 
-    if (result === 'taken') {
+    // A key another row holds and a key the game reads for itself are refused in
+    // the same sentence, because they are the same thing to a pilot: the key is
+    // spoken for, and the row says what by. `conflict` names a binding in the
+    // first case and the game's own job in the second, and the label lookup
+    // falls through to the job, which is already written the way a row reads.
+    if (result === 'taken' || result === 'reserved') {
         refuseBinding(state, name, `${keyLabel(code).toUpperCase()} IS ${BINDING_LABELS[conflict] ?? conflict}`);
         return { result, binding: name, conflict };
     }

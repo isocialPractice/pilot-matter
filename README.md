@@ -123,8 +123,11 @@ wants to fly a loop. All of those are off by default.
 
 Which key is which is a setting too: the panel has a row per control and per
 instruction, each taking the next key pressed as its own, a refusal for a key
-another row already holds, and one row that puts the whole map back. Reset is
-the one row that may be left on no key at all. The panel also says which
+another row already holds or the game reads for itself, and one row that puts
+the whole map back. A refused row says what has the key - `W IS PITCH UP`,
+`P IS PAUSE` - rather than only that the press did not land, because a control
+surface on `P` would be an aircraft that paused itself every time it rolled.
+Reset is the one row that may be left on no key at all. The panel also says which
 controls hand the aircraft back after a level off - the throttle is on that
 list out of the box, and a nudge of the lever on an approach is what clearing
 it is for - and whether the list of every key is up, which is where the `H`
