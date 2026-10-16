@@ -72,7 +72,8 @@ import {
 } from '../js/control-settings.js';
 import {
     BINDING_NAMES, BINDING_LABELS, DEFAULT_BINDINGS, KEY_BINDINGS_STORAGE_KEY,
-    RESET_BINDING, LEVEL_OFF_BINDING, UNBOUND_LABEL, defaultBindings, keyLabel
+    RESET_BINDING, LEVEL_OFF_BINDING, UNBOUND_LABEL, defaultBindings, keyLabel,
+    reservedKeys, reservedRole
 } from '../js/key-bindings.js';
 import {
     OPTION_ENTRY, TOGGLE_ENTRY, BACK_ENTRY,
@@ -774,6 +775,39 @@ test('a key another row holds is refused, and the row says which row holds it', 
     assert.deepEqual(controlBindings(state).yawLeft, ['KeyZ']);
 });
 
+/**
+ * A key the game reads for itself is refused in the same sentence a key another
+ * row holds is refused, because they are the same thing to a pilot: the key is
+ * spoken for, and the row says what by. What a pilot must not get is the key
+ * taken with nothing said, which is an aircraft that pauses itself when it
+ * rolls right and nothing on the row that warned them.
+ */
+test('a key the game reads for itself is refused, and the row says what it does', () => {
+    const state = createControlSettingsState(fakeStorage());
+
+    for (const code of reservedKeys()) {
+        armBinding(state, 'rollRight');
+
+        assert.deepEqual(bindArmedKey(state, code),
+            { result: 'reserved', binding: 'rollRight', conflict: reservedRole(code) });
+
+        assert.equal(bindingArmed(state), 'rollRight', 'the row goes on waiting');
+        assert.equal(controlSettingsEntry(state, bindingEntryId('rollRight')).text,
+            `${BINDING_LABELS.rollRight}${BINDING_SEPARATOR}${keyLabel(code).toUpperCase()} IS ${reservedRole(code)}`,
+            `the row says what ${code} is already doing`);
+        assert.deepEqual(controlBindings(state).rollRight, [...DEFAULT_BINDINGS.rollRight],
+            'and the key it was on is the key it is still on');
+
+        cancelBinding(state);
+    }
+
+    // The row is left waiting by a refusal, so the next key is the answer.
+    armBinding(state, 'rollRight');
+    assert.equal(bindArmedKey(state, reservedKeys()[0]).result, 'reserved');
+    assert.equal(bindArmedKey(state, 'KeyZ').result, 'bound');
+    assert.deepEqual(controlBindings(state).rollRight, ['KeyZ']);
+});
+
 test('the key a row is already on stops the wait and changes nothing', () => {
     const state = createControlSettingsState(fakeStorage());
     armBinding(state, 'pitchUp');
@@ -943,6 +977,40 @@ test('a row waiting for a key is read before the flight behind it', () => {
     assert.ok(handler[0].includes('bindArmedKey(this.controlSettings, e.code)'));
 });
 
+/**
+ * How that reading is kept, which is the half of it no refusal can do on its
+ * own. The aircraft and the camera each read a key on a `window` listener of
+ * their own and neither asks whether a row is waiting, so the only thing
+ * keeping a press off them is js/main.js taking it on the way down the page and
+ * stopping it there. Drop the capture flag or the `stopPropagation` and `C`
+ * cycles the view while a row waits for it - the key taken and the view moved
+ * on the one press, which is the defect the refusal was written against.
+ */
+test('a press at a waiting row never reaches the keys the game reads for itself', () => {
+    const setup = mainSource.match(/setupKeys\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(setup, 'js/main.js should set up the listeners somewhere');
+
+    const first = setup[0].match(/window\.addEventListener\('keydown', \(e\) => \{[\s\S]*?\n {8}\}, (true|false)\);/);
+    assert.ok(first, 'js/main.js should give the listener that reads a waiting row a phase of its own');
+    assert.equal(first[1], 'true',
+        'on the way down the page, ahead of the listeners that read a key on the way back up');
+    assert.ok(first[0].includes('e.stopPropagation();'),
+        'and the press stops there, because those listeners have no row to ask about');
+
+    // A second listener on the way down would read the press first, and the row
+    // would be back to sharing it with whatever read it.
+    for (const [module, listener] of [
+        ['js/aircraft.js', /window\.addEventListener\('keydown', this\.onKeyDown\);/],
+        ['js/camera.js',   /window\.addEventListener\('keydown', \(e\) => \{[\s\S]*?\n {8}\}\);/]
+    ]) {
+        const source = readFileSync(fileURLToPath(new URL(`../${module}`, import.meta.url)), 'utf8');
+        assert.ok(listener.test(source),
+            `${module} should read its key on the way back up, leaving the way down to js/main.js`);
+        assert.equal(/addEventListener\('keydown',[^\n]*,\s*(?:true|\{)/.test(source), false,
+            `${module} should not read a key ahead of the row waiting for one`);
+    }
+});
+
 test('the device is read through whichever pair the panel resolved', () => {
     const track = mainSource.match(/trackTilt\(frozen\)\s*\{[\s\S]*?\n    \}/);
     assert.ok(track, 'js/main.js should hand the attitude of the device to the aircraft');
@@ -953,9 +1021,9 @@ test('the device is read through whichever pair the panel resolved', () => {
 /**
  * A row waiting for a key is read ahead of the shutter as well. The photo key
  * is read before the panels on purpose - a picture is of the world, whatever
- * is over it - but a row that waits for any key at all keeps back exactly two,
- * and a third key that took a picture instead would be a third key nothing can
- * be bound to with nothing on the row to say why.
+ * is over it - but a row that waits for any key at all keeps back three keys,
+ * and a key that took a picture instead would be one more key nothing can be
+ * bound to with nothing on the row to say why.
  */
 test('a waiting row is read ahead of every other key, the shutter included', () => {
     for (const handler of ['onKeyDown', 'onStartKey']) {
