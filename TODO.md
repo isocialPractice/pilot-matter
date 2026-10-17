@@ -22,75 +22,50 @@ its context survives being archived.
   cannot drift apart
   - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
 
-### Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
+### Code Review Override - the reserved-key notices in the docs are held to nothing
 
-- [ ] Four of the eleven menu keys are asserted by nothing in the test that was
-  renamed for them
-  - **Issue**: `test/key-bindings.test.js:245` builds `walking` from
-    `MENU_UP_KEYS`, `MENU_DOWN_KEYS` and `MENU_SELECT_KEYS`, which is seven of
-    the eleven keys a menu works with. `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` are
-    menu keys by the code's own reckoning - `isMenuControlKey` at `js/menu.js:107`
-    is `isMenuKey(code) || isMenuAdjustKey(code)`, and the capture listener at
-    `js/main.js:749` reads the keys it holds back through that function, not
-    through `isMenuKey` - and they are neither imported at
-    `test/key-bindings.test.js:41` nor reached by the loop. Measured over
-    `defaultBindings()`: `ArrowLeft` and `KeyA` return
-    `{ result: 'taken', conflict: 'rollLeft' }` and `ArrowRight` and `KeyD`
-    return `{ result: 'taken', conflict: 'rollRight' }`, so all four behave the
-    way the test's own docblock says they do and nothing establishes it. The
-    docblock at `:236` counts them in - "Nine of the eleven are refused because a
-    row already holds them" - and the figures are right about the code: eleven
-    menu keys, nine held, `Enter` and `NumpadEnter` free. The closing assertion
-    at `:272` then reads the narrower list, so "the keys that choose a row are
-    the only menu keys the map can take" is a claim about eleven keys measured
-    over seven. Nothing fails, and nothing would: the free filter over all
-    eleven is `['Enter', 'NumpadEnter']` in that same order, so widening
-    `walking` leaves the `deepEqual` passing. The completed item asked for
-    assertions "about what `rebind` returns for each menu key", and four of them
-    still get none.
-  - **Goal**: Import `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` at
-    `test/key-bindings.test.js:41` and spread both into `walking`, which brings
-    the four adjust keys through the loop that already asserts a `taken` result
-    against the row that holds it. That is the whole fix - the loop needs no new
-    branch, since the adjust keys take the `holder != null` path the other nine
-    take, and the closing `deepEqual` keeps its current expectation. Then the
-    eleven the docblock counts and the eleven the test reads are the same eleven,
-    which is what a test named for a guarantee is read to settle.
-  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
-
-#### Found Issues
-
-- [ ] The cheatsheet still names one refusal, in both of the files that carry it
-  - **Issue**: `CHEATSHEET.md:168` and `docs/cheatsheet.html:235` carry the same
-    sentence, which enumerates what happens at a waiting row: "A key row waits
-    for a key once it is chosen. A key another row holds is refused and the row
-    says which row holds it; `Esc` is the way out of the wait; `Delete` leaves
-    `RESET FLIGHT` on no key at all, which is the only row allowed to be on
-    none." That was the complete account before this release and is now one
-    refusal short of it. Measured through `bindArmedKey` over a row armed on
-    `ROLL RIGHT`, each of the eight reserved keys is refused with a notice of its
-    own and leaves the row waiting: `TAB IS INSTRUMENTS`, `P IS PAUSE`,
-    `H IS CONTROL LIST`, `M IS MUTE`, `O IS SETTINGS`, `L IS ELEMENT EDITOR`,
-    `F2 IS PHOTO` and `C IS CAMERA`. A pilot reading the cheatsheet for whether
-    `P` can be bound gets a list in which only a row-held key is refused, and
-    `P` is held by no row, so the sentence reads as a yes. `README.md:124`,
-    `docs/controls/index.html:122` and `docs/controls/control-settings.html:185`
-    were all brought up to the new behaviour this turn and these two were not,
-    so the cheatsheet pair is the one place left describing the panel the release
-    replaced. Nothing fails - a cheatsheet does not run. Neither file is
-    generated: `tools/` holds `build-api-reference.mjs` and `serve.mjs`, and
-    nothing in `tools/` or `.github/` names the cheatsheet, so both files are
-    edited by hand and both need the edit.
-  - **Goal**: Add the second refusal to the same sentence in both files, in the
-    register the cheatsheet already uses - one clause, not the paragraph
-    `docs/controls/control-settings.html` carries. Something to the effect that a
-    key the game reads for itself is refused the same way and the row says what
-    the key already does, with one example rather than the list of eight, since
-    the eight are enumerated on the controls page and a cheatsheet that repeats
-    them is a second copy to keep in step. Keep the two files' wording identical
-    to each other, as they are today, and keep `docs/cheatsheet.html` in `<kbd>`
-    and `<code>` markup where `CHEATSHEET.md` uses backticks.
-  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
+- [ ] Five documents write the reserved-key refusal out by hand and no test
+  reads them against the eight keys
+  - **Issue**: `test/site.test.js:466` is `CARRIES`, the table that holds a site
+    page to a list the code publishes. Its docblock exists for this exact
+    failure - the cheatsheet and the terrain page "could go stale with nothing
+    failing", so "these are the pages the code is read against"
+    (`test/site.test.js:462-464`). It has six rows: start fields, control
+    settings, environments twice and game modes twice. The keys the game
+    reserves have no row. `js/reserved-keys.js` publishes `reservedKeys()` and
+    `reservedRole(code)`, and `js/control-settings.js:638` writes a refusal as
+    `${keyLabel(code).toUpperCase()} IS ${reservedRole(code)}`, which
+    `test/control-settings.test.js:796` asserts over every reserved key - so the
+    notice is pinned in the panel and nowhere in the prose. Five documents write
+    that notice, or the eight keys behind it, out by hand: `CHEATSHEET.md:170`
+    and `docs/cheatsheet.html:235` carry `P IS PAUSE`, both added this turn;
+    `docs/controls/control-settings.html:185` carries `P IS PAUSE` and
+    `TAB IS INSTRUMENTS`; `README.md:128` carries `P IS PAUSE`; and
+    `docs/controls/index.html:122` names all eight, as `C`, `P`, `O`, `L`, `M`,
+    `H`, `Tab` and `F2`. The failing state is nameable and the code is already
+    shaped for it: `reservedRoles()` at `js/reserved-keys.js:55` carries a list
+    of codes per role rather than one code, written that way because a role
+    "one key today is two the day a second way to open the settings is added"
+    (`js/reserved-keys.js:93`), and `SETTINGS_OPEN_KEYS` is already a list. Add
+    that ninth key, or rename a role from `PAUSE`, and all five documents are
+    wrong with `npm test` green at 1318. That is the release this item sits
+    under: the cheatsheet pair sat a release behind the panel and the suite
+    reported 1318 passing the whole time.
+  - **Goal**: Give `CARRIES` a reserved-key row, which is the mechanism the file
+    already has for this. The material is the notice the panel writes -
+    `keyLabel(code).toUpperCase()` + `' IS '` + `reservedRole(code)` over
+    `reservedKeys()` - and the one page naming every reserved key today is
+    `docs/controls/index.html`, which names the codes rather than the notices,
+    while `docs/controls/control-settings.html` names two notices of the eight.
+    So decide first which pages owe all eight and which owe one example, and
+    write that decision into the row rather than leaving it to the next reader.
+    `CARRIES` reads `sources`, which is `docs/**.html` only
+    (`test/site.test.js:28`), so `CHEATSHEET.md` and `README.md` need the same
+    check written beside it against `cheatsheetDoc` and `readme`. While there,
+    add the refusal clause to the five essentials at `test/site.test.js:446`,
+    which is what keeps `CHEATSHEET.md` and `docs/cheatsheet.html` saying the
+    same thing: editing that sentence in one and not the other is green today.
+  - From: Code Review Override - the reserved-key notices in the docs are held to nothing
 
 ## Game UI/UX
 
@@ -404,64 +379,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 187 earlier items in `TODO-archive.md`, newest last.
+> 189 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Pair Antecedent 1
-  - **Issue**: the appositive is gone, but the relative clause that replaced it
-    attaches to the wrong noun. `CHANGELOG.md:54` now reads "the one test that
-    made the difference is the pair of fixtures standing directly below the
-    sentence, which writing the capture out fails", and a comma-introduced
-    relative takes the immediately preceding noun phrase, which is "the
-    sentence" rather than the intended "the pair of fixtures" - separated from
-    it by only the participial "standing directly below". So the default
-    reading is that writing the capture out fails *the sentence*. That
-    misreading is not absurd here, which is what makes it reachable: the same
-    entry's opening paragraph says of this very sentence that adding the test
-    "did not date the sentence, it falsified it" at `CHANGELOG.md:44`, so a
-    reader has already been told the sentence is a thing that fails. The item's
-    own **Goal** supplied phrasing with no such gap - "the pair of fixtures
-    standing directly below the sentence is what writing the capture out
-    fails", where "is what" fixes the pair as the object - and the run chose a
-    relative clause instead. The new entry then asserts the swap was neutral:
-    `CHANGELOG.md:24` says "a relative clause carries the same claim", which
-    under the default parse it does not. Nothing fails: a changelog entry does
-    not run.
-  - **Goal**: Make the pair the object beyond doubt, in the entry's own
-    vocabulary. The cleft the item already wrote is the smallest way - "the
-    pair of fixtures standing directly below the sentence is what writing the
-    capture out fails" - and moving the relative off the noun it should not
-    take would do as well. Then correct the `1.0.0-alpha.1.24.10` entry's
-    account of its own fix at `CHANGELOG.md:24-25`, since it both quotes the
-    relative clause and claims it carries the same claim; whichever wording is
-    chosen, the quote beside it has to be that wording. Leave every number
-    where it is: 1247, 1248, the `test/page.test.js:791` citation and the
-    mutation results were each re-checked this review and are correct, and the
-    suite is green at 1248.
-  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
-- [x] The new entry's summary puts the appositive in the file it was not in
-  - **Issue**: `CHANGELOG.md:10-12` opens "`1.0.0-alpha.1.24.9` corrected the
-    suite count a derivation comment measured against, and closed the sentence
-    it corrected on an appositive that merged two constructions". "The sentence
-    it corrected" is the comment sentence in `test/page.test.js`, and that
-    sentence carries no appositive: it reads "writing the capture out beside the
-    name again - either half of it - passed all 1247 tests, which was the suite
-    as it stood before the pair below was added. That pair is what catches it
-    now" at `test/page.test.js:777-779`, which parses cleanly and is what
-    `1.0.0-alpha.1.24.9` left there. The appositive was in the release note's
-    own account of that correction - the sentence the item cited as
-    `CHANGELOG.md:25` when the entry shipped, now at `CHANGELOG.md:53-55` and
-    rewritten by this run. So a reader following the summary goes to the test
-    file to find the fault and finds nothing wrong, in an entry whose whole
-    subject is where a fault was. The `### Changed` bullet below it is
-    correct - it names "the release note's account" in its own first words - so
-    only the summary misplaces it. Nothing fails: a changelog entry does not
-    run.
-  - **Goal**: Say the appositive was in the entry rather than in the comment:
-    that `1.0.0-alpha.1.24.9` corrected the comment's suite count, and closed
-    its own account of that correction on an appositive. Keep the rest of the
-    paragraph, which is accurate - the claim was right, the numbers were right,
-    and the clause both failed to parse and renamed the pair.
-  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
 - [x] Remember whether the control reference list is open
   - From: Flight Controls
 - [x] Choose which controls hand the aircraft back after a level off
@@ -569,3 +488,67 @@ how the simulator got here rather than as a list still to be worked.
     keys named rather than counted, since the sentence it leans on names
     `Esc` and an action rather than two keys.
   - From: UI/UX Override - a control can be bound onto a key the game already reads
+- [x] Four of the eleven menu keys are asserted by nothing in the test that was
+  renamed for them
+  - **Issue**: `test/key-bindings.test.js:245` builds `walking` from
+    `MENU_UP_KEYS`, `MENU_DOWN_KEYS` and `MENU_SELECT_KEYS`, which is seven of
+    the eleven keys a menu works with. `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` are
+    menu keys by the code's own reckoning - `isMenuControlKey` at `js/menu.js:107`
+    is `isMenuKey(code) || isMenuAdjustKey(code)`, and the capture listener at
+    `js/main.js:749` reads the keys it holds back through that function, not
+    through `isMenuKey` - and they are neither imported at
+    `test/key-bindings.test.js:41` nor reached by the loop. Measured over
+    `defaultBindings()`: `ArrowLeft` and `KeyA` return
+    `{ result: 'taken', conflict: 'rollLeft' }` and `ArrowRight` and `KeyD`
+    return `{ result: 'taken', conflict: 'rollRight' }`, so all four behave the
+    way the test's own docblock says they do and nothing establishes it. The
+    docblock at `:236` counts them in - "Nine of the eleven are refused because a
+    row already holds them" - and the figures are right about the code: eleven
+    menu keys, nine held, `Enter` and `NumpadEnter` free. The closing assertion
+    at `:272` then reads the narrower list, so "the keys that choose a row are
+    the only menu keys the map can take" is a claim about eleven keys measured
+    over seven. Nothing fails, and nothing would: the free filter over all
+    eleven is `['Enter', 'NumpadEnter']` in that same order, so widening
+    `walking` leaves the `deepEqual` passing. The completed item asked for
+    assertions "about what `rebind` returns for each menu key", and four of them
+    still get none.
+  - **Goal**: Import `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` at
+    `test/key-bindings.test.js:41` and spread both into `walking`, which brings
+    the four adjust keys through the loop that already asserts a `taken` result
+    against the row that holds it. That is the whole fix - the loop needs no new
+    branch, since the adjust keys take the `holder != null` path the other nine
+    take, and the closing `deepEqual` keeps its current expectation. Then the
+    eleven the docblock counts and the eleven the test reads are the same eleven,
+    which is what a test named for a guarantee is read to settle.
+  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
+- [x] The cheatsheet still names one refusal, in both of the files that carry it
+  - **Issue**: `CHEATSHEET.md:168` and `docs/cheatsheet.html:235` carry the same
+    sentence, which enumerates what happens at a waiting row: "A key row waits
+    for a key once it is chosen. A key another row holds is refused and the row
+    says which row holds it; `Esc` is the way out of the wait; `Delete` leaves
+    `RESET FLIGHT` on no key at all, which is the only row allowed to be on
+    none." That was the complete account before this release and is now one
+    refusal short of it. Measured through `bindArmedKey` over a row armed on
+    `ROLL RIGHT`, each of the eight reserved keys is refused with a notice of its
+    own and leaves the row waiting: `TAB IS INSTRUMENTS`, `P IS PAUSE`,
+    `H IS CONTROL LIST`, `M IS MUTE`, `O IS SETTINGS`, `L IS ELEMENT EDITOR`,
+    `F2 IS PHOTO` and `C IS CAMERA`. A pilot reading the cheatsheet for whether
+    `P` can be bound gets a list in which only a row-held key is refused, and
+    `P` is held by no row, so the sentence reads as a yes. `README.md:124`,
+    `docs/controls/index.html:122` and `docs/controls/control-settings.html:185`
+    were all brought up to the new behaviour this turn and these two were not,
+    so the cheatsheet pair is the one place left describing the panel the release
+    replaced. Nothing fails - a cheatsheet does not run. Neither file is
+    generated: `tools/` holds `build-api-reference.mjs` and `serve.mjs`, and
+    nothing in `tools/` or `.github/` names the cheatsheet, so both files are
+    edited by hand and both need the edit.
+  - **Goal**: Add the second refusal to the same sentence in both files, in the
+    register the cheatsheet already uses - one clause, not the paragraph
+    `docs/controls/control-settings.html` carries. Something to the effect that a
+    key the game reads for itself is refused the same way and the row says what
+    the key already does, with one example rather than the list of eight, since
+    the eight are enumerated on the controls page and a cheatsheet that repeats
+    them is a second copy to keep in step. Keep the two files' wording identical
+    to each other, as they are today, and keep `docs/cheatsheet.html` in `<kbd>`
+    and `<code>` markup where `CHEATSHEET.md` uses backticks.
+  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
