@@ -2490,3 +2490,62 @@ still be found by name.
     mutating both halves of `nameRow()` against both fixtures, and all of them
     are correct.
   - From: Code Review Override - the release note renames the fixtures mid-sentence
+
+## Archived 10-17-26
+
+- [x] Pair Antecedent 1
+  - **Issue**: the appositive is gone, but the relative clause that replaced it
+    attaches to the wrong noun. `CHANGELOG.md:54` now reads "the one test that
+    made the difference is the pair of fixtures standing directly below the
+    sentence, which writing the capture out fails", and a comma-introduced
+    relative takes the immediately preceding noun phrase, which is "the
+    sentence" rather than the intended "the pair of fixtures" - separated from
+    it by only the participial "standing directly below". So the default
+    reading is that writing the capture out fails *the sentence*. That
+    misreading is not absurd here, which is what makes it reachable: the same
+    entry's opening paragraph says of this very sentence that adding the test
+    "did not date the sentence, it falsified it" at `CHANGELOG.md:44`, so a
+    reader has already been told the sentence is a thing that fails. The item's
+    own **Goal** supplied phrasing with no such gap - "the pair of fixtures
+    standing directly below the sentence is what writing the capture out
+    fails", where "is what" fixes the pair as the object - and the run chose a
+    relative clause instead. The new entry then asserts the swap was neutral:
+    `CHANGELOG.md:24` says "a relative clause carries the same claim", which
+    under the default parse it does not. Nothing fails: a changelog entry does
+    not run.
+  - **Goal**: Make the pair the object beyond doubt, in the entry's own
+    vocabulary. The cleft the item already wrote is the smallest way - "the
+    pair of fixtures standing directly below the sentence is what writing the
+    capture out fails" - and moving the relative off the noun it should not
+    take would do as well. Then correct the `1.0.0-alpha.1.24.10` entry's
+    account of its own fix at `CHANGELOG.md:24-25`, since it both quotes the
+    relative clause and claims it carries the same claim; whichever wording is
+    chosen, the quote beside it has to be that wording. Leave every number
+    where it is: 1247, 1248, the `test/page.test.js:791` citation and the
+    mutation results were each re-checked this review and are correct, and the
+    suite is green at 1248.
+  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
+- [x] The new entry's summary puts the appositive in the file it was not in
+  - **Issue**: `CHANGELOG.md:10-12` opens "`1.0.0-alpha.1.24.9` corrected the
+    suite count a derivation comment measured against, and closed the sentence
+    it corrected on an appositive that merged two constructions". "The sentence
+    it corrected" is the comment sentence in `test/page.test.js`, and that
+    sentence carries no appositive: it reads "writing the capture out beside the
+    name again - either half of it - passed all 1247 tests, which was the suite
+    as it stood before the pair below was added. That pair is what catches it
+    now" at `test/page.test.js:777-779`, which parses cleanly and is what
+    `1.0.0-alpha.1.24.9` left there. The appositive was in the release note's
+    own account of that correction - the sentence the item cited as
+    `CHANGELOG.md:25` when the entry shipped, now at `CHANGELOG.md:53-55` and
+    rewritten by this run. So a reader following the summary goes to the test
+    file to find the fault and finds nothing wrong, in an entry whose whole
+    subject is where a fault was. The `### Changed` bullet below it is
+    correct - it names "the release note's account" in its own first words - so
+    only the summary misplaces it. Nothing fails: a changelog entry does not
+    run.
+  - **Goal**: Say the appositive was in the entry rather than in the comment:
+    that `1.0.0-alpha.1.24.9` corrected the comment's suite count, and closed
+    its own account of that correction on an appositive. Keep the rest of the
+    paragraph, which is accurate - the claim was right, the numbers were right,
+    and the clause both failed to parse and renamed the pair.
+  - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact

@@ -166,10 +166,11 @@ crosses the limit and comes round the other side, so a loop and a barrel roll
 carry on.
 
 A key row waits for a key once it is chosen. A key another row holds is refused
-and the row says which row holds it; `Esc` is the way out of the wait; `Delete`
-leaves `RESET FLIGHT` on no key at all, which is the only row allowed to be on
-none. The map is stored under a key of its own, and the reference list is
-written from it.
+and the row says which row holds it; a key the game reads for itself is refused
+the same way and the row says what the key already does, as `P IS PAUSE`; `Esc`
+is the way out of the wait; `Delete` leaves `RESET FLIGHT` on no key at all,
+which is the only row allowed to be on none. The map is stored under a key of
+its own, and the reference list is written from it.
 
 ## Worlds
 

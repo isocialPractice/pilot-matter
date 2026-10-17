@@ -38,7 +38,10 @@ import {
     DEFAULT_KEYMAP, CONTROL_NAMES, RESET_KEYS, LEVEL_OFF_KEYS,
     createInputState, applyKeyToInput
 } from '../js/input-map.js';
-import { MENU_UP_KEYS, MENU_DOWN_KEYS, MENU_SELECT_KEYS } from '../js/menu.js';
+import {
+    MENU_UP_KEYS, MENU_DOWN_KEYS, MENU_SELECT_KEYS,
+    MENU_LEFT_KEYS, MENU_RIGHT_KEYS
+} from '../js/menu.js';
 
 // The keys the game reads for itself, imported from the modules that read them
 // rather than written out here. A code copied into this file would pass against
@@ -243,7 +246,8 @@ test('a stored map putting a control on a key the game reads is read past', () =
  */
 test('the keys that walk the panel are the map\'s, and the menu reads them first', () => {
     const walking = [
-        ...MENU_UP_KEYS, ...MENU_DOWN_KEYS, ...MENU_SELECT_KEYS
+        ...MENU_UP_KEYS, ...MENU_DOWN_KEYS, ...MENU_SELECT_KEYS,
+        ...MENU_LEFT_KEYS, ...MENU_RIGHT_KEYS
     ];
 
     for (const code of walking) {

@@ -5,6 +5,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.26.1] - 2026-10-17
+
+`1.0.0-alpha.1.26.0` taught a waiting row to refuse the eight keys the game
+reads for itself, and brought three of the five documents that describe the
+panel up to it. The cheatsheet pair was the two that were missed, and the test
+named for the eleven menu keys was reading seven of them. Both are the release
+reporting itself accurately rather than behaving differently.
+
+### Changed
+
+- **The cheatsheet says there are two refusals, in both files that carry it.**
+  `CHEATSHEET.md` and `docs/cheatsheet.html` enumerated what happens at a
+  waiting row and stopped at the key another row holds, which was the whole
+  account before the last release and is now one refusal short of it. A pilot
+  reading either file for whether `P` can be bound got a list in which only a
+  row-held key is refused, and `P` is held by no row - so the sentence read as a
+  yes against a panel that says `P IS PAUSE`. One clause is added to the same
+  sentence in both, with a single example rather than the list of eight: the
+  eight are enumerated on the controls page, and a cheatsheet that repeats them
+  is a second copy to keep in step.
+
+### Fixed
+
+- **The test named for the eleven menu keys now reads eleven of them.**
+  `test/key-bindings.test.js` built its list from `MENU_UP_KEYS`,
+  `MENU_DOWN_KEYS` and `MENU_SELECT_KEYS` - seven keys - while its docblock
+  counted eleven and its closing assertion claimed "the keys that choose a row
+  are the only menu keys the map can take". `MENU_LEFT_KEYS` and
+  `MENU_RIGHT_KEYS` are menu keys by the code's own reckoning: `isMenuControlKey`
+  is `isMenuKey(code) || isMenuAdjustKey(code)`, and the capture listener in
+  `js/main.js` holds keys back through that function rather than through
+  `isMenuKey`. Both are imported and spread into the list, which brings
+  `ArrowLeft`, `KeyA`, `ArrowRight` and `KeyD` through the loop that asserts a
+  `taken` result against the row holding the key - `rollLeft` for the first two,
+  `rollRight` for the second two. The loop needed no new branch and the closing
+  `deepEqual` keeps its expectation: the free keys over all eleven are still
+  `Enter` and `NumpadEnter`, in that order. Nothing was failing and nothing
+  would have; the four keys the completed item asked for assertions about were
+  getting none.
+
 ## [1.0.0-alpha.1.26.0] - 2026-10-16
 
 `1.0.0-alpha.1.25.0` gave the pilot every key, and gave away eight the game was
