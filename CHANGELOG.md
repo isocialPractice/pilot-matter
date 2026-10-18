@@ -5,6 +5,56 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.26.2] - 2026-10-18
+
+`1.0.0-alpha.1.26.1` brought the last of the five documents that describe a
+refused key up to the panel, and left all five held to nothing. The notice a
+refused row shows is pinned in `test/control-settings.test.js` over every
+reserved key and was pinned nowhere in the prose, so a ninth key or a renamed
+role would have left five documents wrong with the suite green. This release is
+that check, and the decision about which document owes what.
+
+### Added
+
+- **The documents naming the keys the game reads for itself are read against the
+  code.** `CARRIES` in `test/site.test.js` is the table that holds a site page
+  to a list the code publishes, and it had six rows - start fields, control
+  settings, environments twice and game modes twice - with no row for the keys
+  the game keeps. It has three now, for the controls page, the control settings
+  page and the cheatsheet page, each read against `reservedKeys()` rather than
+  against a list written out again. `CARRIES` reads `docs/**.html` and nothing
+  else, so `CHEATSHEET.md` and `README.md` are held to the same material beside
+  it, in the markdown form they mark a key up in. Every one of the five already
+  names every reserved key - four as a row each, the control settings page as
+  the sentence listing the keys the game keeps - so a ninth key fails all five
+  until each names it, which is the shape `reservedRoles()` was written for: it
+  carries a list of codes per role rather than one code, against the day a
+  second way to open the settings is added.
+- **A document quoting the refusal has to quote one the panel would write.**
+  Four of the five quote it rather than only describing it, and none of them owes
+  all eight notices: a page explaining a refusal wants one worked example, not a
+  catalogue, and the controls page quotes none at all. What they are held to
+  instead is that every `P IS ` in them is followed by what the panel puts there,
+  read off `keyLabel(code).toUpperCase()` and `reservedRole(code)`. Reading each
+  site of the notice rather than looking for the current one somewhere on the
+  page is what makes a rename fail: a document left saying `P IS PAUSE` after
+  the role becomes something else would otherwise pass on the
+  `TAB IS INSTRUMENTS` further down the same paragraph. The role has to be the
+  whole of what follows rather than a prefix of it, and the count of notices
+  found has to be above zero, so deleting the sentence fails too.
+- **The refusal clause is one of the essentials `CHEATSHEET.md` and its page are
+  held to.** The two carry that sentence word for word, and rewording it in one
+  and not the other was green until now - which is how the pair came to sit a
+  release behind the panel in the first place.
+
+### Changed
+
+- **The testing page says which material the site's pages are read against.**
+  Its coverage list named the start fields, the worlds and the game modes, and
+  now names the reserved keys with them, along with the split between every page
+  holding every key and the four that quote a refused row holding the notice it
+  shows.
+
 ## [1.0.0-alpha.1.26.1] - 2026-10-17
 
 `1.0.0-alpha.1.26.0` taught a waiting row to refuse the eight keys the game

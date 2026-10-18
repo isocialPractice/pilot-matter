@@ -7,6 +7,8 @@ import { START_FIELDS } from '../js/config.js';
 import { CONTROL_OPTIONS } from '../js/control-settings.js';
 import { ENVIRONMENTS, MODE_ENVIRONMENTS } from '../js/environment/presets.js';
 import { GAME_MODES } from '../js/game-modes.js';
+import { reservedKeys, reservedRole } from '../js/reserved-keys.js';
+import { keyLabel } from '../js/key-bindings.js';
 import { renderApiReference, PAGE } from '../tools/build-api-reference.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -445,7 +447,11 @@ test('CHEATSHEET.md and its page say the same things', () => {
 
     for (const essential of [
         'createTiledEnvironment', 'validateAircraftContract',
-        'START AIRSPEED', 'CANYON COUNTRY', '40 units/s'
+        'START AIRSPEED', 'CANYON COUNTRY', '40 units/s',
+        // The refusal clause, which both carry word for word. Rewording it in
+        // one and not the other was green until this line: the sentence is the
+        // only place either document explains why a key can be turned down.
+        'the same way and the row says what the key already does'
     ]) {
         assert.ok(cheatsheetDoc.includes(essential), `CHEATSHEET.md should carry ${essential}`);
         assert.ok(page.includes(essential),          `the cheatsheet page should carry ${essential}`);
@@ -463,13 +469,53 @@ test('CHEATSHEET.md and its page say the same things', () => {
  * failing. These are the pages carrying that material, so these are the pages
  * the code is read against.
  */
+/**
+ * The keys the game reads for itself, in the two forms the documentation writes
+ * them in, and the notice a refused row shows for each.
+ *
+ * `js/control-settings.js` builds that notice as
+ * `keyLabel(code).toUpperCase() + ' IS ' + reservedRole(code)`, and
+ * `test/control-settings.test.js` asserts it over every reserved key - so the
+ * sentence is pinned in the panel. It was pinned nowhere in the prose, and five
+ * documents write it, or the keys behind it, out by hand.
+ *
+ * Which document owes what, since the two are not the same debt:
+ *
+ * - **Every key** is owed by all five, because all five already list them: the
+ *   controls page and the cheatsheet page as a row per key, the control
+ *   settings page as the sentence naming the keys the game keeps, and the two
+ *   markdown documents as a row per key again. A ninth reserved key is wrong
+ *   in all five until each names it, which is the failure the roles were
+ *   shaped for - `reservedRoles()` carries a list of codes per role rather
+ *   than one code.
+ * - **One notice** is owed by the four that quote the refusal rather than only
+ *   describe it. None owes all eight: a page explaining a refusal wants one
+ *   worked example, not a catalogue of them, and `docs/controls/index.html`
+ *   describes the refusal without quoting one at all, so it owes none. What
+ *   binds the four instead is that every reserved-key notice they do write has
+ *   to be one the panel writes, so renaming a role fails each stale document
+ *   rather than passing because some other notice on the page still holds.
+ */
+const RESERVED_NOTICES = new Map(
+    reservedKeys().map(code => [keyLabel(code).toUpperCase(), reservedRole(code)])
+);
+
+/** Every reserved key as the site marks up a key, which is how all three pages name them. */
+const RESERVED_KBD = reservedKeys().map(code => `<kbd>${keyLabel(code)}</kbd>`);
+
+/** And as markdown marks one up, for the two documents that are not pages. */
+const RESERVED_CODE = reservedKeys().map(code => '`' + keyLabel(code) + '`');
+
 const CARRIES = [
     ['docs/controls/settings.html',   'start field', START_FIELDS.map(field => field.label)],
     ['docs/controls/control-settings.html', 'control setting', CONTROL_OPTIONS.map(option => option.label)],
     ['docs/terrain.html',             'environment', [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(world => world.label)],
     ['docs/cheatsheet.html',          'environment', [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(world => world.label)],
     ['docs/controls/game-modes.html', 'game mode',   GAME_MODES.map(mode => mode.label)],
-    ['docs/cheatsheet.html',          'game mode',   GAME_MODES.map(mode => mode.label)]
+    ['docs/cheatsheet.html',          'game mode',   GAME_MODES.map(mode => mode.label)],
+    ['docs/controls/index.html',            'reserved key', RESERVED_KBD],
+    ['docs/controls/control-settings.html', 'reserved key', RESERVED_KBD],
+    ['docs/cheatsheet.html',                'reserved key', RESERVED_KBD]
 ];
 
 test('the pages listing what the simulator offers list what it actually offers', () => {
@@ -482,6 +528,81 @@ test('the pages listing what the simulator offers list what it actually offers',
             assert.ok(source.includes(label),
                 `${page} does not name the ${label} ${material}, which the code publishes`);
         }
+    }
+});
+
+// `CARRIES` reads `sources`, which is `docs/**.html` and nothing else, so the
+// two documents that are not pages need the same reading written out here. They
+// mark a key up as markdown rather than as `<kbd>`, and each has a row per key
+// to name it on, so that is the only difference between this and the rows above.
+const MARKDOWN_CARRIES = [
+    ['CHEATSHEET.md', cheatsheetDoc, 'reserved key', RESERVED_CODE],
+    ['README.md',     readme,        'reserved key', RESERVED_CODE]
+];
+
+test('the documents that are not pages name every reserved key too', () => {
+    for (const [name, source, material, labels] of MARKDOWN_CARRIES) {
+        assert.ok(labels.length > 0, `there are no ${material} labels to hold ${name} to`);
+
+        for (const label of labels) {
+            assert.ok(source.includes(label),
+                `${name} does not name the ${label} ${material}, which the code publishes`);
+        }
+    }
+});
+
+/**
+ * The four documents that quote the refusal rather than only describing it.
+ *
+ * `docs/controls/index.html` is the fifth document naming every reserved key
+ * and is deliberately not here: it says a waiting row "refuses them and says
+ * what the key already does" without writing one of the notices out, so it owes
+ * no notice and holding it to one would mean adding prose for a test's sake.
+ */
+const QUOTES_THE_REFUSAL = [
+    ['docs/controls/control-settings.html', sources.get('docs/controls/control-settings.html')],
+    ['docs/cheatsheet.html',                sources.get('docs/cheatsheet.html')],
+    ['CHEATSHEET.md',                       cheatsheetDoc],
+    ['README.md',                           readme]
+];
+
+test('a document quoting the refusal quotes one the panel would write', () => {
+    for (const [name, source] of QUOTES_THE_REFUSAL) {
+        assert.ok(source, `${name} is not where this test expects to read it`);
+
+        let quoted = 0;
+
+        for (const [key, role] of RESERVED_NOTICES) {
+            // Read every `P IS ` in the document rather than looking for the
+            // whole notice, because the point is to fail the stale wording
+            // rather than to find the current one somewhere else on the page:
+            // a renamed PAUSE leaves `P IS PAUSE` sitting here, and a document
+            // still carrying `TAB IS INSTRUMENTS` would otherwise pass on that.
+            const opening = `${key} IS `;
+
+            for (let at = source.indexOf(opening); at !== -1; at = source.indexOf(opening, at + 1)) {
+                const after = at + opening.length;
+
+                // The role has to be the whole of what follows, not a prefix of
+                // it, so a shortened role cannot pass on the stale longer one.
+                // Reading the role off the front and asking only that the next
+                // character is not a capital stops at `PAUSED` and not at
+                // `CONTROL LIST`, because the space is not a capital either -
+                // so `CONTROL LIST` renamed to `CONTROL` would leave every
+                // document saying the old thing and the suite green. Comparing
+                // the whole run of capitals is the reading the roles need: two
+                // of the eight are two words.
+                const said = (source.slice(after).match(/^[A-Z][A-Z ]*/) || [''])[0].trimEnd();
+
+                assert.equal(said, role,
+                    `${name} says ${opening}${said} where the panel says ${opening}${role}`);
+                quoted += 1;
+            }
+        }
+
+        // And the sentence has to still be there. Deleting it is the other way
+        // a document stops saying what the panel does.
+        assert.ok(quoted > 0, `${name} no longer quotes what a refused row says`);
     }
 });
 
