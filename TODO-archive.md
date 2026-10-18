@@ -2549,3 +2549,8 @@ still be found by name.
     paragraph, which is accurate - the claim was right, the numbers were right,
     and the clause both failed to parse and renamed the pair.
   - From: Code Review Override - the relative clause takes the nearer noun, and the summary names the wrong artifact
+
+## Archived 10-18-26
+
+- [x] Remember whether the control reference list is open
+  - From: Flight Controls

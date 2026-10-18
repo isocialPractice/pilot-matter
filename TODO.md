@@ -22,51 +22,6 @@ its context survives being archived.
   cannot drift apart
   - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
 
-### Code Review Override - the reserved-key notices in the docs are held to nothing
-
-- [ ] Five documents write the reserved-key refusal out by hand and no test
-  reads them against the eight keys
-  - **Issue**: `test/site.test.js:466` is `CARRIES`, the table that holds a site
-    page to a list the code publishes. Its docblock exists for this exact
-    failure - the cheatsheet and the terrain page "could go stale with nothing
-    failing", so "these are the pages the code is read against"
-    (`test/site.test.js:462-464`). It has six rows: start fields, control
-    settings, environments twice and game modes twice. The keys the game
-    reserves have no row. `js/reserved-keys.js` publishes `reservedKeys()` and
-    `reservedRole(code)`, and `js/control-settings.js:638` writes a refusal as
-    `${keyLabel(code).toUpperCase()} IS ${reservedRole(code)}`, which
-    `test/control-settings.test.js:796` asserts over every reserved key - so the
-    notice is pinned in the panel and nowhere in the prose. Five documents write
-    that notice, or the eight keys behind it, out by hand: `CHEATSHEET.md:170`
-    and `docs/cheatsheet.html:235` carry `P IS PAUSE`, both added this turn;
-    `docs/controls/control-settings.html:185` carries `P IS PAUSE` and
-    `TAB IS INSTRUMENTS`; `README.md:128` carries `P IS PAUSE`; and
-    `docs/controls/index.html:122` names all eight, as `C`, `P`, `O`, `L`, `M`,
-    `H`, `Tab` and `F2`. The failing state is nameable and the code is already
-    shaped for it: `reservedRoles()` at `js/reserved-keys.js:55` carries a list
-    of codes per role rather than one code, written that way because a role
-    "one key today is two the day a second way to open the settings is added"
-    (`js/reserved-keys.js:93`), and `SETTINGS_OPEN_KEYS` is already a list. Add
-    that ninth key, or rename a role from `PAUSE`, and all five documents are
-    wrong with `npm test` green at 1318. That is the release this item sits
-    under: the cheatsheet pair sat a release behind the panel and the suite
-    reported 1318 passing the whole time.
-  - **Goal**: Give `CARRIES` a reserved-key row, which is the mechanism the file
-    already has for this. The material is the notice the panel writes -
-    `keyLabel(code).toUpperCase()` + `' IS '` + `reservedRole(code)` over
-    `reservedKeys()` - and the one page naming every reserved key today is
-    `docs/controls/index.html`, which names the codes rather than the notices,
-    while `docs/controls/control-settings.html` names two notices of the eight.
-    So decide first which pages owe all eight and which owe one example, and
-    write that decision into the row rather than leaving it to the next reader.
-    `CARRIES` reads `sources`, which is `docs/**.html` only
-    (`test/site.test.js:28`), so `CHEATSHEET.md` and `README.md` need the same
-    check written beside it against `cheatsheetDoc` and `readme`. While there,
-    add the refusal clause to the five essentials at `test/site.test.js:446`,
-    which is what keeps `CHEATSHEET.md` and `docs/cheatsheet.html` saying the
-    same thing: editing that sentence in one and not the other is green today.
-  - From: Code Review Override - the reserved-key notices in the docs are held to nothing
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -379,10 +334,8 @@ in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 189 earlier items in `TODO-archive.md`, newest last.
+> 190 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Remember whether the control reference list is open
-  - From: Flight Controls
 - [x] Choose which controls hand the aircraft back after a level off
   - From: Flight Controls
 - [x] Read tilt through the axis settings the keys are read through
@@ -552,3 +505,45 @@ how the simulator got here rather than as a list still to be worked.
     to each other, as they are today, and keep `docs/cheatsheet.html` in `<kbd>`
     and `<code>` markup where `CHEATSHEET.md` uses backticks.
   - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
+- [x] Five documents write the reserved-key refusal out by hand and no test
+  reads them against the eight keys
+  - **Issue**: `test/site.test.js:466` is `CARRIES`, the table that holds a site
+    page to a list the code publishes. Its docblock exists for this exact
+    failure - the cheatsheet and the terrain page "could go stale with nothing
+    failing", so "these are the pages the code is read against"
+    (`test/site.test.js:462-464`). It has six rows: start fields, control
+    settings, environments twice and game modes twice. The keys the game
+    reserves have no row. `js/reserved-keys.js` publishes `reservedKeys()` and
+    `reservedRole(code)`, and `js/control-settings.js:638` writes a refusal as
+    `${keyLabel(code).toUpperCase()} IS ${reservedRole(code)}`, which
+    `test/control-settings.test.js:796` asserts over every reserved key - so the
+    notice is pinned in the panel and nowhere in the prose. Five documents write
+    that notice, or the eight keys behind it, out by hand: `CHEATSHEET.md:170`
+    and `docs/cheatsheet.html:235` carry `P IS PAUSE`, both added this turn;
+    `docs/controls/control-settings.html:185` carries `P IS PAUSE` and
+    `TAB IS INSTRUMENTS`; `README.md:128` carries `P IS PAUSE`; and
+    `docs/controls/index.html:122` names all eight, as `C`, `P`, `O`, `L`, `M`,
+    `H`, `Tab` and `F2`. The failing state is nameable and the code is already
+    shaped for it: `reservedRoles()` at `js/reserved-keys.js:55` carries a list
+    of codes per role rather than one code, written that way because a role
+    "one key today is two the day a second way to open the settings is added"
+    (`js/reserved-keys.js:93`), and `SETTINGS_OPEN_KEYS` is already a list. Add
+    that ninth key, or rename a role from `PAUSE`, and all five documents are
+    wrong with `npm test` green at 1318. That is the release this item sits
+    under: the cheatsheet pair sat a release behind the panel and the suite
+    reported 1318 passing the whole time.
+  - **Goal**: Give `CARRIES` a reserved-key row, which is the mechanism the file
+    already has for this. The material is the notice the panel writes -
+    `keyLabel(code).toUpperCase()` + `' IS '` + `reservedRole(code)` over
+    `reservedKeys()` - and the one page naming every reserved key today is
+    `docs/controls/index.html`, which names the codes rather than the notices,
+    while `docs/controls/control-settings.html` names two notices of the eight.
+    So decide first which pages owe all eight and which owe one example, and
+    write that decision into the row rather than leaving it to the next reader.
+    `CARRIES` reads `sources`, which is `docs/**.html` only
+    (`test/site.test.js:28`), so `CHEATSHEET.md` and `README.md` need the same
+    check written beside it against `cheatsheetDoc` and `readme`. While there,
+    add the refusal clause to the five essentials at `test/site.test.js:446`,
+    which is what keeps `CHEATSHEET.md` and `docs/cheatsheet.html` saying the
+    same thing: editing that sentence in one and not the other is green today.
+  - From: Code Review Override - the reserved-key notices in the docs are held to nothing
