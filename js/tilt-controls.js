@@ -3,10 +3,12 @@
  *
  * The same input state the keys and the pads write, written instead from the
  * orientation sensors: the device is the stick, and pitching and rolling it
- * pitches and rolls the aircraft. Offered only where there is nothing better -
- * a phone or a tablet with no keys - because a machine that has keys is flown
- * with them, which is the whole of the reason this is a default rather than a
- * replacement.
+ * pitches and rolls the aircraft. On by default only where there is nothing
+ * better - a phone or a tablet with no keys - because a machine that has keys is
+ * flown with them. That is a default rather than a rule: a tablet with a
+ * keyboard may ask for tilt and a phone may ask to be left alone, which is what
+ * the panel's FLY BY TILT row holds and `tiltWanted` in js/control-settings.js
+ * resolves against the machine's own answer.
  *
  * The reading is turned into the controls the flight model already reads, which
  * are held or not held rather than held by an amount. That is a deliberate
@@ -25,6 +27,12 @@ import { axisControl, DEFAULT_AXES } from './input-map.js';
 // How far the device is turned from where it was held before it is asked for
 // anything, in degrees. Wide enough that a hand is not a control input, and
 // narrow enough that a deliberate turn is one.
+//
+// It is the middle of the positions the panel offers rather than the only
+// answer, because how still a hand is varies more between two pilots than
+// almost anything else here: `TILT_DEADZONE_VALUES` in js/control-settings.js
+// sets this one out as NORMAL and puts two either side of it. It stays the
+// default of this module as well, for a caller that passes nothing.
 export const TILT_DEADZONE = 7;
 
 // The controls tilt writes, and the ones it therefore takes off the glass.

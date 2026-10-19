@@ -2554,3 +2554,14 @@ still be found by name.
 
 - [x] Remember whether the control reference list is open
   - From: Flight Controls
+
+## Archived 10-19-26
+
+- [x] Choose which controls hand the aircraft back after a level off
+  - From: Flight Controls
+- [x] Read tilt through the axis settings the keys are read through
+  - From: Flight Controls
+- [x] Rebind any control to a key of the pilot's own
+  - From: Flight Controls
+- [x] Rebind the keys that are not control surfaces
+  - From: Flight Controls

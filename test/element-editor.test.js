@@ -34,8 +34,19 @@ import {
     setEditorClearance,
     heldOffRunway,
     EDITOR_CLEARED_NOTE,
-    rowId
+    rowId,
+    rowValue,
+    rowValueLabel,
+    typedRowValue,
+    isTypedEditorRow,
+    typedEditorRow,
+    typedEditorText,
+    rangeNotice,
+    beginTypedEditorValue,
+    cancelTypedEditorValue,
+    applyTypedEditorKey
 } from '../js/element-editor.js';
+import { TYPED_CARET, typedValueLabel } from '../js/typed-value.js';
 import {
     ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom
 } from '../js/environment/elements.js';
@@ -566,4 +577,300 @@ test('a strip naming something that is not an element names nothing', () => {
     assert.equal(setEditorClearance(state, ['not-an-element']), false);
     assert.equal(setEditorClearance(state, null), false, 'and a world with no strip holds nothing');
     assert.deepEqual(state.cleared, []);
+});
+
+// --- Typing a number into a range ------------------------------------------
+
+/**
+ * A range is stepped a fiftieth of its bounds at a time, which is the right way
+ * to move a number nobody has a figure for and the wrong way to set one somebody
+ * does: a snow line at 1200 metres is forty presses from where the preset left
+ * it, and the pilot knew the figure before the panel was open.
+ */
+test('a row holding a range can be typed into, and no other row can', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+
+    assert.equal(isTypedEditorRow(state, rowId(element.id, 'line', 'value')), true);
+    assert.equal(isTypedEditorRow(state, rowId(element.id, 'color', 'light')), true,
+        'a gradient end holds a figure too, which is the shade it is drawn at');
+
+    assert.equal(isTypedEditorRow(state, element.id), false, 'an element opens rather than holds');
+    assert.equal(isTypedEditorRow(state, EDITOR_RESTORE_ID), false);
+    assert.equal(isTypedEditorRow(state, EDITOR_BACK_ID), false);
+    assert.equal(isTypedEditorRow(state, 'nothing-of-the-sort'), false);
+});
+
+test('a digit at such a row starts the figure it is the first character of', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    assert.equal(typedEditorRow(state), null, 'the panel opens typing nothing');
+    assert.equal(beginTypedEditorValue(state, id, 'Digit1'), id);
+    assert.equal(typedEditorText(state), '1');
+
+    for (const code of ['Digit2', 'Digit0', 'Digit0']) {
+        assert.equal(applyTypedEditorKey(state, code).result, 'typed');
+    }
+    assert.equal(typedEditorText(state), '1200');
+
+    const committed = applyTypedEditorKey(state, 'Enter');
+    assert.equal(committed.result, 'applied');
+    assert.equal(committed.element, element.id, 'and the ground has to be drawn again');
+    assert.equal(committed.value, 1200);
+    assert.equal(editorEntry(state, id).value, 1200);
+    assert.equal(typedEditorRow(state), null);
+});
+
+test('a key that types nothing starts nothing, and nor does a row with no range', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    assert.equal(beginTypedEditorValue(state, id, 'KeyW'), null);
+    assert.equal(beginTypedEditorValue(state, id, 'Period'), null);
+    assert.equal(beginTypedEditorValue(state, element.id, 'Digit1'), null);
+    assert.equal(beginTypedEditorValue(state, EDITOR_BACK_ID, 'Digit1'), null);
+    assert.equal(typedEditorRow(state), null);
+    assert.equal(applyTypedEditorKey(state, 'Digit1'), null, 'and nothing is being typed into');
+});
+
+/**
+ * A gradient end reads as the percentage of the preset's colour it is drawn at,
+ * so the figure the pilot answers is the figure on screen: 150 at a row reading
+ * 150% is a shade of 1.5.
+ */
+test('a gradient end is typed in the percentages it reads in', () => {
+    assert.equal(typedRowValue({ shade: 'light', range: SHADE_RANGE }, 150), 1.5);
+    assert.equal(typedRowValue({ range: SHADE_RANGE }, 150), 150, 'and every other row holds what it reads');
+    assert.equal(typedRowValue({ shade: 'light' }, null), null);
+
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'color', 'light');
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    for (const code of ['Digit5', 'Digit0']) applyTypedEditorKey(state, code);
+
+    const committed = applyTypedEditorKey(state, 'Enter');
+    assert.equal(committed.result, 'applied');
+    assert.equal(committed.value, 1.5);
+    assert.equal(editorEntry(state, id).valueLabel, '150%',
+        'so the row reads back the figure that was typed into it');
+});
+
+/**
+ * `moveValue` clamps every press to the bounds the registry declared, so a
+ * figure outside them is one no amount of stepping could have reached - and the
+ * two routes have to agree about that or the panel disagrees with itself.
+ */
+test('a figure outside the declared bounds is refused, and the row says what they are', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'coverage', 'value');
+    const was = editorEntry(state, id).value;
+
+    // Coverage runs from nothing to one, so 5 is past the top of it.
+    beginTypedEditorValue(state, id, 'Digit5');
+    const refused = applyTypedEditorKey(state, 'Enter');
+
+    assert.equal(refused.result, 'refused');
+    assert.equal(refused.element, null, 'so there is no ground to draw again');
+    assert.equal(editorEntry(state, id).value, was, 'and nothing is written');
+    assert.equal(typedEditorRow(state), id, 'the row goes on taking characters');
+
+    const row = editorEntry(state, id);
+    assert.equal(row.valueLabel, rangeNotice(row.row));
+    assert.ok(row.valueLabel.includes('TO'), `the row should read a span - it reads "${row.valueLabel}"`);
+
+    // Erased back to nothing and typed again as a figure the bounds allow.
+    applyTypedEditorKey(state, 'Backspace');
+    assert.equal(typedEditorText(state), '');
+    for (const code of ['Digit0', 'Period', 'Digit5']) applyTypedEditorKey(state, code);
+    assert.equal(applyTypedEditorKey(state, 'Enter').result, 'applied');
+    assert.equal(editorEntry(state, id).value, 0.5);
+});
+
+test('a bound a row is refused against is written the way the row writes a value', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+
+    const coverage = editorEntry(state, rowId(element.id, 'coverage', 'value'));
+    assert.equal(rangeNotice(coverage.row),
+        `${rowValueLabel(coverage.row, 0)} TO ${rowValueLabel(coverage.row, 1)}`);
+
+    const shade = editorEntry(state, rowId(element.id, 'color', 'light'));
+    assert.equal(rangeNotice(shade.row), '20% TO 200%',
+        'a gradient end is refused against percentages, because that is what it reads in');
+
+    assert.equal(rangeNotice({}), '', 'a row with no range has no bounds to name');
+    assert.equal(rangeNotice(null), '');
+});
+
+test('a figure nobody finished is refused rather than read as nothing', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+    const was = editorEntry(state, id).value;
+
+    beginTypedEditorValue(state, id, 'Minus');
+    assert.equal(applyTypedEditorKey(state, 'Enter').result, 'refused');
+    assert.equal(editorEntry(state, id).value, was);
+});
+
+/**
+ * A span cannot be crossed over itself, and a typed figure that skipped that
+ * rule would be a way of writing a crossed-over range that stepping cannot
+ * produce - which is why both routes write through one place.
+ */
+test('a typed figure cannot cross a span over itself', () => {
+    const { state, element } = openedOn('highlands', 'mountain');
+    const low  = rowId(element.id, 'height', 'min');
+    const high = rowId(element.id, 'height', 'max');
+    const ceiling = editorEntry(state, high).value;
+
+    beginTypedEditorValue(state, low, 'Digit9');
+    for (const code of ['Digit9', 'Digit9', 'Digit9']) applyTypedEditorKey(state, code);
+    const committed = applyTypedEditorKey(state, 'Enter');
+
+    if (committed.result === 'applied') {
+        assert.ok(editorEntry(state, low).value <= ceiling,
+            'a minimum typed past the maximum stops at it, the way a stepped one does');
+    } else {
+        assert.equal(committed.result, 'refused', '9999 is outside the bounds height declares');
+    }
+});
+
+test('a figure the row was already on costs no world rebuild', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'coverage', 'value');
+    const held = editorEntry(state, id).value;
+
+    beginTypedEditorValue(state, id, 'Digit0');
+    for (const character of String(held).slice(1).split('')) {
+        applyTypedEditorKey(state, character === '.' ? 'Period' : `Digit${character}`);
+    }
+
+    const committed = applyTypedEditorKey(state, 'Enter');
+    assert.equal(committed.result, 'applied');
+    assert.equal(committed.element, null,
+        'the same answer the stepper gives for a press that moved nothing');
+    assert.equal(editorEntry(state, id).value, held);
+});
+
+test('giving up leaves the range on the value it already had', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+    const was = editorEntry(state, id).value;
+
+    beginTypedEditorValue(state, id, 'Digit9');
+    assert.deepEqual(applyTypedEditorKey(state, 'Escape'),
+        { result: 'cancelled', element: null, value: null });
+
+    assert.equal(typedEditorRow(state), null);
+    assert.equal(editorEntry(state, id).value, was);
+    assert.equal(cancelTypedEditorValue(state), null, 'and giving up twice gives up on nothing');
+});
+
+test('a key the figure has no use for is handed back to the panel', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    beginTypedEditorValue(state, rowId(element.id, 'line', 'value'), 'Digit9');
+
+    for (const code of ['KeyW', 'KeyS', 'ArrowUp', 'ArrowLeft', 'Space']) {
+        assert.equal(applyTypedEditorKey(state, code), null, `${code} belongs to the panel`);
+    }
+    assert.equal(typedEditorText(state), '9', 'and none of them disturbed the figure');
+});
+
+// --- How a row being typed into reads --------------------------------------
+
+test('a row being typed into reads the figure rather than a value between step marks', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+    const stepped = editorEntry(state, id).text;
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    const row = editorEntry(state, id);
+
+    assert.equal(row.typing, true);
+    assert.equal(row.valueLabel, typedValueLabel('1'));
+    assert.ok(row.text.includes(TYPED_CARET), 'the row says it is taking more characters');
+    assert.notEqual(row.text, stepped);
+
+    applyTypedEditorKey(state, 'Escape');
+    assert.equal(editorEntry(state, id).typing, false);
+    assert.equal(editorEntry(state, id).text, stepped,
+        'and the row reads exactly as it did once the typing is given up on');
+});
+
+test('every other row reads as it always did while one is being typed into', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+    const before = new Map(state.entries.map(entry => [entry.id, entry.text]));
+
+    beginTypedEditorValue(state, id, 'Digit1');
+
+    for (const entry of state.entries) {
+        if (entry.id === id) continue;
+        assert.equal(entry.text, before.get(entry.id), `${entry.id} is not the row being typed into`);
+    }
+});
+
+/**
+ * A panel that opened half way through a figure would read the first digit
+ * pressed at it as the rest of one. A different world and a restored preset both
+ * take the row out from under it, so both give up on the figure too.
+ */
+test('anything that rebuilds the panel is giving up on whatever was being typed', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    closeEditor(state);
+    assert.equal(typedEditorRow(state), null);
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    openEditor(state);
+    assert.equal(typedEditorRow(state), null);
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    restoreEditor(state);
+    assert.equal(typedEditorRow(state), null);
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    setEditorWorld(state, ENVIRONMENTS.find(world => world.id !== 'highlands').id);
+    assert.equal(typedEditorRow(state), null);
+});
+
+test('a typed figure reaches the world the same way a stepped one does', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    for (const code of ['Digit2', 'Digit0', 'Digit0']) applyTypedEditorKey(state, code);
+    applyTypedEditorKey(state, 'Enter');
+
+    const placed = editorPlacements(state).find(placement => placement.type === 'snow');
+    assert.equal(placed.config.line, 1200,
+        'the placements a caller is handed carry the typed figure, not the one it replaced');
+    assert.equal(rowValue(element, 'line', editorEntry(state, id).row), 1200);
+});
+
+/**
+ * Every one of those rebuilds hands back a new set of rows rather than writing
+ * over the ones the panel had, because an element that opened or shut is a row
+ * that came or went and there is nothing to write over.
+ *
+ * So a caller holding the rows is holding the ones from before the rebuild, and
+ * has to be handed the new set to draw anything the rebuild changed. That is
+ * what `setMenuEntries` is for in js/main.js, and the row reading a caret
+ * nothing is typing into any more is what forgetting it looks like.
+ */
+test('giving up on a figure hands back new rows rather than writing over the old', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    beginTypedEditorValue(state, id, 'Digit9');
+    const typed = state.entries;
+    assert.ok(typed.find(entry => entry.id === id).text.includes(TYPED_CARET));
+
+    assert.equal(cancelTypedEditorValue(state), id);
+    assert.notEqual(state.entries, typed, 'the panel is holding a different set of rows');
+    assert.ok(!state.entries.find(entry => entry.id === id).text.includes(TYPED_CARET));
+    assert.ok(typed.find(entry => entry.id === id).text.includes(TYPED_CARET),
+        'and the set from before the rebuild still reads as it did, caret and all');
 });

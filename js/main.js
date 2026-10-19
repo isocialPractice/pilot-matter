@@ -20,6 +20,7 @@ import {
 } from './hud-visibility.js';
 import {
     createSettingsState, openSettings, closeSettings, settingsShowing,
+    typedSettingRow, beginTypedSetting, applyTypedSettingKey, cancelTypedSetting,
     chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
     isSettingsCloseKey, isSettingsOpenKey,
     SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP,
@@ -30,10 +31,11 @@ import {
     createControlSettingsState, openControlSettings, closeControlSettings,
     controlSettingsShowing, chooseControlSetting, adjustControlSetting,
     controlAxes, fullRotationWanted, isControlSettingsCloseKey,
-    tiltInputAxes, levelOffControls, referenceOpenWanted, rememberReferenceOpen,
+    tiltInputAxes, tiltWanted, tiltDeadzone,
+    levelOffControls, referenceOpenWanted, rememberReferenceOpen,
     controlBindings, bindingArmed, bindArmedKey, bindingEntryName,
     CONTROL_SETTINGS_BACK_ID, CONTROL_REFERENCE_ID,
-    AXIS_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP
+    AXIS_GROUP, TILT_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP
 } from './control-settings.js';
 import { aircraftBindings } from './key-bindings.js';
 import { runwayWanted } from './config.js';
@@ -65,6 +67,7 @@ import {
 } from './best-times.js';
 import {
     createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
+    typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
     setEditorClearance, isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
 } from './element-editor.js';
@@ -81,7 +84,7 @@ import {
     isTouchOnly, touchPads, TouchControls, TOUCH_LEFT, TOUCH_RIGHT
 } from './touch-controls.js';
 import {
-    createTiltState, tiltFlying, tiltToInput, levelTilt, TiltSensor, TILT_DEADZONE
+    createTiltState, tiltFlying, tiltToInput, levelTilt, TiltSensor
 } from './tilt-controls.js';
 import {
     createPhotoState, applyPhotoKey, photoPending, completePhoto,
@@ -233,10 +236,15 @@ class FlightSimulator {
         this.photoState     = createPhotoState();
 
         // Whether this machine has to be flown from the glass, and so whether
-        // the pads are drawn and the device's own attitude is read. Asked once:
-        // a phone does not grow a keyboard halfway through a flight.
+        // the pads are drawn. Asked once: a phone does not grow a keyboard
+        // halfway through a flight.
+        //
+        // It is no longer the whole of whether the device's own attitude is
+        // read, only the answer the panel's FLY BY TILT row defers to - a
+        // tablet with a keyboard can now ask for tilt and a phone can ask to be
+        // left alone. `syncTilt` is what carries a change of mind to the sensor.
         this.touchOnly  = isTouchOnly();
-        this.tilt       = createTiltState(this.touchOnly);
+        this.tilt       = createTiltState(tiltWanted(this.controlSettings, this.touchOnly));
         this.tiltSensor = new TiltSensor(this.tilt);
 
         // Which controls the pads are currently drawn for, so the set is rebuilt
@@ -345,11 +353,16 @@ class FlightSimulator {
         );
 
         // And the control panel the same way: the axes under one heading, the
-        // attitude under the next, and the reference list and the way out under
-        // the last, walked as the one list the cursor already treats them as.
+        // tilt and the attitude under the next two, and the reference list and
+        // the way out under the last, walked as the one list the cursor already
+        // treats them as.
         this.controlAxesMenu = new MenuList(
             document.getElementById('control-settings-axes'), this.controlState,
             entry => entry.group === AXIS_GROUP
+        );
+        this.controlTiltMenu = new MenuList(
+            document.getElementById('control-settings-tilt'), this.controlState,
+            entry => entry.group === TILT_GROUP
         );
         this.controlAttitudeMenu = new MenuList(
             document.getElementById('control-settings-attitude'), this.controlState,
@@ -365,12 +378,14 @@ class FlightSimulator {
         );
         this.controlReferenceMenu = new MenuList(
             document.getElementById('control-settings-reference'), this.controlState,
-            entry => ![AXIS_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP].includes(entry.group)
+            entry => ![
+                AXIS_GROUP, TILT_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP
+            ].includes(entry.group)
         );
 
         this.controlMenus = [
-            this.controlAxesMenu, this.controlAttitudeMenu, this.controlLevelOffMenu,
-            this.controlKeysMenu, this.controlReferenceMenu
+            this.controlAxesMenu, this.controlTiltMenu, this.controlAttitudeMenu,
+            this.controlLevelOffMenu, this.controlKeysMenu, this.controlReferenceMenu
         ];
 
         followPointers(
@@ -1016,16 +1031,45 @@ class FlightSimulator {
      * the reading say the row does.
      */
     onSettingsPointer(index, choose, step = 1) {
+        // A figure is typed with a keyboard, so reaching for the mouse is giving
+        // up on one: the row goes back to the value it had rather than being
+        // left reading a caret nothing is being typed into any more.
+        cancelTypedSetting(this.settings);
+
         const chosen = applyMenuPointer(this.settingsState, index, choose);
         if (chosen) this.chooseSettingsEntry(chosen, step);
         this.syncOverlays();
     }
 
     onSettingsKey(e) {
+        // A row being typed into reads the press first, because three of the
+        // keys it answers are keys the panel already means something by: Enter
+        // chooses a row, Escape closes the panel, and Backspace closes it too.
+        // A key the figure has no use for comes back null and falls through to
+        // the panel, so the cursor can still walk off a row mid-figure.
+        if (typedSettingRow(this.settings) != null) {
+            const typed = applyTypedSettingKey(this.settings, e.code);
+            if (typed) {
+                e.preventDefault();
+                if (typed.result === 'applied') this.applySettings();
+                this.syncOverlays();
+                return;
+            }
+        }
+
         // The key that opens the panel closes it again, so O is a way in and
         // out rather than a one-way door.
         if (isSettingsCloseKey(e.code) || (isSettingsOpenKey(e.code) && !e.repeat)) {
             closeSettings(this.settings);
+            this.syncOverlays();
+            return;
+        }
+
+        // A figure the pilot already knows is typed rather than stepped to, so a
+        // digit at a row holding a number starts one. Read after the way out and
+        // before the menu keys, which no digit is one of.
+        if (!e.repeat && beginTypedSetting(this.settings, selectedId(this.settingsState), e.code)) {
+            e.preventDefault();
             this.syncOverlays();
             return;
         }
@@ -1083,6 +1127,7 @@ class FlightSimulator {
         this.aircraft.setFullRotation(fullRotationWanted(this.controlSettings));
         this.aircraft.setBindings(aircraftBindings(controlBindings(this.controlSettings)));
         this.aircraft.setVerticalControls(levelOffControls(this.controlSettings));
+        this.syncTilt();
 
         // The list is the one setting the panel shares with a key, so the panel
         // is what the list is read from rather than the other way round: a box
@@ -1090,6 +1135,39 @@ class FlightSimulator {
         // answer back through `rememberHelpState` below.
         this.helpState.expanded = referenceOpenWanted(this.controlSettings);
         this.syncHelpList();
+    }
+
+    /**
+     * Hands the FLY BY TILT row's answer to the sensor, which is the one control
+     * setting that changes what the machine is doing rather than only how a
+     * reading is read.
+     *
+     * Nothing at all while the answer has not changed, because starting is
+     * asking: Safari wants a gesture before it will report orientation, and the
+     * gesture this has is the press or the click that chose the row. Spending it
+     * on a setting that is already in force would leave a refused ask where a
+     * working sensor was.
+     *
+     * Turning tilt off stops the sensor, which drops the reading, which is what
+     * `tiltFlying` reads - so the pads come back to the glass by the same route
+     * they left it rather than by a second rule written here.
+     */
+    syncTilt() {
+        const wanted = tiltWanted(this.controlSettings, this.touchOnly);
+        if (wanted === this.tilt.enabled) return;
+
+        this.tilt.enabled = wanted;
+
+        if (!wanted) {
+            this.tiltSensor.stop();
+            this.syncOverlays();
+            return;
+        }
+
+        // A refused sensor is a flight flown from the pads, exactly as it is
+        // when the ask happens on the key that starts the flight, so nothing is
+        // waited on here either.
+        this.tiltSensor.start().then(() => this.syncOverlays());
     }
 
     /**
@@ -1243,10 +1321,33 @@ class FlightSimulator {
     }
 
     onEditorKey(e) {
+        // A row being typed into reads the press first, for the reason it does
+        // in the settings panel: Enter, Escape and Backspace all already mean
+        // something here, and a figure being written has first claim on them.
+        if (typedEditorRow(this.editor) != null) {
+            const typed = applyTypedEditorKey(this.editor, e.code);
+            if (typed) {
+                e.preventDefault();
+                this.redrawEditor();
+                if (typed.element) this.refreshWorld();
+                this.syncOverlays();
+                return;
+            }
+        }
+
         // The key that opens the panel closes it again, the way O does the
         // settings panel.
         if (isEditorCloseKey(e.code) || (isEditorOpenKey(e.code) && !e.repeat)) {
             closeEditor(this.editor);
+            this.syncOverlays();
+            return;
+        }
+
+        // A height or a density the pilot already has in mind is typed rather
+        // than stepped to, a fiftieth of the range at a time.
+        if (!e.repeat && beginTypedEditorValue(this.editor, selectedId(this.editorState), e.code)) {
+            e.preventDefault();
+            this.redrawEditor();
             this.syncOverlays();
             return;
         }
@@ -1279,6 +1380,16 @@ class FlightSimulator {
      * reading say the row does.
      */
     onEditorPointer(index, choose, step = 1) {
+        // Giving up on a figure builds this panel's rows again rather than
+        // writing over the ones it had, and the menu the list is drawn from
+        // holds that array rather than the panel - so the rebuilt rows have to
+        // be handed to it here. A pointer that only crossed onto a row chooses
+        // nothing, so nothing below redraws, and the row the figure was on
+        // would go on reading a caret nothing is being typed into.
+        if (cancelTypedEditorValue(this.editor)) {
+            setMenuEntries(this.editorState, this.editor.entries);
+        }
+
         const chosen = applyMenuPointer(this.editorState, index, choose);
         if (chosen) this.chooseEditorRow(chosen, step);
         this.syncOverlays();
@@ -1823,7 +1934,8 @@ class FlightSimulator {
             // the directional one, which is what the panel's TILT READS AXES
             // box answers - see `tiltInputAxes` in js/control-settings.js.
             tiltToInput(
-                this.aircraft.input, this.tilt, TILT_DEADZONE, tiltInputAxes(this.controlSettings)
+                this.aircraft.input, this.tilt,
+                tiltDeadzone(this.controlSettings), tiltInputAxes(this.controlSettings)
             );
         }
     }

@@ -118,6 +118,28 @@
 
 <p><code>TILT READS AXES</code> is the third row because it answers the same question for the other way of flying. A phone or a tablet with no keys is flown by tilting it, and that reading used to write the four controls itself: nose up is the top of the device coming toward the pilot, a wing down is the same wing down on the device, and neither needs inverting because the device <em>is</em> the aircraft. That was the whole answer while nothing could invert anything. A pilot who has since set an axis the other way round may be holding the device as a stick instead, and this box is the one setting that says so - on, the two rows above reach the tilt input as well; off, the device goes on being the aircraft. It is one box rather than two more because the inversion happens in one place for every input source, so the same pair the keys are read through is simply handed to the tilt reading too.</p>
 
+<h2 id="tilt">Tilt</h2>
+
+<p>Under <code>TILT</code> is whether the device itself is flown with, and how far it has to be turned before it is read:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Steps through</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>FLY BY TILT</code></td><td><code>WITH NO KEYS</code>, <code>ALWAYS</code>, <code>NEVER</code></td><td><code>WITH NO KEYS</code></td></tr>
+        <tr><td><code>TILT DEADZONE</code></td><td><code>FINE</code>, <code>NARROW</code>, <code>NORMAL</code>, <code>WIDE</code>, <code>VERY WIDE</code></td><td><code>NORMAL</code></td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>FLY BY TILT</code> has three answers rather than two because the answer the simulator shipped with was the machine's own: it asked once at start-up whether this was a machine with nothing but a touchscreen, and flew by tilt where it was. That is still right for almost every machine, and it is what <code>WITH NO KEYS</code> means - but it was also the end of the matter, so a tablet with a keyboard attached could not turn tilt on and a phone could not turn it off, though both are perfectly capable of the other. <code>ALWAYS</code> and <code>NEVER</code> are the pilot overruling the machine in whichever direction it got wrong.</p>
+
+<p>What the row holds is what the pilot wants rather than what is happening. The sensor can still refuse: a browser may say no outright, and a device with no gyroscope says yes and then reports nothing at all. Either way the row goes on reading <code>ALWAYS</code>, and the <a href="../controls/index.html#without-a-keyboard">pads</a> stay on the glass for a tilt that was asked for and never arrived - an aircraft with no pitch and roll controls would be the alternative. The row is read on the frame it is changed, so turning tilt on mid-flight starts the sensor there and then; on a browser that wants permission first, the press or the click that chose the row is the gesture it wants.</p>
+
+<p><code>TILT DEADZONE</code> is how far the device is turned from where it was last levelled before it asks for anything. Inside it the device holds nothing, which is what lets it be put down flat without the aircraft flying away on its own. How still a hand is varies more between two pilots than almost anything else the panel asks about, and a deadzone too narrow for the hand holding it is an aircraft that will not fly straight - so <code>NORMAL</code> is the figure the simulator has always used, with two positions either side of it.</p>
+
+<p>It is a few labelled positions rather than a range of degrees, the way every other number in both panels is offered: no combination of keys can land the setting between two readings, and a position read off the row is one the pilot chose. Both rows are stored with the rest of the panel, so they outlive the session they were set in.</p>
+
 <h2 id="attitude">Attitude</h2>
 
 <p>Under <code>ATTITUDE</code> is one box:</p>

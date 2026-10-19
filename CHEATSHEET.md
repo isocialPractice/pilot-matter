@@ -42,9 +42,11 @@ by pointer, so only the flight controls are added.
 | `YAW L` / `YAW R` | Nose left / right | Right |
 
 Tilt is what those machines open in, and it takes the four attitude pads off
-the glass. Whatever angle the device is held at when a flight starts is level
-for it, and a reset levels it again. Seven degrees either side of level is
-nothing. Refused, or on a device with no gyroscope, the pads stay and the
+the glass. `FLY BY TILT` in the control settings overrules that either way, so a
+tablet with a keyboard can ask for the device and a phone can ask to be left
+alone. Whatever angle the device is held at when a flight starts is level for
+it, and a reset levels it again. Seven degrees either side of level is nothing,
+and `TILT DEADZONE` offers two positions either side of those seven. Refused, or on a device with no gyroscope, the pads stay and the
 flight is flown from them: a sensor that reports no angles at all is no reading
 rather than a device held level. The pads take the bottom corners, so the
 attitude indicator moves to the top left of the screen, the readouts drop below
@@ -128,6 +130,12 @@ Radio group: `START OFF FLYING` (default) or `RUNWAY TAKEOFF`. Checkbox:
 `RUNWAY`, forced on and disabled under `RUNWAY TAKEOFF`. Pitch is derived,
 never set.
 
+Every row in the table above can be typed into as well as stepped: a digit
+starts the figure, `Enter` takes it, `Backspace` erases a character and `Esc`
+gives up. The figure goes through the validator the stepping goes through, so
+one between two steps is refused and the row says what is allowed -
+`0 KTS TO 200 KTS BY 5`. A row that steps through a list cannot be typed into.
+
 ## Options
 
 | Option | Steps through |
@@ -150,6 +158,8 @@ under a key of its own, so how a pilot flies outlives which world they flew.
 | `PITCH AXIS` | `DIRECTIONAL`, `INVERTED` | `DIRECTIONAL` |
 | `ROLL AXIS` | `DIRECTIONAL`, `INVERTED` | `DIRECTIONAL` |
 | `TILT READS AXES` | On, off | Off |
+| `FLY BY TILT` | `WITH NO KEYS`, `ALWAYS`, `NEVER` | `WITH NO KEYS` |
+| `TILT DEADZONE` | `FINE`, `NARROW`, `NORMAL`, `WIDE`, `VERY WIDE` | `NORMAL` |
 | `FULL ROTATION` | On, off | Off |
 | `PITCH UP`, `PITCH DOWN`, `THROTTLE UP`, `THROTTLE DOWN` | On, off - whether each hands the aircraft back after a level off | On |
 | A key row per control, plus `RESET FLIGHT` and `LEVEL OFF` | Enter, then the key it should be on | The keys above |
@@ -160,7 +170,11 @@ under a key of its own, so how a pilot flies outlives which world they flew.
 `DIRECTIONAL` points the key where the aircraft goes; `INVERTED` points it where
 a stick would. Each axis is set on its own, and both spellings of an input turn
 over together. `TILT READS AXES` carries those two settings through to a device
-flown by tilting it; off, the device is the aircraft. `FULL ROTATION` off clamps
+flown by tilting it; off, the device is the aircraft. `FLY BY TILT` says which
+machines are flown by tilt at all - `WITH NO KEYS` is the machine's own answer
+and the two others overrule it, and what the row holds is what was asked for
+rather than what the sensor granted. `TILT DEADZONE` is how far the device is
+turned before it asks for anything. `FULL ROTATION` off clamps
 the nose short of the vertical and the wings at half a turn; on, either angle
 crosses the limit and comes round the other side, so a loop and a barrel roll
 carry on.
@@ -216,7 +230,11 @@ opens an element onto its ranges; `A`/`D` step the range under the cursor.
 | Gradient | Two rows, `LIGHT` and `DARK`, as a percentage of the preset's colour |
 
 One press moves a fiftieth of what the range allows, rounded to 1, 2, or 5
-times a power of ten. `RESTORE THE PRESET` puts every range back. Edits belong
+times a power of ten. A range can be typed into instead: a digit starts the
+figure, `Enter` takes it and draws the ground again, and the figure is read in
+the units the row reads in - `150` at a gradient end is `150%`. A figure outside
+the declared bounds is refused and the row says what they are.
+`RESTORE THE PRESET` puts every range back. Edits belong
 to the world they were made on and are not stored between sessions. Not
 available while a game mode is being played: a mode brings its own ground.
 

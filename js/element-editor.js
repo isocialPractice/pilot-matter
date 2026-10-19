@@ -23,6 +23,9 @@ import {
 } from './environment/elements.js';
 import { getEnvironment, environmentElements } from './environment/presets.js';
 import { OPTION_LEFT_MARK, OPTION_RIGHT_MARK } from './settings.js';
+import {
+    typedCharacter, startsTypedValue, readTypedKey, typedValueLabel
+} from './typed-value.js';
 
 export const EDITOR_TITLE = 'ELEMENT EDITOR';
 export const EDITOR_HEADING = 'PLACED ELEMENTS';
@@ -212,6 +215,11 @@ export function createEditorState(environmentId, runway = false) {
         // the strip itself reported them. Filled in by the caller after the
         // ground is built, because only the built ground knows.
         cleared: [],
+        // Which row is being typed into, what has been typed, and the bounds a
+        // refused press was measured against. Emptied when the panel opens and
+        // when it closes, so a figure left unfinished is never what the next
+        // digit pressed at the panel carries on from.
+        typing: null,
         entries: []
     };
 
@@ -239,6 +247,9 @@ export function setEditorWorld(state, environmentId, runway = false) {
     state.environmentId = wanted;
     state.runway = strip;
     state.elements = editorElements(getEnvironment(wanted), strip);
+    // A different world is a different set of rows, so a figure being typed into
+    // one of the old ones has nowhere left to land.
+    state.typing = null;
     syncEditorEntries(state);
 
     return true;
@@ -273,6 +284,10 @@ export function restoreEditor(state) {
         element.config = structuredCloneConfig(element.base);
         element.shades = resetShades(element.shades);
     }
+    // Putting the preset back is the opposite of setting a figure by hand, so a
+    // figure half typed when it is asked for is given up on rather than left to
+    // be committed over the world that has just been restored.
+    state.typing = null;
     syncEditorEntries(state);
     return state;
 }
@@ -301,6 +316,7 @@ export function editorShowing(state) {
 export function openEditor(state) {
     const changed = !state.open;
     state.open = true;
+    state.typing = null;
     syncEditorEntries(state);
     return changed;
 }
@@ -308,6 +324,8 @@ export function openEditor(state) {
 export function closeEditor(state) {
     const changed = state.open;
     state.open = false;
+    state.typing = null;
+    syncEditorEntries(state);
     return changed;
 }
 
@@ -339,6 +357,10 @@ export function elementEntryText(element) {
 }
 
 export function rangeEntryText(entry) {
+    // A row being typed into is not being stepped, so the marks that say it is
+    // come off while the typing is in hand - the same reading the settings
+    // panel gives a row of its own being typed into.
+    if (entry.typing) return `${entry.label}  ${entry.valueLabel}`;
     return `${entry.label}  ${OPTION_LEFT_MARK} ${entry.valueLabel} ${OPTION_RIGHT_MARK}`;
 }
 
@@ -370,17 +392,22 @@ export function editorEntries(state) {
 
         for (const [name, range] of Object.entries(getElement(element.type).ranges)) {
             for (const row of rangeRows(name, range)) {
-                const value = rowValue(element, name, row);
+                const value  = rowValue(element, name, row);
+                const id     = rowId(element.id, name, row.part);
+                const typing = state.typing?.id === id ? state.typing : null;
                 const entry = {
                     kind: RANGE_ENTRY,
-                    id: rowId(element.id, name, row.part),
+                    id,
                     element: element.id,
                     name,
                     row,
                     label: row.label,
                     note: '',
                     value,
-                    valueLabel: rowValueLabel(row, value),
+                    typing: typing != null,
+                    valueLabel: typing
+                        ? (typing.notice ?? typedValueLabel(typing.text))
+                        : rowValueLabel(row, value),
                     current: false
                 };
                 entry.text = rangeEntryText(entry);
@@ -443,18 +470,39 @@ export function adjustEditorRange(state, id, step) {
     const moved = moveValue(rowValue(element, name, row), step * rangeStep(range), range.low, range.high);
     if (moved === rowValue(element, name, row)) return null;
 
-    if (row.shade) {
-        element.shades[name][row.shade] = moved;
-        element.config[name][row.shade] = shadeColor(element.base[name][row.shade], moved);
-    } else if (row.at != null) {
-        const span = element.config[name];
-        span[row.at] = row.at === 0 ? Math.min(moved, span[1]) : Math.max(moved, span[0]);
-    } else {
-        element.config[name] = moved;
-    }
-
+    writeRowValue(element, name, row, moved);
     syncEditorEntries(state);
     return element.id;
+}
+
+/**
+ * Writes one number into the element behind the row that holds it, whichever
+ * way the pilot arrived at it.
+ *
+ * A span cannot be crossed over itself: raising a minimum stops at the maximum
+ * and lowering a maximum stops at the minimum, because a range whose ends have
+ * swapped is a range the generator has to guess about. A gradient end is held as
+ * the shade it is being drawn at, and the colour is worked out from the one the
+ * preset laid down, so the preset stays the thing the row is measured against.
+ *
+ * It is one function rather than a branch in each caller because the stepper and
+ * the typing both end here: a typed figure that skipped the span rule would be a
+ * way of writing a crossed-over range that stepping cannot produce.
+ */
+function writeRowValue(element, name, row, value) {
+    if (row.shade) {
+        element.shades[name][row.shade] = value;
+        element.config[name][row.shade] = shadeColor(element.base[name][row.shade], value);
+        return;
+    }
+
+    if (row.at != null) {
+        const span = element.config[name];
+        span[row.at] = row.at === 0 ? Math.min(value, span[1]) : Math.max(value, span[0]);
+        return;
+    }
+
+    element.config[name] = value;
 }
 
 /**
@@ -518,4 +566,142 @@ export function editorPlacements(state) {
         type: element.type,
         config: structuredCloneConfig(element.config)
     }));
+}
+
+// --- Typing a number into a row --------------------------------------------
+
+/**
+ * The value a typed figure stands for, in the units the row reads in.
+ *
+ * Every row but a gradient end reads the number it holds, so the figure is the
+ * value. A gradient end reads as the percentage of the preset's colour it is
+ * being drawn at, so a pilot typing 150 at a row reading 150% means a shade of
+ * 1.5 - the figure on screen is the figure they are answering.
+ */
+export function typedRowValue(row, typed) {
+    if (!Number.isFinite(typed)) return null;
+    return row?.shade ? typed / 100 : typed;
+}
+
+/**
+ * True for a row a figure can be typed into, which is any row holding a range.
+ * An element's own row, the way back to the preset and the way out hold no
+ * number, so a digit pressed at one of them means nothing.
+ */
+export function isTypedEditorRow(state, id) {
+    return editorEntry(state, id)?.kind === RANGE_ENTRY;
+}
+
+/** The row being typed into, or null while none is. */
+export function typedEditorRow(state) {
+    return state?.typing?.id ?? null;
+}
+
+/** What has been typed into it so far, or null while nothing is being typed. */
+export function typedEditorText(state) {
+    return state?.typing?.text ?? null;
+}
+
+/**
+ * What the row says when a press is refused: the bounds the range was declared
+ * with, written the way the row writes a value, so a gradient end is refused
+ * against percentages and a height against feet.
+ */
+export function rangeNotice(row) {
+    const range = row?.range;
+    if (!range) return '';
+    return `${rowValueLabel(row, range.low)} TO ${rowValueLabel(row, range.high)}`;
+}
+
+/**
+ * Starts a pilot typing into a row, taking the key they started with as the
+ * first character of the figure. Returns the row, or null for a key that types
+ * nothing or a row that holds no range.
+ */
+export function beginTypedEditorValue(state, id, code) {
+    if (!startsTypedValue(code) || !isTypedEditorRow(state, id)) return null;
+
+    state.typing = { id, text: typedCharacter(code), notice: null };
+    syncEditorEntries(state);
+    return id;
+}
+
+/** Gives up on the figure, leaving the range on the value it already had. */
+export function cancelTypedEditorValue(state) {
+    const id = state?.typing?.id ?? null;
+    if (id == null) return null;
+
+    state.typing = null;
+    syncEditorEntries(state);
+    return id;
+}
+
+/**
+ * Applies a key press to the row being typed into.
+ *
+ * Returns what the press came to, as `{ result, element, value }`: `typed` and
+ * `erased` for a figure still being written, `applied` for one taken - carrying
+ * the element whose ground has to be drawn again - `refused` for one outside the
+ * bounds the range declared, and `cancelled` for the way out. A refused figure
+ * leaves the row typing, so the next press carries on from what is there.
+ *
+ * Null when no row is being typed into, and null for a key that means nothing to
+ * one, which the caller then reads however it would have otherwise.
+ */
+export function applyTypedEditorKey(state, code) {
+    const typing = state?.typing;
+    if (typing == null) return null;
+
+    const read = readTypedKey(typing.text, code);
+    if (read == null) return null;
+
+    if (read.action === 'cancel') {
+        cancelTypedEditorValue(state);
+        return { result: 'cancelled', element: null, value: null };
+    }
+
+    if (read.action === 'commit') {
+        const entry = editorEntry(state, typing.id);
+        const row   = entry?.row;
+        const value = typedRowValue(row, read.value);
+        const range = row?.range;
+
+        // The bounds the stepper is held to, rather than a second reading of
+        // them: `moveValue` clamps every press to this pair and rounds it to the
+        // places the step moves in, so a figure outside them is one no amount of
+        // stepping could have reached.
+        if (value == null || !range || value < range.low || value > range.high) {
+            typing.notice = rangeNotice(row);
+            syncEditorEntries(state);
+            return { result: 'refused', element: null, value: read.value };
+        }
+
+        const element = editorElement(state, entry.element);
+        if (!element) {
+            cancelTypedEditorValue(state);
+            return { result: 'cancelled', element: null, value: null };
+        }
+
+        const places = stepPlaces(rangeStep(range));
+        const held   = rowValue(element, entry.name, row);
+        const taken  = Number(value.toFixed(places));
+
+        state.typing = null;
+        writeRowValue(element, entry.name, row, taken);
+        syncEditorEntries(state);
+
+        // The element only comes back where the ground actually changed, so a
+        // figure typed in that the row was already on costs no world rebuild -
+        // the same answer the stepper gives for a press that moved nothing.
+        return {
+            result: 'applied',
+            element: rowValue(element, entry.name, row) === held ? null : element.id,
+            value: taken
+        };
+    }
+
+    typing.text = read.text;
+    typing.notice = null;
+    syncEditorEntries(state);
+    return { result: read.action, element: null, value: null };
 }

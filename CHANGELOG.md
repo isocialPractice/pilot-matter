@@ -5,6 +5,128 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.27.0] - 2026-10-19
+
+Four questions the game answered for the pilot now have rows. Whether the
+device is flown with was the machine's own answer, asked once at start-up and
+settled; how far it has to be turned was a constant nothing passed; a figure a
+pilot already knows was a number to be stepped to a press at a time; and the
+beam across a canyon cut was drawn by a rule no test in the folder reached.
+
+### Added
+
+- **Which machines are flown by tilt is the pilot's answer, not the machine's.**
+  `createTiltState(enabled)` always took the answer and `js/main.js` handed it
+  `isTouchOnly()` once at start-up with nothing able to change it afterwards, so
+  a tablet with a keyboard could not turn tilt on and a phone could not turn it
+  off, though both are perfectly capable of the other. `FLY BY TILT` in the
+  control settings holds three answers rather than two: `WITH NO KEYS` is the
+  machine's own, which is still right for almost every machine and is the only
+  one that can be the default, and `ALWAYS` and `NEVER` overrule it in whichever
+  direction it got wrong. What the row holds is what was asked for rather than
+  what is happening - a browser can refuse the sensor and a device with no
+  gyroscope answers yes and then reports nothing - so `tiltFlying` goes on
+  telling those two apart and the pads stay on the glass for a tilt that never
+  arrived. `syncTilt` carries a change of mind to the sensor on the frame it is
+  made, and does nothing at all where the answer has not changed: starting is
+  asking, and the gesture it has is the press or the click that chose the row.
+- **How far the device is turned before it asks for anything is a setting.**
+  `TILT_DEADZONE` was seven degrees and `tiltToInput` took it as an argument
+  nothing passed. How still a hand is varies more between two pilots than almost
+  anything else the panel asks about, and a deadzone too narrow for the hand
+  holding it is an aircraft that will not fly straight. `TILT DEADZONE` offers
+  `FINE`, `NARROW`, `NORMAL`, `WIDE` and `VERY WIDE` - five labelled positions
+  rather than a range of degrees, the way every other number in both panels is
+  offered, so no combination of keys can land it between two readings. `NORMAL`
+  is the module's own constant rather than the same figure written out again, so
+  the default cannot drift from what the simulator shipped with.
+- **A `TILT` heading, which the two rows above sit under.** `TILT READS AXES`
+  stays under `AXES`, where its note points at the two rows above it, and the new
+  heading goes in directly below - so the three tilt rows are adjacent on screen
+  while each is asked about under the heading it belongs to.
+- **A number can be typed into a row rather than stepped to.** Every value in the
+  settings panel and the element editor was moved by a key or a click, which is
+  the right way to offer a position on a dial and the wrong way to offer a figure
+  the pilot already knows: a start altitude of 1390 feet is 139 presses at ten
+  feet a press, and a snow line is forty presses from wherever the preset left
+  it. A digit at a row holding a figure starts one, the row reads what has been
+  typed with a `_` after it, `Enter` takes it, `Backspace` erases a character,
+  and `Esc` or a reach for the mouse gives up and leaves the row on the value it
+  had. A row holding one of a list of settings cannot be typed into, because what
+  a list offers is positions rather than figures - nobody has a number in mind
+  for `CLEAR`.
+- **`js/typed-value.js`, which both panels read a typed figure through.** It
+  holds the keyboard half - which key types what, how the characters accumulate,
+  what the accumulated text comes to as a number - and each panel keeps the part
+  that is actually different: which of its rows hold figures, what range each is
+  held to, and where an accepted one is written. One module rather than a keypad
+  in each, because a figure allowed in one panel and refused in the other is two
+  readings of the same idea.
+- **A typed figure goes through the validator the stepping goes through.** In the
+  settings panel that is `isOptionValue`, so a figure between two steps is
+  refused rather than snapped: the panel offers an airspeed every five knots, 83
+  is not one of them, and the row says what is allowed where the reading sits -
+  `0 KTS TO 200 KTS BY 5`, the range and the step both, because the range alone
+  would be a refusal with no reason on screen. In the element editor it is the
+  bounds `moveValue` already clamps every press into, with the figure rounded to
+  the places the step moves in. A refused figure leaves the row taking
+  characters, so the next press carries on from what is there rather than
+  starting again from nothing.
+- **A gradient end is typed in the percentages it reads in.** The row reads
+  `150%` and holds a shade of 1.5, so `150` typed at it means the shade it looks
+  like. The figure the pilot answers is the figure on screen.
+- **The beam across a canyon cut, and the span the posts stand on, are pinned.**
+  Nothing in `test/` reached `js/walls.js` - it imports Three.js and cannot be
+  constructed in Node - so the beam, which was got wrong once, had only a
+  screenshot and a browser reading the quaternion off the live scene standing
+  behind it. Two readings are held off its source now, in the idiom
+  `test/page.test.js` already uses for `js/rings.js` and `js/guidance.js`: that
+  `buildBeam` turns the cylinder with `quaternion.setFromUnitVectors` from
+  `(0, 1, 0)` to the across vector rather than by a pair of Euler angles, which
+  the module's own comment says does not compose in the order Three.js applies
+  them here, and that `buildCut` takes `acrossX = section.dirZ` and
+  `acrossZ = -section.dirX` with both posts set out along that span. The second
+  is the one with teeth: a corridor that flipped its offset convention would
+  draw its walls on one axis while `corridorCrossing` tested another, with the
+  suite still green. The rule's own span is read back out of `js/corridor.js`,
+  so the pair is held together rather than each held to the convention written
+  out twice.
+
+### Changed
+
+- **The element editor's rebuilt rows are handed to the menu they are drawn
+  from when a figure is given up on.** It is the one panel whose rows come and
+  go, so `syncEditorEntries` builds a new set rather than writing over the one
+  the panel had, and the menu holds that array rather than the panel. A pointer
+  that only crossed onto a row gives up on the figure and chooses nothing, so
+  nothing below it redrew: the row went on reading its caret for a figure
+  already given up on, and the next `Enter` stepped the row rather than taking
+  a figure. The settings panel wants none of this, `syncSettingsEntries` writing
+  over the rows it already has.
+- **Both spans are bounded by counting braces rather than by `[^}]*?`.** That
+  bound is what `test/input-map.test.js` uses, and it is not usable on either of
+  these functions: both open a brace of their own before the line being looked
+  for - `buildBeam` builds a material from an object literal two lines above the
+  turn - so a span stopped at the first `}` never reaches the assertion at all.
+  Counting the braces gets the same guarantee the bound exists for, which is that
+  a span cannot run past the function it is anchored on, out of a body that has
+  braces in it.
+- **One function writes a range in the element editor, whichever way the pilot
+  arrived at the figure.** `adjustEditorRange` held the span rule, the gradient
+  shading and the plain write inline, and a typed figure that skipped the span
+  rule would have been a way of writing a crossed-over range that stepping cannot
+  produce. Both routes end in `writeRowValue` now.
+- **The stale halves of three comments.** `js/tilt-controls.js` said tilt was
+  "offered only where there is nothing better" and that the deadzone was the
+  figure rather than the middle of five; the controls page said a machine with
+  keys "is never offered it". All three were true until this release and would
+  have read as the behaviour afterwards.
+- **The documentation for both panels, the cheatsheet in both its forms, and the
+  README.** The settings page and the terrain page describe the typed route and
+  what refuses a figure; the control settings page carries a `TILT` section; the
+  project structure page lists the new module; the testing page names what is
+  covered.
+
 ## [1.0.0-alpha.1.26.2] - 2026-10-18
 
 `1.0.0-alpha.1.26.1` brought the last of the five documents that describe a

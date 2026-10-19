@@ -46,8 +46,16 @@ import {
     adjustSetting,
     chooseSetting,
     isSettingsCloseKey,
-    isSettingsOpenKey
+    isSettingsOpenKey,
+    isTypedSettingRow,
+    typedSettingRow,
+    typedSettingText,
+    optionRangeNotice,
+    beginTypedSetting,
+    cancelTypedSetting,
+    applyTypedSettingKey
 } from '../js/settings.js';
+import { TYPED_CARET, typedValueLabel } from '../js/typed-value.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 import {
@@ -628,4 +636,234 @@ test('syncing the list is what marks it, so a reopened panel shows the pick', ()
             .map(entry => entry.id),
         [ENVIRONMENTS.at(-1).id]
     );
+});
+
+// --- Typing a number into a row --------------------------------------------
+
+/**
+ * Every value in the panel is stepped by a key or a click, which is the right
+ * way to offer a position on a dial and the wrong way to offer a figure the
+ * pilot already knows: an altitude of 1390 feet is 139 presses from the ground
+ * at ten feet a press.
+ */
+test('a row holding a number along a range can be typed into', () => {
+    const state = createSettingsState(fakeStorage());
+
+    for (const id of ['airspeedKnots', 'altitudeFeet', 'verticalSpeedFpm', 'headingDegrees']) {
+        assert.equal(isTypedSettingRow(state, id), true, `${id} is a figure somebody knows`);
+    }
+
+    // A list offers positions rather than figures, and nobody has a number in
+    // mind for CLEAR.
+    for (const id of [FOG_OPTION, SENSITIVITY_OPTION, SPEED_UNIT_OPTION, 'cameraMode']) {
+        assert.equal(isTypedSettingRow(state, id), false, `${id} is a position on a dial`);
+    }
+
+    assert.equal(isTypedSettingRow(state, 'runway'), false, 'a box is not a figure');
+    assert.equal(isTypedSettingRow(state, FLYING_ENTRY), false, 'nor is one of a set of conditions');
+    assert.equal(isTypedSettingRow(state, SETTINGS_BACK_ID), false);
+    assert.equal(isTypedSettingRow(state, DEFAULT_ENVIRONMENT_ID), false);
+    assert.equal(isTypedSettingRow(state, 'nothing-of-the-sort'), false);
+});
+
+test('a digit at such a row starts the figure it is the first character of', () => {
+    const state = createSettingsState(fakeStorage());
+
+    assert.equal(typedSettingRow(state), null, 'the panel opens typing nothing');
+    assert.equal(beginTypedSetting(state, 'altitudeFeet', 'Digit1'), 'altitudeFeet');
+    assert.equal(typedSettingRow(state), 'altitudeFeet');
+    assert.equal(typedSettingText(state), '1');
+
+    for (const code of ['Digit3', 'Digit9', 'Digit0']) {
+        assert.equal(applyTypedSettingKey(state, code).result, 'typed');
+    }
+    assert.equal(typedSettingText(state), '1390');
+});
+
+test('a key that types nothing starts nothing, and nor does a row with no figure', () => {
+    const state = createSettingsState(fakeStorage());
+
+    assert.equal(beginTypedSetting(state, 'altitudeFeet', 'KeyW'), null);
+    assert.equal(beginTypedSetting(state, 'altitudeFeet', 'Period'), null,
+        'a point is a stray press on a panel being read rather than set');
+    assert.equal(beginTypedSetting(state, FOG_OPTION, 'Digit1'), null);
+    assert.equal(beginTypedSetting(state, SETTINGS_BACK_ID, 'Digit1'), null);
+    assert.equal(typedSettingRow(state), null);
+    assert.equal(applyTypedSettingKey(state, 'Digit1'), null, 'and nothing is being typed into');
+});
+
+test('the figure is written where committing it, and remembered like any other', () => {
+    const storage = fakeStorage();
+    const state = createSettingsState(storage);
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+    for (const code of ['Digit3', 'Digit9', 'Digit0']) applyTypedSettingKey(state, code);
+
+    const committed = applyTypedSettingKey(state, 'Enter');
+    assert.deepEqual(committed, { result: 'applied', option: 'altitudeFeet', value: 1390 });
+    assert.equal(currentOption(state, 'altitudeFeet'), 1390);
+    assert.equal(typedSettingRow(state), null, 'and the row stops taking characters');
+
+    assert.equal(currentOption(createSettingsState(storage), 'altitudeFeet'), 1390,
+        'a typed figure is stored the way a stepped one is, through the same place');
+});
+
+test('a descent is typed with the sign it is written with', () => {
+    const state = createSettingsState(fakeStorage());
+
+    assert.equal(beginTypedSetting(state, 'verticalSpeedFpm', 'Minus'), 'verticalSpeedFpm');
+    for (const code of ['Digit5', 'Digit0', 'Digit0']) applyTypedSettingKey(state, code);
+
+    assert.equal(applyTypedSettingKey(state, 'NumpadEnter').result, 'applied');
+    assert.equal(currentOption(state, 'verticalSpeedFpm'), -500);
+});
+
+/**
+ * The typed route and the stepped one are held to one validator, so a figure
+ * typed in where a stepped one would be refused cannot happen - that would be
+ * the panel disagreeing with itself about what a range is.
+ */
+test('a figure the stepper would not reach is refused, and the row says what is allowed', () => {
+    const state = createSettingsState(fakeStorage());
+    const was = currentOption(state, 'airspeedKnots');
+
+    // 83 knots is inside the range and between two of its steps, which is the
+    // case only a typed figure can produce.
+    beginTypedSetting(state, 'airspeedKnots', 'Digit8');
+    applyTypedSettingKey(state, 'Digit3');
+
+    const refused = applyTypedSettingKey(state, 'Enter');
+    assert.deepEqual(refused, { result: 'refused', option: 'airspeedKnots', value: 83 });
+    assert.equal(currentOption(state, 'airspeedKnots'), was, 'nothing is written');
+    assert.equal(typedSettingRow(state), 'airspeedKnots',
+        'and the row goes on taking characters, so the next press carries on from what is there');
+
+    const row = settingsEntry(state, 'airspeedKnots');
+    assert.equal(row.valueLabel, optionRangeNotice('airspeedKnots'));
+    assert.ok(row.valueLabel.includes('BY 5'),
+        `the range is only half of what is allowed - the row reads "${row.valueLabel}"`);
+    assert.ok(row.valueLabel.includes('200'), 'and the far end of it is named too');
+
+    // Erasing the 3 and committing the 80 is a figure the stepper reaches.
+    assert.equal(applyTypedSettingKey(state, 'Backspace').result, 'erased');
+    assert.equal(typedSettingText(state), '8');
+    applyTypedSettingKey(state, 'Digit0');
+    assert.equal(applyTypedSettingKey(state, 'Enter').result, 'applied');
+    assert.equal(currentOption(state, 'airspeedKnots'), 80);
+});
+
+test('a figure past the end of the range is refused the same way', () => {
+    const state = createSettingsState(fakeStorage());
+    const was = currentOption(state, 'throttlePercent');
+
+    beginTypedSetting(state, 'throttlePercent', 'Digit5');
+    applyTypedSettingKey(state, 'Digit0');
+    applyTypedSettingKey(state, 'Digit0');
+
+    assert.equal(applyTypedSettingKey(state, 'Enter').result, 'refused');
+    assert.equal(currentOption(state, 'throttlePercent'), was);
+});
+
+test('a figure nobody finished is refused rather than read as nothing', () => {
+    const state = createSettingsState(fakeStorage());
+    const was = currentOption(state, 'altitudeFeet');
+
+    beginTypedSetting(state, 'altitudeFeet', 'Minus');
+    const refused = applyTypedSettingKey(state, 'Enter');
+    assert.deepEqual(refused, { result: 'refused', option: 'altitudeFeet', value: null });
+    assert.equal(currentOption(state, 'altitudeFeet'), was,
+        'a sign on its own is a figure half written, not a request for zero');
+});
+
+test('giving up leaves the row on the value it already had', () => {
+    const state = createSettingsState(fakeStorage());
+    const was = currentOption(state, 'altitudeFeet');
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit5');
+    assert.deepEqual(applyTypedSettingKey(state, 'Escape'),
+        { result: 'cancelled', option: 'altitudeFeet', value: null });
+
+    assert.equal(typedSettingRow(state), null);
+    assert.equal(currentOption(state, 'altitudeFeet'), was);
+    assert.equal(cancelTypedSetting(state), null, 'and giving up twice gives up on nothing');
+});
+
+/**
+ * A key the figure has no use for is handed back, which is what keeps the cursor
+ * able to walk off a row mid-figure: the panel reads that key as it always did.
+ */
+test('a key the figure has no use for is handed back to the panel', () => {
+    const state = createSettingsState(fakeStorage());
+    beginTypedSetting(state, 'altitudeFeet', 'Digit5');
+
+    for (const code of ['KeyW', 'KeyS', 'ArrowUp', 'ArrowLeft', 'Space']) {
+        assert.equal(applyTypedSettingKey(state, code), null, `${code} belongs to the panel`);
+    }
+    assert.equal(typedSettingText(state), '5', 'and none of them disturbed the figure');
+});
+
+// --- How a row being typed into reads --------------------------------------
+
+/**
+ * The marks either side of a reading say the row is stepped. A caret inside them
+ * would read as a value the row is on, so they come off for as long as the
+ * typing is in hand.
+ */
+test('a row being typed into reads the figure rather than a value between step marks', () => {
+    const state = createSettingsState(fakeStorage());
+    const stepped = settingsEntry(state, 'altitudeFeet').text;
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+    const row = settingsEntry(state, 'altitudeFeet');
+
+    assert.equal(row.typing, true);
+    assert.equal(row.valueLabel, typedValueLabel('1'));
+    assert.ok(row.text.includes(TYPED_CARET), 'the row says it is taking more characters');
+    assert.ok(!row.text.includes(TOGGLE_ON_MARK));
+    assert.notEqual(row.text, stepped);
+    assert.equal(optionEntryText(row), row.text);
+
+    applyTypedSettingKey(state, 'Escape');
+    assert.equal(settingsEntry(state, 'altitudeFeet').typing, false);
+    assert.equal(settingsEntry(state, 'altitudeFeet').text, stepped,
+        'and the row reads exactly as it did once the typing is given up on');
+});
+
+test('every other row reads as it always did while one is being typed into', () => {
+    const state = createSettingsState(fakeStorage());
+    const before = state.entries.map(entry => entry.text);
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+
+    for (const [at, entry] of state.entries.entries()) {
+        if (entry.id === 'altitudeFeet') continue;
+        assert.equal(entry.text, before[at], `${entry.id} is not the row being typed into`);
+    }
+});
+
+/**
+ * A panel that opened half way through a figure would read the first digit
+ * pressed at it as the rest of one.
+ */
+test('opening or closing the panel is giving up on whatever was being typed', () => {
+    const state = createSettingsState(fakeStorage());
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+    closeSettings(state);
+    assert.equal(typedSettingRow(state), null);
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+    openSettings(state);
+    assert.equal(typedSettingRow(state), null);
+});
+
+test('the range a refusal names is written the way the row writes a value', () => {
+    assert.equal(optionRangeNotice('headingDegrees'), '000 DEG TO 355 DEG BY 5',
+        'a heading is padded and carries its units on both ends of the sentence');
+    assert.equal(optionRangeNotice('verticalSpeedFpm'), '-2000 FT/MIN TO +3000 FT/MIN BY 20',
+        'and a signed figure reads signed');
+
+    for (const id of [FOG_OPTION, 'runway', 'cameraMode', 'nothing-of-the-sort']) {
+        assert.equal(optionRangeNotice(id), '', `${id} holds no range to be refused against`);
+    }
 });

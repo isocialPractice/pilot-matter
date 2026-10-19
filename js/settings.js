@@ -22,6 +22,9 @@ import {
     START_FIELDS, START_FIELD_IDS, CHOICE_FIELD, TOGGLE_FIELD, resolveStart, runwayForced
 } from './config.js';
 import { ORBIT_RATE, ORBIT_RATES } from './camera-math.js';
+import {
+    typedCharacter, startsTypedValue, readTypedKey, typedValueLabel
+} from './typed-value.js';
 
 export { isEnvironmentId } from './environment/presets.js';
 
@@ -375,6 +378,12 @@ export function optionEntryText(entry) {
         return `${entry.value ? TOGGLE_ON_MARK : TOGGLE_OFF_MARK} ${entry.label}`;
     }
     if (entry.kind !== OPTION_ENTRY) return entry.label;
+
+    // A row being typed into is not being stepped, so the marks that say it is
+    // come off for as long as the typing is in hand. What sits between them is
+    // the caret or the range the last press was refused against, and either of
+    // those inside a pair of step marks reads as a value the row is on.
+    if (entry.typing) return `${entry.label}  ${entry.valueLabel}`;
     return `${entry.label}  ${OPTION_LEFT_MARK} ${entry.valueLabel} ${OPTION_RIGHT_MARK}`;
 }
 
@@ -384,6 +393,11 @@ export function createSettingsState(storage = null, environments = ENVIRONMENTS,
         storage,
         options,
         values: readSettings(storage, options),
+        // Which row is being typed into, what has been typed, and the range a
+        // refused press was measured against. Not remembered between sessions:
+        // a panel that opened half way through a figure would read the first
+        // digit pressed at it as the rest of one.
+        typing: null,
         entries: settingsEntries(environments, options)
     };
 
@@ -404,7 +418,10 @@ export function syncSettingsEntries(state) {
 
         if (entry.kind === OPTION_ENTRY) {
             entry.value = state.values[entry.id];
-            entry.valueLabel = optionValueLabel(entry.id, entry.value, options);
+            entry.typing = state.typing?.id === entry.id;
+            entry.valueLabel = entry.typing
+                ? (state.typing.notice ?? typedValueLabel(state.typing.text))
+                : optionValueLabel(entry.id, entry.value, options);
         }
 
         // A choice marks the one condition in force, the same way the list of
@@ -443,6 +460,7 @@ export function settingsShowing(state) {
 export function openSettings(state) {
     const changed = !state.open;
     state.open = true;
+    state.typing = null;
     syncSettingsEntries(state);
     return changed;
 }
@@ -450,6 +468,8 @@ export function openSettings(state) {
 export function closeSettings(state) {
     const changed = state.open;
     state.open = false;
+    state.typing = null;
+    syncSettingsEntries(state);
     return changed;
 }
 
@@ -559,4 +579,118 @@ export function chooseSetting(state, id, step = 1) {
     // A world answers as itself rather than as the setting holding it, because
     // what a caller does about a new world depends on which world it is.
     return applySetting(state, 'environment', id) == null ? null : id;
+}
+
+// --- Typing a number into a row --------------------------------------------
+
+/**
+ * True for a row a figure can be typed into, which is a row holding a number
+ * along a range. A row holding one of a list of settings is not one: what a
+ * list offers is positions rather than figures, and `CLEAR` is not something a
+ * pilot has a number in mind for.
+ */
+export function isTypedSettingRow(state, id) {
+    const entry = settingsEntry(state, id);
+    if (entry?.kind !== OPTION_ENTRY) return false;
+    return isRangeOption(settingsOption(id, state.options ?? SETTINGS_OPTIONS));
+}
+
+/** The row being typed into, or null while none is. */
+export function typedSettingRow(state) {
+    return state?.typing?.id ?? null;
+}
+
+/** What has been typed into it so far, or null while nothing is being typed. */
+export function typedSettingText(state) {
+    return state?.typing?.text ?? null;
+}
+
+/**
+ * What the row says when a press is refused: the range the stepper honours,
+ * written the way the row writes a value, so the sentence the pilot reads is in
+ * the units they just typed in.
+ *
+ * The step is named as well where it is not one, because the range is only half
+ * of what is allowed: the panel offers an airspeed every five knots, and a
+ * refusal that said nothing about the five would be a refusal of 83 knots with
+ * no reason on screen.
+ */
+export function optionRangeNotice(id, options = SETTINGS_OPTIONS) {
+    const option = settingsOption(id, options);
+    if (!isRangeOption(option)) return '';
+
+    const span = `${optionValueLabel(id, option.min, options)} TO ${optionValueLabel(id, option.max, options)}`;
+    return option.step === 1 ? span : `${span} BY ${option.step}`;
+}
+
+/**
+ * Starts a pilot typing into a row, taking the key they started with as the
+ * first character of the figure. Returns the row, or null for a key that types
+ * nothing or a row that holds no figure.
+ */
+export function beginTypedSetting(state, id, code) {
+    if (!startsTypedValue(code) || !isTypedSettingRow(state, id)) return null;
+
+    state.typing = { id, text: typedCharacter(code), notice: null };
+    syncSettingsEntries(state);
+    return id;
+}
+
+/** Gives up on the figure, leaving the row on the value it already had. */
+export function cancelTypedSetting(state) {
+    const id = state?.typing?.id ?? null;
+    if (id == null) return null;
+
+    state.typing = null;
+    syncSettingsEntries(state);
+    return id;
+}
+
+/**
+ * Applies a key press to the row being typed into.
+ *
+ * Returns what the press came to, as `{ result, option, value }`: `typed` and
+ * `erased` for a figure still being written, `applied` for one taken, `refused`
+ * for one the range will not have, and `cancelled` for the way out. A refused
+ * figure leaves the row typing, so the next press carries on from what is there
+ * rather than starting again from nothing.
+ *
+ * Null when no row is being typed into, and null for a key that means nothing
+ * to one - the caller then reads that key however it would have otherwise,
+ * which is what keeps the cursor able to walk off a row mid-figure.
+ */
+export function applyTypedSettingKey(state, code) {
+    const typing = state?.typing;
+    if (typing == null) return null;
+
+    const read = readTypedKey(typing.text, code);
+    if (read == null) return null;
+
+    if (read.action === 'cancel') {
+        return { result: 'cancelled', option: cancelTypedSetting(state), value: null };
+    }
+
+    if (read.action === 'commit') {
+        const options = state.options ?? SETTINGS_OPTIONS;
+
+        // The same validator the stepper is held to, rather than a second
+        // reading of the same range: a figure typed in where a stepped one
+        // would be refused is the panel disagreeing with itself.
+        if (read.value == null || !isOptionValue(typing.id, read.value, options)) {
+            typing.notice = optionRangeNotice(typing.id, options);
+            syncSettingsEntries(state);
+            return { result: 'refused', option: typing.id, value: read.value };
+        }
+
+        const id = typing.id;
+        state.typing = null;
+        applySetting(state, id, read.value);
+        syncSettingsEntries(state);
+        return { result: 'applied', option: id, value: read.value };
+    }
+
+    typing.text = read.text;
+    typing.notice = null;
+    syncSettingsEntries(state);
+    return { result: read.action, option: typing.id, value: null };
 }

@@ -1980,6 +1980,30 @@ test('reaching for the mouse gives up on a figure half typed', () => {
     }
 });
 
+/**
+ * And the editor's rows have to be handed to the menu they are drawn from, which
+ * the settings panel's do not: `syncSettingsEntries` writes over the rows the
+ * panel already had, while `syncEditorEntries` builds a new set - the editor
+ * being the one panel whose rows come and go.
+ *
+ * A pointer that only crossed onto a row chooses nothing, so neither
+ * `chooseEditorRow` nor anything else below it redraws. Without this the row the
+ * figure was on goes on reading its caret for a figure already given up on, and
+ * the next `Enter` steps the row instead of taking a figure.
+ */
+test('and hands the editor the rows that giving up on one rebuilt', () => {
+    const body = mainSource.match(/onEditorPointer\(index, choose, step = 1\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(body, 'js/main.js should read the pointer in onEditorPointer');
+
+    const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)');
+    const handed = body[0].indexOf('setMenuEntries(this.editorState, this.editor.entries)');
+
+    assert.ok(handed > cancel,
+        'onEditorPointer should hand the rebuilt rows to the menu the list is drawn from');
+    assert.ok(handed < body[0].indexOf('syncOverlays('),
+        'before the list is drawn again from them');
+});
+
 // Both panels tell a pilot the rows can be typed into, in the line that already
 // tells them what the keys do.
 test('both panels say a number can be typed at a row', () => {

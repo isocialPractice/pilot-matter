@@ -31,6 +31,7 @@ import { TOGGLE_FIELD } from './config.js';
 import {
     AXIS_DIRECTIONAL, AXIS_INVERTED, AXIS_NAMES, DEFAULT_AXES, VERTICAL_CONTROLS, resolveAxes
 } from './input-map.js';
+import { TILT_DEADZONE } from './tilt-controls.js';
 import {
     BINDING_NAMES, BINDING_LABELS, DEFAULT_BINDINGS,
     bindingLabel, bindingOptional, keyLabel,
@@ -43,6 +44,7 @@ export const CONTROL_SETTINGS_STORAGE_KEY = 'pilot-matter.control-settings';
 export const CONTROL_SETTINGS_TITLE = 'CONTROL SETTINGS';
 
 export const CONTROL_AXES_HEADING      = 'AXES';
+export const CONTROL_TILT_HEADING      = 'TILT';
 export const CONTROL_ATTITUDE_HEADING  = 'ATTITUDE';
 export const CONTROL_LEVEL_OFF_HEADING = 'LEVEL OFF';
 export const CONTROL_KEYS_HEADING      = 'KEYS';
@@ -69,6 +71,7 @@ export const ACTION_ENTRY  = 'action';
 // Which heading a row is drawn under. The cursor walks every row as one list
 // whichever group it is in, so a group is a heading rather than a mode.
 export const AXIS_GROUP      = 'axes';
+export const TILT_GROUP      = 'tilt';
 export const ATTITUDE_GROUP  = 'attitude';
 export const LEVEL_OFF_GROUP = 'levelOff';
 export const BINDING_GROUP   = 'keys';
@@ -79,8 +82,18 @@ export const REFERENCE_GROUP = 'reference';
 export const PITCH_AXIS_OPTION     = 'pitchAxis';
 export const ROLL_AXIS_OPTION      = 'rollAxis';
 export const TILT_AXES_OPTION      = 'tiltAxes';
+export const TILT_FLYING_OPTION    = 'tiltFlying';
+export const TILT_DEADZONE_OPTION  = 'tiltDeadzone';
 export const FULL_ROTATION_OPTION  = 'fullRotation';
 export const REFERENCE_OPEN_OPTION = 'referenceOpen';
+
+// When the device is read as the stick. The machine decides by default, which
+// is the answer the game has always given and the only one that is right
+// without being asked; the other two are the pilot overruling it, in whichever
+// direction their machine got wrong.
+export const TILT_WITH_NO_KEYS = 'noKeys';
+export const TILT_ALWAYS       = 'always';
+export const TILT_NEVER        = 'never';
 
 /**
  * The option holding whether one control hands the aircraft back after a level
@@ -146,6 +159,39 @@ const AXIS_VALUES = Object.freeze([
 const BOX_VALUES = Object.freeze([
     { value: true,  label: 'ON'  },
     { value: false, label: 'OFF' }
+]);
+
+/**
+ * When the device is flown with, as the three answers rather than a box.
+ *
+ * A box would be two answers, and the third is the one the game shipped with:
+ * whichever the machine has. That answer is still right for almost every
+ * machine, and it is the only one that can be the default, because a default of
+ * either other answer is a tablet that cannot be flown or a phone with no
+ * controls at all until somebody finds this row.
+ */
+const TILT_FLYING_VALUES = Object.freeze([
+    { value: TILT_WITH_NO_KEYS, label: 'WITH NO KEYS' },
+    { value: TILT_ALWAYS,       label: 'ALWAYS'       },
+    { value: TILT_NEVER,        label: 'NEVER'        }
+]);
+
+/**
+ * How far the device is turned before it asks for anything, as a few labelled
+ * positions rather than a range of degrees - so no combination of keys lands it
+ * between two of them, which is how the rest of the panel offers a number.
+ *
+ * How still a hand is varies more between two pilots than almost anything else
+ * here, and the middle position is the module's own constant rather than the
+ * same figure written out again: a deadzone too narrow is an aircraft that will
+ * not fly straight, and the pilot it is too narrow for is the one setting this.
+ */
+const TILT_DEADZONE_VALUES = Object.freeze([
+    { value: 3,              label: 'FINE'      },
+    { value: 5,              label: 'NARROW'    },
+    { value: TILT_DEADZONE,  label: 'NORMAL'    },
+    { value: 11,             label: 'WIDE'      },
+    { value: 15,             label: 'VERY WIDE' }
 ]);
 
 /** What each control is called on the box that says whether it counts. */
@@ -218,6 +264,34 @@ export const CONTROL_OPTIONS = Object.freeze([
         kind: TOGGLE_FIELD,
         default: false,
         values: BOX_VALUES
+    },
+    {
+        // Which machine is flown by tilt, which used to be the machine's own
+        // answer and nothing else: `isTouchOnly()` was asked once at start-up
+        // and nothing could change it afterwards, so a tablet with a keyboard
+        // could not turn tilt on and a phone could not turn it off, though both
+        // are perfectly capable of the other.
+        //
+        // What this holds is what the pilot wants rather than what is
+        // happening. The sensor may still refuse - a browser can say no, and a
+        // device with no gyroscope says yes and then reports nothing - and
+        // `tiltFlying` in js/tilt-controls.js is what tells those two apart, so
+        // the pads stay on the glass for a tilt that was asked for and never
+        // arrived.
+        id: TILT_FLYING_OPTION,
+        label: 'FLY BY TILT',
+        note: 'when the device itself is the stick rather than the keys',
+        group: TILT_GROUP,
+        default: TILT_WITH_NO_KEYS,
+        values: TILT_FLYING_VALUES
+    },
+    {
+        id: TILT_DEADZONE_OPTION,
+        label: 'TILT DEADZONE',
+        note: 'how far the device is turned before it asks for anything',
+        group: TILT_GROUP,
+        default: TILT_DEADZONE,
+        values: TILT_DEADZONE_VALUES
     },
     {
         // Off by default, and that is the setting rather than an oversight: the
@@ -527,6 +601,34 @@ export function tiltReadsAxes(state) {
  */
 export function tiltInputAxes(state) {
     return tiltReadsAxes(state) ? controlAxes(state) : DEFAULT_AXES;
+}
+
+/**
+ * Whether this pilot wants to fly by tilt at all, given what the machine they
+ * are on can do.
+ *
+ * `touchOnly` is the machine's own answer, which is what the setting defaults to
+ * deferring to: a phone is flown from the glass because there is nothing else to
+ * fly it from, and a machine with keys is flown with them. Either can be
+ * overruled, and the overruling is a want rather than a state - a machine told
+ * always may still have no sensor to offer, and `tiltFlying` is what reads that.
+ */
+export function tiltWanted(state, touchOnly = false) {
+    const value = currentControlOption(state, TILT_FLYING_OPTION);
+    if (value === TILT_ALWAYS) return true;
+    if (value === TILT_NEVER)  return false;
+    return touchOnly === true;
+}
+
+/**
+ * How far the device is turned before it asks for anything, in degrees, as
+ * `tiltToInput` takes it. The module's own constant for a setting from a version
+ * that offered none, so a stored value this one has never heard of costs the
+ * deadzone nothing.
+ */
+export function tiltDeadzone(state) {
+    const value = currentControlOption(state, TILT_DEADZONE_OPTION);
+    return Number.isFinite(value) ? value : TILT_DEADZONE;
 }
 
 /**

@@ -6,6 +6,7 @@ import {
     CONTROL_SETTINGS_STORAGE_KEY,
     CONTROL_SETTINGS_TITLE,
     CONTROL_AXES_HEADING,
+    CONTROL_TILT_HEADING,
     CONTROL_ATTITUDE_HEADING,
     CONTROL_LEVEL_OFF_HEADING,
     CONTROL_KEYS_HEADING,
@@ -20,12 +21,18 @@ import {
     PITCH_AXIS_OPTION,
     ROLL_AXIS_OPTION,
     TILT_AXES_OPTION,
+    TILT_FLYING_OPTION,
+    TILT_DEADZONE_OPTION,
+    TILT_WITH_NO_KEYS,
+    TILT_ALWAYS,
+    TILT_NEVER,
     FULL_ROTATION_OPTION,
     REFERENCE_OPEN_OPTION,
     levelOffOptionId,
     levelOffOptionControl,
     AXIS_OPTIONS,
     AXIS_GROUP,
+    TILT_GROUP,
     ATTITUDE_GROUP,
     LEVEL_OFF_GROUP,
     BINDING_GROUP,
@@ -56,6 +63,8 @@ import {
     fullRotationWanted,
     tiltReadsAxes,
     tiltInputAxes,
+    tiltWanted,
+    tiltDeadzone,
     levelOffControls,
     referenceOpenWanted,
     rememberReferenceOpen,
@@ -82,6 +91,9 @@ import {
 import {
     AXIS_DIRECTIONAL, AXIS_INVERTED, AXIS_NAMES, DEFAULT_AXES, VERTICAL_CONTROLS
 } from '../js/input-map.js';
+import {
+    TILT_DEADZONE, createTiltState, tiltFlying, applyTiltReading
+} from '../js/tilt-controls.js';
 import { START_MENU_ENTRIES, PAUSE_MENU_ENTRIES } from '../js/menu.js';
 
 // js/main.js imports Three.js, so what it does with the panel is read off its
@@ -104,8 +116,8 @@ function fakeStorage(initial = {}) {
 test('the panel is titled, and names each thing it sets', () => {
     assert.equal(CONTROL_SETTINGS_TITLE, 'CONTROL SETTINGS');
     const headings = [
-        CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING, CONTROL_LEVEL_OFF_HEADING,
-        CONTROL_KEYS_HEADING, CONTROL_REFERENCE_HEADING
+        CONTROL_AXES_HEADING, CONTROL_TILT_HEADING, CONTROL_ATTITUDE_HEADING,
+        CONTROL_LEVEL_OFF_HEADING, CONTROL_KEYS_HEADING, CONTROL_REFERENCE_HEADING
     ];
     for (const heading of headings) {
         assert.ok(heading.length > 0, 'every section of the panel should carry a heading');
@@ -123,7 +135,8 @@ test('the panel remembers its choices somewhere of its own', () => {
 
 test('every option answers to an id, and no two answer to one', () => {
     assert.deepEqual(CONTROL_OPTION_IDS, [
-        PITCH_AXIS_OPTION, ROLL_AXIS_OPTION, TILT_AXES_OPTION, FULL_ROTATION_OPTION,
+        PITCH_AXIS_OPTION, ROLL_AXIS_OPTION, TILT_AXES_OPTION,
+        TILT_FLYING_OPTION, TILT_DEADZONE_OPTION, FULL_ROTATION_OPTION,
         ...VERTICAL_CONTROLS.map(levelOffOptionId), REFERENCE_OPEN_OPTION
     ]);
     assert.equal(new Set(CONTROL_OPTION_IDS).size, CONTROL_OPTION_IDS.length);
@@ -147,6 +160,9 @@ test('each option is drawn under the heading it belongs to', () => {
     assert.equal(controlOption(ROLL_AXIS_OPTION).group, AXIS_GROUP);
     assert.equal(controlOption(TILT_AXES_OPTION).group, AXIS_GROUP,
         'the device is read through the two settings above it, so it is asked about beside them');
+    assert.equal(controlOption(TILT_FLYING_OPTION).group, TILT_GROUP);
+    assert.equal(controlOption(TILT_DEADZONE_OPTION).group, TILT_GROUP,
+        'how far the device is turned is a question about the device, not about an axis');
     assert.equal(controlOption(FULL_ROTATION_OPTION).group, ATTITUDE_GROUP);
     for (const control of VERTICAL_CONTROLS) {
         assert.equal(controlOption(levelOffOptionId(control)).group, LEVEL_OFF_GROUP);
@@ -166,6 +182,8 @@ test('the panel opens on the controls the simulator has always had', () => {
         [PITCH_AXIS_OPTION]: AXIS_DIRECTIONAL,
         [ROLL_AXIS_OPTION]:  AXIS_DIRECTIONAL,
         [TILT_AXES_OPTION]: false,
+        [TILT_FLYING_OPTION]: TILT_WITH_NO_KEYS,
+        [TILT_DEADZONE_OPTION]: TILT_DEADZONE,
         [FULL_ROTATION_OPTION]: false,
         ...Object.fromEntries(VERTICAL_CONTROLS.map(control => [levelOffOptionId(control), true])),
         [REFERENCE_OPEN_OPTION]: true
@@ -646,6 +664,182 @@ test('the device is read through the axis settings only when the pilot asks', ()
     assert.equal(tiltReadsAxes(state), true);
     assert.deepEqual(tiltInputAxes(state), controlAxes(state),
         'on, the device is read through the same pair the keys are');
+});
+
+// --- Flying by tilt, or by keys --------------------------------------------
+
+/**
+ * `createTiltState(enabled)` took the answer and js/main.js handed it
+ * `isTouchOnly()` once at start-up, with nothing able to change it afterwards: a
+ * tablet with a keyboard could not turn tilt on and a phone could not turn it
+ * off, though both are perfectly capable of the other.
+ *
+ * So the row holds three answers rather than two. The machine's own answer is
+ * the default, because it is right for almost every machine and it is the only
+ * one that can be: a default of ALWAYS is a desktop reading a sensor nobody
+ * asked it to, and a default of NEVER is a phone with no controls at all until
+ * somebody finds this row.
+ */
+test('whether the device is flown with is the pilot to answer, not the machine', () => {
+    const state = createControlSettingsState(fakeStorage());
+
+    assert.equal(currentControlOption(state, TILT_FLYING_OPTION), TILT_WITH_NO_KEYS,
+        'the panel opens deferring to the machine, which is what the game always did');
+    assert.equal(tiltWanted(state, true), true, 'so a machine with no keys is flown by tilt');
+    assert.equal(tiltWanted(state, false), false, 'and a machine with keys is flown with them');
+    assert.equal(tiltWanted(state), false, 'with nothing said about the machine, nothing is assumed');
+
+    adjustControlSetting(state, TILT_FLYING_OPTION, 1);
+    assert.equal(currentControlOption(state, TILT_FLYING_OPTION), TILT_ALWAYS);
+    assert.equal(tiltWanted(state, false), true,
+        'a tablet with a keyboard can ask for the device to be the stick');
+
+    adjustControlSetting(state, TILT_FLYING_OPTION, 1);
+    assert.equal(currentControlOption(state, TILT_FLYING_OPTION), TILT_NEVER);
+    assert.equal(tiltWanted(state, true), false,
+        'and a phone can ask to be left alone, which is the half nothing offered before');
+
+    // Stepped back round to where it started, because a list in this panel wraps
+    // at both ends and three answers are no exception.
+    adjustControlSetting(state, TILT_FLYING_OPTION, 1);
+    assert.equal(currentControlOption(state, TILT_FLYING_OPTION), TILT_WITH_NO_KEYS);
+});
+
+test('the answer outlives the session the pilot gave it in', () => {
+    const storage = fakeStorage();
+    const state = createControlSettingsState(storage);
+
+    assert.equal(adjustControlSetting(state, TILT_FLYING_OPTION, -1), TILT_FLYING_OPTION);
+    assert.equal(currentControlOption(state, TILT_FLYING_OPTION), TILT_NEVER,
+        'stepping down from the first answer reaches the last, the way every list here does');
+
+    assert.equal(tiltWanted(createControlSettingsState(storage), true), false,
+        'and the next session on that phone is still flown from the pads');
+});
+
+/**
+ * The setting is what the pilot wants rather than what is happening: a browser
+ * can refuse the sensor, and a device with no gyroscope answers yes and then
+ * reports nothing. `tiltFlying` is what tells those two apart, so the pads stay
+ * on the glass for a tilt that was asked for and never arrived - and this row
+ * reads ALWAYS whichever way that went.
+ */
+test('asking for tilt is not the same as getting it', () => {
+    const state = createControlSettingsState(fakeStorage());
+    adjustControlSetting(state, TILT_FLYING_OPTION, 1);
+
+    const tilt = createTiltState(tiltWanted(state, false));
+    assert.equal(tilt.enabled, true, 'the state is created wanting it');
+    assert.equal(tiltFlying(tilt), false, 'and not flying by it, there being no reading yet');
+
+    applyTiltReading(tilt, null, null);
+    assert.equal(tiltFlying(tilt), false,
+        'a device that fires the event with nothing in it has still reported nothing');
+    assert.equal(tiltWanted(state, false), true, 'and the row goes on saying what was asked for');
+
+    applyTiltReading(tilt, 10, 0);
+    assert.equal(tiltFlying(tilt), true, 'a reading is what turns the want into a state');
+});
+
+// --- How far the device is turned ------------------------------------------
+
+/**
+ * `TILT_DEADZONE` was 7 degrees and `tiltToInput` took it as an argument that
+ * nothing passed. How still a hand is varies more between two pilots than almost
+ * anything else here, and a deadzone too narrow means an aircraft that will not
+ * fly straight.
+ */
+test('how far the device is turned before it asks for anything is a setting', () => {
+    const state = createControlSettingsState(fakeStorage());
+
+    assert.equal(tiltDeadzone(state), TILT_DEADZONE,
+        'the panel opens on the figure the module shipped with');
+
+    const offered = controlOption(TILT_DEADZONE_OPTION).values.map(entry => entry.value);
+    assert.ok(offered.includes(TILT_DEADZONE), 'which is one of the positions it offers');
+    assert.ok(offered.some(value => value < TILT_DEADZONE), 'with somewhere narrower to go');
+    assert.ok(offered.some(value => value > TILT_DEADZONE), 'and somewhere wider');
+
+    adjustControlSetting(state, TILT_DEADZONE_OPTION, 1);
+    assert.ok(tiltDeadzone(state) > TILT_DEADZONE, 'and stepping up widens it');
+    adjustControlSetting(state, TILT_DEADZONE_OPTION, -2);
+    assert.ok(tiltDeadzone(state) < TILT_DEADZONE, 'and stepping down narrows it');
+});
+
+/**
+ * A few labelled positions rather than a range of degrees, the way the rest of
+ * the panel offers a number: no combination of keys can land the setting between
+ * two of them, and a figure read off a row is a figure the pilot chose.
+ */
+test('the deadzone is offered as positions rather than as a range', () => {
+    const option = controlOption(TILT_DEADZONE_OPTION);
+
+    assert.ok(Array.isArray(option.values), 'a range would let a key land it between two readings');
+    assert.ok(option.values.length >= 3, 'and one either side of normal is the fewest worth offering');
+
+    for (const entry of option.values) {
+        assert.ok(Number.isFinite(entry.value) && entry.value > 0,
+            'every position is a deadzone in degrees');
+        assert.ok(/^[A-Z ]+$/.test(entry.label),
+            `${entry.value} degrees should read as a position, not as a figure - it reads "${entry.label}"`);
+    }
+
+    const degrees = option.values.map(entry => entry.value);
+    assert.deepEqual(degrees, [...degrees].sort((a, b) => a - b),
+        'in order, so stepping the row one way always goes one way');
+    assert.equal(new Set(degrees).size, degrees.length, 'two positions on one figure is one position');
+});
+
+/**
+ * A value from a version that offered none of this, or from nowhere at all, is
+ * the module's own figure rather than a deadzone of nothing - which would be a
+ * device that cannot be held still enough to fly straight.
+ */
+test('a deadzone from somewhere else is the one the module shipped with', () => {
+    const stored = fakeStorage({
+        [CONTROL_SETTINGS_STORAGE_KEY]: JSON.stringify({ [TILT_DEADZONE_OPTION]: 999 })
+    });
+
+    assert.equal(tiltDeadzone(createControlSettingsState(stored)), TILT_DEADZONE);
+    assert.equal(tiltDeadzone(createControlSettingsState(null)), TILT_DEADZONE);
+    assert.equal(tiltDeadzone({}), TILT_DEADZONE);
+    assert.equal(tiltDeadzone(null), TILT_DEADZONE);
+});
+
+/**
+ * Both of these reach the sensor through js/main.js, which imports Three.js, so
+ * what it does with them is read off its source the way the rest of this file
+ * reads it.
+ */
+test('the sensor is handed the answer the panel holds rather than the machine alone', () => {
+    assert.match(mainSource, /createTiltState\(tiltWanted\(this\.controlSettings, this\.touchOnly\)\)/,
+        'js/main.js should open the tilt state on the setting, resolved against the machine');
+
+    const sync = mainSource.match(/syncTilt\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(sync, 'and offer a way to carry a change of mind to the sensor');
+    assert.ok(sync[0].includes('tiltWanted(this.controlSettings, this.touchOnly)'),
+        'reading the same resolved answer rather than a second rule of its own');
+    assert.ok(sync[0].includes('this.tiltSensor.stop()'),
+        'stopping the sensor for a pilot who has asked to be left alone');
+    assert.ok(sync[0].includes('this.tiltSensor.start()'),
+        'and starting it for one who has asked for the device');
+    assert.ok(/if \(wanted === this\.tilt\.enabled\) return;/.test(sync[0]),
+        'and doing nothing at all where the answer has not changed, because starting is asking '
+      + 'and the gesture it has is the one that chose the row');
+
+    const apply = mainSource.match(/applyControlSettings\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(apply, 'js/main.js should hand the panel to the flight in one place');
+    assert.ok(apply[0].includes('this.syncTilt()'),
+        'and the sensor is one of the things it hands it to, or the row is set and nothing happens');
+});
+
+test('the deadzone the device is read with is the one the panel is on', () => {
+    const track = mainSource.match(/trackTilt\(frozen\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(track, 'js/main.js should hand the attitude of the device to the aircraft');
+    assert.ok(track[0].includes('tiltDeadzone(this.controlSettings)'),
+        'through the deadzone the panel resolved, rather than the module constant it used to pass');
+    assert.ok(!/TILT_DEADZONE/.test(mainSource),
+        'the constant is a default of the panel now, so js/main.js has no business naming it');
 });
 
 // --- Remembering the reference list ----------------------------------------

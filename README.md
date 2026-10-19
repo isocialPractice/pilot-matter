@@ -114,12 +114,23 @@ editor, `A`/`D` or `←`/`→` step the value under the cursor through its setti
 and a click on a row holding a value steps it the way the click reads: left of
 the middle steps it back, right of it steps it on. `Esc` backs out.
 
+A number is also typed rather than stepped to, in the two panels that hold one:
+a digit at a row holding a figure starts it, `Enter` takes it, and the figure
+goes through the validator the stepping goes through, so neither route allows
+what the other refuses. A start altitude of 1390 feet is four presses that way
+and 139 the other.
+
 What the keys mean is itself a setting. The `CONTROL SETTINGS` entry, on the
 start screen and in the pause menu, reads each attitude axis either way round -
 `DIRECTIONAL` points the key where the aircraft goes, `INVERTED` points it where
 a stick would - carries that reading through to a device flown by tilting it,
 and opens the attitude up to a full turn in pitch and in roll for a pilot who
 wants to fly a loop. All of those are off by default.
+
+Flying by tilt is a setting as well, rather than whatever the machine happens to
+be: it opens on the machine's own answer, and a tablet with a keyboard can ask
+for the device while a phone can ask to be left alone. How far the device is
+turned before it asks for anything is a row beside it.
 
 Which key is which is a setting too: the panel has a row per control and per
 instruction, each taking the next key pressed as its own, a refusal for a key
