@@ -15,9 +15,11 @@ import { MUTE_KEY } from '../js/audio.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
 import {
-    CONTROL_SETTINGS_TITLE, CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING,
-    CONTROL_LEVEL_OFF_HEADING, CONTROL_KEYS_HEADING,
-    CONTROL_REFERENCE_HEADING, CONTROL_REFERENCE_LABEL
+    CONTROL_SETTINGS_TITLE, CONTROL_AXES_HEADING, CONTROL_TILT_HEADING,
+    CONTROL_ATTITUDE_HEADING, CONTROL_LEVEL_OFF_HEADING, CONTROL_KEYS_HEADING,
+    CONTROL_REFERENCE_HEADING, CONTROL_REFERENCE_LABEL,
+    AXIS_GROUP, TILT_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP,
+    REFERENCE_GROUP, controlSettingsEntries
 } from '../js/control-settings.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 import { TOUCH_PADS, TOUCH_CELLS, TOUCH_LEFT, TOUCH_RIGHT } from '../js/touch-controls.js';
@@ -290,27 +292,38 @@ const CARD_LINE_CEILINGS = {
     name: 20, objective: 32, status: 44, clock: 29, pointer: 30
 };
 
+/**
+ * The six groups the control settings panel is split across, each with the
+ * heading over it and the list its rows are drawn into, in the order the panel
+ * draws them.
+ *
+ * One table rather than two arrays beside each other, because the three facts
+ * about a group travel together: a group added to the panel wants a heading, a
+ * list, and a place in the order, and the tests below are what say so.
+ */
+const CONTROL_GROUPS = [
+    { group: AXIS_GROUP,      heading: CONTROL_AXES_HEADING,      list: 'control-settings-axes' },
+    { group: TILT_GROUP,      heading: CONTROL_TILT_HEADING,      list: 'control-settings-tilt' },
+    { group: ATTITUDE_GROUP,  heading: CONTROL_ATTITUDE_HEADING,  list: 'control-settings-attitude' },
+    { group: LEVEL_OFF_GROUP, heading: CONTROL_LEVEL_OFF_HEADING, list: 'control-settings-level-off' },
+    { group: BINDING_GROUP,   heading: CONTROL_KEYS_HEADING,      list: 'control-settings-keys' },
+    { group: REFERENCE_GROUP, heading: CONTROL_REFERENCE_HEADING, list: 'control-settings-reference' }
+];
+
+// The six lists the control settings panel is split across, which are held to
+// the same rules the settings panel's three are.
+const CONTROL_LISTS = CONTROL_GROUPS.map(entry => entry.list);
+
 // Every menu drawn into the page: the two cards, the panels they open, and the
-// three lists one panel is split across.
+// lists the two biggest panels are split across.
 const MENU_LISTS = [
     'start-menu', 'pause-menu', 'game-modes-menu', 'element-editor-menu',
     'settings-menu', 'settings-start', 'settings-options',
-    'control-settings-axes', 'control-settings-attitude', 'control-settings-level-off',
-    'control-settings-keys', 'control-settings-reference'
-];
-
-// The five lists the control settings panel is split across, which are held to
-// the same rules the settings panel's three are.
-const CONTROL_LISTS = [
-    'control-settings-axes', 'control-settings-attitude', 'control-settings-level-off',
-    'control-settings-keys', 'control-settings-reference'
+    ...CONTROL_LISTS
 ];
 
 // The heading over each of those lists, in the order the panel draws them.
-const CONTROL_HEADINGS = [
-    CONTROL_AXES_HEADING, CONTROL_ATTITUDE_HEADING, CONTROL_LEVEL_OFF_HEADING,
-    CONTROL_KEYS_HEADING, CONTROL_REFERENCE_HEADING
-];
+const CONTROL_HEADINGS = CONTROL_GROUPS.map(entry => entry.heading);
 
 // The browser tab shows the title next to the favicon, so the two should
 // name the same thing rather than a leftover working title.
@@ -565,6 +578,90 @@ test('the control settings panel is titled and says what it is setting', () => {
         assert.ok(new RegExp(`<h3>${heading}</h3>`).test(indexHtml),
             `the panel should name what its ${heading} list changes`);
     }
+});
+
+/**
+ * The cursor walks the whole panel as one list and the lists it is drawn into
+ * are filtered by group, so the order the headings come down the page has to be
+ * the order the entries come in. A heading drawn out of that order is a cursor
+ * that jumps up the page and back down again on one press of W.
+ *
+ * Checked against the entries rather than against a second copy of the order,
+ * because the entries are the thing the cursor actually walks.
+ */
+test('the panel draws its headings in the order the cursor walks the groups', () => {
+    const panel = indexHtml.slice(
+        indexHtml.indexOf('id="control-settings"'),
+        indexHtml.indexOf('id="game-modes"')
+    );
+    assert.ok(panel.length > 0, 'index.html should carry the control settings panel');
+
+    const drawn = [...panel.matchAll(/<h3>([^<]+)<\/h3>\s*<ul id="([^"]+)"><\/ul>/g)]
+        .map(([, heading, list]) => ({ heading, list }));
+
+    assert.deepEqual(drawn, CONTROL_GROUPS.map(({ heading, list }) => ({ heading, list })),
+        'every heading should be followed by the list its rows go into, in the drawn order');
+
+    // And that order is the order the entries themselves come in.
+    const walked = [];
+    for (const entry of controlSettingsEntries()) {
+        if (walked[walked.length - 1] !== entry.group) walked.push(entry.group);
+    }
+
+    assert.deepEqual(walked, CONTROL_GROUPS.map(entry => entry.group),
+        'the cursor walks the groups in this order, so the headings should be drawn in it');
+});
+
+/**
+ * Every group the panel's rows declare has a list of its own to be drawn into,
+ * and the last list takes what is left over.
+ *
+ * This is the one with teeth. `controlReferenceMenu` in js/main.js is a
+ * catch-all - it draws every entry whose group is not one of the five named
+ * before it - so a group added to js/control-settings.js and not to that list
+ * is not a group that goes missing. It is a group drawn under REFERENCE,
+ * beneath the way out of the panel, with nothing anywhere saying so.
+ *
+ * js/main.js imports Three.js and cannot be imported here, so the filters are
+ * read off its source the way the key handlers below are.
+ */
+test('every group the panel declares is drawn under a heading of its own', () => {
+    const declared = [...new Set(controlSettingsEntries().map(entry => entry.group))];
+    assert.deepEqual(declared.sort(), CONTROL_GROUPS.map(entry => entry.group).sort(),
+        'a group the rows declare and the panel has no heading for is a group drawn '
+      + 'under somebody else\'s');
+
+    // The name each group constant is written under, so a filter naming the
+    // constant can be read against the group it stands for.
+    const named = {
+        AXIS_GROUP, TILT_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP, REFERENCE_GROUP
+    };
+
+    const reference = CONTROL_GROUPS[CONTROL_GROUPS.length - 1];
+    for (const { group, list } of CONTROL_GROUPS) {
+        if (group === reference.group) continue;
+
+        const built = new RegExp(
+            `getElementById\\('${list}'\\)[\\s\\S]{0,120}?entry\\.group === (\\w+)`);
+        const match = mainSource.match(built);
+        assert.ok(match, `js/main.js should draw #${list} from the entries of one group`);
+        assert.equal(named[match[1]], group,
+            `#${list} is drawn from ${match[1]}, which is not the group its heading names`);
+    }
+
+    // And the catch-all at the end excludes every one of the others, so what is
+    // left over is the reference group and nothing else.
+    const catchAll = mainSource.match(new RegExp(
+        `getElementById\\('${reference.list}'\\)[\\s\\S]{0,240}?!\\[([\\s\\S]*?)\\]\\s*\\.includes\\(entry\\.group\\)`));
+    assert.ok(catchAll, `js/main.js should draw #${reference.list} from what the others leave`);
+
+    const excluded = catchAll[1].split(',').map(name => name.trim()).filter(Boolean);
+    assert.deepEqual(
+        excluded.map(name => named[name]).sort(),
+        CONTROL_GROUPS.filter(entry => entry.group !== reference.group)
+            .map(entry => entry.group).sort(),
+        `#${reference.list} takes everything the five before it do not, so a group missing `
+      + 'from that list is a group drawn under REFERENCE with the suite still green');
 });
 
 // The panel says how it is worked, the way the settings panel does: a row that is
@@ -1804,6 +1901,192 @@ test('the card is floated by the run that floats the rest of them', () => {
     for (const overlay of ['attitude', 'muted', 'hud']) {
         assert.ok(floated.includes(overlay), `and go on floating ${overlay}`);
     }
+});
+
+// --- Typing a number into a panel row --------------------------------------
+
+/**
+ * Three of the keys a figure answers are keys the panels already mean something
+ * by: Enter chooses a row, Escape closes the panel, and Backspace closes it too.
+ * So a row being typed into has to read the press before the panel does, or the
+ * first Enter at a figure closes nothing and sets nothing.
+ *
+ * js/main.js imports Three.js, so the order is read off its source the way the
+ * rest of what it does with a panel is.
+ */
+const mainSource = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
+
+const TYPING_HANDLERS = [
+    ['onSettingsKey', 'typedSettingRow(this.settings)', 'applyTypedSettingKey', 'beginTypedSetting'],
+    ['onEditorKey',   'typedEditorRow(this.editor)',    'applyTypedEditorKey',  'beginTypedEditorValue']
+];
+
+test('a row being typed into reads a key before the panel it is on does', () => {
+    for (const [handler, showing, apply, begin] of TYPING_HANDLERS) {
+        const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        assert.ok(body, `js/main.js should read keys in ${handler}`);
+
+        const typing = body[0].indexOf(showing);
+        const close  = body[0].search(/is(?:Settings|Editor)CloseKey\(e\.code\)/);
+        const menu   = body[0].indexOf('isMenuKey(e.code)');
+
+        assert.ok(typing >= 0, `${handler} should ask whether a row is being typed into`);
+        assert.ok(body[0].includes(`${apply}(`), 'and hand the press to the figure');
+        assert.ok(close > typing,
+            `${handler} reads the key that closes the panel at ${close} and the figure at `
+          + `${typing} - a figure being written has first claim on Escape`);
+        assert.ok(menu > typing,
+            `${handler} reads the menu keys at ${menu} and the figure at ${typing} - `
+          + 'a figure being written has first claim on Enter');
+
+        // And a digit starts one, read after the way out so the panel can always
+        // be left, and before the stepping keys, which no digit is one of.
+        const start = body[0].indexOf(`${begin}(`);
+        assert.ok(start > close, `${handler} should leave the way out of the panel reachable`);
+        assert.ok(start < menu, `${handler} should start a figure before it walks the cursor`);
+    }
+});
+
+/**
+ * A key the figure has no use for comes back null and falls through to the
+ * panel, so the cursor can still walk off a row mid-figure. A handler that
+ * returned on the ask rather than on the answer would swallow every key.
+ */
+test('a key the figure has no use for falls through to the panel', () => {
+    for (const [handler, showing] of TYPING_HANDLERS) {
+        const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        const guard = body[0].slice(body[0].indexOf(showing));
+
+        assert.match(guard.slice(0, 400), /if \(typed\) \{/,
+            `${handler} should return only where the figure answered the press`);
+    }
+});
+
+/**
+ * A figure is typed with a keyboard, so reaching for the mouse is giving up on
+ * one: the row goes back to the value it had rather than being left reading a
+ * caret nothing is being typed into any more.
+ */
+test('reaching for the mouse gives up on a figure half typed', () => {
+    for (const [handler, cancel] of [
+        ['onSettingsPointer', 'cancelTypedSetting(this.settings)'],
+        ['onEditorPointer',   'cancelTypedEditorValue(this.editor)']
+    ]) {
+        const body = mainSource.match(new RegExp(`${handler}\\(index, choose, step = 1\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        assert.ok(body, `js/main.js should read the pointer in ${handler}`);
+        assert.ok(body[0].includes(cancel), `${handler} should give up on a figure being typed`);
+        assert.ok(body[0].indexOf(cancel) < body[0].indexOf('applyMenuPointer('),
+            'before the click moves the cursor off the row the figure was on');
+    }
+});
+
+// Both panels tell a pilot the rows can be typed into, in the line that already
+// tells them what the keys do.
+test('both panels say a number can be typed at a row', () => {
+    for (const panel of ['settings', 'element-editor']) {
+        const hint = indexHtml.match(new RegExp(`<div id="${panel}">[\\s\\S]*?<small>([^<]*)</small>`));
+        assert.ok(hint, `index.html should carry a hint line under the ${panel} panel`);
+        assert.match(hint[1], /TYPE A NUMBER/,
+            `the ${panel} panel reads "${hint[1]}" and says nothing about typing one`);
+    }
+});
+
+// --- The walls a canyon run is flown between -------------------------------
+
+/**
+ * The corridor is drawn by `js/walls.js`, which imports Three.js and so cannot
+ * be constructed here. Nothing in `test/` has ever reached it: the beam across
+ * each cut was got wrong once, and the only things that have ever caught it are
+ * a pair of eyes on a screenshot and a browser reading the quaternion back off
+ * the live scene - both checks that happen only when somebody runs them.
+ *
+ * So the two things worth pinning are read off the source, the way the ring
+ * colours and the approach marks above are.
+ */
+const wallsSource = readFileSync(fileURLToPath(new URL('../js/walls.js', import.meta.url)), 'utf8');
+
+/**
+ * One named function's body, cut at the brace that closes it.
+ *
+ * Every assertion below reads a span of this slice rather than of the whole
+ * file, for the reason the spans in test/input-map.test.js are bounded with
+ * `[^}]*?`: a span free to reach the end of the file passes the day the text it
+ * looks for is written a second time below the function it was anchored on.
+ * That bound is not usable here, because both of these functions open a brace
+ * of their own before the line being looked for - `buildBeam` builds a material
+ * from an object literal two lines above the turn - so a span stopped at the
+ * first `}` never reaches the assertion at all. Counting the braces gets the
+ * same guarantee from a body that has some in it.
+ */
+function functionBody(source, name) {
+    const opened = source.search(new RegExp(`function ${name}\\(`));
+    if (opened < 0) return null;
+
+    const from = source.indexOf('{', opened);
+    if (from < 0) return null;
+
+    let depth = 0;
+    for (let at = from; at < source.length; at += 1) {
+        if (source[at] === '{') depth += 1;
+        if (source[at] === '}') {
+            depth -= 1;
+            if (depth === 0) return source.slice(from, at + 1);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * A cylinder is built standing up its own Y and the beam wants that axis lying
+ * along the span of the cut. The turn is said as the two directions it is
+ * between, because the pair of Euler angles that would say it the short way
+ * does not compose in the order Three.js applies them here - the module's own
+ * comment says so in as many words, and that is the fault it is describing.
+ */
+test('the beam is turned from one direction to the other rather than by Euler angles', () => {
+    const beam = functionBody(wallsSource, 'buildBeam');
+    assert.ok(beam, 'js/walls.js should draw the beam across a cut in a function of its own');
+
+    assert.match(beam, /quaternion\.setFromUnitVectors\(/,
+        'and turn it by the two directions the turn is between');
+    assert.match(beam, /new THREE\.Vector3\(0, 1, 0\)/,
+        'from the Y a cylinder is built standing up, which is the axis being turned');
+    assert.match(beam, /new THREE\.Vector3\(acrossX, 0, acrossZ\)\.normalize\(\)/,
+        'to the span of the cut, normalized because setFromUnitVectors takes unit vectors');
+    assert.ok(!/rotation\.(set\b|[xyz]\s*=)/.test(beam),
+        'a pair of Euler angles here is the turn said the short way and said wrong, '
+      + 'in a way only a screenshot would show');
+});
+
+/**
+ * The posts stand either side of the cut, and which way either side is has to
+ * be the same span `corridorCrossing` in js/corridor.js measures its offset
+ * along. This is the one with teeth: a corridor that flipped its offset
+ * convention would draw its walls on the wrong axis with the suite still green,
+ * because nothing that runs here touches the drawing.
+ */
+test('a cut is drawn across the span the rule measures it along', () => {
+    const cut = functionBody(wallsSource, 'buildCut');
+    assert.ok(cut, 'js/walls.js should build one cut in a function of its own');
+
+    assert.match(cut, /const acrossX\s*=\s*section\.dirZ;/,
+        'and take the span across it from the way the run goes, square to it');
+    assert.match(cut, /const acrossZ\s*=\s*-section\.dirX;/,
+        'in the same handedness corridorCrossing measures the offset in, '
+      + 'or the walls stand on one axis while the rule tests another');
+    assert.match(cut, /acrossX \* section\.halfWidth \* side/,
+        'with the two posts set out along that span rather than along the run');
+    assert.match(cut, /acrossZ \* section\.halfWidth \* side/,
+        'on both of its components, or one post is placed off the span the other is on');
+
+    // Read the rule's own span back out of js/corridor.js, so the pair is held
+    // together rather than each held to the same convention written out twice.
+    const corridorSource = readFileSync(
+        fileURLToPath(new URL('../js/corridor.js', import.meta.url)), 'utf8');
+    assert.match(corridorSource,
+        /\(at\.x - section\.x\) \* section\.dirZ - \(at\.z - section\.z\) \* section\.dirX/,
+        'js/corridor.js should measure the offset along (dirZ, -dirX), the span the posts stand on');
 });
 
 // --- The controls for a machine with no keys -------------------------------
