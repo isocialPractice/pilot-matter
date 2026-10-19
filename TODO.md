@@ -65,6 +65,25 @@ its context survives being archived.
   - **Goal**: Resolve to [typed-row-cursor-left.prompt.md](.claude/prompts/typed-row-cursor-left.prompt.md)
   - From: Simulator Configuration
 
+#### Found Issues
+
+- [ ] The cheatsheet offers a typed figure at a row that steps through a list
+  - **Issue**: the paragraph added under `## The start state` in `CHEATSHEET.md`
+    and under `<h2 id="the-start-state">` in `docs/cheatsheet.html` opens "Every
+    row in the table above can be typed into as well as stepped". That table
+    carries six rows, and `START CAMERA` is the sixth: it steps through `chase`,
+    `cockpit` and `orbit`, its `Step` column reads `-`, and
+    `isTypedSettingRow(state, 'cameraMode')` is `false`, so a digit pressed at
+    it does nothing. The same paragraph closes "A row that steps through a list
+    cannot be typed into", which is the sentence that contradicts its own
+    opening - a reader taking either at its word is wrong about the other. The
+    settings page has it right already: `docs/controls/settings.html` says
+    "every row of the start state but the condition, the strip and the view".
+  - **Goal**: narrow the claim in both files to the rows that hold a figure,
+    the way the settings page words it, so `START CAMERA` is not offered a
+    typed figure it refuses. The five rows above it are correct as written.
+  - From: UI/UX Override - a figure typed into a panel row
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
