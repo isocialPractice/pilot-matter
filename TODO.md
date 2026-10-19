@@ -11,16 +11,59 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
-  the machine has
-  - From: Flight Controls
-- [ ] Set how far the device is turned before it asks for anything
-  - From: Flight Controls
-- [ ] Accept typed values in the **Element Editor** and the **Settings** panel
+- [ ] Prune `## Flight Controls`, which is the worst of the five
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [ ] Prune `## Simulator Configuration`
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [ ] Prune `## Environment Design`
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [ ] Prune `## Simulator API`
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [ ] Prune the four built items in `## World & Environment`
+  - From: Documentation & Polish `->` Pruning the Roadmap
+
+### UI/UX Override - a figure typed into a panel row
+
+#### Resolve Issues
+
+- [ ] Typed Row 1: a press the figure cannot take restarts the figure rather
+  than being refused
+  - **Issue**: in the settings panel with the cursor on `START ALTITUDE`,
+    typing `1`, `3`, `9` reads `START ALTITUDE  139_`; the next press of the
+    minus key - the key beside `0`, and under the thumb on a numpad - leaves
+    the row reading `START ALTITUDE  -_`, and `0` then `Enter` sets the start
+    altitude to `0 FT`. The three digits already typed are gone with no sign
+    they were, and a figure nobody asked for is taken. The eight character
+    ceiling does the same: eight digits read `12345678_` and a ninth leaves
+    `9_`. The element editor answers both presses identically - a minus part
+    way along `COUNT` leaves `COUNT  -_`. `js/typed-value.js` refuses both
+    presses correctly and says in `extendTypedValue` that refusing one "leaves
+    the text as it was"; `js/main.js` then reads the same press a second time
+    through `beginTypedSetting` / `beginTypedEditorValue`, which start a figure
+    without asking whether one is already in hand. Observed in Chromium against
+    `npm run serve`, both panels, and confirmed against the module directly:
+    `readTypedKey('139', 'Minus')` is `null` and `startsTypedValue('Minus')` is
+    `true`.
+  - **Goal**: Resolve to [typed-row-refused-press.prompt.md](.claude/prompts/typed-row-refused-press.prompt.md)
   - From: Simulator Configuration
-- [ ] Pin the way a cut is drawn against the way a cut is tested, so the two
-  cannot drift apart
-  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
+
+- [ ] Typed Row 2: a figure stays behind on the row the cursor walked off
+  - **Issue**: the cursor leaving a row mid-figure is deliberate, and the
+    figure surviving the walk is what is wrong with it. In the settings panel,
+    typing `2` at `START ALTITUDE` and pressing `S` moves the highlight to
+    `START CLIMB` while the caret stays on `START ALTITUDE`; `5`, `0`, `0` then
+    go to the unhighlighted row and `Enter` sets a start altitude of 2500 feet
+    while the cursor sits on the climb row. The element editor does the same,
+    and there it closes a door the code opens on purpose: open an element, type
+    a digit into a range, walk down to `RESTORE THE PRESET` and press `Enter` -
+    the `Enter` is taken by the figure, the row reads `LINE  ‹ 7 ›` and the
+    preset is never restored. Clicking the same entry does restore it, because
+    `onEditorPointer` calls `cancelTypedEditorValue` first and `onEditorKey`
+    has no equivalent. That leaves `restoreEditor`'s own `state.typing = null`,
+    and the comment above it, unreachable from the keyboard. Observed in
+    Chromium against `npm run serve`.
+  - **Goal**: Resolve to [typed-row-cursor-left.prompt.md](.claude/prompts/typed-row-cursor-left.prompt.md)
+  - From: Simulator Configuration
 
 ## Game UI/UX
 
@@ -329,21 +372,82 @@ applies a minor version update.
 Keep the docs accurate and improve first-run experience. Completing items
 in this section applies a patch version update.
 
+### Pruning the Roadmap
+
+Section 5 of the automation copies a roadmap item into `## Current` and leaves
+the original where it was, so a section goes on listing work the repository has
+long since built. Five sections are in that state, and
+`node todo.mjs --pending` counts 56 items where a handful are outstanding - a
+figure that makes the file useless for deciding what to do next, and that reads
+from outside as a project barely started.
+
+Pruning is one item per section because the judgment is per item: each has to be
+read against the source before it is called finished, which is a different
+question from doing the next piece of work and should be answered deliberately
+rather than as a side effect of refilling a queue. Nothing is deleted. A built
+item is checked off and archived with its `From:` path, the way finished work
+has always left this file, so the record of what was built survives in
+`TODO-archive.md`. An item that turns out not to be built stays unchecked and
+in place, and the pruning item says which ones those were.
+
+- [ ] Prune `## Flight Controls`, which is the worst of the five
+  - Every one of its ten items is built, which makes it the whole section: the
+    two axis toggles and the full 360 landed in `1.24.0-alpha`, five more in
+    `1.0.0-alpha.1.25.0`, and the last two - flying by tilt and the deadzone -
+    in `1.0.0-alpha.1.27.0`. Check each against `js/control-settings.js`,
+    `js/input-map.js`, `js/key-bindings.js` and `js/tilt-controls.js` before
+    checking it off.
+  - The section header stays, per **Roadmap Section Structure**, with its
+    opening paragraph. A section with nothing left under it is the record of
+    that area of work being finished, not a section to delete.
+- [ ] Prune `## Simulator Configuration`
+  - All nine are built. The start state, the environment selection and the five
+    assembled environments are in the shipped simulator; the three naming the
+    menu entry renamed in `1.24.0-alpha` are built; `Reset Flight` restores the
+    configured start; the pause menu carries its `Settings` entry; and typed
+    values landed in `1.0.0-alpha.1.27.0`.
+  - Two of its items ask to reword the two above them, which were worded for a
+    `Controls` entry that no longer exists. Read what each actually asks for
+    before deciding it is done - a reword nobody did is not the same as a
+    rename somebody did.
+- [ ] Prune `## Environment Design`
+  - The registry it opens by asking for is `js/environment/elements.js`, and
+    every element below it is implemented in it. The gradient helper is there
+    too. Twenty items, and the one to be careful with is the mountain bulk
+    range, whose checkbox-gated length, width and girth are a specific shape
+    that may or may not be what the registry declares.
+- [ ] Prune `## Simulator API`
+  - `js/api/index.js` exists and re-exports both halves, and the eleven items
+    under it are the surface `docs/api.md` documents and `test/api-contract.js`
+    and `test/api-reference.test.js` hold it to. The last item asks for unit
+    tests of both pure surfaces, which is what those two files are.
+- [ ] Prune the four built items in `## World & Environment`
+  - The edge algorithm's promise is held by `test/world-tiles.test.js`, and
+    `matchEdges` and `SEAM_BLEND` settle an assembly where its fields meet, so
+    the two algorithm items and the two reassembly items behind them are done.
+  - The fifth item, the weather branch, is not pruned: it is real outstanding
+    work and is the next item below.
+- [ ] Say whether the `local-weather` branch is ready to be integrated, on the
+  item that asks for it
+  - The branch exists locally and on `origin`, and its item makes the merge
+    conditional on its API having stabilized - a condition nobody has recorded
+    an answer to, so the item cannot be queued or dropped as it stands.
+  - Read the branch rather than merging it: what it adds (clouds, rain, moon,
+    sky styling), what surface it exposes, whether that surface has settled,
+    and what it would cost to bring onto main against the environment pipeline
+    as it now is.
+  - The answer is nested under the item as a note, with the date, so the next
+    run reads a decision rather than asking the question again. Merge nothing
+    this run - the item is the look, and the integration is whatever the look
+    recommends.
+
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 190 earlier items in `TODO-archive.md`, newest last.
+> 194 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Choose which controls hand the aircraft back after a level off
-  - From: Flight Controls
-- [x] Read tilt through the axis settings the keys are read through
-  - From: Flight Controls
-- [x] Rebind any control to a key of the pilot's own
-  - From: Flight Controls
-- [x] Rebind the keys that are not control surfaces
-  - From: Flight Controls
 - [x] A key the game reads for something else is still a key the map will take
   - **Issue**: the `KEYS` list refuses a key another row holds and nothing
     else, because that is all `rebind` in `js/key-bindings.js` checks - the ten
@@ -547,3 +651,14 @@ how the simulator got here rather than as a list still to be worked.
     which is what keeps `CHEATSHEET.md` and `docs/cheatsheet.html` saying the
     same thing: editing that sentence in one and not the other is green today.
   - From: Code Review Override - the reserved-key notices in the docs are held to nothing
+- [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
+  the machine has
+  - From: Flight Controls
+- [x] Set how far the device is turned before it asks for anything
+  - From: Flight Controls
+- [x] **Typed Row**: Accept typed values in the **Element Editor** and the
+  **Settings** panel
+  - From: Simulator Configuration
+- [x] Pin the way a cut is drawn against the way a cut is tested, so the two
+  cannot drift apart
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
