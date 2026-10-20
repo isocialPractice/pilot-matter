@@ -1068,7 +1068,13 @@ class FlightSimulator {
         // A figure the pilot already knows is typed rather than stepped to, so a
         // digit at a row holding a number starts one. Read after the way out and
         // before the menu keys, which no digit is one of.
-        if (!e.repeat && beginTypedSetting(this.settings, selectedId(this.settingsState), e.code)) {
+        //
+        // Only where no figure is in hand. A press the figure itself has already
+        // refused - a minus part way along, or a ninth character - comes back
+        // null above and reaches here, and starting a fresh figure on it throws
+        // away everything typed so far with nothing on the row to say it went.
+        if (!e.repeat && typedSettingRow(this.settings) == null
+            && beginTypedSetting(this.settings, selectedId(this.settingsState), e.code)) {
             e.preventDefault();
             this.syncOverlays();
             return;
@@ -1086,6 +1092,14 @@ class FlightSimulator {
 
         if (!isMenuKey(e.code)) return;
         e.preventDefault();
+
+        // Walking off a row is giving up on a figure for the same reason
+        // reaching for the mouse is. The highlight is the only thing on the
+        // panel saying where the pilot is, so a figure left live on the row
+        // behind it takes every digit after and sets a value the cursor is
+        // nowhere near. Given up on before the cursor moves, which is the
+        // order onSettingsPointer already uses.
+        cancelTypedSetting(this.settings);
 
         const chosen = applyMenuKey(this.settingsState, e.code, true, e.repeat);
         if (chosen) this.chooseSettingsEntry(chosen);
@@ -1344,8 +1358,11 @@ class FlightSimulator {
         }
 
         // A height or a density the pilot already has in mind is typed rather
-        // than stepped to, a fiftieth of the range at a time.
-        if (!e.repeat && beginTypedEditorValue(this.editor, selectedId(this.editorState), e.code)) {
+        // than stepped to, a fiftieth of the range at a time. Guarded on no
+        // figure being in hand for the reason the settings panel is: a press
+        // the figure refused is not a press that starts a new one.
+        if (!e.repeat && typedEditorRow(this.editor) == null
+            && beginTypedEditorValue(this.editor, selectedId(this.editorState), e.code)) {
             e.preventDefault();
             this.redrawEditor();
             this.syncOverlays();
@@ -1364,6 +1381,15 @@ class FlightSimulator {
 
         if (!isMenuKey(e.code)) return;
         e.preventDefault();
+
+        // Walking off a row gives up on a figure here too, and the rebuilt rows
+        // go to the menu the list is drawn from, the way onEditorPointer hands
+        // them over. Without it the cursor leaves a caret behind on the row it
+        // came from, and RESTORE THE PRESET is unreachable from the keyboard:
+        // the Enter that would ask for it is taken by the figure still in hand.
+        if (cancelTypedEditorValue(this.editor)) {
+            setMenuEntries(this.editorState, this.editor.entries);
+        }
 
         const chosen = applyMenuKey(this.editorState, e.code, true, e.repeat);
         if (chosen) this.chooseEditorRow(chosen);

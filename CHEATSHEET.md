@@ -130,11 +130,14 @@ Radio group: `START OFF FLYING` (default) or `RUNWAY TAKEOFF`. Checkbox:
 `RUNWAY`, forced on and disabled under `RUNWAY TAKEOFF`. Pitch is derived,
 never set.
 
-Every row in the table above can be typed into as well as stepped: a digit
-starts the figure, `Enter` takes it, `Backspace` erases a character and `Esc`
-gives up. The figure goes through the validator the stepping goes through, so
-one between two steps is refused and the row says what is allowed -
-`0 KTS TO 200 KTS BY 5`. A row that steps through a list cannot be typed into.
+Every row in the table above but `START CAMERA` can be typed into as well as
+stepped: a digit starts the figure, `Enter` takes it, `Backspace` erases a
+character, and `Esc`, the mouse, or walking the cursor to another row gives up.
+The figure goes through the validator the stepping goes through, so one between
+two steps is refused and the row says what is allowed - `0 KTS TO 200 KTS BY 5`.
+A character the figure has no room for is turned down and leaves what is typed
+where it is. A row that steps through a list holds no figure to type, which is
+why the view is the one left out.
 
 ## Options
 

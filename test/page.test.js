@@ -2004,6 +2004,72 @@ test('and hands the editor the rows that giving up on one rebuilt', () => {
         'before the list is drawn again from them');
 });
 
+/**
+ * A press the figure has already refused is not a press that starts a new one.
+ *
+ * `js/typed-value.js` refuses a minus part way along a figure and a character
+ * past the ceiling, and refusing leaves the text as it was - so the press comes
+ * back null and falls through to the rest of the handler. Both handlers then
+ * asked only whether the key starts a figure and whether the row holds one,
+ * which is true of a minus at an altitude row whether or not a figure is
+ * already in hand: the three digits typed went, with nothing on the row to say
+ * they had, and the next press carried on from the stray character.
+ */
+test('a press the figure turned down does not start a fresh figure', () => {
+    for (const [handler, showing, , begin] of TYPING_HANDLERS) {
+        const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        const start = body[0].indexOf(`${begin}(`);
+        assert.ok(start > -1, `${handler} should start a figure at a digit`);
+
+        // The condition the start sits in, back to the `if` that opens it.
+        const guard = body[0].slice(body[0].lastIndexOf('if (', start), start);
+        assert.ok(guard.includes(`${showing} == null`),
+            `${handler} should start a figure only where none is in hand`);
+    }
+});
+
+/**
+ * Walking off a row is giving up on a figure for the same reason reaching for
+ * the mouse is. The highlight is the only thing on the panel saying where the
+ * pilot is, so a figure left live on the row behind it takes every digit after
+ * it and `Enter` sets a value the cursor is nowhere near.
+ *
+ * The fall-through that lets the cursor walk off at all is not the defect and
+ * stays - see *a key the figure has no use for falls through to the panel*.
+ * The key still reaches the panel; it is the figure that does not survive it.
+ */
+test('and walking the cursor off one gives up on it the same way', () => {
+    for (const [handler, cancel] of [
+        ['onSettingsKey', 'cancelTypedSetting(this.settings)'],
+        ['onEditorKey',   'cancelTypedEditorValue(this.editor)']
+    ]) {
+        const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        const given = body[0].indexOf(cancel);
+        const menu  = body[0].indexOf('isMenuKey(e.code)');
+        const moves = body[0].indexOf('applyMenuKey(');
+
+        assert.ok(given > menu, `${handler} should give up on a figure where the cursor walks`);
+        assert.ok(given < moves, 'before the cursor moves off the row the figure was on');
+    }
+});
+
+/**
+ * And the editor hands the rebuilt rows over here too, for the reason
+ * `onEditorPointer` does: `syncEditorEntries` builds a new set rather than
+ * writing over the old, so the menu the list is drawn from is left holding the
+ * rows from before unless it is handed the new ones.
+ */
+test('and hands the editor the rows that walking off one rebuilt', () => {
+    const body = mainSource.match(/onEditorKey\(e\)\s*\{[\s\S]*?\n    \}/);
+    const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)');
+    const handed = body[0].indexOf('setMenuEntries(this.editorState, this.editor.entries)');
+
+    assert.ok(cancel > -1 && handed > cancel,
+        'onEditorKey should hand the rebuilt rows to the menu the list is drawn from');
+    assert.ok(handed < body[0].indexOf('applyMenuKey('),
+        'before the cursor is walked over them');
+});
+
 // Both panels tell a pilot the rows can be typed into, in the line that already
 // tells them what the keys do.
 test('both panels say a number can be typed at a row', () => {

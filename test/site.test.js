@@ -451,10 +451,50 @@ test('CHEATSHEET.md and its page say the same things', () => {
         // The refusal clause, which both carry word for word. Rewording it in
         // one and not the other was green until this line: the sentence is the
         // only place either document explains why a key can be turned down.
-        'the same way and the row says what the key already does'
+        'the same way and the row says what the key already does',
+        // The typed-figure clause, likewise word for word in both. It opened
+        // "Every row in the table above", and the table's sixth row steps
+        // through a list and refuses a digit - so the paragraph offered a
+        // figure at a row that has none and then contradicted itself closing.
+        // Both halves are pinned: the exception the opening names, and the
+        // reason the close gives for it.
+        'in the table above but',
+        'A row that steps through a list holds no figure to type',
+        // And the two ways a figure ends that are not Enter, likewise shared:
+        // the presses that give up on one, and the press it simply has no room
+        // for, which costs nothing rather than starting the figure again.
+        ', the mouse, or walking the cursor to another row gives up',
+        'A character the figure has no room for is turned down'
     ]) {
         assert.ok(cheatsheetDoc.includes(essential), `CHEATSHEET.md should carry ${essential}`);
         assert.ok(page.includes(essential),          `the cheatsheet page should carry ${essential}`);
+    }
+});
+
+/**
+ * Which of the start state rows the cheatsheet offers a typed figure at.
+ *
+ * The exception is read off the fields rather than written out here, so a
+ * start field that gains or loses its range fails this rather than leaving
+ * the paragraph quietly offering a figure at a row that refuses one. A field
+ * holding `values` and no `kind` is a row the table carries and the stepper
+ * walks through a list - which is what `isTypedSettingRow` answers false for,
+ * and the only kind of start row a digit does nothing at.
+ */
+test('the cheatsheet offers a typed figure only at the start rows that hold one', () => {
+    const stepped = START_FIELDS.filter(field => field.values != null && field.kind == null);
+    assert.equal(stepped.length, 1, 'one start state row steps a list rather than holding a figure');
+
+    for (const [name, source] of [
+        ['CHEATSHEET.md',        cheatsheetDoc],
+        ['docs/cheatsheet.html', sources.get('docs/cheatsheet.html')]
+    ]) {
+        const opened = source.indexOf('in the table above but');
+        assert.ok(opened > -1, `${name} should narrow the typed figure claim to the rows that hold one`);
+
+        const clause = source.slice(opened, opened + 120);
+        assert.ok(clause.includes(stepped[0].label),
+            `${name} should name ${stepped[0].label} as the row a figure cannot be typed into`);
     }
 });
 

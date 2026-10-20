@@ -46,7 +46,7 @@ import {
     cancelTypedEditorValue,
     applyTypedEditorKey
 } from '../js/element-editor.js';
-import { TYPED_CARET, typedValueLabel } from '../js/typed-value.js';
+import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
 import {
     ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom
 } from '../js/environment/elements.js';
@@ -776,6 +776,36 @@ test('a key the figure has no use for is handed back to the panel', () => {
     assert.equal(typedEditorText(state), '9', 'and none of them disturbed the figure');
 });
 
+/**
+ * And so is a press the figure has no room for, which is the same answer for a
+ * different reason: the character cannot legally go where it was aimed, so the
+ * text is left as it was and the press comes back as nothing. A caller that
+ * read that nothing as the start of a fresh figure would throw away everything
+ * typed so far, with nothing on the row to say it had gone.
+ */
+test('a press the figure cannot take leaves what is already typed where it was', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    beginTypedEditorValue(state, id, 'Digit1');
+    for (const code of ['Digit2', 'Digit0']) applyTypedEditorKey(state, code);
+    assert.equal(typedEditorText(state), '120');
+
+    for (const code of ['Minus', 'NumpadSubtract']) {
+        assert.equal(applyTypedEditorKey(state, code), null,
+            `a ${code} part way along is not the figure's to take`);
+        assert.equal(typedEditorText(state), '120', 'and the digits already typed are still there');
+        assert.equal(typedEditorRow(state), id, 'on the row they were typed into');
+    }
+
+    for (const code of ['Digit0', 'Digit0', 'Digit0', 'Digit0', 'Digit0']) {
+        applyTypedEditorKey(state, code);
+    }
+    assert.equal(typedEditorText(state).length, TYPED_MAX, 'the row is full');
+    assert.equal(applyTypedEditorKey(state, 'Digit9'), null, 'so a ninth is not the figure\'s to take');
+    assert.equal(typedEditorText(state), '12000000', 'and the eight it holds are untouched');
+});
+
 // --- How a row being typed into reads --------------------------------------
 
 test('a row being typed into reads the figure rather than a value between step marks', () => {
@@ -834,6 +864,39 @@ test('anything that rebuilds the panel is giving up on whatever was being typed'
     beginTypedEditorValue(state, id, 'Digit1');
     setEditorWorld(state, ENVIRONMENTS.find(world => world.id !== 'highlands').id);
     assert.equal(typedEditorRow(state), null);
+});
+
+/**
+ * Asking for the preset back with a figure in hand puts every range back and
+ * gives up on the figure, which is the whole of what the row is for.
+ *
+ * This was unreachable from the keyboard until the cursor gave up on a figure
+ * on its way down the panel: the Enter that asks for the restore was taken by
+ * the figure still live on the row the cursor had left, so the row read its
+ * typed value and the preset was never put back. Clicking the entry worked,
+ * because the pointer route gives up on the figure first.
+ */
+test('the preset goes back under a figure half typed, rather than the figure over it', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const moved = rowId(element.id, 'coverage', 'value');
+    const typed = rowId(element.id, 'line', 'value');
+
+    const base = editorEntry(state, moved).value;
+    assert.equal(adjustEditorRange(state, moved, 1), element.id);
+    assert.notEqual(editorEntry(state, moved).value, base, 'a range is away from the preset');
+
+    beginTypedEditorValue(state, typed, 'Digit7');
+    assert.equal(typedEditorRow(state), typed, 'and a figure is in hand at another row');
+
+    assert.equal(chooseEditorEntry(state, EDITOR_RESTORE_ID), EDITOR_RESTORE_ID);
+
+    assert.equal(editorEntry(state, moved).value, base, 'the range the panel moved is back');
+    assert.equal(typedEditorRow(state), null, 'and the figure is given up on rather than committed');
+    // The way back and the way out carry no reading at all, so the caret can
+    // only be on a row that holds one.
+    for (const entry of state.entries) {
+        assert.ok(!(entry.text ?? '').includes(TYPED_CARET), `${entry.id} holds no caret`);
+    }
 });
 
 test('a typed figure reaches the world the same way a stepped one does', () => {

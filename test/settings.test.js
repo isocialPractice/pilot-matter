@@ -55,7 +55,7 @@ import {
     cancelTypedSetting,
     applyTypedSettingKey
 } from '../js/settings.js';
-import { TYPED_CARET, typedValueLabel } from '../js/typed-value.js';
+import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 import {
@@ -789,6 +789,25 @@ test('giving up leaves the row on the value it already had', () => {
 });
 
 /**
+ * And it leaves the whole panel reading as it did, which is what makes giving
+ * up the right answer to the cursor walking off a row mid-figure: a caret left
+ * behind says a row is taking characters that the highlight is nowhere near.
+ */
+test('and no row anywhere on the panel is left reading a caret', () => {
+    const state = createSettingsState(fakeStorage());
+    const before = state.entries.map(entry => entry.text);
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit2');
+    assert.equal(cancelTypedSetting(state), 'altitudeFeet');
+
+    for (const [at, entry] of state.entries.entries()) {
+        assert.equal(entry.text, before[at], `${entry.id} reads as it did before the figure`);
+        assert.ok(!entry.typing, `${entry.id} is not being typed into`);
+        assert.ok(!entry.text.includes(TYPED_CARET), `${entry.id} holds no caret`);
+    }
+});
+
+/**
  * A key the figure has no use for is handed back, which is what keeps the cursor
  * able to walk off a row mid-figure: the panel reads that key as it always did.
  */
@@ -800,6 +819,45 @@ test('a key the figure has no use for is handed back to the panel', () => {
         assert.equal(applyTypedSettingKey(state, code), null, `${code} belongs to the panel`);
     }
     assert.equal(typedSettingText(state), '5', 'and none of them disturbed the figure');
+});
+
+/**
+ * A press the figure has no room for is refused, and refusing it leaves the
+ * text as it was: the three digits already typed are what the row still holds.
+ *
+ * The press comes back as nothing, which is the same answer a menu key gets -
+ * so the caller reads it however it would have otherwise, and must not read it
+ * as the first character of a fresh figure. A minus is the key beside 0 and
+ * under the thumb on a numpad, so catching it on the way to the last digit is
+ * an ordinary slip, and the slip cost three digits with nothing on the row to
+ * say they had gone.
+ */
+test('a press the figure cannot take leaves what is already typed where it was', () => {
+    const state = createSettingsState(fakeStorage());
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+    for (const code of ['Digit3', 'Digit9']) applyTypedSettingKey(state, code);
+    assert.equal(typedSettingText(state), '139');
+
+    for (const code of ['Minus', 'NumpadSubtract']) {
+        assert.equal(applyTypedSettingKey(state, code), null,
+            `a ${code} part way along is not the figure's to take`);
+        assert.equal(typedSettingText(state), '139', 'and the digits already typed are still there');
+        assert.equal(typedSettingRow(state), 'altitudeFeet', 'on the row they were typed into');
+    }
+});
+
+test('and a character past the ceiling leaves the ones under it', () => {
+    const state = createSettingsState(fakeStorage());
+
+    beginTypedSetting(state, 'altitudeFeet', 'Digit1');
+    for (const code of ['Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8']) {
+        applyTypedSettingKey(state, code);
+    }
+    assert.equal(typedSettingText(state).length, TYPED_MAX, 'the row is full');
+
+    assert.equal(applyTypedSettingKey(state, 'Digit9'), null, 'so a ninth is not the figure\'s to take');
+    assert.equal(typedSettingText(state), '12345678', 'and the eight it holds are untouched');
 });
 
 // --- How a row being typed into reads --------------------------------------
