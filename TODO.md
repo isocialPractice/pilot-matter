@@ -39,6 +39,30 @@ its context survives being archived.
     differently depending on which hand does it.
   - **Goal**: Resolve to [typed-row-adjust-key.prompt.md](.claude/prompts/typed-row-adjust-key.prompt.md)
   - From: UI/UX Override - a figure typed into a panel row
+- [ ] The handler-order test finds its cancel by the first match rather than in
+  the branch it means, so the item above cannot pass it
+  - **Issue**: `test/page.test.js`, in "and walking the cursor off one gives up
+    on it the same way", takes `given = body[0].indexOf(cancel)` over the whole
+    handler and asserts `given > body[0].indexOf('isMenuKey(e.code)')`. The
+    occurrence it means is the one in the menu-key branch, and `indexOf` returns
+    whichever comes first - so a `cancelTypedSetting(this.settings)` anywhere
+    above `isMenuKey` reads as a cancel in the wrong place. The step-key branch
+    is above `isMenuKey`, which makes this the test the item above has to get
+    past. Measured: with that one line added over `adjustSetting` in
+    `onSettingsKey` and nothing else changed, `node --test test/page.test.js`
+    fails with "onSettingsKey should give up on a figure where the cursor
+    walks" while the menu-key branch still gives up on the figure exactly as it
+    does now. The editor's companion test, "and hands the editor the rows that
+    walking off one rebuilt", reads its `cancelTypedEditorValue` and
+    `setMenuEntries` the same unanchored way.
+  - **Goal**: Search from the branch rather than from the top of the handler -
+    `body[0].indexOf(cancel, menu)` in place of `body[0].indexOf(cancel)`, and
+    the same for the editor test's two lookups - so each assertion reads the
+    occurrence that sits where the cursor walks. While there, give both tests
+    the `assert.ok(body, ...)` the idiom beside them carries at
+    `test/page.test.js:1927`: a regex that stopped matching throws a TypeError
+    on `body[0]` rather than naming the handler it could not find.
+  - From: UI/UX Override - a figure typed into a panel row
 
 ## Game UI/UX
 

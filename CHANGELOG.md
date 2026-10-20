@@ -5,6 +5,81 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.28.0] - 2026-10-20
+
+`1.0.0-alpha.1.27.0` offered a figure at a row holding one and left two presses
+able to take it away without saying so: a key the figure had no room for started
+a fresh figure over it, and the cursor could walk to another row while the one it
+left went on taking digits. The cheatsheet, meanwhile, offered the typed route at
+the one row of the start state that refuses it, and said in the same paragraph
+that such a row refuses it.
+
+### Fixed
+
+- **A press the figure cannot take no longer restarts the figure.**
+  `js/typed-value.js` refuses a minus anywhere but the front and a character past
+  the eight a row holds, and refusing leaves the text as it was - so the press
+  comes back as nothing, which is also how a key the figure has no use for
+  reaches the panel. Both key handlers in `js/main.js` then read that same press
+  a second time: `beginTypedSetting` and `beginTypedEditorValue` ask only whether
+  the key starts a figure and whether the row holds one, and both are true of a
+  minus at an altitude row whether or not a figure is already in hand. Typing
+  `1`, `3`, `9` at `START ALTITUDE` and catching the minus beside `0` on the way
+  to the last digit left the row reading `-_`, and `0` then `Enter` set a start
+  altitude of nothing - three digits gone with nothing on the row to say they had
+  been, and a figure taken that nobody asked for. The eight character ceiling did
+  the same, a ninth digit leaving the row reading `9_`. Both handlers start a
+  figure only where none is in hand, and the refused press still falls through to
+  the panel rather than being swallowed by it.
+- **A figure no longer stays behind on the row the cursor walked off.** Reaching
+  for the mouse already gave up on one - both pointer handlers open by doing
+  exactly that - and walking the cursor with `W`/`S` did not, so the caret sat on
+  one row while the highlight sat on another. Typing `2` at `START ALTITUDE`,
+  pressing `S`, then `5`, `0`, `0` and `Enter` set a start altitude of 2500 feet
+  with the cursor on `START CLIMB`, which is the row the pilot was watching. The
+  highlight is the only thing on either panel saying where a value is being set,
+  so both key handlers give up on the figure where the cursor walks, before it
+  moves, which is the order the pointer handlers already use. The key still
+  reaches the panel and the cursor still moves: it is the figure that does not
+  survive the press.
+- **`RESTORE THE PRESET` answers the keyboard again.** `restoreEditor` gives up
+  on a half typed figure on its way past, and says why, and could not be asked
+  for while one was in hand: the `Enter` that asks for it was taken by the figure
+  still live on the row the cursor had left, so that row took the figure and the
+  world was never put back. Clicking the same entry did restore it, the
+  pointer route having given up on the figure first. With the cursor giving up on
+  the way down the panel, the `Enter` reaches `chooseEditorRow` and every range
+  goes back. `restoreEditor`'s own clearing stays as the belt to that braces.
+- **The cheatsheet offers a typed figure only at the rows that hold one.** The
+  paragraph under the start state table opened "Every row in the table above can
+  be typed into as well as stepped" and closed "A row that steps through a list
+  cannot be typed into". The table's sixth row is `START CAMERA`, which steps
+  through `chase`, `cockpit` and `orbit`, carries `-` in its `Step` column and
+  answers `isTypedSettingRow` with `false` - so a reader taking either sentence
+  at its word was wrong about the other. Both files name the exception the way
+  the settings page already worded it.
+
+### Changed
+
+- **The documentation for both panels says what gives up on a figure.** The
+  settings page, the terrain page and the cheatsheet in both its forms name
+  walking the cursor off a row beside `Esc` and the mouse, and say that a
+  character the figure has no room for costs nothing rather than starting the
+  figure over. The terrain page adds what the first of those buys, which is the
+  restore row being reachable mid-figure at all.
+- **Nine tests, over the modules, the handlers and the pages.**
+  `test/settings.test.js` and `test/element-editor.test.js` pin that a refused
+  character leaves the figure where it was and comes back as something the caller
+  may read itself, that giving up leaves no row anywhere reading a caret, and
+  that the restore row puts every range back under a figure half typed.
+  `test/page.test.js` reads the two handlers off `js/main.js` as source text, the
+  way the handler order beside them is already read, for the guard on starting a
+  figure, for giving up on one before the cursor moves, and for the editor
+  handing the rebuilt rows to the menu its list is drawn from.
+  `test/site.test.js` takes the exception from `START_FIELDS` rather than
+  restating it, so a start field that gains or loses its range fails rather than
+  leaving the paragraph offering a figure at a row that refuses one.
+
 ## [1.0.0-alpha.1.27.0] - 2026-10-19
 
 Four questions the game answered for the pilot now have rows. Whether the
