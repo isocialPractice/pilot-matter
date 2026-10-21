@@ -5,6 +5,85 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.29.0] - 2026-10-21
+
+`1.0.0-alpha.1.28.0` taught the cursor to give up on a half typed figure and
+left the keys beside it still able to move the value out from under one. Those
+keys are read above the giving up in the same handler, so a step landed on the
+row while the caret still read the figure - and the test written to hold the
+giving up in place found it by the first match in the handler rather than in the
+branch it meant, which is why nothing failed when the step keys went past it.
+
+### Fixed
+
+- **A step key no longer moves the value behind a figure half typed.**
+  `A`/`D` and `<-`/`->` step the row under the cursor, and both key handlers in
+  `js/main.js` read that block above the giving up added for the cursor, so the
+  step went through with the figure still live. At `START ALTITUDE` reading
+  `1390 FT`, typing `2` and pressing `->` left the row reading
+  `START ALTITUDE  2_` while the stored altitude moved to 1400, and a second
+  press took it to 1410 with nothing on the panel saying so - the `Enter` that
+  followed was then refused against a figure the pilot never typed. The element
+  editor answered the same way at a range. Clicking the row instead read
+  `START ALTITUDE  ‹ 1420 FT ›` with no caret, the pointer route having given up
+  on the figure as its first statement, so the same action answered differently
+  depending on which hand did it. Both handlers now give up on the figure for
+  any key the panel works with at all - `isMenuControlKey`, which is
+  `isMenuKey` and `isMenuAdjustKey` together - above both the stepping and the
+  walking, and the cancel that sat below `isMenuKey` has nothing left to do and
+  is gone. A key the panel does nothing with still leaves the figure alone,
+  since nothing it does can move the value out from under one. In the editor the
+  rebuilt rows are still handed to the menu its list is drawn from before either
+  the stepping or the walking reads them.
+- **The handler-order tests read the occurrence they mean.**
+  `test/page.test.js`, in *and walking the cursor off one gives up on it the
+  same way*, took `body[0].indexOf(cancel)` over the whole handler and asserted
+  it sat below `isMenuKey(e.code)`. `indexOf` returns whichever comes first, so
+  the occurrence it measured was never the one it meant: it was whichever cancel
+  the handler reached first, held to the branch that walks the cursor. That made
+  the test the obstacle to the fix above rather than the thing holding it - a
+  handler that gave up on a figure before stepping it was reported as giving up
+  in the wrong place. Measured on the source as it stood: a `cancelTypedSetting`
+  added over `adjustSetting` and nothing else changed failed with "onSettingsKey
+  should give up on a figure where the cursor walks", while the menu-key branch
+  went on giving up on the figure exactly as before. Both lookups there and the
+  two in *and hands the editor the rows that walking off one rebuilt* now search
+  from the branch - `indexOf(cancel, works)`, where `works` is
+  `isMenuControlKey(e.code)` - so each assertion reads the occurrence that sits
+  where the keys are taken, and the giving up can be held above the stepping as
+  well as the walking. Both tests also carry the `assert.ok(body, ...)` the
+  idiom beside them already does, so a regex that stopped matching names the
+  handler it could not find instead of throwing a `TypeError` on `body[0]`.
+
+### Changed
+
+- **A figure and the value under it cannot both be live, and the suite says so.**
+  The walking test now reads every call in each handler that a live figure must
+  not outlast - `adjustSetting`, `applyMenuKey` and `chooseSettingsEntry` in the
+  settings panel, `adjustEditorRange`, `applyMenuKey` and `chooseEditorRow` in
+  the editor - and holds the giving up above all of them, rather than above the
+  one that walks the cursor alone. That is the assertion the fix above needed and the one
+  the old anchor could not express: stepping a row is a write, and a write with
+  a figure still in hand is the defect whichever key caused it.
+- **The documentation names the step keys beside the other ways a figure goes.**
+  The settings page, the terrain page and the cheatsheet in both its forms list
+  stepping the row with `A`/`D` alongside `Esc`, the mouse and walking the
+  cursor. The settings page also says what the pair of them protect: the
+  highlight says where a value is being set and the reading says what it is, so
+  a figure outlives neither.
+- **The cheatsheet pair is held to the step keys as well.**
+  *CHEATSHEET.md and its page say the same things* in `test/site.test.js` pinned
+  one clause for the ways a figure ends that are not `Enter`, and that clause
+  named two of them. It pins the stepping beside them now, as a run of its own,
+  because stepping is the press that gives up on a figure and changes the value
+  in the same breath - so a document listing the mouse and the cursor and not
+  this one is exactly the half-updated page the test is there to fail. The
+  markdown paragraph is reflowed so each pinned run sits on one line, the way
+  the two already pinned beneath it do.
+
+The suite is green at 1395, unchanged - everything added this release is an
+assertion or a pinned clause inside a test that already existed.
+
 ## [1.0.0-alpha.1.28.0] - 2026-10-20
 
 `1.0.0-alpha.1.27.0` offered a figure at a row holding one and left two presses
