@@ -22,47 +22,32 @@ its context survives being archived.
 - [ ] Prune the four built items in `## World & Environment`
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - a figure typed into a panel row
+### UI/UX Override - a step key with a figure in hand
 
 #### Found Issues
 
-- [ ] A step key with a figure in hand moves the value behind the caret
-  - **Issue**: The cursor keys now give up on a half typed figure, but the step
-    keys beside them do not: they are read above that in the same handler. At
-    `START ALTITUDE` reading `1390 FT`, typing `2` and pressing `->` leaves the
-    row reading `START ALTITUDE  2_` while the stored altitude moves to 1400,
-    and a second press takes it to 1410 with nothing on the panel saying so.
-    The `Enter` that follows is then refused against a figure the pilot never
-    typed. The element editor does the same to a range. Clicking the row
-    instead reads `START ALTITUDE  ‹ 1420 FT ›` with no caret, because the
-    pointer route gives up on the figure first - so the same action answers
-    differently depending on which hand does it.
-  - **Goal**: Resolve to [typed-row-adjust-key.prompt.md](.claude/prompts/typed-row-adjust-key.prompt.md)
-  - From: UI/UX Override - a figure typed into a panel row
-- [ ] The handler-order test finds its cancel by the first match rather than in
-  the branch it means, so the item above cannot pass it
-  - **Issue**: `test/page.test.js`, in "and walking the cursor off one gives up
-    on it the same way", takes `given = body[0].indexOf(cancel)` over the whole
-    handler and asserts `given > body[0].indexOf('isMenuKey(e.code)')`. The
-    occurrence it means is the one in the menu-key branch, and `indexOf` returns
-    whichever comes first - so a `cancelTypedSetting(this.settings)` anywhere
-    above `isMenuKey` reads as a cancel in the wrong place. The step-key branch
-    is above `isMenuKey`, which makes this the test the item above has to get
-    past. Measured: with that one line added over `adjustSetting` in
-    `onSettingsKey` and nothing else changed, `node --test test/page.test.js`
-    fails with "onSettingsKey should give up on a figure where the cursor
-    walks" while the menu-key branch still gives up on the figure exactly as it
-    does now. The editor's companion test, "and hands the editor the rows that
-    walking off one rebuilt", reads its `cancelTypedEditorValue` and
-    `setMenuEntries` the same unanchored way.
-  - **Goal**: Search from the branch rather than from the top of the handler -
-    `body[0].indexOf(cancel, menu)` in place of `body[0].indexOf(cancel)`, and
-    the same for the editor test's two lookups - so each assertion reads the
-    occurrence that sits where the cursor walks. While there, give both tests
-    the `assert.ok(body, ...)` the idiom beside them carries at
-    `test/page.test.js:1927`: a regex that stopped matching throws a TypeError
-    on `body[0]` rather than naming the handler it could not find.
-  - From: UI/UX Override - a figure typed into a panel row
+- [ ] The handler-order test still passes on a cancel outside the branch
+  - **Issue**: Not a defect in the panels - both of them answer a step key
+    correctly, on all four keys, and a browser run of this release confirmed it.
+    The gap is in what pins that. `test/page.test.js` finds the cancel with
+    `indexOf(cancel, works)` and then asserts only that it sits above the calls
+    that write a value, which a cancel sitting *after* the `isMenuControlKey`
+    branch satisfies just as well as one sitting *inside* it. Confirmed by
+    mutation rather than by reading: a scratch `js/main.js` whose settings
+    handler read `if (isMenuControlKey(e.code)) { }` followed by an unguarded
+    `cancelTypedSetting(this.settings);` passed all 86 tests in that file. That
+    build is the too-wide guard the release notes say the panels avoid - every
+    key gives up on the figure, so a press the panel does nothing with silently
+    throws away what the pilot typed.
+  - **Goal**: Assert the cancel is governed by the branch, not merely below it -
+    for both handlers, that the text between `isMenuControlKey(e.code)` and the
+    cancel contains no statement terminator, so the two are one guarded
+    statement rather than two. The browser-side reading that catches it is
+    pressing a digit, then `KeyQ`, then a second digit: the row must come back
+    `23_`, carrying the figure on, rather than `3_`. Reading the row alone does
+    not catch it, because the handler returns on an ignored key without calling
+    `syncOverlays`, so the stale text survives a figure that was dropped.
+  - From: UI/UX Override - a step key with a figure in hand
 
 ## Game UI/UX
 
@@ -445,72 +430,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 197 earlier items in `TODO-archive.md`, newest last.
+> 199 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Four of the eleven menu keys are asserted by nothing in the test that was
-  renamed for them
-  - **Issue**: `test/key-bindings.test.js:245` builds `walking` from
-    `MENU_UP_KEYS`, `MENU_DOWN_KEYS` and `MENU_SELECT_KEYS`, which is seven of
-    the eleven keys a menu works with. `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` are
-    menu keys by the code's own reckoning - `isMenuControlKey` at `js/menu.js:107`
-    is `isMenuKey(code) || isMenuAdjustKey(code)`, and the capture listener at
-    `js/main.js:749` reads the keys it holds back through that function, not
-    through `isMenuKey` - and they are neither imported at
-    `test/key-bindings.test.js:41` nor reached by the loop. Measured over
-    `defaultBindings()`: `ArrowLeft` and `KeyA` return
-    `{ result: 'taken', conflict: 'rollLeft' }` and `ArrowRight` and `KeyD`
-    return `{ result: 'taken', conflict: 'rollRight' }`, so all four behave the
-    way the test's own docblock says they do and nothing establishes it. The
-    docblock at `:236` counts them in - "Nine of the eleven are refused because a
-    row already holds them" - and the figures are right about the code: eleven
-    menu keys, nine held, `Enter` and `NumpadEnter` free. The closing assertion
-    at `:272` then reads the narrower list, so "the keys that choose a row are
-    the only menu keys the map can take" is a claim about eleven keys measured
-    over seven. Nothing fails, and nothing would: the free filter over all
-    eleven is `['Enter', 'NumpadEnter']` in that same order, so widening
-    `walking` leaves the `deepEqual` passing. The completed item asked for
-    assertions "about what `rebind` returns for each menu key", and four of them
-    still get none.
-  - **Goal**: Import `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` at
-    `test/key-bindings.test.js:41` and spread both into `walking`, which brings
-    the four adjust keys through the loop that already asserts a `taken` result
-    against the row that holds it. That is the whole fix - the loop needs no new
-    branch, since the adjust keys take the `holder != null` path the other nine
-    take, and the closing `deepEqual` keeps its current expectation. Then the
-    eleven the docblock counts and the eleven the test reads are the same eleven,
-    which is what a test named for a guarantee is read to settle.
-  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
-- [x] The cheatsheet still names one refusal, in both of the files that carry it
-  - **Issue**: `CHEATSHEET.md:168` and `docs/cheatsheet.html:235` carry the same
-    sentence, which enumerates what happens at a waiting row: "A key row waits
-    for a key once it is chosen. A key another row holds is refused and the row
-    says which row holds it; `Esc` is the way out of the wait; `Delete` leaves
-    `RESET FLIGHT` on no key at all, which is the only row allowed to be on
-    none." That was the complete account before this release and is now one
-    refusal short of it. Measured through `bindArmedKey` over a row armed on
-    `ROLL RIGHT`, each of the eight reserved keys is refused with a notice of its
-    own and leaves the row waiting: `TAB IS INSTRUMENTS`, `P IS PAUSE`,
-    `H IS CONTROL LIST`, `M IS MUTE`, `O IS SETTINGS`, `L IS ELEMENT EDITOR`,
-    `F2 IS PHOTO` and `C IS CAMERA`. A pilot reading the cheatsheet for whether
-    `P` can be bound gets a list in which only a row-held key is refused, and
-    `P` is held by no row, so the sentence reads as a yes. `README.md:124`,
-    `docs/controls/index.html:122` and `docs/controls/control-settings.html:185`
-    were all brought up to the new behaviour this turn and these two were not,
-    so the cheatsheet pair is the one place left describing the panel the release
-    replaced. Nothing fails - a cheatsheet does not run. Neither file is
-    generated: `tools/` holds `build-api-reference.mjs` and `serve.mjs`, and
-    nothing in `tools/` or `.github/` names the cheatsheet, so both files are
-    edited by hand and both need the edit.
-  - **Goal**: Add the second refusal to the same sentence in both files, in the
-    register the cheatsheet already uses - one clause, not the paragraph
-    `docs/controls/control-settings.html` carries. Something to the effect that a
-    key the game reads for itself is refused the same way and the row says what
-    the key already does, with one example rather than the list of eight, since
-    the eight are enumerated on the controls page and a cheatsheet that repeats
-    them is a second copy to keep in step. Keep the two files' wording identical
-    to each other, as they are today, and keep `docs/cheatsheet.html` in `<kbd>`
-    and `<code>` markup where `CHEATSHEET.md` uses backticks.
-  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
 - [x] Five documents write the reserved-key refusal out by hand and no test
   reads them against the eight keys
   - **Issue**: `test/site.test.js:466` is `CARRIES`, the table that holds a site
@@ -616,4 +537,41 @@ how the simulator got here rather than as a list still to be worked.
   - **Goal**: narrow the claim in both files to the rows that hold a figure,
     the way the settings page words it, so `START CAMERA` is not offered a
     typed figure it refuses. The five rows above it are correct as written.
+  - From: UI/UX Override - a figure typed into a panel row
+- [x] A step key with a figure in hand moves the value behind the caret
+  - **Issue**: The cursor keys now give up on a half typed figure, but the step
+    keys beside them do not: they are read above that in the same handler. At
+    `START ALTITUDE` reading `1390 FT`, typing `2` and pressing `->` leaves the
+    row reading `START ALTITUDE  2_` while the stored altitude moves to 1400,
+    and a second press takes it to 1410 with nothing on the panel saying so.
+    The `Enter` that follows is then refused against a figure the pilot never
+    typed. The element editor does the same to a range. Clicking the row
+    instead reads `START ALTITUDE  ‹ 1420 FT ›` with no caret, because the
+    pointer route gives up on the figure first - so the same action answers
+    differently depending on which hand does it.
+  - **Goal**: Resolve to [typed-row-adjust-key.prompt.md](.claude/prompts/typed-row-adjust-key.prompt.md)
+  - From: UI/UX Override - a figure typed into a panel row
+- [x] The handler-order test finds its cancel by the first match rather than in
+  the branch it means, so the item above cannot pass it
+  - **Issue**: `test/page.test.js`, in "and walking the cursor off one gives up
+    on it the same way", takes `given = body[0].indexOf(cancel)` over the whole
+    handler and asserts `given > body[0].indexOf('isMenuKey(e.code)')`. The
+    occurrence it means is the one in the menu-key branch, and `indexOf` returns
+    whichever comes first - so a `cancelTypedSetting(this.settings)` anywhere
+    above `isMenuKey` reads as a cancel in the wrong place. The step-key branch
+    is above `isMenuKey`, which makes this the test the item above has to get
+    past. Measured: with that one line added over `adjustSetting` in
+    `onSettingsKey` and nothing else changed, `node --test test/page.test.js`
+    fails with "onSettingsKey should give up on a figure where the cursor
+    walks" while the menu-key branch still gives up on the figure exactly as it
+    does now. The editor's companion test, "and hands the editor the rows that
+    walking off one rebuilt", reads its `cancelTypedEditorValue` and
+    `setMenuEntries` the same unanchored way.
+  - **Goal**: Search from the branch rather than from the top of the handler -
+    `body[0].indexOf(cancel, menu)` in place of `body[0].indexOf(cancel)`, and
+    the same for the editor test's two lookups - so each assertion reads the
+    occurrence that sits where the cursor walks. While there, give both tests
+    the `assert.ok(body, ...)` the idiom beside them carries at
+    `test/page.test.js:1927`: a regex that stopped matching throws a TypeError
+    on `body[0]` rather than naming the handler it could not find.
   - From: UI/UX Override - a figure typed into a panel row
