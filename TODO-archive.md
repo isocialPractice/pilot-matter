@@ -2665,3 +2665,70 @@ still be found by name.
     keys named rather than counted, since the sentence it leans on names
     `Esc` and an action rather than two keys.
   - From: UI/UX Override - a control can be bound onto a key the game already reads
+
+## Archived 10-21-26
+
+- [x] Four of the eleven menu keys are asserted by nothing in the test that was
+  renamed for them
+  - **Issue**: `test/key-bindings.test.js:245` builds `walking` from
+    `MENU_UP_KEYS`, `MENU_DOWN_KEYS` and `MENU_SELECT_KEYS`, which is seven of
+    the eleven keys a menu works with. `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` are
+    menu keys by the code's own reckoning - `isMenuControlKey` at `js/menu.js:107`
+    is `isMenuKey(code) || isMenuAdjustKey(code)`, and the capture listener at
+    `js/main.js:749` reads the keys it holds back through that function, not
+    through `isMenuKey` - and they are neither imported at
+    `test/key-bindings.test.js:41` nor reached by the loop. Measured over
+    `defaultBindings()`: `ArrowLeft` and `KeyA` return
+    `{ result: 'taken', conflict: 'rollLeft' }` and `ArrowRight` and `KeyD`
+    return `{ result: 'taken', conflict: 'rollRight' }`, so all four behave the
+    way the test's own docblock says they do and nothing establishes it. The
+    docblock at `:236` counts them in - "Nine of the eleven are refused because a
+    row already holds them" - and the figures are right about the code: eleven
+    menu keys, nine held, `Enter` and `NumpadEnter` free. The closing assertion
+    at `:272` then reads the narrower list, so "the keys that choose a row are
+    the only menu keys the map can take" is a claim about eleven keys measured
+    over seven. Nothing fails, and nothing would: the free filter over all
+    eleven is `['Enter', 'NumpadEnter']` in that same order, so widening
+    `walking` leaves the `deepEqual` passing. The completed item asked for
+    assertions "about what `rebind` returns for each menu key", and four of them
+    still get none.
+  - **Goal**: Import `MENU_LEFT_KEYS` and `MENU_RIGHT_KEYS` at
+    `test/key-bindings.test.js:41` and spread both into `walking`, which brings
+    the four adjust keys through the loop that already asserts a `taken` result
+    against the row that holds it. That is the whole fix - the loop needs no new
+    branch, since the adjust keys take the `holder != null` path the other nine
+    take, and the closing `deepEqual` keeps its current expectation. Then the
+    eleven the docblock counts and the eleven the test reads are the same eleven,
+    which is what a test named for a guarantee is read to settle.
+  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted
+- [x] The cheatsheet still names one refusal, in both of the files that carry it
+  - **Issue**: `CHEATSHEET.md:168` and `docs/cheatsheet.html:235` carry the same
+    sentence, which enumerates what happens at a waiting row: "A key row waits
+    for a key once it is chosen. A key another row holds is refused and the row
+    says which row holds it; `Esc` is the way out of the wait; `Delete` leaves
+    `RESET FLIGHT` on no key at all, which is the only row allowed to be on
+    none." That was the complete account before this release and is now one
+    refusal short of it. Measured through `bindArmedKey` over a row armed on
+    `ROLL RIGHT`, each of the eight reserved keys is refused with a notice of its
+    own and leaves the row waiting: `TAB IS INSTRUMENTS`, `P IS PAUSE`,
+    `H IS CONTROL LIST`, `M IS MUTE`, `O IS SETTINGS`, `L IS ELEMENT EDITOR`,
+    `F2 IS PHOTO` and `C IS CAMERA`. A pilot reading the cheatsheet for whether
+    `P` can be bound gets a list in which only a row-held key is refused, and
+    `P` is held by no row, so the sentence reads as a yes. `README.md:124`,
+    `docs/controls/index.html:122` and `docs/controls/control-settings.html:185`
+    were all brought up to the new behaviour this turn and these two were not,
+    so the cheatsheet pair is the one place left describing the panel the release
+    replaced. Nothing fails - a cheatsheet does not run. Neither file is
+    generated: `tools/` holds `build-api-reference.mjs` and `serve.mjs`, and
+    nothing in `tools/` or `.github/` names the cheatsheet, so both files are
+    edited by hand and both need the edit.
+  - **Goal**: Add the second refusal to the same sentence in both files, in the
+    register the cheatsheet already uses - one clause, not the paragraph
+    `docs/controls/control-settings.html` carries. Something to the effect that a
+    key the game reads for itself is refused the same way and the row says what
+    the key already does, with one example rather than the list of eight, since
+    the eight are enumerated on the controls page and a cheatsheet that repeats
+    them is a second copy to keep in step. Keep the two files' wording identical
+    to each other, as they are today, and keep `docs/cheatsheet.html` in `<kbd>`
+    and `<code>` markup where `CHEATSHEET.md` uses backticks.
+  - From: Code Review Override - the cheatsheet keeps the old refusal and the adjust keys go unasserted

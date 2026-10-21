@@ -1080,6 +1080,18 @@ class FlightSimulator {
             return;
         }
 
+        // Walking off a row is giving up on a figure for the same reason
+        // reaching for the mouse is, and stepping the value under it is giving
+        // up on one for the same reason again. The highlight says where the
+        // pilot is and the reading says what is stored, so a figure left live
+        // through either takes every digit after it and is finally measured
+        // against a value the row never showed. Given up on for any key the
+        // panel works with, above both the stepping and the walking - which is
+        // the order onSettingsPointer already reads in. A key the panel does
+        // nothing with leaves the figure alone, since nothing it does can move
+        // the value out from under one.
+        if (isMenuControlKey(e.code)) cancelTypedSetting(this.settings);
+
         // An option is stepped where a world is chosen, so the roll keys move
         // a setting along its own list rather than the cursor down the panel.
         if (isMenuAdjustKey(e.code)) {
@@ -1092,14 +1104,6 @@ class FlightSimulator {
 
         if (!isMenuKey(e.code)) return;
         e.preventDefault();
-
-        // Walking off a row is giving up on a figure for the same reason
-        // reaching for the mouse is. The highlight is the only thing on the
-        // panel saying where the pilot is, so a figure left live on the row
-        // behind it takes every digit after and sets a value the cursor is
-        // nowhere near. Given up on before the cursor moves, which is the
-        // order onSettingsPointer already uses.
-        cancelTypedSetting(this.settings);
 
         const chosen = applyMenuKey(this.settingsState, e.code, true, e.repeat);
         if (chosen) this.chooseSettingsEntry(chosen);
@@ -1369,6 +1373,21 @@ class FlightSimulator {
             return;
         }
 
+        // Walking off a row gives up on a figure here too, and so does stepping
+        // the range under it: either one moves the number the figure is being
+        // measured against while the caret still reads the figure. Given up on
+        // for any key the panel works with, above both of them, the way
+        // onSettingsKey and onEditorPointer read in that order.
+        //
+        // The rebuilt rows then go to the menu the list is drawn from, as
+        // onEditorPointer hands them over. Without it the cursor leaves a caret
+        // behind on the row it came from, and RESTORE THE PRESET is unreachable
+        // from the keyboard: the Enter that would ask for it is taken by the
+        // figure still in hand.
+        if (isMenuControlKey(e.code) && cancelTypedEditorValue(this.editor)) {
+            setMenuEntries(this.editorState, this.editor.entries);
+        }
+
         // A range is stepped where an element is opened, so the roll keys move
         // a number along its own bounds rather than the cursor down the panel.
         if (isMenuAdjustKey(e.code)) {
@@ -1381,15 +1400,6 @@ class FlightSimulator {
 
         if (!isMenuKey(e.code)) return;
         e.preventDefault();
-
-        // Walking off a row gives up on a figure here too, and the rebuilt rows
-        // go to the menu the list is drawn from, the way onEditorPointer hands
-        // them over. Without it the cursor leaves a caret behind on the row it
-        // came from, and RESTORE THE PRESET is unreachable from the keyboard:
-        // the Enter that would ask for it is taken by the figure still in hand.
-        if (cancelTypedEditorValue(this.editor)) {
-            setMenuEntries(this.editorState, this.editor.entries);
-        }
 
         const chosen = applyMenuKey(this.editorState, e.code, true, e.repeat);
         if (chosen) this.chooseEditorRow(chosen);

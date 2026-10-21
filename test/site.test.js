@@ -460,10 +460,15 @@ test('CHEATSHEET.md and its page say the same things', () => {
         // reason the close gives for it.
         'in the table above but',
         'A row that steps through a list holds no figure to type',
-        // And the two ways a figure ends that are not Enter, likewise shared:
-        // the presses that give up on one, and the press it simply has no room
-        // for, which costs nothing rather than starting the figure again.
-        ', the mouse, or walking the cursor to another row gives up',
+        // And the ways a figure ends that are not Enter, likewise shared: the
+        // presses that give up on one, and the press it simply has no room for,
+        // which costs nothing rather than starting the figure again. Stepping
+        // the row is pinned beside the mouse and the cursor because it is the
+        // press that gives up on a figure and changes the value in the same
+        // breath, so a document that lists the other two and not this one is
+        // the half-updated page this test exists to fail.
+        ', the mouse, walking the cursor to another row, or',
+        'stepping the row with',
         'A character the figure has no room for is turned down'
     ]) {
         assert.ok(cheatsheetDoc.includes(essential), `CHEATSHEET.md should carry ${essential}`);

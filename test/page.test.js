@@ -2029,27 +2029,52 @@ test('a press the figure turned down does not start a fresh figure', () => {
 });
 
 /**
- * Walking off a row is giving up on a figure for the same reason reaching for
- * the mouse is. The highlight is the only thing on the panel saying where the
- * pilot is, so a figure left live on the row behind it takes every digit after
- * it and `Enter` sets a value the cursor is nowhere near.
+ * Walking off a row is giving up on a figure, and so is stepping the value
+ * under it. The highlight says where the pilot is and the reading says what is
+ * stored, so a figure left live through either takes every digit after it and
+ * is finally measured against a value the row never showed.
+ *
+ * Both are keys the panel works with, so the giving up is read off
+ * `isMenuControlKey` rather than off the keys that walk the cursor alone - and
+ * both assertions below are anchored on that branch rather than on the top of
+ * the handler. An unanchored `indexOf` returns whichever giving up comes first,
+ * so a cancel left anywhere above the branch would read as this one and the
+ * test would pass on a handler that still steps a live figure.
  *
  * The fall-through that lets the cursor walk off at all is not the defect and
  * stays - see *a key the figure has no use for falls through to the panel*.
  * The key still reaches the panel; it is the figure that does not survive it.
  */
-test('and walking the cursor off one gives up on it the same way', () => {
-    for (const [handler, cancel] of [
-        ['onSettingsKey', 'cancelTypedSetting(this.settings)'],
-        ['onEditorKey',   'cancelTypedEditorValue(this.editor)']
-    ]) {
-        const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
-        const given = body[0].indexOf(cancel);
-        const menu  = body[0].indexOf('isMenuKey(e.code)');
-        const moves = body[0].indexOf('applyMenuKey(');
+const PANEL_KEY_WRITES = [
+    ['onSettingsKey', 'cancelTypedSetting(this.settings)',
+        ['adjustSetting(', 'applyMenuKey(', 'chooseSettingsEntry(']],
+    ['onEditorKey',   'cancelTypedEditorValue(this.editor)',
+        ['adjustEditorRange(', 'applyMenuKey(', 'chooseEditorRow(']]
+];
 
-        assert.ok(given > menu, `${handler} should give up on a figure where the cursor walks`);
-        assert.ok(given < moves, 'before the cursor moves off the row the figure was on');
+test('and walking the cursor off one gives up on it the same way', () => {
+    for (const [handler, cancel, writes] of PANEL_KEY_WRITES) {
+        const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        assert.ok(body, `js/main.js should read keys in ${handler}`);
+
+        const works = body[0].indexOf('isMenuControlKey(e.code)');
+        assert.ok(works > -1,
+            `${handler} should ask whether the key is one the panel works with at all`);
+
+        const given = body[0].indexOf(cancel, works);
+        assert.ok(given > works,
+            `${handler} should give up on a figure where the panel takes a key, not below it`);
+
+        // A step and a figure cannot both be live, so the giving up comes above
+        // everything in the handler that writes a value: the keys that step the
+        // row, the ones that walk the cursor, and the choice either ends in.
+        for (const write of writes) {
+            const at = body[0].indexOf(write);
+            assert.ok(at > -1, `${handler} should reach ${write}`);
+            assert.ok(given < at,
+                `${handler} gives up on a figure at ${given} and writes a value at ${at}, in `
+              + `${write} - a figure and the value under it cannot both be live`);
+        }
     }
 });
 
@@ -2058,16 +2083,26 @@ test('and walking the cursor off one gives up on it the same way', () => {
  * `onEditorPointer` does: `syncEditorEntries` builds a new set rather than
  * writing over the old, so the menu the list is drawn from is left holding the
  * rows from before unless it is handed the new ones.
+ *
+ * Both lookups are anchored on the branch for the reason the test above is.
  */
 test('and hands the editor the rows that walking off one rebuilt', () => {
     const body = mainSource.match(/onEditorKey\(e\)\s*\{[\s\S]*?\n    \}/);
-    const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)');
-    const handed = body[0].indexOf('setMenuEntries(this.editorState, this.editor.entries)');
+    assert.ok(body, 'js/main.js should read keys in onEditorKey');
 
-    assert.ok(cancel > -1 && handed > cancel,
+    const works  = body[0].indexOf('isMenuControlKey(e.code)');
+    assert.ok(works > -1, 'onEditorKey should ask whether the key is one the panel works with');
+
+    const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)', works);
+    const handed = body[0].indexOf('setMenuEntries(this.editorState, this.editor.entries)', works);
+
+    assert.ok(cancel > works && handed > cancel,
         'onEditorKey should hand the rebuilt rows to the menu the list is drawn from');
-    assert.ok(handed < body[0].indexOf('applyMenuKey('),
-        'before the cursor is walked over them');
+    for (const reads of ['adjustEditorRange(', 'applyMenuKey(']) {
+        const at = body[0].indexOf(reads);
+        assert.ok(at > -1, `onEditorKey should reach ${reads}`);
+        assert.ok(handed < at, `before ${reads} reads them`);
+    }
 });
 
 // Both panels tell a pilot the rows can be typed into, in the line that already
