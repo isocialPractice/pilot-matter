@@ -2041,9 +2041,13 @@ test('a press the figure turned down does not start a fresh figure', () => {
  * so a cancel left anywhere above the branch would read as this one and the
  * test would pass on a handler that still steps a live figure.
  *
- * The fall-through that lets the cursor walk off at all is not the defect and
- * stays - see *a key the figure has no use for falls through to the panel*.
- * The key still reaches the panel; it is the figure that does not survive it.
+ * Anchoring is half of it. A cancel found from the branch is a cancel somewhere
+ * *below* the branch, which a cancel on the line after it satisfies as readily
+ * as one inside it - so the two are also read as a single statement, per
+ * `GOVERNED` below. The fall-through that lets the cursor walk off at all is
+ * not the defect and stays - see *a key the figure has no use for falls through
+ * to the panel*. The key still reaches the panel; it is the figure that does
+ * not survive it.
  */
 const PANEL_KEY_WRITES = [
     ['onSettingsKey', 'cancelTypedSetting(this.settings)',
@@ -2052,18 +2056,50 @@ const PANEL_KEY_WRITES = [
         ['adjustEditorRange(', 'applyMenuKey(', 'chooseEditorRow(']]
 ];
 
+const CONTROL_KEY = 'isMenuControlKey(e.code)';
+
+/**
+ * Whether a call the branch is supposed to govern is governed by it, read off
+ * the text lying between the two. Nothing but a condition and an opening may
+ * separate them: `) `, ` && ` and `) {` all leave the branch and the call as
+ * one guarded statement, while a `;` or a `}` in there has closed the branch
+ * before the call is reached, leaving two statements in a row.
+ *
+ * Position alone cannot tell those apart, and the difference is the whole
+ * behaviour. A handler reading `if (isMenuControlKey(e.code)) { }` above an
+ * unguarded `cancelTypedSetting(this.settings);` gives up on the figure for
+ * every key rather than for the keys the panel works with, so a press the
+ * panel does nothing with silently throws away what the pilot typed - and it
+ * passed every test in this file.
+ */
+const GOVERNED = /[;}]/;
+
+/** The text between the branch at `from` and the call already found at `at`. */
+function between(body, from, at) {
+    return body.slice(from + CONTROL_KEY.length, at);
+}
+
 test('and walking the cursor off one gives up on it the same way', () => {
     for (const [handler, cancel, writes] of PANEL_KEY_WRITES) {
         const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
         assert.ok(body, `js/main.js should read keys in ${handler}`);
 
-        const works = body[0].indexOf('isMenuControlKey(e.code)');
+        const works = body[0].indexOf(CONTROL_KEY);
         assert.ok(works > -1,
             `${handler} should ask whether the key is one the panel works with at all`);
 
         const given = body[0].indexOf(cancel, works);
         assert.ok(given > works,
             `${handler} should give up on a figure where the panel takes a key, not below it`);
+
+        // And inside that branch rather than merely under it, which is a
+        // reading no index can give - see GOVERNED above.
+        const guarded = between(body[0], works, given);
+        assert.doesNotMatch(guarded, GOVERNED,
+            `${handler} closes the branch at \`${guarded.trim()}\` and only then gives up on `
+          + 'a figure - the two have to be one guarded statement, or every key the panel '
+          + 'works with becomes every key at all and a press the panel ignores throws away '
+          + 'the figure in hand');
 
         // A step and a figure cannot both be live, so the giving up comes above
         // everything in the handler that writes a value: the keys that step the
@@ -2084,13 +2120,14 @@ test('and walking the cursor off one gives up on it the same way', () => {
  * writing over the old, so the menu the list is drawn from is left holding the
  * rows from before unless it is handed the new ones.
  *
- * Both lookups are anchored on the branch for the reason the test above is.
+ * Both lookups are anchored on the branch, and both are read as governed by it,
+ * for the reasons the test above is.
  */
 test('and hands the editor the rows that walking off one rebuilt', () => {
     const body = mainSource.match(/onEditorKey\(e\)\s*\{[\s\S]*?\n    \}/);
     assert.ok(body, 'js/main.js should read keys in onEditorKey');
 
-    const works  = body[0].indexOf('isMenuControlKey(e.code)');
+    const works  = body[0].indexOf(CONTROL_KEY);
     assert.ok(works > -1, 'onEditorKey should ask whether the key is one the panel works with');
 
     const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)', works);
@@ -2098,6 +2135,13 @@ test('and hands the editor the rows that walking off one rebuilt', () => {
 
     assert.ok(cancel > works && handed > cancel,
         'onEditorKey should hand the rebuilt rows to the menu the list is drawn from');
+    for (const [at, name] of [[cancel, 'give up on a figure'], [handed, 'hand the rows over']]) {
+        const guarded = between(body[0], works, at);
+        assert.doesNotMatch(guarded, GOVERNED,
+            `onEditorKey closes the branch at \`${guarded.trim()}\` and only then goes on to `
+          + `${name} - the branch and what it governs have to be one statement, or the `
+          + 'editor gives up on a figure for keys the panel does nothing with');
+    }
     for (const reads of ['adjustEditorRange(', 'applyMenuKey(']) {
         const at = body[0].indexOf(reads);
         assert.ok(at > -1, `onEditorKey should reach ${reads}`);
