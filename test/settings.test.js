@@ -56,6 +56,7 @@ import {
     applyTypedSettingKey
 } from '../js/settings.js';
 import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
+import { isMenuControlKey } from '../js/menu.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
 import {
@@ -819,6 +820,48 @@ test('a key the figure has no use for is handed back to the panel', () => {
         assert.equal(applyTypedSettingKey(state, code), null, `${code} belongs to the panel`);
     }
     assert.equal(typedSettingText(state), '5', 'and none of them disturbed the figure');
+});
+
+/**
+ * And a key neither the figure nor the panel claims leaves it alone, which is
+ * the half the test above cannot show on its own: every key it presses is one
+ * the panel works with, and those are exactly the keys the handler does give a
+ * figure up for. A key no branch claims - yaw, the throttle, reset - has to
+ * fall past all of them with the figure still in hand.
+ *
+ * Read in the order js/main.js reads the press, because the order is what the
+ * behaviour rests on: the figure answers first and comes back null, the row
+ * already being typed into is what stops a fresh figure beginning on that
+ * nothing, and the giving up is reached only where the key is one the panel
+ * works with. Giving up on a key outside that last branch is a figure thrown
+ * away for every key at all, with nothing on the row to say it went - so the
+ * digit after the press is what the assertion turns on. One that reads `3`
+ * rather than `23` started afresh.
+ */
+test('a key neither the figure nor the panel claims leaves the figure in hand', () => {
+    const state = createSettingsState(fakeStorage());
+
+    for (const code of ['KeyQ', 'KeyE', 'KeyR', 'ShiftLeft', 'ControlLeft']) {
+        assert.equal(isMenuControlKey(code), false,
+            `${code} should not be a key the panel works with`);
+        assert.ok(!SETTINGS_CLOSE_KEYS.includes(code), `${code} should not be the way out either`);
+
+        beginTypedSetting(state, 'altitudeFeet', 'Digit2');
+        assert.equal(applyTypedSettingKey(state, code), null,
+            `${code} should not be the figure's to take`);
+        assert.equal(typedSettingRow(state), 'altitudeFeet',
+            `${code} should leave the row being typed into, so no fresh figure begins`);
+
+        // The branch the handler reaches next, written as the handler writes it:
+        // on a key like this it does not run at all.
+        if (isMenuControlKey(code)) cancelTypedSetting(state);
+
+        assert.equal(typedSettingText(state), '2', `${code} should leave the figure where it was`);
+        applyTypedSettingKey(state, 'Digit3');
+        assert.equal(typedSettingText(state), '23',
+            `the digit after ${code} should carry on rather than start a fresh figure`);
+        cancelTypedSetting(state);
+    }
 });
 
 /**

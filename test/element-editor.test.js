@@ -47,6 +47,7 @@ import {
     applyTypedEditorKey
 } from '../js/element-editor.js';
 import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
+import { isMenuControlKey } from '../js/menu.js';
 import {
     ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom
 } from '../js/environment/elements.js';
@@ -774,6 +775,42 @@ test('a key the figure has no use for is handed back to the panel', () => {
         assert.equal(applyTypedEditorKey(state, code), null, `${code} belongs to the panel`);
     }
     assert.equal(typedEditorText(state), '9', 'and none of them disturbed the figure');
+});
+
+/**
+ * And a key neither the figure nor the panel claims leaves it alone, for the
+ * reason it does in the settings panel: the keys the test above presses are all
+ * keys the panel works with, which are the keys the handler gives a figure up
+ * for. A key no branch claims has to fall past the lot of them with the figure
+ * still in hand, so the digit after it carries on from what was typed.
+ *
+ * Read in the order js/main.js reads the press - the figure first, then the row
+ * already being typed into, then the branch that gives up - because a giving up
+ * reached outside that branch throws the figure away for every key at all.
+ */
+test('a key neither the figure nor the panel claims leaves the figure in hand', () => {
+    const { state, element } = openedOn('highlands', 'snow');
+    const id = rowId(element.id, 'line', 'value');
+
+    for (const code of ['KeyQ', 'KeyE', 'KeyR', 'ShiftLeft', 'ControlLeft']) {
+        assert.equal(isMenuControlKey(code), false,
+            `${code} should not be a key the panel works with`);
+        assert.ok(!EDITOR_CLOSE_KEYS.includes(code), `${code} should not be the way out either`);
+
+        beginTypedEditorValue(state, id, 'Digit2');
+        assert.equal(applyTypedEditorKey(state, code), null,
+            `${code} should not be the figure's to take`);
+        assert.equal(typedEditorRow(state), id,
+            `${code} should leave the row being typed into, so no fresh figure begins`);
+
+        if (isMenuControlKey(code)) cancelTypedEditorValue(state);
+
+        assert.equal(typedEditorText(state), '2', `${code} should leave the figure where it was`);
+        applyTypedEditorKey(state, 'Digit3');
+        assert.equal(typedEditorText(state), '23',
+            `the digit after ${code} should carry on rather than start a fresh figure`);
+        cancelTypedEditorValue(state);
+    }
 });
 
 /**
