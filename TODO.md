@@ -22,32 +22,40 @@ its context survives being archived.
 - [ ] Prune the four built items in `## World & Environment`
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - a step key with a figure in hand
+### Code Review Override - the tightened handler test passes on an inverted guard
 
 #### Found Issues
 
-- [ ] The handler-order test still passes on a cancel outside the branch
-  - **Issue**: Not a defect in the panels - both of them answer a step key
-    correctly, on all four keys, and a browser run of this release confirmed it.
-    The gap is in what pins that. `test/page.test.js` finds the cancel with
-    `indexOf(cancel, works)` and then asserts only that it sits above the calls
-    that write a value, which a cancel sitting *after* the `isMenuControlKey`
-    branch satisfies just as well as one sitting *inside* it. Confirmed by
-    mutation rather than by reading: a scratch `js/main.js` whose settings
-    handler read `if (isMenuControlKey(e.code)) { }` followed by an unguarded
-    `cancelTypedSetting(this.settings);` passed all 86 tests in that file. That
-    build is the too-wide guard the release notes say the panels avoid - every
-    key gives up on the figure, so a press the panel does nothing with silently
-    throws away what the pilot typed.
-  - **Goal**: Assert the cancel is governed by the branch, not merely below it -
-    for both handlers, that the text between `isMenuControlKey(e.code)` and the
-    cancel contains no statement terminator, so the two are one guarded
-    statement rather than two. The browser-side reading that catches it is
-    pressing a digit, then `KeyQ`, then a second digit: the row must come back
-    `23_`, carrying the figure on, rather than `3_`. Reading the row alone does
-    not catch it, because the handler returns on an ignored key without calling
-    `syncOverlays`, so the stale text survives a figure that was dropped.
-  - From: UI/UX Override - a step key with a figure in hand
+- [ ] Both handler-order tests read where the giving up sits and never which
+  keys it answers
+  - **Issue**: `CONTROL_KEY` is the bare text `isMenuControlKey(e.code)`
+    (`test/page.test.js:2059`), `works` is `indexOf(CONTROL_KEY)`
+    (`test/page.test.js:2087` and `:2130`), and `between()` slices forward from
+    `works + CONTROL_KEY.length` (`test/page.test.js:2078`). Every reading in
+    both tests therefore starts at or after that token, so nothing looks at the
+    character in front of it and a `!` there is invisible. Measured by mutation
+    on the source as it stands, not by reading: inverting the settings branch at
+    `js/main.js:1093` to
+    `if (!isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` leaves
+    all 1397 tests passing, and inverting the editor branch at
+    `js/main.js:1387` to
+    `if (!isMenuControlKey(e.code) && cancelTypedEditorValue(this.editor))`
+    does the same. Either build is the `1.0.0-alpha.1.28.0` defect back and
+    worse than it was: the giving up now answers only the keys the panel does
+    nothing with, so a step key reaches a live figure again *and* a press the
+    panel ignores throws the figure away. `js/main.js` was restored after each
+    run and `git diff -- js/` is empty.
+  - **Goal**: Assert the sense of the branch beside its reach - that the
+    condition opens `if (` with nothing between that and `isMenuControlKey`,
+    for both handlers in both tests, so a `!` fails. The material is already
+    computed: `works` is the index of the token, and the slice back to the
+    preceding `if (` is the reading *a press the figure turned down does not
+    start a fresh figure* already takes with `lastIndexOf('if (', start)`
+    (`test/page.test.js:2025`). Leave `GOVERNED` as it is - this is a second
+    assertion beside it, not a replacement - and verify it the way this issue
+    was found, by putting each inversion back and watching the two tests name
+    the handler.
+  - From: Code Review Override - the tightened handler test passes on an inverted guard
 
 ## Game UI/UX
 
@@ -430,50 +438,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 199 earlier items in `TODO-archive.md`, newest last.
+> 200 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Five documents write the reserved-key refusal out by hand and no test
-  reads them against the eight keys
-  - **Issue**: `test/site.test.js:466` is `CARRIES`, the table that holds a site
-    page to a list the code publishes. Its docblock exists for this exact
-    failure - the cheatsheet and the terrain page "could go stale with nothing
-    failing", so "these are the pages the code is read against"
-    (`test/site.test.js:462-464`). It has six rows: start fields, control
-    settings, environments twice and game modes twice. The keys the game
-    reserves have no row. `js/reserved-keys.js` publishes `reservedKeys()` and
-    `reservedRole(code)`, and `js/control-settings.js:638` writes a refusal as
-    `${keyLabel(code).toUpperCase()} IS ${reservedRole(code)}`, which
-    `test/control-settings.test.js:796` asserts over every reserved key - so the
-    notice is pinned in the panel and nowhere in the prose. Five documents write
-    that notice, or the eight keys behind it, out by hand: `CHEATSHEET.md:170`
-    and `docs/cheatsheet.html:235` carry `P IS PAUSE`, both added this turn;
-    `docs/controls/control-settings.html:185` carries `P IS PAUSE` and
-    `TAB IS INSTRUMENTS`; `README.md:128` carries `P IS PAUSE`; and
-    `docs/controls/index.html:122` names all eight, as `C`, `P`, `O`, `L`, `M`,
-    `H`, `Tab` and `F2`. The failing state is nameable and the code is already
-    shaped for it: `reservedRoles()` at `js/reserved-keys.js:55` carries a list
-    of codes per role rather than one code, written that way because a role
-    "one key today is two the day a second way to open the settings is added"
-    (`js/reserved-keys.js:93`), and `SETTINGS_OPEN_KEYS` is already a list. Add
-    that ninth key, or rename a role from `PAUSE`, and all five documents are
-    wrong with `npm test` green at 1318. That is the release this item sits
-    under: the cheatsheet pair sat a release behind the panel and the suite
-    reported 1318 passing the whole time.
-  - **Goal**: Give `CARRIES` a reserved-key row, which is the mechanism the file
-    already has for this. The material is the notice the panel writes -
-    `keyLabel(code).toUpperCase()` + `' IS '` + `reservedRole(code)` over
-    `reservedKeys()` - and the one page naming every reserved key today is
-    `docs/controls/index.html`, which names the codes rather than the notices,
-    while `docs/controls/control-settings.html` names two notices of the eight.
-    So decide first which pages owe all eight and which owe one example, and
-    write that decision into the row rather than leaving it to the next reader.
-    `CARRIES` reads `sources`, which is `docs/**.html` only
-    (`test/site.test.js:28`), so `CHEATSHEET.md` and `README.md` need the same
-    check written beside it against `cheatsheetDoc` and `readme`. While there,
-    add the refusal clause to the five essentials at `test/site.test.js:446`,
-    which is what keeps `CHEATSHEET.md` and `docs/cheatsheet.html` saying the
-    same thing: editing that sentence in one and not the other is green today.
-  - From: Code Review Override - the reserved-key notices in the docs are held to nothing
 - [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
   the machine has
   - From: Flight Controls
@@ -575,3 +541,25 @@ how the simulator got here rather than as a list still to be worked.
     `test/page.test.js:1927`: a regex that stopped matching throws a TypeError
     on `body[0]` rather than naming the handler it could not find.
   - From: UI/UX Override - a figure typed into a panel row
+- [x] The handler-order test still passes on a cancel outside the branch
+  - **Issue**: Not a defect in the panels - both of them answer a step key
+    correctly, on all four keys, and a browser run of this release confirmed it.
+    The gap is in what pins that. `test/page.test.js` finds the cancel with
+    `indexOf(cancel, works)` and then asserts only that it sits above the calls
+    that write a value, which a cancel sitting *after* the `isMenuControlKey`
+    branch satisfies just as well as one sitting *inside* it. Confirmed by
+    mutation rather than by reading: a scratch `js/main.js` whose settings
+    handler read `if (isMenuControlKey(e.code)) { }` followed by an unguarded
+    `cancelTypedSetting(this.settings);` passed all 86 tests in that file. That
+    build is the too-wide guard the release notes say the panels avoid - every
+    key gives up on the figure, so a press the panel does nothing with silently
+    throws away what the pilot typed.
+  - **Goal**: Assert the cancel is governed by the branch, not merely below it -
+    for both handlers, that the text between `isMenuControlKey(e.code)` and the
+    cancel contains no statement terminator, so the two are one guarded
+    statement rather than two. The browser-side reading that catches it is
+    pressing a digit, then `KeyQ`, then a second digit: the row must come back
+    `23_`, carrying the figure on, rather than `3_`. Reading the row alone does
+    not catch it, because the handler returns on an ignored key without calling
+    `syncOverlays`, so the stale text survives a figure that was dropped.
+  - From: UI/UX Override - a step key with a figure in hand

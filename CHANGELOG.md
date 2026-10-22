@@ -5,6 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.29.1] - 2026-10-22
+
+`1.0.0-alpha.1.29.0` anchored the handler-order tests on the branch that takes
+the keys, which fixed the occurrence they measured and left what they measure
+about it too weak to matter. Searching from the branch finds a cancel somewhere
+*below* the branch, and a cancel on the line after one sits below it as surely
+as a cancel inside it - so the assertion held for the position of the call and
+said nothing about whether the branch governs it. Nothing in the panels was
+wrong: both handlers answer a step key correctly on all four keys, and a browser
+run of that release confirmed it. What was wrong was that nothing would have
+said so.
+
+### Fixed
+
+- **The handler-order tests read a guarded statement rather than a position.**
+  `test/page.test.js` found the giving up with `indexOf(cancel, works)` and then
+  asserted only that it sat above the calls that write a value, which a cancel
+  *after* the `isMenuControlKey` branch satisfies exactly as well as one inside
+  it. Measured by mutation rather than by reading: a `js/main.js` whose settings
+  handler read `if (isMenuControlKey(e.code)) { }` followed by an unguarded
+  `cancelTypedSetting(this.settings);` passed all 86 tests in the file. That
+  build is the too-wide guard the previous release notes say the panels avoid -
+  every key gives up on the figure, so a press the panel does nothing with
+  throws away what the pilot typed, and the row says nothing about it because
+  the handler returns on an ignored key without reaching `syncOverlays`. Both
+  *and walking the cursor off one gives up on it the same way* and *and hands
+  the editor the rows that walking off one rebuilt* now read the text lying
+  between the branch and the call it governs and refuse a `;` or a `}` in it, so
+  the two have to be one guarded statement rather than two in a row. The three
+  shapes that leave them one - `) `, ` && ` and `) {` - all still pass, so the
+  braced form of either branch is free to be written; the mutation above now
+  fails with the text it closed the branch at, and the same mutation of the
+  editor's branch fails in both tests.
+
+The suite is green at 1397, with two tests added beside the panels' own in the
+verification that followed - *a key neither the figure nor the panel claims
+leaves the figure in hand*, read in each panel's own module.
+
 ## [1.0.0-alpha.1.29.0] - 2026-10-21
 
 `1.0.0-alpha.1.28.0` taught the cursor to give up on a half typed figure and
