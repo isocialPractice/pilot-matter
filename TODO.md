@@ -22,40 +22,51 @@ its context survives being archived.
 - [ ] Prune the four built items in `## World & Environment`
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### Code Review Override - the tightened handler test passes on an inverted guard
+### Code Review Override - the branch sense is read in front of the token only
 
-#### Found Issues
-
-- [ ] Both handler-order tests read where the giving up sits and never which
-  keys it answers
-  - **Issue**: `CONTROL_KEY` is the bare text `isMenuControlKey(e.code)`
-    (`test/page.test.js:2059`), `works` is `indexOf(CONTROL_KEY)`
-    (`test/page.test.js:2087` and `:2130`), and `between()` slices forward from
-    `works + CONTROL_KEY.length` (`test/page.test.js:2078`). Every reading in
-    both tests therefore starts at or after that token, so nothing looks at the
-    character in front of it and a `!` there is invisible. Measured by mutation
-    on the source as it stands, not by reading: inverting the settings branch at
-    `js/main.js:1093` to
-    `if (!isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` leaves
-    all 1397 tests passing, and inverting the editor branch at
-    `js/main.js:1387` to
-    `if (!isMenuControlKey(e.code) && cancelTypedEditorValue(this.editor))`
-    does the same. Either build is the `1.0.0-alpha.1.28.0` defect back and
-    worse than it was: the giving up now answers only the keys the panel does
-    nothing with, so a step key reaches a live figure again *and* a press the
-    panel ignores throws the figure away. `js/main.js` was restored after each
-    run and `git diff -- js/` is empty.
-  - **Goal**: Assert the sense of the branch beside its reach - that the
-    condition opens `if (` with nothing between that and `isMenuControlKey`,
-    for both handlers in both tests, so a `!` fails. The material is already
-    computed: `works` is the index of the token, and the slice back to the
-    preceding `if (` is the reading *a press the figure turned down does not
-    start a fresh figure* already takes with `lastIndexOf('if (', start)`
-    (`test/page.test.js:2025`). Leave `GOVERNED` as it is - this is a second
-    assertion beside it, not a replacement - and verify it the way this issue
-    was found, by putting each inversion back and watching the two tests name
-    the handler.
-  - From: Code Review Override - the tightened handler test passes on an inverted guard
+- [ ] An inversion written after `isMenuControlKey` is still invisible to both
+  handler-order tests
+  - **Issue**: `opens()` (`test/page.test.js:2101`) slices from the `if (` up to
+    the token and `between()` (`test/page.test.js:2081`) slices from the end of
+    the token onward, so the only inversion either can see is one spelled in
+    front of the token. Measured by mutation on the source as it stands, not by
+    reading: rewriting the settings branch at `js/main.js:1093` to
+    `if (isMenuControlKey(e.code) === false) cancelTypedSetting(this.settings);`
+    and the editor branch at `js/main.js:1387` to
+    `if (isMenuControlKey(e.code) === false && cancelTypedEditorValue(this.editor)) {`
+    leaves all 1397 tests passing - `opens()` reads `''` for both and
+    `GOVERNED` finds no `;` or `}` in ` === false) `. That build is the same
+    `1.0.0-alpha.1.28.0` defect this release closed against `!`, reached by a
+    different spelling: a step key moves the value out from under a live figure
+    *and* a press the panel ignores throws that figure away. `js/main.js` was
+    restored after each run and `git diff -- js/` is empty.
+  - **Goal**: Read the rest of the condition too, so the sense is pinned
+    wherever it is written rather than only in front of the token. The text
+    between the end of `CONTROL_KEY` and the `)` that closes the condition is
+    the unread span - `)` for `onSettingsKey`, ` && cancelTypedEditorValue(this.editor)`
+    for `onEditorKey` - and nothing comparing the call's result belongs in it.
+    Leave `GOVERNED` and `opens()` as they are; this is a third reading beside
+    them. Verify it the way this issue was found, by putting each `=== false`
+    build back and watching both tests name the handler, and by confirming the
+    two `!` mutations still fail.
+  - From: Code Review Override - the branch sense is read in front of the token only
+- [ ] `opens()` fails a reformat that changes no behaviour, and says the handler
+  answers the wrong keys
+  - **Issue**: `assert.strictEqual(sense, '')` (`test/page.test.js:2119` and
+    `:2170`) requires the span to be empty rather than blank, so
+    `if (  isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` at
+    `js/main.js:1093` - two spaces, identical behaviour - fails with
+    *onSettingsKey opens the branch `if (  isMenuControlKey(e.code)` and so
+    gives up on a figure for the keys the panel does nothing with*. The message
+    names a defect that is not there, which is worse than the bare failure: a
+    later reader told the handler answers the wrong keys has been pointed at
+    the condition rather than at the whitespace.
+  - **Goal**: Compare `sense.trim()` against `''` so blank text passes and a
+    `!` still fails. A no-space `if(` is the same class and fails more wildly,
+    since `lastIndexOf('if (', at)` then finds some earlier `if (` in the
+    handler and quotes the span between the two - worth reading for at the same
+    time.
+  - From: Code Review Override - the branch sense is read in front of the token only
 
 ## Game UI/UX
 
@@ -438,11 +449,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 200 earlier items in `TODO-archive.md`, newest last.
+> 201 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
-  the machine has
-  - From: Flight Controls
 - [x] Set how far the device is turned before it asks for anything
   - From: Flight Controls
 - [x] **Typed Row**: Accept typed values in the **Element Editor** and the
@@ -563,3 +571,33 @@ how the simulator got here rather than as a list still to be worked.
     not catch it, because the handler returns on an ignored key without calling
     `syncOverlays`, so the stale text survives a figure that was dropped.
   - From: UI/UX Override - a step key with a figure in hand
+- [x] Both handler-order tests read where the giving up sits and never which
+  keys it answers
+  - **Issue**: `CONTROL_KEY` is the bare text `isMenuControlKey(e.code)`
+    (`test/page.test.js:2059`), `works` is `indexOf(CONTROL_KEY)`
+    (`test/page.test.js:2087` and `:2130`), and `between()` slices forward from
+    `works + CONTROL_KEY.length` (`test/page.test.js:2078`). Every reading in
+    both tests therefore starts at or after that token, so nothing looks at the
+    character in front of it and a `!` there is invisible. Measured by mutation
+    on the source as it stands, not by reading: inverting the settings branch at
+    `js/main.js:1093` to
+    `if (!isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` leaves
+    all 1397 tests passing, and inverting the editor branch at
+    `js/main.js:1387` to
+    `if (!isMenuControlKey(e.code) && cancelTypedEditorValue(this.editor))`
+    does the same. Either build is the `1.0.0-alpha.1.28.0` defect back and
+    worse than it was: the giving up now answers only the keys the panel does
+    nothing with, so a step key reaches a live figure again *and* a press the
+    panel ignores throws the figure away. `js/main.js` was restored after each
+    run and `git diff -- js/` is empty.
+  - **Goal**: Assert the sense of the branch beside its reach - that the
+    condition opens `if (` with nothing between that and `isMenuControlKey`,
+    for both handlers in both tests, so a `!` fails. The material is already
+    computed: `works` is the index of the token, and the slice back to the
+    preceding `if (` is the reading *a press the figure turned down does not
+    start a fresh figure* already takes with `lastIndexOf('if (', start)`
+    (`test/page.test.js:2025`). Leave `GOVERNED` as it is - this is a second
+    assertion beside it, not a replacement - and verify it the way this issue
+    was found, by putting each inversion back and watching the two tests name
+    the handler.
+  - From: Code Review Override - the tightened handler test passes on an inverted guard
