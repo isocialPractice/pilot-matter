@@ -2041,13 +2041,16 @@ test('a press the figure turned down does not start a fresh figure', () => {
  * so a cancel left anywhere above the branch would read as this one and the
  * test would pass on a handler that still steps a live figure.
  *
- * Anchoring is half of it. A cancel found from the branch is a cancel somewhere
- * *below* the branch, which a cancel on the line after it satisfies as readily
- * as one inside it - so the two are also read as a single statement, per
- * `GOVERNED` below. The fall-through that lets the cursor walk off at all is
- * not the defect and stays - see *a key the figure has no use for falls through
- * to the panel*. The key still reaches the panel; it is the figure that does
- * not survive it.
+ * Anchoring is one of three readings. A cancel found from the branch is a
+ * cancel somewhere *below* the branch, which a cancel on the line after it
+ * satisfies as readily as one inside it - so the two are also read as a single
+ * statement, per `GOVERNED` below. Both of those read where the cancel sits,
+ * and neither reads which keys the branch answers - so the condition itself is
+ * read for that, per `opens` below.
+ *
+ * The fall-through that lets the cursor walk off at all is not the defect and
+ * stays - see *a key the figure has no use for falls through to the panel*. The
+ * key still reaches the panel; it is the figure that does not survive it.
  */
 const PANEL_KEY_WRITES = [
     ['onSettingsKey', 'cancelTypedSetting(this.settings)',
@@ -2079,6 +2082,27 @@ function between(body, from, at) {
     return body.slice(from + CONTROL_KEY.length, at);
 }
 
+/**
+ * Which keys the branch answers, read off the text between the `if (` that
+ * opens it and the token itself. Empty is the sense that is wanted: the giving
+ * up happens for the keys the panel works with.
+ *
+ * Every other reading here starts at or after `CONTROL_KEY` and so cannot see
+ * the character in front of it. A `!` there is therefore invisible to all of
+ * them, and inverting either branch left the whole suite green - the giving up
+ * then answers only the keys the panel does nothing with, so a step key reaches
+ * a live figure again *and* a press the panel ignores throws the figure away.
+ * That is the `1.0.0-alpha.1.28.0` defect back and worse than it was.
+ *
+ * Reach is the other half and `GOVERNED` above is still what reads it: a
+ * branch with the right sense and the wrong reach gives up on a figure outside
+ * itself, which no reading of the condition can catch.
+ */
+function opens(body, at) {
+    const from = body.lastIndexOf('if (', at);
+    return from < 0 ? null : body.slice(from + 'if ('.length, at);
+}
+
 test('and walking the cursor off one gives up on it the same way', () => {
     for (const [handler, cancel, writes] of PANEL_KEY_WRITES) {
         const body = mainSource.match(new RegExp(`${handler}\\(e\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
@@ -2087,6 +2111,16 @@ test('and walking the cursor off one gives up on it the same way', () => {
         const works = body[0].indexOf(CONTROL_KEY);
         assert.ok(works > -1,
             `${handler} should ask whether the key is one the panel works with at all`);
+
+        // And asks it that way round. Every reading below starts at the token,
+        // so this is the only one that sees a `!` in front of it - see `opens`.
+        const sense = opens(body[0], works);
+        assert.ok(sense != null, `${handler} should ask that in an \`if\``);
+        assert.strictEqual(sense, '',
+            `${handler} opens the branch \`if (${sense}${CONTROL_KEY}\` and so gives up on a `
+          + 'figure for the keys the panel does nothing with - the giving up has to answer '
+          + 'the keys it works with, or a step key moves the value out from under a live '
+          + 'figure and a press the panel ignores throws that figure away');
 
         const given = body[0].indexOf(cancel, works);
         assert.ok(given > works,
@@ -2121,7 +2155,8 @@ test('and walking the cursor off one gives up on it the same way', () => {
  * rows from before unless it is handed the new ones.
  *
  * Both lookups are anchored on the branch, and both are read as governed by it,
- * for the reasons the test above is.
+ * for the reasons the test above is - and the branch is read for its sense
+ * first, since an anchor on an inverted condition anchors on the wrong keys.
  */
 test('and hands the editor the rows that walking off one rebuilt', () => {
     const body = mainSource.match(/onEditorKey\(e\)\s*\{[\s\S]*?\n    \}/);
@@ -2129,6 +2164,13 @@ test('and hands the editor the rows that walking off one rebuilt', () => {
 
     const works  = body[0].indexOf(CONTROL_KEY);
     assert.ok(works > -1, 'onEditorKey should ask whether the key is one the panel works with');
+
+    const sense = opens(body[0], works);
+    assert.ok(sense != null, 'onEditorKey should ask that in an `if`');
+    assert.strictEqual(sense, '',
+        `onEditorKey opens the branch \`if (${sense}${CONTROL_KEY}\` and so rebuilds the rows `
+      + 'for the keys the panel does nothing with and leaves them for the keys it works '
+      + 'with - the branch has to answer the keys the panel works with');
 
     const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)', works);
     const handed = body[0].indexOf('setMenuEntries(this.editorState, this.editor.entries)', works);

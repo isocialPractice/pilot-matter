@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.29.2] - 2026-10-23
+
+`1.0.0-alpha.1.29.1` read the branch and the call it governs as one statement
+and still read nothing about which keys the branch answers. Every reading in
+both handler-order tests started at the `isMenuControlKey(e.code)` token or
+after it, so the character in front of it was in none of their spans and a `!`
+there was invisible to all of them.
+
+### Fixed
+
+- **Both handler-order tests now read the sense of the branch beside its
+  reach.** `CONTROL_KEY` is the bare text `isMenuControlKey(e.code)`, `works` is
+  its index, and `between()` slices forward from the end of it, so an inverted
+  condition read to the tests exactly as the correct one did. Measured by
+  mutation on the source as it stood: inverting the settings branch to
+  `if (!isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` left all
+  1397 tests passing, and inverting the editor branch to
+  `if (!isMenuControlKey(e.code) && cancelTypedEditorValue(this.editor))` did
+  the same. Either build is the `1.0.0-alpha.1.28.0` defect back and worse than
+  it was - the giving up then answers only the keys the panel does nothing with,
+  so a step key reaches a live figure again *and* a press the panel ignores
+  throws the figure away. A new `opens()` reads the text between the `if (` that
+  opens the branch and the token itself and requires it empty, in *and walking
+  the cursor off one gives up on it the same way* for both handlers and in *and
+  hands the editor the rows that walking off one rebuilt* for the editor's. Both
+  mutations now fail naming the handler and quoting the condition they read;
+  `GOVERNED` is untouched, since a branch with the right sense and the wrong
+  reach is a separate defect no reading of the condition catches.
+
+Nothing in `js/` changed. The panels answered both branches correctly before
+this release and answer them correctly after it; what changed is that an
+inversion of either one now fails. The suite is green at 1397.
+
 ## [1.0.0-alpha.1.29.1] - 2026-10-22
 
 `1.0.0-alpha.1.29.0` anchored the handler-order tests on the branch that takes

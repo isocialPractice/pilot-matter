@@ -2777,3 +2777,9 @@ still be found by name.
     which is what keeps `CHEATSHEET.md` and `docs/cheatsheet.html` saying the
     same thing: editing that sentence in one and not the other is green today.
   - From: Code Review Override - the reserved-key notices in the docs are held to nothing
+
+## Archived 10-23-26
+
+- [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
+  the machine has
+  - From: Flight Controls
