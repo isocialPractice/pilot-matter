@@ -5,6 +5,64 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.29.3] - 2026-10-24
+
+`1.0.0-alpha.1.29.2` read the sense of the branch off the span in front of the
+`isMenuControlKey(e.code)` token, which closed the inversion spelled `!` and
+left the one spelled `=== false` open. It also required that span to be empty
+rather than blank, so a reformat that changes no behaviour failed, and failed
+by reporting a defect in the condition.
+
+### Fixed
+
+- **The sense of the branch is now read behind the token as well as in front of
+  it.** `opens()` slices from the `if (` up to the token and `between()` slices
+  from the end of the token onward, so the only inversion either could see was
+  one written in front of it. Measured by mutation: rewriting the settings
+  branch at `js/main.js:1093` to
+  `if (isMenuControlKey(e.code) === false) cancelTypedSetting(this.settings);`
+  and the editor branch at `js/main.js:1387` to
+  `if (isMenuControlKey(e.code) === false && cancelTypedEditorValue(this.editor)) {`
+  left all 1397 tests passing - `opens()` read `''` for both, and `GOVERNED`
+  found no `;` or `}` in ` === false) `. Either build is the
+  `1.0.0-alpha.1.28.0` defect reached by a different spelling: a step key moves
+  the value out from under a live figure *and* a press the panel ignores throws
+  that figure away. A new `rest()` balances parentheses from inside the opening
+  one to find the `)` that closes the condition, and the span it returns -
+  `''` for `onSettingsKey`, ` && cancelTypedEditorValue(this.editor)` for
+  `onEditorKey` - is read against a new `COMPARED` for anything comparing the
+  call's result. `COMPARED` is anchored at the start of that span, because a
+  comparison of the call is written against its closing parenthesis and can be
+  written nowhere else: one held off by a parenthesis of its own,
+  `if ((isMenuControlKey(e.code)) === false)`, leaves `(` in front of the token
+  and `opens()` rejects it there. Unanchored it would read any comparison
+  anywhere in the condition, which the rest of a condition is entitled to hold -
+  `if (isMenuControlKey(e.code) && this.settings.typing?.id != null)` guards the
+  giving up on a figure already in hand, which `cancelTypedSetting` checks for
+  itself, so it answers the same keys. Both `=== false` builds now fail naming
+  the handler and quoting the condition, and both `!` builds still fail through
+  `opens()`. `GOVERNED` and `opens()` are otherwise untouched; this is a third
+  reading beside them, since sense at one end of the token says nothing about
+  sense at the other.
+- **A reformat of the condition no longer fails, and no longer names a defect
+  that is not there.** `assert.strictEqual(sense, '')` required the span in
+  front of the token to be empty, so
+  `if (  isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` - two
+  spaces, identical behaviour - failed with *onSettingsKey opens the branch
+  `if (  isMenuControlKey(e.code)` and so gives up on a figure for the keys the
+  panel does nothing with*, pointing a later reader at the condition rather
+  than at the whitespace. The comparison is now against `sense.trim()`, so
+  blank passes and a `!` still fails. `if(` with no space was the same class
+  and failed more wildly: `lastIndexOf('if (', at)` missed the opening
+  altogether and anchored on an earlier `if (` in the handler, quoting most of
+  a statement the branch has nothing to do with. The opening is now matched as
+  `/if\s*\(/g`, taking the last one before the token, so both spellings read as
+  the blank span they are.
+
+Nothing in `js/` changed. Both panels answered their branches correctly before
+this release and answer them correctly after it; what changed is which
+rewrites of those branches the suite rejects. The suite is green at 1397.
+
 ## [1.0.0-alpha.1.29.2] - 2026-10-23
 
 `1.0.0-alpha.1.29.1` read the branch and the call it governs as one statement

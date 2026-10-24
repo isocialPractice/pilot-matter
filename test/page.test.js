@@ -2041,12 +2041,15 @@ test('a press the figure turned down does not start a fresh figure', () => {
  * so a cancel left anywhere above the branch would read as this one and the
  * test would pass on a handler that still steps a live figure.
  *
- * Anchoring is one of three readings. A cancel found from the branch is a
+ * Anchoring is one of four readings. A cancel found from the branch is a
  * cancel somewhere *below* the branch, which a cancel on the line after it
  * satisfies as readily as one inside it - so the two are also read as a single
  * statement, per `GOVERNED` below. Both of those read where the cancel sits,
  * and neither reads which keys the branch answers - so the condition itself is
- * read for that, per `opens` below.
+ * read for that, at both ends of the token: in front of it, per `opens` below,
+ * and behind it, per `rest` and `COMPARED`. One end alone leaves the inversion
+ * writable at the other, which is how `=== false` passed a suite that `!` had
+ * already been closed against.
  *
  * The fall-through that lets the cursor walk off at all is not the defect and
  * stays - see *a key the figure has no use for falls through to the panel*. The
@@ -2083,9 +2086,9 @@ function between(body, from, at) {
 }
 
 /**
- * Which keys the branch answers, read off the text between the `if (` that
- * opens it and the token itself. Empty is the sense that is wanted: the giving
- * up happens for the keys the panel works with.
+ * Which keys the branch answers, read off the text between the `if` that opens
+ * it and the token itself. Blank is the sense that is wanted: the giving up
+ * happens for the keys the panel works with.
  *
  * Every other reading here starts at or after `CONTROL_KEY` and so cannot see
  * the character in front of it. A `!` there is therefore invisible to all of
@@ -2094,14 +2097,67 @@ function between(body, from, at) {
  * a live figure again *and* a press the panel ignores throws the figure away.
  * That is the `1.0.0-alpha.1.28.0` defect back and worse than it was.
  *
- * Reach is the other half and `GOVERNED` above is still what reads it: a
+ * Blank rather than empty, and the opening matched rather than searched for as
+ * the four characters `if (`: both are the same mistake, which is reading a
+ * house style as the behaviour. `if (  isMenuControlKey(e.code))` answers the
+ * same keys with two spaces in it, and a fixed `lastIndexOf('if (', at)` misses
+ * `if(` entirely and anchors on some earlier `if (` in the handler, so the span
+ * it then quotes is most of a statement the branch has nothing to do with.
+ *
+ * Reach is the second half and `GOVERNED` above is still what reads it: a
  * branch with the right sense and the wrong reach gives up on a figure outside
- * itself, which no reading of the condition can catch.
+ * itself, which no reading of the condition can catch. Sense written behind the
+ * token is the third, and `rest` below reads that.
  */
 function opens(body, at) {
-    const from = body.lastIndexOf('if (', at);
-    return from < 0 ? null : body.slice(from + 'if ('.length, at);
+    let from = -1;
+    for (const open of body.slice(0, at).matchAll(/if\s*\(/g)) from = open.index + open[0].length;
+    return from < 0 ? null : body.slice(from, at);
 }
+
+/**
+ * The rest of the condition, from the end of the token to the `)` that closes
+ * the `if` - `''` for `onSettingsKey`, ` && cancelTypedEditorValue(this.editor)`
+ * for `onEditorKey`. Found by balancing parentheses from inside the opening one,
+ * since the token carries a pair of its own and the first `)` after it is that
+ * pair's rather than the condition's.
+ */
+function rest(body, at) {
+    let depth = 1;
+    for (let i = at + CONTROL_KEY.length; i < body.length; i++) {
+        if (body[i] === '(') depth++;
+        else if (body[i] === ')' && --depth === 0) return body.slice(at + CONTROL_KEY.length, i);
+    }
+    return null;
+}
+
+/**
+ * Anything comparing the token's result, which is the sense written behind it
+ * rather than in front. `opens` above reads only the span ahead of the token,
+ * so `if (isMenuControlKey(e.code) === false)` is invisible to it - the span is
+ * blank and the branch is inverted anyway. `GOVERNED` cannot see it either: it
+ * reads the text between the token and the call it governs, and ` === false) `
+ * holds neither a `;` nor a `}`, so the call still reads as guarded.
+ *
+ * Both `=== false` builds left all 1397 tests passing, which is the
+ * `1.0.0-alpha.1.28.0` defect reached by a different spelling than the `!` it
+ * was closed against. Nothing comparing the call belongs in a condition that is
+ * asking whether the panel works with the key at all.
+ *
+ * Anchored at the start of the span, because a comparison *of the call* is
+ * written against its closing parenthesis and can be written nowhere else - one
+ * held off by a parenthesis of its own, `if ((isMenuControlKey(e.code)) === false)`,
+ * leaves `(` in front of the token and `opens` above rejects it there. Read
+ * unanchored instead and this is a reading of any comparison anywhere in the
+ * condition, which the rest of a condition is entitled to hold:
+ * `if (isMenuControlKey(e.code) && this.settings.typing?.id != null)` guards the
+ * giving up on a figure already in hand, which `cancelTypedSetting` checks for
+ * itself, so the keys answered are the same ones - and unanchored it failed as
+ * *onSettingsKey asks ... and so compares what the panel works with*, naming a
+ * defect that is not there. That is the fault `sense` read untrimmed had at the
+ * other end of the token, and an assertion is worth no more than its message.
+ */
+const COMPARED = /^\s*(?:[=!<>]=|[<>])/;
 
 test('and walking the cursor off one gives up on it the same way', () => {
     for (const [handler, cancel, writes] of PANEL_KEY_WRITES) {
@@ -2112,15 +2168,25 @@ test('and walking the cursor off one gives up on it the same way', () => {
         assert.ok(works > -1,
             `${handler} should ask whether the key is one the panel works with at all`);
 
-        // And asks it that way round. Every reading below starts at the token,
+        // And asks it that way round. Every other reading starts at the token,
         // so this is the only one that sees a `!` in front of it - see `opens`.
         const sense = opens(body[0], works);
         assert.ok(sense != null, `${handler} should ask that in an \`if\``);
-        assert.strictEqual(sense, '',
+        assert.strictEqual(sense.trim(), '',
             `${handler} opens the branch \`if (${sense}${CONTROL_KEY}\` and so gives up on a `
           + 'figure for the keys the panel does nothing with - the giving up has to answer '
           + 'the keys it works with, or a step key moves the value out from under a live '
           + 'figure and a press the panel ignores throws that figure away');
+
+        // And asks it that way round at the other end too, where the same
+        // inversion is spelled as a comparison neither reading above can see.
+        const behind = rest(body[0], works);
+        assert.ok(behind != null, `${handler} should close the condition it opens`);
+        assert.doesNotMatch(behind, COMPARED,
+            `${handler} asks \`${CONTROL_KEY}${behind}\` and so compares what the panel works `
+          + 'with rather than acting on it - the giving up has to answer the keys it works '
+          + 'with however the condition is spelled, or a step key moves the value out from '
+          + 'under a live figure and a press the panel ignores throws that figure away');
 
         const given = body[0].indexOf(cancel, works);
         assert.ok(given > works,
@@ -2167,10 +2233,17 @@ test('and hands the editor the rows that walking off one rebuilt', () => {
 
     const sense = opens(body[0], works);
     assert.ok(sense != null, 'onEditorKey should ask that in an `if`');
-    assert.strictEqual(sense, '',
+    assert.strictEqual(sense.trim(), '',
         `onEditorKey opens the branch \`if (${sense}${CONTROL_KEY}\` and so rebuilds the rows `
       + 'for the keys the panel does nothing with and leaves them for the keys it works '
       + 'with - the branch has to answer the keys the panel works with');
+
+    const behind = rest(body[0], works);
+    assert.ok(behind != null, 'onEditorKey should close the condition it opens');
+    assert.doesNotMatch(behind, COMPARED,
+        `onEditorKey asks \`${CONTROL_KEY}${behind}\` and so compares what the panel works `
+      + 'with rather than acting on it - the rows are then rebuilt for the keys the panel '
+      + 'does nothing with, however the condition is spelled');
 
     const cancel = body[0].indexOf('cancelTypedEditorValue(this.editor)', works);
     const handed = body[0].indexOf('setMenuEntries(this.editorState, this.editor.entries)', works);
