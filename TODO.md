@@ -22,52 +22,6 @@ its context survives being archived.
 - [ ] Prune the four built items in `## World & Environment`
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### Code Review Override - the branch sense is read in front of the token only
-
-- [ ] An inversion written after `isMenuControlKey` is still invisible to both
-  handler-order tests
-  - **Issue**: `opens()` (`test/page.test.js:2101`) slices from the `if (` up to
-    the token and `between()` (`test/page.test.js:2081`) slices from the end of
-    the token onward, so the only inversion either can see is one spelled in
-    front of the token. Measured by mutation on the source as it stands, not by
-    reading: rewriting the settings branch at `js/main.js:1093` to
-    `if (isMenuControlKey(e.code) === false) cancelTypedSetting(this.settings);`
-    and the editor branch at `js/main.js:1387` to
-    `if (isMenuControlKey(e.code) === false && cancelTypedEditorValue(this.editor)) {`
-    leaves all 1397 tests passing - `opens()` reads `''` for both and
-    `GOVERNED` finds no `;` or `}` in ` === false) `. That build is the same
-    `1.0.0-alpha.1.28.0` defect this release closed against `!`, reached by a
-    different spelling: a step key moves the value out from under a live figure
-    *and* a press the panel ignores throws that figure away. `js/main.js` was
-    restored after each run and `git diff -- js/` is empty.
-  - **Goal**: Read the rest of the condition too, so the sense is pinned
-    wherever it is written rather than only in front of the token. The text
-    between the end of `CONTROL_KEY` and the `)` that closes the condition is
-    the unread span - `)` for `onSettingsKey`, ` && cancelTypedEditorValue(this.editor)`
-    for `onEditorKey` - and nothing comparing the call's result belongs in it.
-    Leave `GOVERNED` and `opens()` as they are; this is a third reading beside
-    them. Verify it the way this issue was found, by putting each `=== false`
-    build back and watching both tests name the handler, and by confirming the
-    two `!` mutations still fail.
-  - From: Code Review Override - the branch sense is read in front of the token only
-- [ ] `opens()` fails a reformat that changes no behaviour, and says the handler
-  answers the wrong keys
-  - **Issue**: `assert.strictEqual(sense, '')` (`test/page.test.js:2119` and
-    `:2170`) requires the span to be empty rather than blank, so
-    `if (  isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` at
-    `js/main.js:1093` - two spaces, identical behaviour - fails with
-    *onSettingsKey opens the branch `if (  isMenuControlKey(e.code)` and so
-    gives up on a figure for the keys the panel does nothing with*. The message
-    names a defect that is not there, which is worse than the bare failure: a
-    later reader told the handler answers the wrong keys has been pointed at
-    the condition rather than at the whitespace.
-  - **Goal**: Compare `sense.trim()` against `''` so blank text passes and a
-    `!` still fails. A no-space `if(` is the same class and fails more wildly,
-    since `lastIndexOf('if (', at)` then finds some earlier `if (` in the
-    handler and quotes the span between the two - worth reading for at the same
-    time.
-  - From: Code Review Override - the branch sense is read in front of the token only
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -449,13 +403,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 201 earlier items in `TODO-archive.md`, newest last.
+> 203 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Set how far the device is turned before it asks for anything
-  - From: Flight Controls
-- [x] **Typed Row**: Accept typed values in the **Element Editor** and the
-  **Settings** panel
-  - From: Simulator Configuration
 - [x] Pin the way a cut is drawn against the way a cut is tested, so the two
   cannot drift apart
   - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
@@ -601,3 +550,46 @@ how the simulator got here rather than as a list still to be worked.
     was found, by putting each inversion back and watching the two tests name
     the handler.
   - From: Code Review Override - the tightened handler test passes on an inverted guard
+- [x] An inversion written after `isMenuControlKey` is still invisible to both
+  handler-order tests
+  - **Issue**: `opens()` (`test/page.test.js:2101`) slices from the `if (` up to
+    the token and `between()` (`test/page.test.js:2081`) slices from the end of
+    the token onward, so the only inversion either can see is one spelled in
+    front of the token. Measured by mutation on the source as it stands, not by
+    reading: rewriting the settings branch at `js/main.js:1093` to
+    `if (isMenuControlKey(e.code) === false) cancelTypedSetting(this.settings);`
+    and the editor branch at `js/main.js:1387` to
+    `if (isMenuControlKey(e.code) === false && cancelTypedEditorValue(this.editor)) {`
+    leaves all 1397 tests passing - `opens()` reads `''` for both and
+    `GOVERNED` finds no `;` or `}` in ` === false) `. That build is the same
+    `1.0.0-alpha.1.28.0` defect this release closed against `!`, reached by a
+    different spelling: a step key moves the value out from under a live figure
+    *and* a press the panel ignores throws that figure away. `js/main.js` was
+    restored after each run and `git diff -- js/` is empty.
+  - **Goal**: Read the rest of the condition too, so the sense is pinned
+    wherever it is written rather than only in front of the token. The text
+    between the end of `CONTROL_KEY` and the `)` that closes the condition is
+    the unread span - `)` for `onSettingsKey`, ` && cancelTypedEditorValue(this.editor)`
+    for `onEditorKey` - and nothing comparing the call's result belongs in it.
+    Leave `GOVERNED` and `opens()` as they are; this is a third reading beside
+    them. Verify it the way this issue was found, by putting each `=== false`
+    build back and watching both tests name the handler, and by confirming the
+    two `!` mutations still fail.
+  - From: Code Review Override - the branch sense is read in front of the token only
+- [x] `opens()` fails a reformat that changes no behaviour, and says the handler
+  answers the wrong keys
+  - **Issue**: `assert.strictEqual(sense, '')` (`test/page.test.js:2119` and
+    `:2170`) requires the span to be empty rather than blank, so
+    `if (  isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` at
+    `js/main.js:1093` - two spaces, identical behaviour - fails with
+    *onSettingsKey opens the branch `if (  isMenuControlKey(e.code)` and so
+    gives up on a figure for the keys the panel does nothing with*. The message
+    names a defect that is not there, which is worse than the bare failure: a
+    later reader told the handler answers the wrong keys has been pointed at
+    the condition rather than at the whitespace.
+  - **Goal**: Compare `sense.trim()` against `''` so blank text passes and a
+    `!` still fails. A no-space `if(` is the same class and fails more wildly,
+    since `lastIndexOf('if (', at)` then finds some earlier `if (` in the
+    handler and quotes the span between the two - worth reading for at the same
+    time.
+  - From: Code Review Override - the branch sense is read in front of the token only

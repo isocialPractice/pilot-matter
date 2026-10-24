@@ -2783,3 +2783,11 @@ still be found by name.
 - [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
   the machine has
   - From: Flight Controls
+
+## Archived 10-24-26
+
+- [x] Set how far the device is turned before it asks for anything
+  - From: Flight Controls
+- [x] **Typed Row**: Accept typed values in the **Element Editor** and the
+  **Settings** panel
+  - From: Simulator Configuration
