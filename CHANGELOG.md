@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Five roadmap sections were pruned of the work the simulator had already
+  built.** `## Flight Controls`, `## Simulator Configuration`,
+  `## Simulator API` and sixteen of the twenty items in
+  `## Environment Design` were read against the source, checked off and
+  archived, along with three of the four edge-algorithm items in
+  `## World & Environment` - 49 items in all. Nothing was deleted and no
+  section header was removed: each kept its heading and its opening paragraph
+  as the record of that area of work, which is what
+  **Roadmap Section Structure** asks for. `node todo.mjs --pending` read 67
+  before the pass.
+- **Five items were read against the source and left unchecked, which is the
+  half of pruning that is easy to skip.** The four mountain-shape items in
+  `## Environment Design` ask for checkbox-gated `min`/`max` length, width and
+  girth; `mountain` in `js/environment/elements.js` declares `radius` as one
+  footprint span and `girth` as `scalar(0, 1, 0)`, and the three range kinds
+  are `span`, `scalar` and `gradient`, so there is no gate for them to be built
+  on. In `## World & Environment`, reassembling the five environments against
+  the seam algorithm is not done: `matchEdges` has no caller outside
+  `js/api/matter.js`, so a host that assembles its own world gets settled joins
+  and the simulator does not. Each item carries the finding beneath it, so the
+  next run reads a conclusion rather than repeating the search.
+
+No version is applied. Every change this run is to `TODO.md`, its archive and
+this file, and nothing in the simulator behaves differently - the suite reads
+1397 tests passing before the pass and after it.
+
 ## [1.0.0-alpha.1.29.3] - 2026-10-24
 
 `1.0.0-alpha.1.29.2` read the sense of the branch off the span in front of the

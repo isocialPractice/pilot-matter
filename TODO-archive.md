@@ -2791,3 +2791,458 @@ still be found by name.
 - [x] **Typed Row**: Accept typed values in the **Element Editor** and the
   **Settings** panel
   - From: Simulator Configuration
+
+## Archived 10-25-26
+
+- [x] Pin the way a cut is drawn against the way a cut is tested, so the two
+  cannot drift apart
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
+- [x] Typed Row 1: a press the figure cannot take restarts the figure rather
+  than being refused
+  - **Issue**: in the settings panel with the cursor on `START ALTITUDE`,
+    typing `1`, `3`, `9` reads `START ALTITUDE  139_`; the next press of the
+    minus key - the key beside `0`, and under the thumb on a numpad - leaves
+    the row reading `START ALTITUDE  -_`, and `0` then `Enter` sets the start
+    altitude to `0 FT`. The three digits already typed are gone with no sign
+    they were, and a figure nobody asked for is taken. The eight character
+    ceiling does the same: eight digits read `12345678_` and a ninth leaves
+    `9_`. The element editor answers both presses identically - a minus part
+    way along `COUNT` leaves `COUNT  -_`. `js/typed-value.js` refuses both
+    presses correctly and says in `extendTypedValue` that refusing one "leaves
+    the text as it was"; `js/main.js` then reads the same press a second time
+    through `beginTypedSetting` / `beginTypedEditorValue`, which start a figure
+    without asking whether one is already in hand. Observed in Chromium against
+    `npm run serve`, both panels, and confirmed against the module directly:
+    `readTypedKey('139', 'Minus')` is `null` and `startsTypedValue('Minus')` is
+    `true`.
+  - **Goal**: Resolve to [typed-row-refused-press.prompt.md](.claude/prompts/typed-row-refused-press.prompt.md)
+  - From: Simulator Configuration
+- [x] Typed Row 2: a figure stays behind on the row the cursor walked off
+  - **Issue**: the cursor leaving a row mid-figure is deliberate, and the
+    figure surviving the walk is what is wrong with it. In the settings panel,
+    typing `2` at `START ALTITUDE` and pressing `S` moves the highlight to
+    `START CLIMB` while the caret stays on `START ALTITUDE`; `5`, `0`, `0` then
+    go to the unhighlighted row and `Enter` sets a start altitude of 2500 feet
+    while the cursor sits on the climb row. The element editor does the same,
+    and there it closes a door the code opens on purpose: open an element, type
+    a digit into a range, walk down to `RESTORE THE PRESET` and press `Enter` -
+    the `Enter` is taken by the figure, the row reads `LINE  ‹ 7 ›` and the
+    preset is never restored. Clicking the same entry does restore it, because
+    `onEditorPointer` calls `cancelTypedEditorValue` first and `onEditorKey`
+    has no equivalent. That leaves `restoreEditor`'s own `state.typing = null`,
+    and the comment above it, unreachable from the keyboard. Observed in
+    Chromium against `npm run serve`.
+  - **Goal**: Resolve to [typed-row-cursor-left.prompt.md](.claude/prompts/typed-row-cursor-left.prompt.md)
+  - From: Simulator Configuration
+- [x] The cheatsheet offers a typed figure at a row that steps through a list
+  - **Issue**: the paragraph added under `## The start state` in `CHEATSHEET.md`
+    and under `<h2 id="the-start-state">` in `docs/cheatsheet.html` opens "Every
+    row in the table above can be typed into as well as stepped". That table
+    carries six rows, and `START CAMERA` is the sixth: it steps through `chase`,
+    `cockpit` and `orbit`, its `Step` column reads `-`, and
+    `isTypedSettingRow(state, 'cameraMode')` is `false`, so a digit pressed at
+    it does nothing. The same paragraph closes "A row that steps through a list
+    cannot be typed into", which is the sentence that contradicts its own
+    opening - a reader taking either at its word is wrong about the other. The
+    settings page has it right already: `docs/controls/settings.html` says
+    "every row of the start state but the condition, the strip and the view".
+  - **Goal**: narrow the claim in both files to the rows that hold a figure,
+    the way the settings page words it, so `START CAMERA` is not offered a
+    typed figure it refuses. The five rows above it are correct as written.
+  - From: UI/UX Override - a figure typed into a panel row
+- [x] A step key with a figure in hand moves the value behind the caret
+  - **Issue**: The cursor keys now give up on a half typed figure, but the step
+    keys beside them do not: they are read above that in the same handler. At
+    `START ALTITUDE` reading `1390 FT`, typing `2` and pressing `->` leaves the
+    row reading `START ALTITUDE  2_` while the stored altitude moves to 1400,
+    and a second press takes it to 1410 with nothing on the panel saying so.
+    The `Enter` that follows is then refused against a figure the pilot never
+    typed. The element editor does the same to a range. Clicking the row
+    instead reads `START ALTITUDE  ‹ 1420 FT ›` with no caret, because the
+    pointer route gives up on the figure first - so the same action answers
+    differently depending on which hand does it.
+  - **Goal**: Resolve to [typed-row-adjust-key.prompt.md](.claude/prompts/typed-row-adjust-key.prompt.md)
+  - From: UI/UX Override - a figure typed into a panel row
+- [x] The handler-order test finds its cancel by the first match rather than in
+  the branch it means, so the item above cannot pass it
+  - **Issue**: `test/page.test.js`, in "and walking the cursor off one gives up
+    on it the same way", takes `given = body[0].indexOf(cancel)` over the whole
+    handler and asserts `given > body[0].indexOf('isMenuKey(e.code)')`. The
+    occurrence it means is the one in the menu-key branch, and `indexOf` returns
+    whichever comes first - so a `cancelTypedSetting(this.settings)` anywhere
+    above `isMenuKey` reads as a cancel in the wrong place. The step-key branch
+    is above `isMenuKey`, which makes this the test the item above has to get
+    past. Measured: with that one line added over `adjustSetting` in
+    `onSettingsKey` and nothing else changed, `node --test test/page.test.js`
+    fails with "onSettingsKey should give up on a figure where the cursor
+    walks" while the menu-key branch still gives up on the figure exactly as it
+    does now. The editor's companion test, "and hands the editor the rows that
+    walking off one rebuilt", reads its `cancelTypedEditorValue` and
+    `setMenuEntries` the same unanchored way.
+  - **Goal**: Search from the branch rather than from the top of the handler -
+    `body[0].indexOf(cancel, menu)` in place of `body[0].indexOf(cancel)`, and
+    the same for the editor test's two lookups - so each assertion reads the
+    occurrence that sits where the cursor walks. While there, give both tests
+    the `assert.ok(body, ...)` the idiom beside them carries at
+    `test/page.test.js:1927`: a regex that stopped matching throws a TypeError
+    on `body[0]` rather than naming the handler it could not find.
+  - From: UI/UX Override - a figure typed into a panel row
+- [x] The handler-order test still passes on a cancel outside the branch
+  - **Issue**: Not a defect in the panels - both of them answer a step key
+    correctly, on all four keys, and a browser run of this release confirmed it.
+    The gap is in what pins that. `test/page.test.js` finds the cancel with
+    `indexOf(cancel, works)` and then asserts only that it sits above the calls
+    that write a value, which a cancel sitting *after* the `isMenuControlKey`
+    branch satisfies just as well as one sitting *inside* it. Confirmed by
+    mutation rather than by reading: a scratch `js/main.js` whose settings
+    handler read `if (isMenuControlKey(e.code)) { }` followed by an unguarded
+    `cancelTypedSetting(this.settings);` passed all 86 tests in that file. That
+    build is the too-wide guard the release notes say the panels avoid - every
+    key gives up on the figure, so a press the panel does nothing with silently
+    throws away what the pilot typed.
+  - **Goal**: Assert the cancel is governed by the branch, not merely below it -
+    for both handlers, that the text between `isMenuControlKey(e.code)` and the
+    cancel contains no statement terminator, so the two are one guarded
+    statement rather than two. The browser-side reading that catches it is
+    pressing a digit, then `KeyQ`, then a second digit: the row must come back
+    `23_`, carrying the figure on, rather than `3_`. Reading the row alone does
+    not catch it, because the handler returns on an ignored key without calling
+    `syncOverlays`, so the stale text survives a figure that was dropped.
+  - From: UI/UX Override - a step key with a figure in hand
+- [x] Both handler-order tests read where the giving up sits and never which
+  keys it answers
+  - **Issue**: `CONTROL_KEY` is the bare text `isMenuControlKey(e.code)`
+    (`test/page.test.js:2059`), `works` is `indexOf(CONTROL_KEY)`
+    (`test/page.test.js:2087` and `:2130`), and `between()` slices forward from
+    `works + CONTROL_KEY.length` (`test/page.test.js:2078`). Every reading in
+    both tests therefore starts at or after that token, so nothing looks at the
+    character in front of it and a `!` there is invisible. Measured by mutation
+    on the source as it stands, not by reading: inverting the settings branch at
+    `js/main.js:1093` to
+    `if (!isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` leaves
+    all 1397 tests passing, and inverting the editor branch at
+    `js/main.js:1387` to
+    `if (!isMenuControlKey(e.code) && cancelTypedEditorValue(this.editor))`
+    does the same. Either build is the `1.0.0-alpha.1.28.0` defect back and
+    worse than it was: the giving up now answers only the keys the panel does
+    nothing with, so a step key reaches a live figure again *and* a press the
+    panel ignores throws the figure away. `js/main.js` was restored after each
+    run and `git diff -- js/` is empty.
+  - **Goal**: Assert the sense of the branch beside its reach - that the
+    condition opens `if (` with nothing between that and `isMenuControlKey`,
+    for both handlers in both tests, so a `!` fails. The material is already
+    computed: `works` is the index of the token, and the slice back to the
+    preceding `if (` is the reading *a press the figure turned down does not
+    start a fresh figure* already takes with `lastIndexOf('if (', start)`
+    (`test/page.test.js:2025`). Leave `GOVERNED` as it is - this is a second
+    assertion beside it, not a replacement - and verify it the way this issue
+    was found, by putting each inversion back and watching the two tests name
+    the handler.
+  - From: Code Review Override - the tightened handler test passes on an inverted guard
+- [x] An inversion written after `isMenuControlKey` is still invisible to both
+  handler-order tests
+  - **Issue**: `opens()` (`test/page.test.js:2101`) slices from the `if (` up to
+    the token and `between()` (`test/page.test.js:2081`) slices from the end of
+    the token onward, so the only inversion either can see is one spelled in
+    front of the token. Measured by mutation on the source as it stands, not by
+    reading: rewriting the settings branch at `js/main.js:1093` to
+    `if (isMenuControlKey(e.code) === false) cancelTypedSetting(this.settings);`
+    and the editor branch at `js/main.js:1387` to
+    `if (isMenuControlKey(e.code) === false && cancelTypedEditorValue(this.editor)) {`
+    leaves all 1397 tests passing - `opens()` reads `''` for both and
+    `GOVERNED` finds no `;` or `}` in ` === false) `. That build is the same
+    `1.0.0-alpha.1.28.0` defect this release closed against `!`, reached by a
+    different spelling: a step key moves the value out from under a live figure
+    *and* a press the panel ignores throws that figure away. `js/main.js` was
+    restored after each run and `git diff -- js/` is empty.
+  - **Goal**: Read the rest of the condition too, so the sense is pinned
+    wherever it is written rather than only in front of the token. The text
+    between the end of `CONTROL_KEY` and the `)` that closes the condition is
+    the unread span - `)` for `onSettingsKey`, ` && cancelTypedEditorValue(this.editor)`
+    for `onEditorKey` - and nothing comparing the call's result belongs in it.
+    Leave `GOVERNED` and `opens()` as they are; this is a third reading beside
+    them. Verify it the way this issue was found, by putting each `=== false`
+    build back and watching both tests name the handler, and by confirming the
+    two `!` mutations still fail.
+  - From: Code Review Override - the branch sense is read in front of the token only
+- [x] `opens()` fails a reformat that changes no behaviour, and says the handler
+  answers the wrong keys
+  - **Issue**: `assert.strictEqual(sense, '')` (`test/page.test.js:2119` and
+    `:2170`) requires the span to be empty rather than blank, so
+    `if (  isMenuControlKey(e.code)) cancelTypedSetting(this.settings);` at
+    `js/main.js:1093` - two spaces, identical behaviour - fails with
+    *onSettingsKey opens the branch `if (  isMenuControlKey(e.code)` and so
+    gives up on a figure for the keys the panel does nothing with*. The message
+    names a defect that is not there, which is worse than the bare failure: a
+    later reader told the handler answers the wrong keys has been pointed at
+    the condition rather than at the whitespace.
+  - **Goal**: Compare `sense.trim()` against `''` so blank text passes and a
+    `!` still fails. A no-space `if(` is the same class and fails more wildly,
+    since `lastIndexOf('if (', at)` then finds some earlier `if (` in the
+    handler and quotes the span between the two - worth reading for at the same
+    time.
+  - From: Code Review Override - the branch sense is read in front of the token only
+- [x] Prune `## Flight Controls`, which is the worst of the five
+  - All ten read as built and all ten were checked off, leaving the header
+    and its paragraph. The seven settings the third item asked somebody to
+    propose are the seven items below it, and each is declared in
+    `CONTROL_OPTIONS` in `js/control-settings.js` - `pitchAxis`, `rollAxis`,
+    `tiltAxes`, `tiltFlying`, `tiltDeadzone`, `fullRotation`, a level-off box
+    per vertical control, and `referenceOpen` - with the key rows and
+    `RESTORE DEFAULT KEYS` beside them. `boundAttitude(pitch, roll, full)` in
+    `js/attitude.js` wraps instead of clamping when the full rotation is
+    asked for, `OPTIONAL_BINDINGS` in `js/key-bindings.js` is what lets reset
+    be bound to nothing, and `js/main.js` reads all of it at 1144-1154 and
+    1974.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune `## Simulator Configuration`
+  - All nine read as built and all nine were checked off. `DEFAULT_CONFIG` in
+    `js/config.js` holds the start state the first item names, figure for
+    figure, and `START_FIELDS` makes each one settable; `flightStart` and
+    `createFlightState` in `js/flight-state.js` take that start, which is what
+    a reset restores. Both menus in `js/menu.js` carry `CONTROL SETTINGS` and
+    `SETTINGS`, and the reference list is a row inside the panel the first of
+    those opens rather than the thing it opens.
+  - The two items the pruning item said to read rather than assume are the
+    start-screen menu item and the reference-list item above the rename, and
+    the reword asked for in the same pass was done: both name **Control
+    Settings** today, so neither is asking for the old entry back.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune `## Environment Design`
+  - Sixteen of the twenty were checked off: the registry, the gradient
+    helper, the mountain height range, and every element range from grass
+    through snow. `ELEMENTS` in `js/environment/elements.js` declares each
+    element's ranges beside its generator, and the four flagged readings all
+    hold - the river's three incommensurate waves avoid symmetry, `widenPath`
+    swells the width smoothly between its bounds, the forest's three lobes
+    share no common multiple, and the desert reuses the sand gradient's light
+    end.
+  - **The four mountain-shape items stayed unchecked**: the bulk range, the
+    length, the width and the girth. The registry declares `radius` as one
+    footprint span and `girth` as a scalar, and there is no checkbox-gated
+    range kind for any of them to be built on. The finding is written under
+    the bulk range item, which is where the next run will need it.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune `## Simulator API`
+  - All eleven read as built and all eleven were checked off. `js/api/index.js`
+    re-exports both halves; `resolvePilotOptions` in `js/api/contract.js` takes
+    the scene, the aircraft and its anchor, the terrain sampler and bounds, and
+    the keymap; `createTelemetry` and `TELEMETRY_FIELDS` are the stable reading;
+    `createEnvironment` in `js/api/matter.js` returns the detachable group,
+    registers a caller-supplied mesh as an element, and exposes `applyDepth` on
+    its own. The last item's unit tests are `test/api-contract.test.js`, which
+    covers option defaults, contract validation and telemetry shape, with
+    `test/api-reference.test.js` beside it.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune the four built items in `## World & Environment`
+  - Three of the four were checked off, not four. The edge algorithm's promise
+    is held by `test/world-tiles.test.js`, the five environments are flown over
+    the endless grid `Terrain` lays in `js/terrain.js`, and the seam algorithm
+    is `matchEdges` and `SEAM_BLEND` in `js/environment/elements.js`, settled
+    across twelve tests in `test/environment-tiles.test.js`.
+  - **The fourth stayed unchecked**: reassembling the five environments once
+    the seamless algorithm landed. It landed and they were not reassembled -
+    `matchEdges` has no caller outside `js/api/matter.js`, so the simulator's
+    own tiles are never settled against each other. The reasoning is written
+    under the item.
+  - The weather branch item was left alone as the pruning item said to, and is
+    the next item queued below.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Test the edge algorithm against the promise it makes: that from any
+  position, at any heading, the ground drawn reaches further than the camera
+  can see, and that the tile at a given place is the same ground every time
+  it is laid
+  - From: World & Environment
+- [x] Reassemble the five environments against the edge algorithm as it
+  stands, so a preset reads as one endless country rather than as the same
+  square laid again and again with a different seed
+  - From: World & Environment
+- [x] Make the edge algorithm seed a new tile against the tiles already
+  beside it, so neighbouring ground blends into a seamless pattern rather
+  than meeting at a join
+  - From: World & Environment
+- [x] Add an element registry (`js/environment/elements.js`) where each
+  element declares its configurable ranges and its generator function, so
+  new elements are data rather than a bespoke terrain pass
+  - From: Environment Design
+- [x] **Mountain** height range: peaks render between a `min` and a `max`
+  height
+  - From: Environment Design
+- [x] Add a pure, testable gradient helper that blends a `light` and a `dark`
+  color of one base hue with complementary steps, so no element shifts color
+  dramatically across its gradient
+  - From: Environment Design
+- [x] **Grass** color range: a green base rendered as a `light` to `dark`
+  gradient
+  - From: Environment Design
+- [x] **Sand** color range: a brown base rendered as a `light` to `dark`
+  gradient
+  - From: Environment Design
+- [x] **Water body** color range: a blue base rendered as a `light` to `dark`
+  gradient
+  - From: Environment Design
+- [x] **River** color range: a blue base rendered as a `light` to `dark`
+  gradient
+  - From: Environment Design
+- [x] **River** windy ratio: a `0` to `1` curve factor applied along the
+  river path by an algorithm that avoids symmetry and reads as a natural
+  river
+  - From: Environment Design
+- [x] **River** width: a `0` to `1` width ratio varied gradually within a
+  `min` and `max` width range, so neighboring segments never differ
+  dramatically
+  - From: Environment Design
+- [x] **Forest** tree height range: a `min` and `max` height for the trees in
+  the forest
+  - From: Environment Design
+- [x] **Forest** density: a `0` to `1` value setting how tightly the trees
+  pack
+  - From: Environment Design
+- [x] **Forest** size: a `min` and `max` circumference, with an algorithm
+  that generates an asymmetric outline reading as a natural forest
+  - From: Environment Design
+- [x] **Canyon** element: depth range, wall steepness, and a branching path
+  length carved into the heightfield
+  - From: Environment Design
+- [x] **Desert** element: dune height range and dune spacing, reusing the
+  sand color range
+  - From: Environment Design
+- [x] **Town** element: block-modeled buildings and homes, configured by
+  grid size, block density, and building height range
+  - From: Environment Design
+- [x] **Snow** element: a snow line altitude, a `0` to `1` coverage value,
+  and a slope threshold so snow settles on high and flat ground
+  - From: Environment Design
+- [x] Add a single public entry point (`js/api/index.js`) that re-exports the
+  Pilot API and the Matter API, so a host page imports one module
+  - From: Simulator API
+- [x] **Pilot API**: move the control and flight loop behind a
+  `createPilot()` factory that runs against a caller-supplied scene
+  - From: Simulator API
+- [x] **Pilot API**: accept an external environment through a supplied
+  terrain height sampler and bounds, so altitude and crash detection work
+  outside the bundled terrain
+  - From: Simulator API
+- [x] **Pilot API**: accept an external aircraft asset (any `Object3D` or
+  loader result) with a declared control anchor, replacing the built-in mesh
+  - From: Simulator API
+- [x] **Pilot API**: expose read-only telemetry (airspeed, altitude, vertical
+  speed, heading, throttle) as a stable object, so an external HUD renders
+  without reaching into internals
+  - From: Simulator API
+- [x] **Pilot API**: publish the keybinding map as an interface a host can
+  remap or replace with its own input source
+  - From: Simulator API
+- [x] **Matter API**: add a `createEnvironment()` factory returning terrain,
+  sky, and mountains as one detachable group any external scene can add
+  - From: Simulator API
+- [x] **Matter API**: define the contract an external aircraft must satisfy
+  (position, orientation, bounds query), so aircraft driven by other control
+  APIs can fly the environment
+  - From: Simulator API
+- [x] **Matter API**: allow caller-supplied meshes and materials to be
+  registered as environment elements and placed by the generator
+  - From: Simulator API
+- [x] **Matter API**: expose environment depth (fog and distance shading) as
+  a standalone effect other scenes can apply without importing the terrain
+  - From: Simulator API
+- [x] Add unit tests for the pure surfaces of both APIs: option defaults,
+  contract validation, and telemetry shape
+  - From: Simulator API
+- [x] Set the initial flight state to 80 knots airspeed, 1390 ft altitude,
+  +1260 ft/min vertical speed, heading 000, 20% throttle, and the chase
+  camera, superseding the current standing start
+  - From: Simulator Configuration
+- [x] Make Reset Flight restore the configured start state instead of
+  hardcoded values
+  - From: Simulator Configuration
+- [x] Add a start screen menu built on the keyboard menu in `js/menu.js`,
+  with **Control Settings** and **Settings** entries
+  - From: Simulator Configuration
+- [x] Reach the control reference list from the start screen **Control
+  Settings** entry, so it matches the pause menu entry of the same name
+  - From: Simulator Configuration
+- [x] Rename the **Controls** entry to **Control Settings**, and make what it
+      opens a panel of settings rather than a list
+  - Four sites carry the name today: the start screen and pause menu entries in
+    `js/menu.js`, and the two `case 'controls':` handlers in `js/main.js`. The
+    list itself is `js/controls-help.js`.
+  - **What it opens changes with the name.** The entry currently shows a reference
+    list; it should open the settings that govern the controls, with the reference
+    list reachable from inside it rather than instead of it. The toggles under
+    **Flight Controls** are the first things that belong there.
+  - **Reword the two items above in the same pass.** Both name a **Controls**
+    entry, so a run that renames the entry without touching them leaves the queue
+    asking for the old name back.
+  - From: Simulator Configuration
+- [x] Accept typed values in the **Element Editor** and the **Settings** panel
+  - Every value is stepped by clicking today, which is slow for a number a pilot
+    already knows. Allow the value to be typed as well, validated against the
+    same range the stepper honours, so the two routes cannot disagree about what
+    is allowed.
+  - From: Simulator Configuration
+- [x] Add a **Settings** entry to the pause menu that opens the same panel
+  the start screen opens
+  - From: Simulator Configuration
+- [x] Add an environment selection to the settings panel, defaulting to the
+  current generated terrain
+  - From: Simulator Configuration
+- [x] Add 5 assembled environments, each a named preset of the Environment
+  Design elements, selectable from the environment setting
+  - From: Simulator Configuration
+- [x] Allow a full 360 in pitch and in roll, without breaking the controls at
+  the limit
+  - The attitude is clamped at a maximum pitch and roll today, which is what
+    keeps the input sane: past the limit, "up" stops meaning up. A loop or a
+    barrel roll needs the clamp to open, and needs the controls to stay
+    coherent on the way round rather than fighting the pilot at the top.
+  - **The algorithm is the item.** Watch for the attitude crossing the current
+    maximum and carry the frame round with it, so the input keeps meaning what
+    it meant before the crossing. Decide it once, in the attitude code, rather
+    than special-casing each key - a fix per key is how two keys come to
+    disagree about which way is up at 180 degrees.
+  - Leave the clamp in place for pilots who have not asked for this: it is the
+    thing that makes ordinary flight readable, so the 360 is a setting rather
+    than a new default.
+  - From: Flight Controls
+- [x] Toggle pitch and roll between inverted and directional, independently
+  - Four states fall out of two toggles, and all four are wanted: pitch
+    inverted with roll directional, both inverted, both directional, and pitch
+    directional with roll inverted. Inverted means up lowers the nose and right
+    turns left, which is what a pilot coming from a yoke expects; directional
+    means the key points where the aircraft goes.
+  - Both toggles live in the control settings, and both apply to `WASD` and the
+    arrow keys alike, since they are two spellings of one input rather than two
+    control schemes.
+  - Depends on the control settings panel existing - see **Simulator
+    Configuration**.
+  - From: Flight Controls
+- [x] Propose seven control settings worth having, as items in this section
+  - The panel is worth more than the two toggles above, and what else belongs
+    in it is a question about this simulator rather than a general one: read
+    `js/input-map.js`, `js/controls-help.js` and `js/tilt-controls.js` and
+    propose from what is already configurable in code but not in the interface.
+  - Seven items, each one thing a pilot would change and a reason they would
+    change it. Anything that is really a flight-model constant belongs under
+    **Simulator Configuration** instead.
+  - From: Flight Controls
+- [x] Rebind any control to a key of the pilot's own
+  - `DEFAULT_KEYMAP` in `js/input-map.js` is already a plain map from a control
+    to the codes that work it, and `applyKeyToInput` takes the map rather than
+    reading the constant - which is exactly what the Pilot API lets a host
+    replace. The game offers none of it.
+  - A row per control, showing the key it is on and taking the next key pressed
+    as the new one. Two controls on one key is the state worth refusing, and a
+    pilot who has bound themselves out of the panel needs the way back: a row
+    that puts the whole map back as it was.
+  - From: Flight Controls
+- [x] Read tilt through the axis settings the keys are read through
+  - `tiltToInput` in `js/tilt-controls.js` writes the four axis controls itself
+    and says so in as many words - "neither needs inverting, and neither should
+    be" - which was right while nothing could invert them. Now a pilot can set
+    pitch inverted and find it applies to the keys and not to the device.
+  - One setting rather than two more: whether the axis settings reach the tilt
+    input as well. Off is the behaviour the comment describes and the reason for
+    it, which is that the device is the aircraft; on is a pilot who thinks of it
+    as a stick.
+  - From: Flight Controls
