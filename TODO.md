@@ -69,56 +69,6 @@ its context survives being archived.
     ranges the others declare, so it wants all three in place first.
   - From: Environment Design
 
-### Code Review Override - the pruning section still reads as unpruned
-
-#### Found Issues
-
-- [ ] `### Pruning the Roadmap` opens on the condition the pass just removed
-  - **Issue**: the section's opening paragraph reads "Five sections are in that
-    state, and `node todo.mjs --pending` counts 56 items where a handful are
-    outstanding - a figure that makes the file useless for deciding what to do
-    next, and that reads from outside as a project barely started." The
-    10-25-26 pass pruned all five of those sections, and what is left under
-    each is outstanding work rather than built work. The figure is wrong three
-    times over: the tool read 67 at `HEAD`, not 56, and it reads 14 now. A run
-    or a reader taking that paragraph at its word re-opens a pruning pass
-    against five sections that hold seven genuinely unfinished items between
-    them.
-  - **Goal**: rewrite the paragraph so it describes the section as it now
-    stands, and drop the item count rather than correcting it - the figure went
-    stale between the day it was written and the day the pass ran, which is
-    what any count of a moving queue does. The mechanism sentence above it
-    ("Section 5 of the automation copies a roadmap item into `## Current` and
-    leaves the original where it was") is still true and worth keeping, since
-    it is why the section still has items under it. Keep the closing
-    paragraph's standing procedure as written. Verify with
-    `node todo.mjs --pending` and by reading the five sections back.
-  - From: Code Review Override - the pruning section still reads as unpruned
-- [ ] The Canyon Run pruning item names three different thresholds for one
-  trigger
-  - **Issue**: the item queued into `### Pruning the Roadmap` this run calls
-    the straggler "the sixth instance of what this section describes", then
-    says "If a third instance of that turns up, the thing to queue is a change
-    to how an item is queued - not a seventh pruning item." Sixth, third and
-    seventh cannot all be counting the same thing, and nothing in the item says
-    which counter the trigger reads. Measured against the files: this pass
-    checked off twelve roadmap originals whose `## Current` staging copy had
-    already been archived by a run between 10-07-26 and 10-24-26 - all ten of
-    `## Flight Controls`, plus `Rename the **Controls** entry` and `Accept
-    typed values in the **Element Editor** and the **Settings** panel`. So on
-    the reading that counts items the threshold was passed nine times over in
-    the pass that wrote the sentence, and on the reading that counts pruning
-    items it is at one of three. The next run cannot tell whether to change how
-    items are queued or to queue another pruning item, which is the whole
-    decision the sentence exists to make.
-  - **Goal**: state one counter and the number it stands at. The pattern itself
-    is real and is confirmed upstream: `## Current` is a staging area whose
-    copies archive on their own, the tool has no concept of item identity
-    across copies, and no rule in the automation's instructions covers the
-    original left behind - so the change the item gestures at is a change to
-    that tool rather than to this repository, and saying so is part of the fix.
-  - From: Code Review Override - the pruning section still reads as unpruned
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -266,10 +216,17 @@ in this section applies a patch version update.
 
 Section 5 of the automation copies a roadmap item into `## Current` and leaves
 the original where it was, so a section goes on listing work the repository has
-long since built. Five sections are in that state, and
-`node todo.mjs --pending` counts 56 items where a handful are outstanding - a
-figure that makes the file useless for deciding what to do next, and that reads
-from outside as a project barely started.
+long since built. The 10.25.2026 pass read the five sections that were in that
+state - `## Flight Controls`, `## Simulator Configuration`,
+`## Environment Design`, `## Simulator API` and `## World & Environment` - and
+nothing built is left listed under any of them: `## Environment Design` and
+`## World & Environment` hold the outstanding work, and the other three hold
+nothing at all, keeping their headings and opening paragraphs as the record of
+that area of work.
+No figure for the queue is kept in this paragraph on purpose: a count of a
+moving queue is stale by the time anybody reads it, so
+`node todo.mjs --pending` is the thing to ask rather than a number written
+down here.
 
 Pruning is one item per section because the judgment is per item: each has to be
 read against the source before it is called finished, which is a different
@@ -294,8 +251,8 @@ in place, and the pruning item says which ones those were.
     this run - the item is the look, and the integration is whatever the look
     recommends.
 - [ ] Prune the archived item still listed under `#### Canyon Run`
-  - Found by the 10.25.2026 pruning pass, and it is the sixth instance of what
-    this section describes rather than a new kind of thing: `Pin the way a cut
+  - Found by the 10.25.2026 pruning pass, and it is the sixth pruning item this
+    section has produced rather than a new kind of thing: `Pin the way a cut
     is drawn against the way a cut is tested` sits unchecked under
     `#### Canyon Run` and checked in `TODO-archive.md`, archived with its
     `From: Game Modes UI/UX -> Improve Existing Game Modes -> Canyon Run` path.
@@ -305,39 +262,35 @@ in place, and the pruning item says which ones those were.
     `buildCut` taking `const acrossX = section.dirZ` - each bounded to the
     function it is anchored on. Read those assertions against the module before
     checking the item off, the way the five sections above were read.
-  - Worth noticing that this one was made by the run that finished the work,
-    which is why the five sections above were not the end of it: every run that
+  - **The counter is pruning items this section has produced, and it stands at
+    six**: the five of the 10.25.2026 sweep, which are the five `Prune ...`
+    items under `## Archived 10-25-26` in `TODO-archive.md`, plus this one.
+    Count them in the archive, which is the full record, rather than in
+    `## Complete`, which is a window onto it:
+    `rollCompleteMethod: recentsByNumber` keeps only the ten newest items
+    visible there, and four more completed items roll the first of the five out
+    of it, so a count taken there would read five and let a seventh pruning item
+    through as the sixth. While all five sit in both files a grep across the two
+    counts each of them twice.
+  - This one was made by the run that finished the work rather than found by a
+    sweep, which is why the five were not the end of it: every run that
     completes a queued item leaves its roadmap original behind, so pruning is a
-    pass that comes round rather than a job that finishes. If a third instance
-    of that turns up, the thing to queue is a change to how an item is queued -
-    not a seventh pruning item.
+    pass that comes round rather than a job that finishes. **So the seventh is
+    the one not to write.** The fault is upstream rather than here - section 5
+    of the automation copies an item into `## Current` and leaves the original
+    in place, `todo.mjs` carries no notion of item identity across those two
+    copies, and no rule in the instructions covers the original left behind once
+    the copy archives. That makes the change a change to the automation tool and
+    not to this repository, so what gets queued in place of a seventh pruning
+    item is a request against the tool.
 
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 262 earlier items in `TODO-archive.md`, newest last.
+> 264 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
-  the machine has
-  - `createTiltState(enabled)` takes the answer, and `js/main.js` hands it
-    `isTouchOnly()` once at start-up with nothing able to change it afterwards.
-    A tablet with a keyboard cannot turn tilt on and a phone cannot turn it off,
-    though both are perfectly capable of the other.
-  - The sensor may still refuse, so the setting is what is wanted rather than
-    what is happening: `tiltFlying` already tells those two apart, and the pads
-    stay on the glass for a tilt that was asked for and never arrived.
-  - From: Flight Controls
-- [x] Set how far the device is turned before it asks for anything
-  - `TILT_DEADZONE` in `js/tilt-controls.js` is 7 degrees, and `tiltToInput`
-    takes it as an argument that nothing passes. How still a hand is varies more
-    between two pilots than almost anything else here, and a deadzone too narrow
-    means an aircraft that will not fly straight.
-  - A few labelled positions rather than a range of degrees, the way the other
-    options in the settings panel are offered, so no combination of keys lands
-    it between two of them.
-  - From: Flight Controls
 - [x] Choose which controls hand the aircraft back after a level off
   - `VERTICAL_CONTROLS` in `js/input-map.js` is the list `wantsVerticalChange`
     takes, and the throttle is in it: a nudge of the lever on an approach drops
@@ -406,3 +359,48 @@ how the simulator got here rather than as a list still to be worked.
   - The fifth item, the weather branch, is not pruned: it is real outstanding
     work and is the next item below.
   - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] `### Pruning the Roadmap` opens on the condition the pass just removed
+  - **Issue**: the section's opening paragraph reads "Five sections are in that
+    state, and `node todo.mjs --pending` counts 56 items where a handful are
+    outstanding - a figure that makes the file useless for deciding what to do
+    next, and that reads from outside as a project barely started." The
+    10-25-26 pass pruned all five of those sections, and what is left under
+    each is outstanding work rather than built work. The figure is wrong three
+    times over: the tool read 67 at `HEAD`, not 56, and it reads 14 now. A run
+    or a reader taking that paragraph at its word re-opens a pruning pass
+    against five sections that hold seven genuinely unfinished items between
+    them.
+  - **Goal**: rewrite the paragraph so it describes the section as it now
+    stands, and drop the item count rather than correcting it - the figure went
+    stale between the day it was written and the day the pass ran, which is
+    what any count of a moving queue does. The mechanism sentence above it
+    ("Section 5 of the automation copies a roadmap item into `## Current` and
+    leaves the original where it was") is still true and worth keeping, since
+    it is why the section still has items under it. Keep the closing
+    paragraph's standing procedure as written. Verify with
+    `node todo.mjs --pending` and by reading the five sections back.
+  - From: Code Review Override - the pruning section still reads as unpruned
+- [x] The Canyon Run pruning item names three different thresholds for one
+  trigger
+  - **Issue**: the item queued into `### Pruning the Roadmap` this run calls
+    the straggler "the sixth instance of what this section describes", then
+    says "If a third instance of that turns up, the thing to queue is a change
+    to how an item is queued - not a seventh pruning item." Sixth, third and
+    seventh cannot all be counting the same thing, and nothing in the item says
+    which counter the trigger reads. Measured against the files: this pass
+    checked off twelve roadmap originals whose `## Current` staging copy had
+    already been archived by a run between 10-07-26 and 10-24-26 - all ten of
+    `## Flight Controls`, plus `Rename the **Controls** entry` and `Accept
+    typed values in the **Element Editor** and the **Settings** panel`. So on
+    the reading that counts items the threshold was passed nine times over in
+    the pass that wrote the sentence, and on the reading that counts pruning
+    items it is at one of three. The next run cannot tell whether to change how
+    items are queued or to queue another pruning item, which is the whole
+    decision the sentence exists to make.
+  - **Goal**: state one counter and the number it stands at. The pattern itself
+    is real and is confirmed upstream: `## Current` is a staging area whose
+    copies archive on their own, the tool has no concept of item identity
+    across copies, and no rule in the automation's instructions covers the
+    original left behind - so the change the item gestures at is a change to
+    that tool rather than to this repository, and saying so is part of the fix.
+  - From: Code Review Override - the pruning section still reads as unpruned

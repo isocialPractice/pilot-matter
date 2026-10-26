@@ -3246,3 +3246,25 @@ still be found by name.
     it, which is that the device is the aircraft; on is a pilot who thinks of it
     as a stick.
   - From: Flight Controls
+
+## Archived 10-26-26
+
+- [x] Fly by tilt, or by keys, whichever the pilot wants rather than whichever
+  the machine has
+  - `createTiltState(enabled)` takes the answer, and `js/main.js` hands it
+    `isTouchOnly()` once at start-up with nothing able to change it afterwards.
+    A tablet with a keyboard cannot turn tilt on and a phone cannot turn it off,
+    though both are perfectly capable of the other.
+  - The sensor may still refuse, so the setting is what is wanted rather than
+    what is happening: `tiltFlying` already tells those two apart, and the pads
+    stay on the glass for a tilt that was asked for and never arrived.
+  - From: Flight Controls
+- [x] Set how far the device is turned before it asks for anything
+  - `TILT_DEADZONE` in `js/tilt-controls.js` is 7 degrees, and `tiltToInput`
+    takes it as an argument that nothing passes. How still a hand is varies more
+    between two pilots than almost anything else here, and a deadzone too narrow
+    means an aircraft that will not fly straight.
+  - A few labelled positions rather than a range of degrees, the way the other
+    options in the settings panel are offered, so no combination of keys lands
+    it between two of them.
+  - From: Flight Controls

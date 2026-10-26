@@ -30,10 +30,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `js/api/matter.js`, so a host that assembles its own world gets settled joins
   and the simulator does not. Each item carries the finding beneath it, so the
   next run reads a conclusion rather than repeating the search.
+- **`### Pruning the Roadmap` no longer opens on the condition its own pass
+  removed.** The section's opening paragraph described five sections as still
+  listing built work and carried a count of the queue, both of which the pruning
+  pass had just made false - a reader taking it at its word would re-open a pass
+  against five sections whose remaining items are genuinely unfinished. The
+  paragraph now names the five sections as read and says nothing built is left
+  listed under any of them - `## Environment Design` and `## World & Environment`
+  hold the outstanding work, and the other three hold nothing at all, keeping
+  their headings as the record of that area of work. The count is dropped rather
+  than corrected: a figure for a moving queue is stale by the time it is read,
+  so the paragraph points at `node todo.mjs --pending` instead of quoting a
+  number. The mechanism sentence above it and the standing procedure below it
+  are unchanged, since both are still true and are why the section keeps its
+  items.
+- **The Canyon Run pruning item states one counter instead of three numbers.**
+  The item called its straggler the sixth instance, then set the trigger for
+  changing how items are queued at a third instance, then named the thing not to
+  write as a seventh pruning item - three numbers for one decision, with nothing
+  saying which was being counted. It now names a single counter, pruning items
+  the section has produced, standing at six, and says where to count it:
+  `TODO-archive.md`, which is the full record, rather than `## Complete`, which
+  `recentsByNumber` holds to the ten newest items and which four more
+  completions would roll the first of the five out of. While all five sit in
+  both files a search across the two double-counts them. The item also now says
+  where the fix belongs: `## Current` is a staging area whose copies archive on
+  their own, `todo.mjs` carries no notion of item identity across the two
+  copies, and no rule covers the original left behind - so the change the item
+  gestures at is a change to the automation tool rather than to this repository.
 
-No version is applied. Every change this run is to `TODO.md`, its archive and
-this file, and nothing in the simulator behaves differently - the suite reads
-1397 tests passing before the pass and after it.
+No version is applied. Every change in these entries is to `TODO.md`, its
+archive and this file, and nothing in the simulator behaves differently - the
+suite reads 1397 tests passing before them and after them.
 
 ## [1.0.0-alpha.1.29.3] - 2026-10-24
 
