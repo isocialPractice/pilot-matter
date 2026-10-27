@@ -261,7 +261,7 @@
 <table>
     <thead><tr><th>Element</th><th>Configured through</th></tr></thead>
     <tbody>
-        <tr><td>Mountain</td><td>Count, height, radius, girth</td></tr>
+        <tr><td>Mountain</td><td>Count, height, radius, girth, length, width</td></tr>
         <tr><td>Canyon</td><td>Depth, width, steepness, branches, wander</td></tr>
         <tr><td>Desert</td><td>Dune height, crest spacing, coverage, sand gradient</td></tr>
         <tr><td>Grass</td><td>Green gradient, height band</td></tr>
@@ -289,9 +289,12 @@
         <tr><td>Span</td><td>Two rows, <code>MIN</code> and <code>MAX</code>, neither able to cross the other</td></tr>
         <tr><td>Scalar</td><td>One row, one number</td></tr>
         <tr><td>Gradient</td><td>Two rows, <code>LIGHT</code> and <code>DARK</code>, as a percentage of the preset's colour</td></tr>
+        <tr><td>Gated</td><td>Three rows: a switch reading <code>OFF</code> or <code>ON</code>, then its <code>MIN</code> and <code>MAX</code></td></tr>
     </tbody>
 </table>
 </div>
+
+<p>A gated range is a pair of bounds that only sometimes applies, for a footprint an element otherwise works out for itself. The switch opens <code>OFF</code>, where the element draws what it always drew, and moves in one press rather than by a fiftieth. Its bounds stay listed either way, so a range can be set up before it is turned on. The mountain's <code>LENGTH</code> and <code>WIDTH</code> are the two: off, a peak is the round bump <code>RADIUS</code> and <code>GIRTH</code> arrive at; on, its footprint is the one it was asked for.</p>
 
 <p>One press moves a fiftieth of what the range allows, rounded to 1, 2, or 5 times a power of ten. A range can be typed into instead: a digit starts the figure, <kbd>Enter</kbd> takes it and draws the ground again, and the figure is read in the units the row reads in - <code>150</code> at a gradient end is <code>150%</code>. A figure outside the declared bounds is refused and the row says what they are. <code>RESTORE THE PRESET</code> puts every range back. Edits belong to the world they were made on and are not stored between sessions. Not available while a game mode is being played: a mode brings its own ground.</p>
 

@@ -79,6 +79,11 @@ export const EDITOR_CLEARED_NOTE = 'held off the runway';
 export const RANGE_STEPS = 50;
 
 export function rangeStep(range) {
+    // A range may name its own step, for a row where a fiftieth of the bounds
+    // is the wrong press: a switch is two values and has to move between them
+    // in one, rather than crawl from off to on in fifty hundredths.
+    if (range.step > 0) return range.step;
+
     const raw = Math.abs(range.high - range.low) / RANGE_STEPS;
     if (!(raw > 0)) return 1;
 
@@ -127,6 +132,29 @@ export function shadeColor(color, shade) {
     return color.map(channel => clamp(channel * shade, 0, 1));
 }
 
+// --- The switch on a gated range -------------------------------------------
+
+/**
+ * The row a gated range's switch is drawn as.
+ *
+ * It is a range like any other so the one stepper, the one typing path and the
+ * one clamp all reach it - the panel has no second kind of row, and a switch
+ * that needed one would need its own key handling, its own refusal notice and
+ * its own place in every test that walks the rows. What it declares instead is
+ * a step of its own: without it a press would move a fiftieth of the way from
+ * off to on, which is a switch nobody can work.
+ */
+export const GATE_RANGE = { kind: 'scalar', low: 0, high: 1, default: 0, step: 1 };
+
+/** What the switch reads as, which is a word rather than the number behind it. */
+export const GATE_ON_LABEL  = 'ON';
+export const GATE_OFF_LABEL = 'OFF';
+
+/** True once the switch has been moved far enough to count as thrown. */
+export function gateOn(value) {
+    return Number(value) >= 0.5;
+}
+
 // --- The rows an element's ranges are drawn as -----------------------------
 
 /**
@@ -135,6 +163,7 @@ export function shadeColor(color, shade) {
  *
  * A span is two rows, because a span is two numbers and the pilot means to
  * move one of them. A gradient is two rows for the same reason, one per end.
+ * A gated range is three: the switch, and then the two bounds it turns on.
  * Everything else is one row and one number.
  */
 export function rangeRows(name, range) {
@@ -142,6 +171,19 @@ export function rangeRows(name, range) {
         return [
             { part: 'min', label: `${label(name)} MIN`, range, at: 0 },
             { part: 'max', label: `${label(name)} MAX`, range, at: 1 }
+        ];
+    }
+
+    // The switch is listed above the bounds it governs, so a reader meets the
+    // question before the two answers to it. The bounds stay listed while it is
+    // off: a pilot setting a footprint sets the numbers and then turns it on as
+    // often as the other way round, and a pair of rows that appeared and
+    // disappeared under the cursor would move every row below them.
+    if (range.kind === 'gated') {
+        return [
+            { part: 'on',  label: label(name),           range: GATE_RANGE, gate: true },
+            { part: 'min', label: `${label(name)} MIN`,  range, gated: true, at: 0 },
+            { part: 'max', label: `${label(name)} MAX`,  range, gated: true, at: 1 }
         ];
     }
 
@@ -296,6 +338,12 @@ function structuredCloneConfig(config) {
     const copy = {};
     for (const [name, value] of Object.entries(config)) {
         if (Array.isArray(value)) copy[name] = [...value];
+        // Read before the gradient below rather than after it. A resolved
+        // gradient and a resolved gated range are both plain objects, so the
+        // last branch cannot be "an object, therefore a gradient" any more -
+        // read that way a gated range is copied by spreading a `light` that is
+        // not there, which throws rather than copying the wrong thing.
+        else if (Array.isArray(value?.range)) copy[name] = { on: value.on, range: [...value.range] };
         else if (value && typeof value === 'object') {
             copy[name] = { light: [...value.light], dark: [...value.dark] };
         } else copy[name] = value;
@@ -338,6 +386,11 @@ export function rowId(elementId, name, part) {
 /** What a range row is currently reading, in the element's configuration. */
 export function rowValue(element, name, row) {
     if (row.shade) return element.shades[name][row.shade];
+    // Both read before `row.at`, which a gated bound carries too: a gated
+    // range holds its pair one level in, under `range`, so reading it as a span
+    // would read the `on` and the `range` as the two bounds.
+    if (row.gate) return element.config[name].on ? 1 : 0;
+    if (row.gated) return element.config[name].range[row.at];
     if (row.at != null) return element.config[name][row.at];
     return element.config[name];
 }
@@ -349,6 +402,7 @@ export function rowValue(element, name, row) {
  */
 export function rowValueLabel(row, value) {
     if (row.shade) return `${Math.round(value * 100)}%`;
+    if (row.gate) return gateOn(value) ? GATE_ON_LABEL : GATE_OFF_LABEL;
     return value.toFixed(stepPlaces(rangeStep(row.range)));
 }
 
@@ -496,13 +550,27 @@ function writeRowValue(element, name, row, value) {
         return;
     }
 
+    if (row.gate) {
+        element.config[name].on = gateOn(value);
+        return;
+    }
+
+    if (row.gated) {
+        writePair(element.config[name].range, row.at, value);
+        return;
+    }
+
     if (row.at != null) {
-        const span = element.config[name];
-        span[row.at] = row.at === 0 ? Math.min(value, span[1]) : Math.max(value, span[0]);
+        writePair(element.config[name], row.at, value);
         return;
     }
 
     element.config[name] = value;
+}
+
+/** One end of a pair of bounds, held to the other so the pair cannot cross. */
+function writePair(pair, at, value) {
+    pair[at] = at === 0 ? Math.min(value, pair[1]) : Math.max(value, pair[0]);
 }
 
 /**

@@ -2373,6 +2373,108 @@ test('a cut is drawn across the span the rule measures it along', () => {
         'js/corridor.js should measure the offset along (dirZ, -dirX), the span the posts stand on');
 });
 
+// --- The joins between the tiles the world is laid on ----------------------
+
+/**
+ * `js/terrain.js` imports Three.js and so cannot be constructed here either,
+ * which is the same reason the walls above are read as text. What it does that
+ * is worth pinning is an ordering and a completeness, both of which are
+ * invisible from outside: a tile settled after its mesh was built draws the
+ * unsettled ground and never corrects it, and a tile settled against four
+ * neighbours rather than eight leaves the corners of its own ground open.
+ *
+ * `matchEdges` itself is pure and is tested properly in
+ * test/environment-tiles.test.js; the neighbour list is pure and is tested
+ * properly in test/world-tiles.test.js. This section pins the one piece between
+ * them that a renderer is required to hold.
+ */
+const terrainSource = readFileSync(fileURLToPath(new URL('../js/terrain.js', import.meta.url)), 'utf8');
+
+/**
+ * One class method's body, cut at the brace that closes it.
+ *
+ * The same brace count `functionBody` above uses, and for the same reason - a
+ * method has braces of its own inside it, so a span bounded with `[^}]*?` stops
+ * before the line being looked for. What differs is only how the declaration is
+ * recognised: a method is a name and its arguments at the head of a line rather
+ * than a `function` keyword.
+ */
+function methodBody(source, name) {
+    const opened = source.search(new RegExp(`^\\s+${name}\\([^)]*\\)\\s*\\{`, 'm'));
+    if (opened < 0) return null;
+
+    const from = source.indexOf('{', opened);
+    if (from < 0) return null;
+
+    let depth = 0;
+    for (let at = from; at < source.length; at += 1) {
+        if (source[at] === '{') depth += 1;
+        if (source[at] === '}') {
+            depth -= 1;
+            if (depth === 0) return source.slice(from, at + 1);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * The reassembly this pins: `matchEdges` used to be reached from the Matter API
+ * alone, so a host assembling its own world got settled joins and the simulator
+ * did not. The base ground hid it, because it is noise read at world
+ * coordinates and runs on across a join whatever tile draws it - what did not
+ * run on was anything an element added, which is placed from a per-tile seed.
+ */
+test('a tile is settled against its neighbours before it is drawn, not after', () => {
+    const added = methodBody(terrainSource, 'addTile');
+    assert.ok(added, 'js/terrain.js should lay one tile in a method of its own');
+
+    const settled = added.search(/this\.joinTile\(/);
+    const drawn   = added.search(/buildMesh\(/);
+
+    assert.ok(settled >= 0, 'and settle the field it generated against the tiles already beside it');
+    assert.ok(drawn >= 0, 'and build the mesh it adds to the scene');
+    assert.ok(settled < drawn,
+        'the join has to come first: a mesh built from unsettled ground is the join on screen, '
+      + 'and nothing draws that tile again');
+
+    assert.match(added, /redrawTile\(/,
+        'and the neighbours whose own ground the join moved have to be drawn again');
+});
+
+test('every neighbour is handed over in one pass rather than one at a time', () => {
+    const join = methodBody(terrainSource, 'joinTile');
+    assert.ok(join, 'js/terrain.js should settle a field in a method of its own');
+
+    assert.match(join, /tilesTouching\(index\)/,
+        'against every tile that can share a vertex with it, which is eight rather than four');
+    assert.match(join, /matchEdges\(\[field, \.\.\.touching\.map\(tile => tile\.field\)\]\)/,
+        'in a single call carrying all of them, because a vertex four tiles reach has to be '
+      + 'settled against all four at once or it closes against neither');
+
+    assert.equal(join.match(/matchEdges\(/g).length, 1,
+        'one call, or a corner is settled twice against two tiles and agrees with neither');
+});
+
+/**
+ * The water is recorded off the finished field - resting heights, colours, and
+ * which vertices lie under the level - so a surface recorded before a join is
+ * resting on ground that has since moved. This is the half of a redraw that is
+ * easy to leave out, because the land looks right without it.
+ */
+test('a tile drawn again records its water again, over the ground that moved', () => {
+    const redraw = functionBody(terrainSource, 'redrawTile');
+    assert.ok(redraw, 'js/terrain.js should draw a settled tile again in a function of its own');
+
+    assert.match(redraw, /tile\.water\s*=\s*waterSurface\(field\)/,
+        'the surface is read off the field as it now stands rather than kept');
+    assert.match(redraw, /tile\.watered\s*=\s*false/,
+        'and the tile is marked unwatered, or a paused world leaves the old surface '
+      + 'over the new ground');
+    assert.match(redraw, /computeVertexNormals\(\)/,
+        'and the normals are worked out again, or the moved ground is lit as the ground it was');
+});
+
 // --- The controls for a machine with no keys -------------------------------
 
 test('each cluster of pads has an empty box to be drawn into', () => {

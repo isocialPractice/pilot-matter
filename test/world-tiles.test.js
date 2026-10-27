@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs';
 import {
     TILE_REACH, TILE_KEEP,
     tileIndexAt, tileKey, tileCenter, tileBounds, tilesInReach,
-    tileWorthKeeping, sameTile, isHomeTile
+    tileWorthKeeping, sameTile, isHomeTile, tilesTouching
 } from '../js/world-tiles.js';
-import { DEFAULT_SIZE, tileSeed } from '../js/environment/elements.js';
+import {
+    DEFAULT_SIZE, tileSeed, createField, fieldX, fieldZ
+} from '../js/environment/elements.js';
 
 const SIZE = DEFAULT_SIZE;
 const HALF = SIZE / 2;
@@ -205,4 +207,108 @@ test('the tiles around it are the same world without being the same ground', () 
 test('the tile at a place is that ground every time it is laid', () => {
     assert.equal(tileSeed(99, 3, -2), tileSeed(99, 3, -2));
     assert.notEqual(tileSeed(99, 3, -2), tileSeed(99, -2, 3));
+});
+
+// --- The tiles one tile has to be settled against -------------------------
+
+/**
+ * Where a tile puts every vertex on its outside, as the keys `matchEdges`
+ * groups them by.
+ *
+ * This is the thing the neighbour list is actually for, so it is what the tests
+ * below measure it against: a tile is settled against another because the two
+ * put a vertex in the same place, and asking the field arithmetic where those
+ * places are is a different question from asking the grid arithmetic which
+ * tiles are adjacent. A list that agreed with itself about adjacency and
+ * disagreed with the field about shared vertices would leave a join open.
+ */
+function boundaryPlaces(index, segments = 8) {
+    const field = createField({
+        size: SIZE, segments,
+        originX: index.x * SIZE, originZ: index.z * SIZE
+    });
+
+    const places = new Set();
+    for (let i = 0; i < field.count; i++) {
+        const col = i % field.stride;
+        const row = Math.floor(i / field.stride);
+        if (col === 0 || col === field.stride - 1 || row === 0 || row === field.stride - 1) {
+            places.add(`${Math.round(fieldX(field, i) * 1000) / 1000},`
+                     + `${Math.round(fieldZ(field, i) * 1000) / 1000}`);
+        }
+    }
+
+    return places;
+}
+
+/** How many vertices two tiles put in the same place. */
+function sharedWith(here, there) {
+    const mine = boundaryPlaces(here);
+    let shared = 0;
+    for (const place of boundaryPlaces(there)) if (mine.has(place)) shared++;
+    return shared;
+}
+
+test('a tile is settled against eight tiles, which is every one it can touch', () => {
+    for (const index of [{ x: 0, z: 0 }, { x: 3, z: -2 }, { x: -7, z: 11 }]) {
+        const touching = tilesTouching(index);
+
+        assert.equal(touching.length, 8, `${tileKey(index)} should name eight neighbours`);
+        assert.equal(new Set(touching.map(tileKey)).size, 8, 'and name none of them twice');
+        assert.ok(!touching.some(place => sameTile(place, index)),
+            'a tile is not its own neighbour');
+    }
+});
+
+// The whole point of the list, and the one assertion that would catch a
+// neighbour quietly dropped out of it.
+test('every tile named shares vertices with the tile it was named for', () => {
+    const index = { x: 2, z: -1 };
+
+    for (const place of tilesTouching(index)) {
+        assert.ok(sharedWith(index, place) > 0,
+            `${tileKey(place)} is named a neighbour of ${tileKey(index)} but shares no vertex with it`);
+    }
+});
+
+// And the other direction, which is the one a diagonal would be lost in: the
+// four tiles across a corner share exactly one vertex each, so a list built out
+// of the four sides alone passes the test above and still leaves four corners of
+// the tile unmatched.
+test('no tile left off the list shares a vertex with it, and the corners are on it', () => {
+    const index = { x: 2, z: -1 };
+    const named = new Set(tilesTouching(index).map(tileKey));
+
+    for (let dz = -2; dz <= 2; dz++) {
+        for (let dx = -2; dx <= 2; dx++) {
+            const place = { x: index.x + dx, z: index.z + dz };
+            if (sameTile(place, index)) continue;
+
+            const shared = sharedWith(index, place);
+            assert.equal(shared > 0, named.has(tileKey(place)),
+                `${tileKey(place)} shares ${shared} vertices and is `
+              + `${named.has(tileKey(place)) ? '' : 'not '}named`);
+        }
+    }
+
+    for (const corner of [{ x: 1, z: -2 }, { x: 3, z: -2 }, { x: 1, z: 0 }, { x: 3, z: 0 }]) {
+        assert.ok(named.has(tileKey(corner)), `the corner ${tileKey(corner)} has to be settled against`);
+        assert.equal(sharedWith(index, corner), 1, 'a corner is one vertex, which still has to close');
+    }
+});
+
+test('the sides are settled before the corners, so a longer join is never the one dropped', () => {
+    const index = { x: 0, z: 0 };
+    const touching = tilesTouching(index);
+
+    const sides = touching.slice(0, 4).map(place => sharedWith(index, place));
+    const corners = touching.slice(4).map(place => sharedWith(index, place));
+
+    assert.ok(sides.every(count => count > 1), 'the first four share a whole edge');
+    assert.ok(corners.every(count => count === 1), 'and the last four share one vertex');
+});
+
+test('a tile with no place in the grid has no neighbours rather than eight wrong ones', () => {
+    assert.deepEqual(tilesTouching(null), []);
+    assert.deepEqual(tilesTouching(undefined), []);
 });

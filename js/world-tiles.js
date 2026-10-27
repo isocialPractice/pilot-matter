@@ -125,3 +125,25 @@ export function tileWorthKeeping(index, x, z, size, reach = TILE_REACH, keep = T
     return bounds.minX <= x + span && bounds.maxX >= x - span
         && bounds.minZ <= z + span && bounds.maxZ >= z - span;
 }
+
+/**
+ * The eight tiles around one, which is every tile it can share a vertex with.
+ *
+ * Four of them meet it along a side and four only at a corner, and both have to
+ * be in the list: a corner vertex is a place four tiles all reach, so a tile
+ * settled against its sides alone would leave three of the four corners of its
+ * own ground unmatched against the tile diagonally across from it.
+ *
+ * The order is the sides first and then the corners, so a caller that has to
+ * stop short settles the longest joins before the shortest.
+ */
+export function tilesTouching(index) {
+    if (index == null) return [];
+
+    const { x, z } = index;
+    return [
+        { x: x - 1, z }, { x: x + 1, z }, { x, z: z - 1 }, { x, z: z + 1 },
+        { x: x - 1, z: z - 1 }, { x: x + 1, z: z - 1 },
+        { x: x - 1, z: z + 1 }, { x: x + 1, z: z + 1 }
+    ];
+}

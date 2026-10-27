@@ -5,10 +5,89 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-alpha.1.30.0] - 2026-10-27
+
+The endless world stops showing its joins, and the element registry grows the
+range kind the mountain's footprint items were waiting on. Both were items the
+10.25.2026 pruning pass read against the source and deliberately left unchecked,
+so this is the half of that pass that was real work rather than bookkeeping.
+
+The `TODO.md` entries below, from the pruning pass itself, had been sitting
+unreleased because every change in them was to `TODO.md` and this file. They
+ship here.
+
+### Added
+
+- **A fourth range kind: `gated`, a pair of bounds a switch turns on.** The
+  three kinds were `span`, `scalar` and `gradient`, and none of them was a pair
+  of bounds a checkbox turns on, which is what blocked the four mountain-shape
+  items in `## Environment Design` - there was nothing to build them with.
+  `gated(low, high, defaultLow, defaultHigh)` declares one, `resolveConfig`
+  resolves it to `{ on, range }`, and it is clamped and uncrossed by the same
+  code a `span` is: `test/environment-elements.test.js` holds the two kinds
+  against each other over nine awkward pairs rather than writing the clamp's
+  answers out twice.
+
+  The reason it has to be a kind of its own, rather than a span with a value
+  that means nothing: a span always applies, so saying "leave this alone" with
+  one means finding a figure the generator reads as no opinion - and then the
+  generator can never be asked for that figure. A switch says it outright.
+
+  It is off unless something turns it on, so declaring one on an element every
+  preset places moves no world already described. A bare `[low, high]` turns it
+  on, because a caller that troubled to name bounds is asking for them to be
+  used, and anything other than `true` at `on` reads as off, so what a generator
+  gets is always an answer rather than a value to test for truthiness.
+- **The mountain's footprint can be said outright, as a gated `length` and
+  `width`.** They are the two axes of the ellipse a peak is drawn on. Off, each
+  gives way to what was always there - `width` to `radius`, and `length` to
+  `radius` stretched by `girth` - so a peak is round, stretched by a random
+  amount, or exactly the footprint it was asked for. With both given, `girth`
+  has nothing left to say about that peak; with only the width given it still
+  does, because the long axis is then the one the generator is working out.
+- **The panel draws a gated range as three rows: the switch, then its `MIN` and
+  `MAX`.** The switch is a range like any other, so the one stepper, the one
+  typing path and the one clamp all reach it and the panel grows no second kind
+  of row - what it declares instead is a step of its own, `GATE_RANGE`, without
+  which a press would move a fiftieth of the way from off to on and take fifty
+  presses to throw. It reads `OFF` or `ON` rather than `0` or `1`, and a refused
+  figure is refused in the same words. Its bounds stay listed while it is off,
+  so a range can be set up before it is turned on and no row moves under the
+  cursor as the switch is worked.
+- **`tilesTouching(index)` in `js/world-tiles.js`: the eight tiles one tile can
+  share a vertex with.** Four meet it along a side and four only at a corner,
+  and the corners have to be on the list - a corner vertex is a place four tiles
+  reach, so a tile settled against its sides alone leaves four corners of its
+  own ground unmatched. `test/world-tiles.test.js` measures the list against the
+  field arithmetic rather than against itself: every tile named shares a vertex,
+  every tile not named shares none, and a sides-only list fails it.
 
 ### Changed
 
+- **Every tile of the endless world is now settled against the tiles already
+  laid beside it, as it is laid.** `matchEdges` had no caller outside
+  `js/api/matter.js`, so a host assembling its own world got settled joins and
+  the simulator did not. The base ground hid it: `applyBase` samples the noise
+  at world coordinates, so the ground runs on across a join whatever tile draws
+  it. What did not run on was anything an element added, because elements are
+  placed from a per-tile seed - a peak whose radius reached past the edge was
+  raised on one side of it and not the other.
+
+  `Terrain.joinTile` hands the new field and every drawn neighbour to
+  `matchEdges` in a single call, because a vertex four tiles reach has to be
+  settled against all four at once or it closes against neither. It runs before
+  the mesh is built, so the tile is drawn once from matched ground rather than
+  drawn and corrected, and the neighbours whose own ground moved are written
+  back into the geometry they already carry rather than rebuilt - a join moves a
+  few vertices either side of one edge, and rebuilding a plane to redraw that
+  would spend the cost of generating a tile on a frame already generating one.
+  Only the tile being added is read, so the per-frame budget `drawTiles` spends
+  is the budget it always was.
+
+  A redrawn tile records its water again. The resting heights and colours are
+  read off the finished field, so a surface recorded before a join rests on
+  ground that has since moved, and `watered` comes off with it or a paused world
+  leaves the old surface over the new ground.
 - **Five roadmap sections were pruned of the work the simulator had already
   built.** `## Flight Controls`, `## Simulator Configuration`,
   `## Simulator API` and sixteen of the twenty items in
@@ -30,6 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `js/api/matter.js`, so a host that assembles its own world gets settled joins
   and the simulator does not. Each item carries the finding beneath it, so the
   next run reads a conclusion rather than repeating the search.
+
+  Three of those five are the ones this version closes.
 - **`### Pruning the Roadmap` no longer opens on the condition its own pass
   removed.** The section's opening paragraph described five sections as still
   listing built work and carried a count of the queue, both of which the pruning
@@ -58,10 +139,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their own, `todo.mjs` carries no notion of item identity across the two
   copies, and no rule covers the original left behind - so the change the item
   gestures at is a change to the automation tool rather than to this repository.
+- **The `local-weather` branch is not going to be merged, and the item that
+  asked for it now says what to do instead.** It made the merge conditional on
+  the branch's API stabilizing, and nobody had recorded an answer. The answer is
+  that the condition will never be met: the surface is `export const WEATHER`
+  hand-edited in the module and `STYLE = resolve(WEATHER)` resolved once at
+  import, which is a build-time constant rather than an API settling down.
+  Nothing of `js/weather-style.js` can come across either - its `day`/`night`
+  switch is superseded by the continuous cycle in `js/day-night.js`, and its one
+  shared terrain colouring function has no seam to attach to an element
+  registry. What is worth having is `js/weather.js`: the cloud deck, the rain,
+  the strike timing and the celestial sprite, lifted onto main's own surfaces.
+  The branch is one commit off the initial commit of 02.21.2026 and describes a
+  repository with no test suite, no tiles, no presets and no water; merging it
+  conflicts across about a hundred files and resolves to deleting main. The item
+  carries the whole reading, dated, so no later run asks the question again.
 
-No version is applied. Every change in these entries is to `TODO.md`, its
-archive and this file, and nothing in the simulator behaves differently - the
-suite reads 1397 tests passing before them and after them.
+### Fixed
+
+- **A copy of an element's configuration no longer reads "an object, therefore
+  a gradient".** `structuredCloneConfig` in `js/element-editor.js` copied any
+  non-array object by spreading its `light` and `dark`, which was safe only
+  while a gradient was the one range kind resolving to an object. A gated range
+  resolves to one too, so the old branch order would have thrown on the way out
+  of the panel rather than copying the wrong thing. It reads the pair first now,
+  and the panel's placements round-trip through `resolveConfig` unchanged.
+
+### Testing
+
+- **A seeded mountain world is pinned to a recorded fingerprint, not to a second
+  run of the same code.** The claim behind the footprint gates is that no world
+  already described moved: each gate is read in place of the one draw the value
+  it replaces spent, so the random stream is the same length whichever way the
+  gates are set, and every peak is laid where it was. A test comparing
+  gated-off against ungated within the current code passes on any change that
+  moves both - which is every change to the draw order, and the draw order is
+  the thing that has to hold. The fingerprint catches it; verified by reordering
+  the generator and watching it fail. All five preset worlds were also hashed
+  before and after the change and are byte-identical.
+- **`js/terrain.js` is read as source text, the way `js/walls.js` is.** It
+  imports Three.js and cannot be constructed in Node, so what
+  `test/page.test.js` pins is the ordering and the completeness a renderer has
+  to hold and that nothing else can see: that the join runs before the mesh is
+  built, that every neighbour goes into one `matchEdges` call, and that a
+  redrawn tile records its water again. Each was verified by mutation - settling
+  after the draw, settling one neighbour at a time, and dropping the water -
+  with the suite failing on all three.
 
 ## [1.0.0-alpha.1.29.3] - 2026-10-24
 

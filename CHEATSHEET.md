@@ -207,7 +207,7 @@ Five more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
 
 | Element | Configured through |
 |---------|--------------------|
-| Mountain | Count, height, radius, girth |
+| Mountain | Count, height, radius, girth, length, width |
 | Canyon | Depth, width, steepness, branches, wander |
 | Desert | Dune height, crest spacing, coverage, sand gradient |
 | Grass | Green gradient, height band |
@@ -232,6 +232,15 @@ opens an element onto its ranges; `A`/`D` step the range under the cursor.
 | Span | Two rows, `MIN` and `MAX`, neither able to cross the other |
 | Scalar | One row, one number |
 | Gradient | Two rows, `LIGHT` and `DARK`, as a percentage of the preset's colour |
+| Gated | Three rows: a switch reading `OFF` or `ON`, then its `MIN` and `MAX` |
+
+A gated range is a pair of bounds that only sometimes applies, for a footprint
+an element otherwise works out for itself. The switch opens `OFF`, where the
+element draws what it always drew, and moves in one press rather than by a
+fiftieth. Its bounds stay listed either way, so a range can be set up before it
+is turned on. The mountain's `LENGTH` and `WIDTH` are the two: off, a peak is
+the round bump `RADIUS` and `GIRTH` arrive at; on, its footprint is the one it
+was asked for.
 
 One press moves a fiftieth of what the range allows, rounded to 1, 2, or 5
 times a power of ten. A range can be typed into instead: a digit starts the

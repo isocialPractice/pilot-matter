@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {
-    DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight, waterSurface, tileSeed
+    DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight, waterSurface, tileSeed, matchEdges
 } from './environment/elements.js';
 import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
 import { animateWater } from './water.js';
 import {
     TILE_REACH, tileIndexAt, tileKey, tileBounds, tileCenter, tilesInReach,
-    tileWorthKeeping, sameTile, isHomeTile
+    tileWorthKeeping, sameTile, isHomeTile, tilesTouching
 } from './world-tiles.js';
 import { recordWorld, sameWorld } from './world-record.js';
 
@@ -160,6 +160,11 @@ export class Terrain {
      * there alone. Only the middle tile carries the strip a world was asked
      * for: a runway is a place in the world rather than a feature of the ground
      * that repeats across it, and a landing is on that strip or on none.
+     *
+     * The tile is settled against the tiles already laid beside it before it is
+     * drawn, so the world has no join anywhere in it. That has to happen here
+     * rather than as a pass over the world afterwards, because a tile is added
+     * one at a time and the one being added is the only one whose edges are new.
      */
     addTile(index) {
         const key = tileKey(index);
@@ -178,11 +183,53 @@ export class Terrain {
             originZ: middle.z
         });
 
+        // Settled before the mesh is built, so the new tile is drawn once from
+        // ground that has already been matched rather than drawn and corrected.
+        const settled = this.joinTile(field, index);
+
         const tile = { index, field, mesh: buildMesh(field), water: waterSurface(field), watered: false };
         this.scene.add(tile.mesh);
         this.tiles.set(key, tile);
 
+        for (const neighbour of settled) redrawTile(neighbour);
+
         return tile;
+    }
+
+    /**
+     * Settles a field about to be laid at a place in the grid against every
+     * tile already drawn beside it, so what an element drew up to one tile's
+     * edge meets what its neighbour drew at theirs.
+     *
+     * The base ground was always seamless, because it is noise sampled at world
+     * coordinates and runs on across a join whatever tile draws it. What did not
+     * run on is the elements, which are placed from a per-tile seed: a peak
+     * whose radius reaches past the edge was raised on one side of it and not
+     * the other, and that is the join this closes.
+     *
+     * Every neighbour is handed over at once rather than one at a time, for the
+     * reason the Matter API's `join` does it that way: a vertex four tiles all
+     * reach has to be settled against all four of them to close, and settling it
+     * twice against two of them leaves a corner that agrees with neither.
+     *
+     * Costs nothing per frame beyond the tile being added - no tile is read that
+     * is not touching it - so the budget `drawTiles` spends is the budget it
+     * always was.
+     *
+     * Returns the tiles whose own ground moved, which are the ones that have to
+     * be drawn again.
+     */
+    joinTile(field, index) {
+        const touching = [];
+        for (const place of tilesTouching(index)) {
+            const tile = this.tiles.get(tileKey(place));
+            if (tile) touching.push(tile);
+        }
+
+        if (touching.length === 0) return [];
+        if (matchEdges([field, ...touching.map(tile => tile.field)]) === 0) return [];
+
+        return touching;
     }
 
     /** Takes one tile out of the scene and gives back everything it held. */
@@ -299,6 +346,41 @@ function buildMesh(field) {
     geo.computeVertexNormals();
 
     return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+}
+
+/**
+ * Draws a tile again from the field as it now stands, for a tile whose ground
+ * was moved by a join after it was laid.
+ *
+ * The geometry it is already drawn with is written into rather than replaced. A
+ * tile settled against a new neighbour has had a few vertices either side of one
+ * edge moved and nothing else touched, so building a whole plane and disposing
+ * the old one would spend the cost of generating a tile to redraw a strip of it -
+ * on a frame that is already generating a tile.
+ *
+ * The water is recorded again rather than kept. Its resting heights and colours
+ * are read off the finished field, so a surface recorded before the join is a
+ * surface resting on ground that has since moved, and the vertices at or under
+ * the level are not necessarily the same ones. `watered` comes off with it so a
+ * paused world - where the water pass returns early on a tile already written -
+ * still puts the surface back over the ground that moved underneath it.
+ */
+function redrawTile(tile) {
+    const { field, mesh } = tile;
+    const position = mesh.geometry.attributes.position;
+    const color    = mesh.geometry.attributes.color;
+
+    for (let i = 0; i < field.count; i++) position.setY(i, field.height[i]);
+    color.array.set(field.color);
+
+    position.needsUpdate = true;
+    color.needsUpdate = true;
+    mesh.geometry.computeVertexNormals();
+
+    tile.water   = waterSurface(field);
+    tile.watered = false;
+
+    return tile;
 }
 
 /**

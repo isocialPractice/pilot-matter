@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
     ELEMENTS, ELEMENTS_BY_ID, ELEMENT_ORDER,
     DEFAULT_SIZE, DEFAULT_SEGMENTS,
     createField, fieldX, fieldZ, paint, readColor, mixColor, slopeAt, sampleHeight,
-    createRandom, pick, span, scalar, gradient, blend,
+    createRandom, pick, span, scalar, gradient, gated, blend,
     resolveConfig, applyBase, applyElement, orderPlacements,
     getElement, isElementId, carveProfile,
     isOnRunway, waterSurface, clearRunwayGround, RUNWAY_FREEBOARD
@@ -199,7 +200,7 @@ test('an element is data: ranges to configure it and a generator to draw it', ()
         const names = Object.keys(element.ranges);
         assert.ok(names.length > 0, `${element.id} should declare what can be configured about it`);
         for (const [name, range] of Object.entries(element.ranges)) {
-            assert.ok(['span', 'scalar', 'gradient'].includes(range.kind),
+            assert.ok(['span', 'scalar', 'gradient', 'gated'].includes(range.kind),
                 `${element.id}.${name} is not a range`);
         }
     }
@@ -412,7 +413,13 @@ test('no element the editor can move reaches the strip', () => {
                 if (range.kind === 'gradient') continue;
 
                 const config = { ...resolveConfig(element, placement.config) };
-                config[name] = range.kind === 'span' ? [range.low, range.high] : range.high;
+                // A gated range is pushed to its widest with the gate thrown,
+                // because that is the strongest thing the panel can ask for -
+                // left off it asks for nothing at all, and the one range the
+                // editor can open furthest would go untested.
+                config[name] = range.kind === 'gated' ? { on: true, range: [range.low, range.high] }
+                    : range.kind === 'span' ? [range.low, range.high]
+                    : range.high;
 
                 const field = buildEnvironment(environment, {
                     runway: true,
@@ -435,4 +442,216 @@ test('no element the editor can move reaches the strip', () => {
             }
         }
     }
+});
+
+// --- A range a switch turns on --------------------------------------------
+
+/**
+ * The fourth range kind, and the one the other three could not express: a pair
+ * of bounds that only sometimes applies.
+ *
+ * A span always applies, so saying "leave this alone" with one means finding a
+ * value that happens to mean nothing - and then the generator cannot be asked
+ * for that value. The switch says it outright instead.
+ */
+test('a gated range declares a pair of bounds and a switch that is off', () => {
+    const range = gated(100, 7000, 900, 2400);
+
+    assert.equal(range.kind, 'gated');
+    assert.equal(range.low, 100);
+    assert.equal(range.high, 7000);
+    assert.deepEqual(range.default, { on: false, range: [900, 2400] });
+});
+
+// Off by default is what lets a range be added to an element without moving
+// any world already described by a preset written before it existed.
+test('a gated range resolves to off and its declared bounds when nothing asks', () => {
+    const element = { ranges: { length: gated(100, 7000, 900, 2400) } };
+
+    assert.deepEqual(resolveConfig(element, {}), { length: { on: false, range: [900, 2400] } });
+    assert.deepEqual(resolveConfig(element, { length: undefined }),
+        { length: { on: false, range: [900, 2400] } });
+});
+
+test('a gated range is clamped and uncrossed the way a span is', () => {
+    const element = { ranges: { length: gated(100, 7000, 900, 2400) } };
+
+    assert.deepEqual(resolveConfig(element, { length: { on: true, range: [0, 99999] } }),
+        { length: { on: true, range: [100, 7000] } }, 'neither end leaves what was declared');
+
+    assert.deepEqual(resolveConfig(element, { length: { on: true, range: [2400, 900] } }),
+        { length: { on: true, range: [900, 2400] } }, 'and a pair handed over backwards is read');
+
+    assert.deepEqual(resolveConfig(element, { length: { on: true, range: ['x', undefined] } }),
+        { length: { on: true, range: [900, 2400] } }, 'a bound that is not a number falls back');
+});
+
+/**
+ * Held against a span rather than written out twice, because the two kinds are
+ * two bounds each and should be clamped by one piece of code. Pinned as the
+ * comparison it is: a second clamp written beside the first would pass a test
+ * that listed the answers and fail this one the day the two drifted - which
+ * includes the corners nobody would think to list, like a `null` bound reading
+ * as the 0 it converts to rather than as nothing at all.
+ */
+test('a gated range and a span answer the same question the same way', () => {
+    const asSpan  = { ranges: { h: span(100, 7000, 900, 2400) } };
+    const asGated = { ranges: { h: gated(100, 7000, 900, 2400) } };
+
+    for (const pair of [
+        [0, 99999], [2400, 900], ['x', undefined], ['x', null], [100, 100], [7000, 1],
+        [-5, 5], [NaN, 3000], [1200, 1200]
+    ]) {
+        assert.deepEqual(
+            resolveConfig(asGated, { h: { on: true, range: pair } }).h.range,
+            resolveConfig(asSpan, { h: pair }).h,
+            `${JSON.stringify(pair)} should clamp the same whichever kind holds it`);
+    }
+});
+
+test('a bare pair of bounds means the gate is on, because naming them asks for them', () => {
+    const element = { ranges: { length: gated(100, 7000, 900, 2400) } };
+
+    assert.deepEqual(resolveConfig(element, { length: [600, 1800] }),
+        { length: { on: true, range: [600, 1800] } });
+
+    assert.deepEqual(resolveConfig(element, { length: { on: true } }),
+        { length: { on: true, range: [900, 2400] } },
+        'and a gate thrown with no bounds beside it takes the declared ones');
+});
+
+// The gate is an answer rather than a value, so anything short of yes is no.
+// A string, a 1, or a missing key all have to come out the same way, or a
+// generator reading `config.length.on` branches on truthiness it was never
+// handed.
+test('the gate is held as an answer, so only a yes turns it on', () => {
+    const element = { ranges: { length: gated(100, 7000, 900, 2400) } };
+
+    for (const given of [true]) {
+        assert.equal(resolveConfig(element, { length: { on: given } }).length.on, true);
+    }
+
+    for (const given of [false, 1, 'yes', 'true', null, 0, undefined]) {
+        const held = resolveConfig(element, { length: { on: given } }).length.on;
+        assert.equal(held, false, `an \`on\` of ${JSON.stringify(given)} is not a yes`);
+        assert.equal(typeof held, 'boolean', 'and what is held is always an answer');
+    }
+});
+
+// --- What the mountain's footprint gates do to the ground ------------------
+
+/** Every peak one mountain configuration lays, as the generator works them out. */
+function peaksFrom(config = {}, seed = 7) {
+    const element = getElement('mountain');
+    const field   = createField({ size: 8000, segments: 24 });
+    const laid    = [];
+
+    // The peaks are not handed back, so they are read off the ground: a run
+    // with the same seed and the same count lays them in the same places, and
+    // the heights are what the footprint changes. Reading the field is what
+    // makes these tests about the world rather than about the arithmetic.
+    element.generate(field, resolveConfig(element, { count: 6, ...config }), createRandom(seed));
+    for (let i = 0; i < field.count; i++) laid.push(field.height[i]);
+
+    return laid;
+}
+
+// The reason the gates are read where they are read, and the one claim that
+// makes them safe to add: a world that turns neither on is the world that was
+// always drawn, to the last vertex. Each gate spends exactly the one draw the
+// value it replaces spent, so the stream is the same length either way.
+test('with both gates off a mountain is the mountain the simulator always drew', () => {
+    const always = peaksFrom({});
+
+    assert.deepEqual(peaksFrom({ length: { on: false, range: [200, 300] } }), always,
+        'bounds set behind a switch that is off change nothing');
+    assert.deepEqual(peaksFrom({ width: { on: false, range: [200, 300] } }), always,
+        'on either gate');
+    assert.ok(always.some(height => height > 0), 'and the test is reading real ground');
+});
+
+test('the width gate replaces the radius the footprint was taken from', () => {
+    const wide   = peaksFrom({ width: { on: true, range: [2800, 3000] } });
+    const narrow = peaksFrom({ width: { on: true, range: [150, 200] } });
+
+    const spread = (heights) => heights.filter(height => height > 1).length;
+
+    assert.ok(spread(wide) > spread(narrow),
+        'a peak asked for a wide footprint covers more ground than one asked for a narrow one');
+    assert.notDeepEqual(wide, peaksFrom({}), 'and neither is the ungated ground');
+});
+
+test('the length gate sets the long axis, independently of the width', () => {
+    const base = { width: { on: true, range: [400, 400] } };
+
+    const long  = peaksFrom({ ...base, length: { on: true, range: [3000, 3000] } });
+    const short = peaksFrom({ ...base, length: { on: true, range: [400, 400] } });
+
+    assert.notDeepEqual(long, short, 'the long axis is drawn where it was asked for');
+
+    // A peak whose two axes are equal is the round bump, so the stretch the
+    // pair comes to has to be exactly 1 rather than near it: this is the
+    // assertion that catches a footprint read as a radius and a diameter, or
+    // the two axes handed over the wrong way round.
+    const round = peaksFrom({ ...base, girth: 0 });
+    assert.deepEqual(short, round,
+        'a length equal to the width is the round peak a girth of zero draws');
+});
+
+// Girth and the gates describe the same axis, so the one that was asked for
+// outright has to win. Left the other way round a pilot who set a length would
+// watch a random stretch override it.
+test('a length asked for outright is not stretched by girth as well', () => {
+    const asked = { length: { on: true, range: [2000, 2000] }, width: { on: true, range: [500, 500] } };
+
+    assert.deepEqual(peaksFrom({ ...asked, girth: 0 }), peaksFrom({ ...asked, girth: 1 }),
+        'with both axes given, girth has nothing left to say');
+
+    // And with only the width given it still does, because the long axis is
+    // then the one the generator is still working out for itself.
+    const widthOnly = { width: { on: true, range: [500, 500] } };
+    assert.notDeepEqual(peaksFrom({ ...widthOnly, girth: 0 }), peaksFrom({ ...widthOnly, girth: 1 }));
+});
+
+/**
+ * The ground a seeded mountain run lays, as one value.
+ *
+ * Recorded rather than worked out, because the claim is about history: the
+ * footprint gates were added to an element every preset already places, and the
+ * only way to say "no world moved" is to hold the ground against what it was
+ * before they existed. A test that compares two runs of the current code
+ * instead passes on any change that moves both of them, which is every change
+ * to the order the values are drawn in - and the order is exactly what has to
+ * hold, because each gate is read in place of the one draw the value it
+ * replaces spent.
+ *
+ * It fails loudly on purpose. If the generator is deliberately changed, this
+ * is the test that says which worlds went with it.
+ */
+const MOUNTAIN_GROUND = 'ebc57bd333deb39f';
+
+function groundFingerprint(config = {}, seed = 7) {
+    const element = getElement('mountain');
+    const field   = createField({ size: 8000, segments: 24 });
+
+    element.generate(field, resolveConfig(element, config), createRandom(seed));
+
+    const digest = createHash('sha256');
+    digest.update(Buffer.from(field.height.buffer, field.height.byteOffset, field.height.byteLength));
+    return digest.digest('hex').slice(0, 16);
+}
+
+test('the ground a seeded mountain lays is the ground it laid before the gates existed', () => {
+    assert.equal(groundFingerprint({ count: 6 }), MOUNTAIN_GROUND,
+        'a world placed by a preset written before the footprint gates has to be '
+      + 'the same world now: every gate is off by default, and each one spends '
+      + 'exactly the draw the value it replaces spent, so the stream is the same '
+      + 'length and every peak is laid in the same place');
+
+    // And the gates being off has to be the whole of why, rather than the
+    // defaults happening to agree with it: turning one on moves the ground.
+    assert.notEqual(groundFingerprint({ count: 6, width: { on: true, range: [150, 200] } }),
+        MOUNTAIN_GROUND, 'a gate thrown is a different world, or the gate does nothing');
+    assert.notEqual(groundFingerprint({ count: 6, length: { on: true, range: [5000, 6000] } }),
+        MOUNTAIN_GROUND);
 });

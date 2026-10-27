@@ -450,6 +450,14 @@ tiles all reach has to be settled against all four of them to close.
 middle.join(north, south, east, west);
 ```
 
+The eight tiles around one are all of them: four meet it along a side and four
+only at a corner, and a tile settled against its sides alone leaves the four
+corners of its own ground unmatched against the tile diagonally across from it.
+
+The simulator settles its own ground the same way, as each tile is laid rather
+than as a pass over the world afterwards, so a host assembling a world by hand
+and a flight over the built-in one meet the same seamless ground.
+
 `createTiledEnvironment` does the whole of it: builds the grid, lights it once
 rather than once per square, and settles every join in one pass before anything
 is drawn.
@@ -1265,6 +1273,50 @@ ground, and the elements placed over it. A host can pass its own list of
 placements instead of a preset's, and every value in one is clamped into the
 range the element declares, so a placement cannot configure an element outside
 what it says it supports.
+
+Every range an element declares says which of four kinds it is, which is what a
+host reading `ELEMENTS` has to branch on and what a value handed to
+`resolveConfig` is read as:
+
+| Kind | Asked for as | Resolves to |
+|------|--------------|-------------|
+| `span` | `[low, high]` | A pair of bounds, each clamped, the lower first |
+| `scalar` | A number | One number, clamped |
+| `gradient` | `{light, dark}` | A base hue as its two ends, each a colour triple |
+| `gated` | `{on, range}`, or a bare `[low, high]` | `{on, range}` - a pair of bounds and whether they apply |
+
+A `gated` range is a pair of bounds that only sometimes applies, for a footprint
+an element otherwise works out for itself. A `span` always applies, so the only
+way to say "leave this alone" with one is to find a value that happens to mean
+nothing - and then the generator cannot be asked for that value. The switch says
+it outright instead.
+
+It is off unless something turns it on, so an element can declare one without
+moving any world already described: a placement written before the range existed
+resolves to the ground it always did. A bare pair turns it on, because a caller
+that troubled to name bounds is asking for them to be used; an `on` with no
+bounds beside it takes the declared ones. Anything other than `true` is read as
+off, so what comes back is always an answer rather than a value to test for
+truthiness.
+
+The mountain declares two: `length` and `width`, the two axes of the ellipse a
+peak is drawn on. Off, each gives way to what was always there - `width` to
+`radius`, and `length` to `radius` stretched by `girth` - so a peak is round,
+stretched by a random amount, or exactly the footprint it was asked for.
+
+```javascript
+import { createEnvironment } from 'pilot-matter';
+
+createEnvironment({
+    elements: [
+        // A ridge: the long axis said outright, the short one left to `radius`
+        { type: 'mountain', config: { count: 8, length: [2600, 3200] } },
+        // Both axes given, so `girth` has nothing left to say about the peak
+        { type: 'mountain', config: { count: 4, length: { on: true, range: [1800, 1800] },
+                                               width:  { on: true, range: [600, 600] } } }
+    ]
+});
+```
 
 ```javascript
 import { createEnvironment } from 'pilot-matter';

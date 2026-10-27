@@ -3268,3 +3268,133 @@ still be found by name.
     options in the settings panel are offered, so no combination of keys lands
     it between two of them.
   - From: Flight Controls
+
+## Archived 10-27-26
+
+- [x] Choose which controls hand the aircraft back after a level off
+  - `VERTICAL_CONTROLS` in `js/input-map.js` is the list `wantsVerticalChange`
+    takes, and the throttle is in it: a nudge of the lever on an approach drops
+    the altitude hold the pilot set it up with. Roll and yaw are deliberately
+    out, and the reasoning for that is written where the list is.
+  - A box per control rather than a list to pick from, since the question is
+    whether each one counts and the answers are independent.
+  - From: Flight Controls
+- [x] Rebind the keys that are not control surfaces
+  - `RESET_KEYS` and `LEVEL_OFF_KEYS` in `js/input-map.js` are kept out of the
+    input state on purpose - one is an instruction and the other is a trim - so
+    the keymap above will not reach them. `R` ends a flight on one press with
+    nothing between, and `Space` is also the key a menu is chosen with, which
+    `js/input-map.js` says is the reason it is bound apart.
+  - Both rebindable, and reset allowed to be bound to nothing at all, for a
+    pilot flying a long route who would rather reach for the pause menu.
+  - From: Flight Controls
+- [x] Remember whether the control reference list is open
+  - `createHelpState(expanded = true)` in `js/controls-help.js` takes the state
+    the list opens in and `js/main.js` passes nothing, so every session opens
+    with the list over the corner of the window and the `H` key's answer is
+    forgotten at the end of it.
+  - Stored beside the other control settings rather than as a third thing: it is
+    the same question the panel is already asking, which is how this pilot wants
+    the controls to behave.
+  - From: Flight Controls
+- [x] Prune `## Flight Controls`, which is the worst of the five
+  - Every one of its ten items is built, which makes it the whole section: the
+    two axis toggles and the full 360 landed in `1.24.0-alpha`, five more in
+    `1.0.0-alpha.1.25.0`, and the last two - flying by tilt and the deadzone -
+    in `1.0.0-alpha.1.27.0`. Check each against `js/control-settings.js`,
+    `js/input-map.js`, `js/key-bindings.js` and `js/tilt-controls.js` before
+    checking it off.
+  - The section header stays, per **Roadmap Section Structure**, with its
+    opening paragraph. A section with nothing left under it is the record of
+    that area of work being finished, not a section to delete.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune `## Simulator Configuration`
+  - All nine are built. The start state, the environment selection and the five
+    assembled environments are in the shipped simulator; the three naming the
+    menu entry renamed in `1.24.0-alpha` are built; `Reset Flight` restores the
+    configured start; the pause menu carries its `Settings` entry; and typed
+    values landed in `1.0.0-alpha.1.27.0`.
+  - Two of its items ask to reword the two above them, which were worded for a
+    `Controls` entry that no longer exists. Read what each actually asks for
+    before deciding it is done - a reword nobody did is not the same as a
+    rename somebody did.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune `## Environment Design`
+  - The registry it opens by asking for is `js/environment/elements.js`, and
+    every element below it is implemented in it. The gradient helper is there
+    too. Twenty items, and the one to be careful with is the mountain bulk
+    range, whose checkbox-gated length, width and girth are a specific shape
+    that may or may not be what the registry declares.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune `## Simulator API`
+  - `js/api/index.js` exists and re-exports both halves, and the eleven items
+    under it are the surface `docs/api.md` documents and `test/api-contract.js`
+    and `test/api-reference.test.js` hold it to. The last item asks for unit
+    tests of both pure surfaces, which is what those two files are.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune the four built items in `## World & Environment`
+  - The edge algorithm's promise is held by `test/world-tiles.test.js`, and
+    `matchEdges` and `SEAM_BLEND` settle an assembly where its fields meet, so
+    the two algorithm items and the two reassembly items behind them are done.
+  - The fifth item, the weather branch, is not pruned: it is real outstanding
+    work and is the next item below.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] `### Pruning the Roadmap` opens on the condition the pass just removed
+  - **Issue**: the section's opening paragraph reads "Five sections are in that
+    state, and `node todo.mjs --pending` counts 56 items where a handful are
+    outstanding - a figure that makes the file useless for deciding what to do
+    next, and that reads from outside as a project barely started." The
+    10-25-26 pass pruned all five of those sections, and what is left under
+    each is outstanding work rather than built work. The figure is wrong three
+    times over: the tool read 67 at `HEAD`, not 56, and it reads 14 now. A run
+    or a reader taking that paragraph at its word re-opens a pruning pass
+    against five sections that hold seven genuinely unfinished items between
+    them.
+  - **Goal**: rewrite the paragraph so it describes the section as it now
+    stands, and drop the item count rather than correcting it - the figure went
+    stale between the day it was written and the day the pass ran, which is
+    what any count of a moving queue does. The mechanism sentence above it
+    ("Section 5 of the automation copies a roadmap item into `## Current` and
+    leaves the original where it was") is still true and worth keeping, since
+    it is why the section still has items under it. Keep the closing
+    paragraph's standing procedure as written. Verify with
+    `node todo.mjs --pending` and by reading the five sections back.
+  - From: Code Review Override - the pruning section still reads as unpruned
+- [x] The Canyon Run pruning item names three different thresholds for one
+  trigger
+  - **Issue**: the item queued into `### Pruning the Roadmap` this run calls
+    the straggler "the sixth instance of what this section describes", then
+    says "If a third instance of that turns up, the thing to queue is a change
+    to how an item is queued - not a seventh pruning item." Sixth, third and
+    seventh cannot all be counting the same thing, and nothing in the item says
+    which counter the trigger reads. Measured against the files: this pass
+    checked off twelve roadmap originals whose `## Current` staging copy had
+    already been archived by a run between 10-07-26 and 10-24-26 - all ten of
+    `## Flight Controls`, plus `Rename the **Controls** entry` and `Accept
+    typed values in the **Element Editor** and the **Settings** panel`. So on
+    the reading that counts items the threshold was passed nine times over in
+    the pass that wrote the sentence, and on the reading that counts pruning
+    items it is at one of three. The next run cannot tell whether to change how
+    items are queued or to queue another pruning item, which is the whole
+    decision the sentence exists to make.
+  - **Goal**: state one counter and the number it stands at. The pattern itself
+    is real and is confirmed upstream: `## Current` is a staging area whose
+    copies archive on their own, the tool has no concept of item identity
+    across copies, and no rule in the automation's instructions covers the
+    original left behind - so the change the item gestures at is a change to
+    that tool rather than to this repository, and saying so is part of the fix.
+  - From: Code Review Override - the pruning section still reads as unpruned
+- [x] Say whether the `local-weather` branch is ready to be integrated, on the
+  item that asks for it
+  - The branch exists locally and on `origin`, and its item makes the merge
+    conditional on its API having stabilized - a condition nobody has recorded
+    an answer to, so the item cannot be queued or dropped as it stands.
+  - Read the branch rather than merging it: what it adds (clouds, rain, moon,
+    sky styling), what surface it exposes, whether that surface has settled,
+    and what it would cost to bring onto main against the environment pipeline
+    as it now is.
+  - The answer is nested under the item as a note, with the date, so the next
+    run reads a decision rather than asking the question again. Merge nothing
+    this run - the item is the look, and the integration is whatever the look
+    recommends.
+  - From: Documentation & Polish `->` Pruning the Roadmap

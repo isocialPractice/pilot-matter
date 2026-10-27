@@ -116,7 +116,7 @@
 <table>
     <thead><tr><th>Element</th><th>Configured through</th></tr></thead>
     <tbody>
-        <tr><td><strong>Mountain</strong></td><td>Peak count, a height range, a radius range, and a girth that stretches a peak along an axis of its own</td></tr>
+        <tr><td><strong>Mountain</strong></td><td>Peak count, a height range, a radius range, a girth that stretches a peak along an axis of its own, and a switched length and width that say the footprint outright instead</td></tr>
         <tr><td><strong>Canyon</strong></td><td>A depth range, a width range, a steepness, a branch count, and how far the cut wanders</td></tr>
         <tr><td><strong>Desert</strong></td><td>A dune height range, the spacing between crests, how much of the world the dune sea covers, and a sand gradient</td></tr>
         <tr><td><strong>Grass</strong></td><td>A green gradient, and the height band it covers</td></tr>
@@ -209,7 +209,7 @@
 
 <p>The ground is drawn out 12000 units past the aircraft, which is as far as the camera is drawn at, rather than out to where the fog happens to end - the fog is a setting the pilot can turn down and the far plane is not. Tiles are laid a few at a time, one per frame, so crossing into new country costs a frame or two rather than a stall, and the tile the aircraft is actually over is always drawn before it is flown over. Ground far enough behind is released, but not the moment it goes out of reach: a tile is held a little past that, so an aircraft weaving over the line does not generate the same country again every time it crosses back.</p>
 
-<p>What the grid does not yet do is hide its joins. The base ground runs on across a join, because it is noise read off the world rather than off the tile, but what the elements drew stops at the tile they were drawn for - a river reaches the edge and the next tile's river begins somewhere else. Settling those joins the way <a href="#worlds-laid-beside-each-other">an assembly settles them</a> is the next step; a seam in the distance is a smaller thing than the end of the world.</p>
+<p>The grid hides its joins. The base ground always ran on across one, because it is noise read off the world rather than off the tile, but what the elements drew stopped at the tile they were drawn for - a river reached the edge and the next tile's river began somewhere else. Each tile is now settled against the tiles already laid beside it as it is added, the same way <a href="#worlds-laid-beside-each-other">an assembly settles them</a>, against all eight of them rather than the four it shares a side with: a corner vertex is a place four tiles reach, and a tile matched along its sides alone leaves its corners open. The settling touches only the few vertices either side of each join, and only the tile being laid is new, so the ground still fills in a few tiles a frame rather than stalling to close a seam.</p>
 
 <p>The <a href="api.html">Pilot API</a> still carries a host's own terrain round at the bounds that terrain declares, because a host's world is the size the host says it is. A host whose world continues past what it declared turns the crossing off with <code>wrap: false</code>.</p>
 

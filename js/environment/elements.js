@@ -241,6 +241,25 @@ export function gradient(light, dark) {
 }
 
 /**
+ * A pair of bounds a switch turns on, such as a footprint an element otherwise
+ * works out for itself.
+ *
+ * This is a span and a question about whether to use it, which is a different
+ * thing from either on its own. A span always applies, so the only way to say
+ * "leave this alone" with one is to find a value that happens to mean nothing -
+ * and a generator that reads 0 as "no opinion" cannot be asked for 0. A switch
+ * of its own says it outright, which is what lets an element declare a range it
+ * only sometimes takes and go on drawing what it always drew when it is off.
+ *
+ * Off by default, so a declaration adds a range to an element without changing
+ * any world already described: every preset written before the range existed
+ * resolves to the same ground it always did.
+ */
+export function gated(low, high, defaultLow, defaultHigh, on = false) {
+    return { kind: 'gated', low, high, default: { on, range: [defaultLow, defaultHigh] } };
+}
+
+/**
  * A colour between the light and the dark end of one base hue. Both ends are
  * given as a colour of the same hue, so a gradient walks a base colour from
  * pale to deep rather than crossing the wheel: no element shifts colour
@@ -277,12 +296,33 @@ function resolveRange(range, given) {
 
     if (range.kind === 'span') {
         const pair = Array.isArray(given) && given.length === 2 ? given : range.default;
-        const low  = clampNumber(pair[0], range, range.default[0]);
-        const high = clampNumber(pair[1], range, range.default[1]);
-        return low <= high ? [low, high] : [high, low];
+        return clampPair(pair, range, range.default);
+    }
+
+    // A gated range is written either way round: `{ on, range }` says both
+    // halves, and a bare pair says the range and means it - a caller that
+    // troubled to name bounds is asking for them to be used, and reading that
+    // as "off, but here are some numbers" would be answering a question nobody
+    // asked. An `on` with no range beside it takes the declared one.
+    if (range.kind === 'gated') {
+        const asked = Array.isArray(given) ? { on: true, range: given } : given;
+        const pair  = Array.isArray(asked?.range) && asked.range.length === 2
+            ? asked.range : range.default.range;
+
+        return {
+            on: asked == null ? range.default.on : asked.on === true,
+            range: clampPair(pair, range, range.default.range)
+        };
     }
 
     return clampNumber(given, range, range.default);
+}
+
+/** A pair of bounds, each inside what was declared and the low end below the high. */
+function clampPair(pair, range, fallback) {
+    const low  = clampNumber(pair[0], range, fallback[0]);
+    const high = clampNumber(pair[1], range, fallback[1]);
+    return low <= high ? [low, high] : [high, low];
 }
 
 function clampNumber(value, range, fallback) {
@@ -338,7 +378,16 @@ const mountain = {
         radius: span(100, 3000, 400, 1100),
         // Girth stretches a peak along an axis of its own. At 0 the bump is
         // the round one the simulator has always drawn.
-        girth:  scalar(0, 1, 0)
+        girth:  scalar(0, 1, 0),
+        // The footprint said outright, as the two axes of the ellipse a peak
+        // is drawn on, rather than left to `radius` and `girth` to arrive at.
+        // Each is switched on by itself, and off each gives way to what was
+        // always there: `width` to `radius`, and `length` to `radius` stretched
+        // by `girth`. So a peak is round, stretched by a random amount, or
+        // exactly the footprint it was asked for, and the first two are what
+        // the simulator has always drawn.
+        length: gated(100, 7000, 900, 2400),
+        width:  gated(100, 3000, 400, 1100)
     },
 
     generate(field, config, random) {
@@ -347,14 +396,34 @@ const mountain = {
         const peaks  = [];
 
         for (let i = 0; i < total; i++) {
-            peaks.push({
-                x:       field.originX + (random() * 2 - 1) * half,
-                z:       field.originZ + (random() * 2 - 1) * half,
-                radius:  pick(random, config.radius),
-                peak:    pick(random, config.height),
-                angle:   random() * Math.PI * 2,
-                stretch: 1 + config.girth * (0.4 + random())
-            });
+            // Every value is drawn in the order it has always been drawn in,
+            // and each gate spends exactly the one draw the value it replaces
+            // spent: a gated range is read with `pick` where `radius` was read
+            // with `pick`, and in place of the single `random()` the girth
+            // stretch took. So turning a gate on changes that peak's footprint
+            // and nothing else about the world - every peak after it stands
+            // where it stood, because the stream it is laid out from is the
+            // same length whichever way the gates are set.
+            const x = field.originX + (random() * 2 - 1) * half;
+            const z = field.originZ + (random() * 2 - 1) * half;
+
+            // The footprint, as the two axes of the ellipse the bump is drawn
+            // on. Held as a radius and a stretch rather than as the pair,
+            // because that is what `ellipticalDistance` measures with, and
+            // because an ungated peak then works out to the exact peak it
+            // always was rather than one that rounds to it.
+            const across = config.width.on
+                ? pick(random, config.width.range)
+                : pick(random, config.radius);
+
+            const peak  = pick(random, config.height);
+            const angle = random() * Math.PI * 2;
+
+            const along = config.length.on
+                ? pick(random, config.length.range)
+                : across * (1 + config.girth * (0.4 + random()));
+
+            peaks.push({ x, z, radius: across, peak, angle, stretch: along / across });
         }
 
         for (let i = 0; i < field.count; i++) {

@@ -35,7 +35,7 @@ two pages as Markdown, for reading without a browser.
 - **Arcade flight model** - pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases, airspeed-driven lift, and a wing that stalls when the speed decays
 - **The world as data** - eleven environment elements, each declaring the ranges it can be configured through and the algorithm that draws it, assembled into five worlds and regenerated on the spot
 - **An element editor** - open the world being flown, move any range an element declares, and watch the ground drawn again from the algorithm
-- **A world with no edge** - the square an environment describes is one tile of an endless grid of them, drawn out further than the camera can see, so there is always more ground ahead
+- **A world with no edge** - the square an environment describes is one tile of an endless grid of them, drawn out further than the camera can see, so there is always more ground ahead, and each tile settled against the tiles beside it as it is laid, so there is no join anywhere in it
 - **A day to fly through** - the sun walks across the sky and the light, the fog, and the water's sheen warm and cool with it
 - **Eight game modes** - Runway Landing, Flying through Loops, Dead Stick, Cargo Run, Search and Rescue, Traffic Pattern, Canyon Run and Photo Survey: three or four stages each, each getting harder at exactly the thing it is about, with every stage timed against your own best. A landing is scored on where down the strip it touched, how far off the middle, how hard, and how square; a course past its first stage lays its gates over, so a loop has to be flown at the angle it was laid at
 - **Flown, not just arrived at** - a traffic pattern marks every leg of the circuit on how near its heading and its height it was held, so the landing is a fifth of the score rather than all of it; a canyon run counts a cut only when it is crossed inside the walls and under the ceiling, so climbing over the top is not a way through; and a photo survey counts a landmark only when the shutter goes with the aircraft inside the height, the range and the heading the brief asked for
@@ -170,7 +170,8 @@ The ground is a `16000 x 16000` unit plane displaced by seven octaves of
 fractal Brownian motion, and everything over it is an environment element: a
 registry entry carrying the ranges it can be configured through and the
 algorithm that draws it. The square is one tile of an endless grid, each tile
-seeded from its own place, drawn out as far as the camera can see.
+seeded from its own place, drawn out as far as the camera can see and settled
+against its neighbours as it is laid.
 [Read it in full](https://isocialpractice.github.io/pilot-matter/docs/terrain.html).
 
 ## [Simulator API](https://isocialpractice.github.io/pilot-matter/docs/api.html)

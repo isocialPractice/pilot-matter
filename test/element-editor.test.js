@@ -44,12 +44,17 @@ import {
     rangeNotice,
     beginTypedEditorValue,
     cancelTypedEditorValue,
-    applyTypedEditorKey
+    applyTypedEditorKey,
+    GATE_RANGE,
+    GATE_ON_LABEL,
+    GATE_OFF_LABEL,
+    gateOn
 } from '../js/element-editor.js';
 import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
 import { isMenuControlKey } from '../js/menu.js';
 import {
-    ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom
+    ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom,
+    gated
 } from '../js/environment/elements.js';
 import {
     ENVIRONMENTS, getEnvironment, DEFAULT_ENVIRONMENT_ID, buildEnvironment
@@ -433,9 +438,14 @@ test('every reading the panel holds is inside the range it was declared with', (
     for (const element of state.elements) {
         for (const [name, range] of Object.entries(getElement(element.type).ranges)) {
             const held = element.config[name];
-            if (range.kind === 'span') {
-                assert.ok(held[0] >= range.low && held[1] <= range.high, `${element.type}.${name}`);
-                assert.ok(held[0] <= held[1], `${element.type}.${name} should not be inside out`);
+            if (range.kind === 'span' || range.kind === 'gated') {
+                const pair = range.kind === 'gated' ? held.range : held;
+                assert.ok(pair[0] >= range.low && pair[1] <= range.high, `${element.type}.${name}`);
+                assert.ok(pair[0] <= pair[1], `${element.type}.${name} should not be inside out`);
+                if (range.kind === 'gated') {
+                    assert.equal(typeof held.on, 'boolean',
+                        `${element.type}.${name} should hold its gate as an answer rather than a number`);
+                }
             } else if (range.kind !== 'gradient') {
                 assert.ok(held >= range.low && held <= range.high, `${element.type}.${name}`);
             }
@@ -973,4 +983,184 @@ test('giving up on a figure hands back new rows rather than writing over the old
     assert.ok(!state.entries.find(entry => entry.id === id).text.includes(TYPED_CARET));
     assert.ok(typed.find(entry => entry.id === id).text.includes(TYPED_CARET),
         'and the set from before the rebuild still reads as it did, caret and all');
+});
+
+// --- The switch on a gated range -------------------------------------------
+
+/**
+ * A gated range is three rows: the switch, then the two bounds it governs.
+ *
+ * The bounds stay listed while the switch is off, rather than appearing with
+ * it. A pilot sets the numbers and then turns the range on at least as often as
+ * the other way round, and rows that came and went under the cursor would move
+ * every row below them as the switch was worked.
+ */
+test('a gated range is drawn as a switch and the two bounds it turns on', () => {
+    const rows = rangeRows('length', gated(100, 7000, 900, 2400));
+
+    assert.deepEqual(rows.map(row => row.part), ['on', 'min', 'max']);
+    assert.deepEqual(rows.map(row => row.label), ['LENGTH', 'LENGTH MIN', 'LENGTH MAX']);
+
+    assert.equal(rows[0].range, GATE_RANGE, 'the switch is a range of its own');
+    assert.ok(rows[0].gate, 'and says it is the switch');
+    assert.ok(rows.slice(1).every(row => row.gated), 'the bounds say which kind holds them');
+    assert.deepEqual(rows.slice(1).map(row => row.at), [0, 1]);
+});
+
+// Without a step of its own the switch would move a fiftieth of the way from
+// off to on, and take fifty presses to throw.
+test('the switch moves between off and on in one press', () => {
+    assert.equal(rangeStep(GATE_RANGE), 1);
+    assert.equal(stepPlaces(rangeStep(GATE_RANGE)), 0, 'and reads as a whole answer');
+
+    // Which is a property of the range declaring one, not of this range: every
+    // range that declares no step is still measured off its bounds.
+    assert.equal(rangeStep({ low: 0, high: 1 }), 0.02);
+    assert.equal(rangeStep({ low: 0, high: 1, step: 0.5 }), 0.5);
+});
+
+test('the switch reads as a word rather than as the number behind it', () => {
+    const [gate, min] = rangeRows('length', gated(100, 7000, 900, 2400));
+
+    assert.equal(rowValueLabel(gate, 0), GATE_OFF_LABEL);
+    assert.equal(rowValueLabel(gate, 1), GATE_ON_LABEL);
+    assert.equal(rowValueLabel(min, 900), '900', 'and a bound under it reads as the figure it is');
+
+    assert.equal(rangeNotice(gate), GATE_OFF_LABEL + ' TO ' + GATE_ON_LABEL,
+        'so a refused press at the switch is refused in the same words');
+
+    assert.equal(gateOn(1), true);
+    assert.equal(gateOn(0), false);
+    assert.equal(gateOn(0.5), true, 'half thrown is thrown, so a press can never land between');
+    assert.equal(gateOn(0.49), false);
+});
+
+/** The panel opened on the mountain, which is the element that declares them. */
+function openedOnMountain() {
+    return openedOn('highlands', 'mountain');
+}
+
+test('the panel lists the mountain footprint as three rows apiece', () => {
+    const { state, element } = openedOnMountain();
+
+    for (const name of ['length', 'width']) {
+        for (const part of ['on', 'min', 'max']) {
+            const entry = editorEntry(state, rowId(element.id, name, part));
+            assert.ok(entry, name + ' should be drawn with an ' + part + ' row');
+            assert.equal(entry.kind, RANGE_ENTRY);
+        }
+    }
+
+    const gate = editorEntry(state, rowId(element.id, 'length', 'on'));
+    assert.equal(gate.value, 0, 'and the switch opens off, as the range declares');
+    assert.ok(gate.text.includes(GATE_OFF_LABEL), 'reading as the word rather than as a 0');
+});
+
+test('throwing the switch turns the range on and asks for the ground again', () => {
+    const { state, element } = openedOnMountain();
+    const id = rowId(element.id, 'length', 'on');
+
+    assert.equal(element.config.length.on, false);
+    assert.equal(adjustEditorRange(state, id, 1), element.id, 'the ground has to be drawn again');
+    assert.equal(element.config.length.on, true, 'and the gate is held as an answer');
+    assert.equal(typeof element.config.length.on, 'boolean');
+    assert.ok(editorEntry(state, id).text.includes(GATE_ON_LABEL));
+
+    assert.equal(adjustEditorRange(state, id, 1), null, 'on is as far as it goes');
+    assert.equal(element.config.length.on, true);
+
+    assert.equal(adjustEditorRange(state, id, -1), element.id);
+    assert.equal(element.config.length.on, false, 'and it turns back off in one press');
+});
+
+test('a bound under the switch is stepped whether the switch is on or off', () => {
+    const { state, element } = openedOnMountain();
+    const id = rowId(element.id, 'length', 'max');
+    const before = element.config.length.range[1];
+
+    assert.equal(adjustEditorRange(state, id, 1), element.id);
+    assert.ok(element.config.length.range[1] > before, 'set the numbers, then turn it on');
+    assert.equal(element.config.length.on, false, 'and stepping a bound does not throw the switch');
+});
+
+// The same rule a span is held to, and it has to reach through the extra level
+// a gated range holds its pair under: read as a span, the pair would be the
+// `on` and the `range` rather than the two bounds.
+test('the bounds under a switch cannot be crossed over each other', () => {
+    const { state, element } = openedOnMountain();
+    const declared = getElement('mountain').ranges.length;
+
+    for (let i = 0; i < 400; i++) adjustEditorRange(state, rowId(element.id, 'width', 'min'), 1);
+    const width = element.config.width.range;
+    assert.ok(width[0] <= width[1], 'a minimum raised to the top stops at the maximum');
+
+    for (let i = 0; i < 400; i++) adjustEditorRange(state, rowId(element.id, 'length', 'max'), -1);
+    const length = element.config.length.range;
+    assert.ok(length[0] <= length[1], 'and a maximum lowered to the bottom stops at the minimum');
+    assert.ok(length[0] >= declared.low && length[1] <= declared.high,
+        'and neither leaves the bounds the range was declared with');
+});
+
+test('a figure typed at the switch throws it, and anything else is refused', () => {
+    const { state, element } = openedOnMountain();
+    const id = rowId(element.id, 'length', 'on');
+
+    assert.equal(beginTypedEditorValue(state, id, 'Digit1'), id);
+    const thrown = applyTypedEditorKey(state, 'Enter');
+    assert.equal(thrown.result, 'applied');
+    assert.equal(thrown.element, element.id);
+    assert.equal(element.config.length.on, true);
+
+    assert.equal(beginTypedEditorValue(state, id, 'Digit0'), id);
+    assert.equal(applyTypedEditorKey(state, 'Enter').result, 'applied');
+    assert.equal(element.config.length.on, false, 'and a 0 turns it back off');
+
+    assert.equal(beginTypedEditorValue(state, id, 'Digit5'), id);
+    const refused = applyTypedEditorKey(state, 'Enter');
+    assert.equal(refused.result, 'refused', 'a switch has no fifth position');
+    assert.equal(element.config.length.on, false);
+    assert.equal(editorEntry(state, id).valueLabel, GATE_OFF_LABEL + ' TO ' + GATE_ON_LABEL);
+});
+
+/**
+ * The panel hands its world out as placements, which go back through
+ * `resolveConfig` on the way into the generator. A gated range has to survive
+ * that round trip or the ground drawn is not the ground the panel is reading -
+ * and it is the copy on the way out that this catches: a resolved gated range
+ * and a resolved gradient are both plain objects, so a copy that reads "an
+ * object, therefore a gradient" throws on the one and silently flattens the
+ * other.
+ */
+test('a gated range survives being handed out as a placement and resolved again', () => {
+    const { state, element } = openedOnMountain();
+
+    adjustEditorRange(state, rowId(element.id, 'length', 'on'), 1);
+    for (let i = 0; i < 3; i++) adjustEditorRange(state, rowId(element.id, 'length', 'min'), 1);
+
+    const placement = editorPlacements(state).find(entry => entry.type === 'mountain');
+    assert.deepEqual(resolveConfig(getElement('mountain'), placement.config), element.config);
+    assert.equal(placement.config.length.on, true);
+
+    // Copied rather than referenced, the way every other range is: a caller
+    // holding the placement should not find its world changing as the panel
+    // goes on being worked.
+    const held = placement.config.length.range[0];
+    adjustEditorRange(state, rowId(element.id, 'length', 'min'), 1);
+    assert.equal(placement.config.length.range[0], held, 'the pair is a copy');
+
+    adjustEditorRange(state, rowId(element.id, 'length', 'on'), -1);
+    assert.equal(placement.config.length.on, true, 'and so is the switch');
+});
+
+test('putting the preset back turns the switches back off with it', () => {
+    const { state, element } = openedOnMountain();
+
+    adjustEditorRange(state, rowId(element.id, 'width', 'on'), 1);
+    for (let i = 0; i < 5; i++) adjustEditorRange(state, rowId(element.id, 'width', 'max'), -1);
+    assert.equal(element.config.width.on, true);
+
+    restoreEditor(state);
+    const restored = state.elements.find(entry => entry.type === 'mountain');
+    assert.deepEqual(restored.config.width, resolveConfig(getElement('mountain'), {}).width);
+    assert.equal(restored.config.width.on, false);
 });
