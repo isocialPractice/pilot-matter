@@ -225,7 +225,7 @@ How the aircraft is flown rather than what it is flown over: what the keys
 mean, how far the attitude may go, and which of that a pilot is allowed to
 change. Completing items in this section applies a minor version update.
 
-## Pause: Interactive Build Mode
+## Interactive Build Mode
 
 The twelve-tool editor laid over the world, where ground is shaped by pointing
 at it rather than by stepping numbers in a list. The plan for it is already
@@ -233,7 +233,10 @@ written; this section is what carries it out. Completing items in this section
 applies a minor version update.
 
 - [ ] Carry out the interactive build mode plan
-  - **Goal**: Resolve to [interactive-mode-plan.prompt.md](.claude/prompts/interactive-mode-plan.prompt.md)
+  - The plan is `.claude/prompts/interactive-mode-plan.prompt.md`. It is named
+    here rather than linked as a goal, because a completed item's goal file is
+    deleted, and this one is untracked and has no other copy: keep it when
+    this item closes.
   - The plan states the twelve tools, the two-column palette, the per-tool
     panel and how each is configured, and says outright that this is not a
     second element editor. Work it from there rather than from this item, and
