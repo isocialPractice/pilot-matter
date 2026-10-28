@@ -2471,8 +2471,62 @@ test('a tile drawn again records its water again, over the ground that moved', (
     assert.match(redraw, /tile\.watered\s*=\s*false/,
         'and the tile is marked unwatered, or a paused world leaves the old surface '
       + 'over the new ground');
-    assert.match(redraw, /computeVertexNormals\(\)/,
+    assert.match(redraw, /relightSeam\(mesh\.geometry, field\)/,
         'and the normals are worked out again, or the moved ground is lit as the ground it was');
+});
+
+/**
+ * And worked out over the strip that moved. `computeVertexNormals` walks all 201
+ * by 201 vertices of a tile, which measured 26.7ms of one `addTile`'s 61ms
+ * across eight neighbours - most of what writing into the geometry rather than
+ * rebuilding it was there to save, spent lighting ground that did not move.
+ */
+test('the ground a join moved is lit over the strip it moved, not over the whole tile', () => {
+    const relight = functionBody(terrainSource, 'relightSeam');
+    assert.ok(relight, 'js/terrain.js should light a settled tile in a function of its own');
+
+    assert.match(relight, /seamBand\(field\)/,
+        'the strip is the band the join eased its correction into, which the field records');
+    assert.match(relight, /updateNormals\(/,
+        'and that band is the only part of the mesh worked out again');
+    assert.match(relight, /computeVertexNormals\(\)/,
+        'with the whole plane left as the answer for a tile carrying no band');
+});
+
+/**
+ * And the water over the tiles that redraw just touched. `redrawTile` reads a
+ * surface off its field again, which puts back the openness that one tile alone
+ * works out - at every join the tile is on, not only the join with the tile just
+ * laid. So the settling that follows has to reach wider than the tiles the join
+ * moved, or a neighbour redrawn here is left unsettled against the tiles further
+ * out, whose joins were settled on a frame that is over.
+ *
+ * Measured in a browser on 10.28.2026 across `lakeside` and `river-basin`: with
+ * this, every vertex two tiles both call water agrees to 0; with each surface put
+ * back to what one tile alone makes of it, the two disagree by up to 0.29 of the
+ * shoreline fade, which `animateWater` scales both the swell and the glint by.
+ */
+test('the water is settled after the ground, over every tile the join rebuilt', () => {
+    const added = methodBody(terrainSource, 'addTile');
+    assert.ok(added, 'js/terrain.js should lay one tile in a method of its own');
+
+    const redrawn = added.search(/redrawTile\(/);
+    const watered = added.search(/matchWater\(/);
+
+    assert.ok(watered >= 0, 'the water either side of a join has to be settled too');
+    assert.ok(redrawn < watered,
+        'and after the neighbours are drawn again, or the redraw puts back the openness '
+      + 'one tile alone works out and the settling is undone by the frame that did it');
+
+    assert.match(added, /matchWater\(this\.waterAssembly\(/,
+        'over the assembly a join can have unsettled rather than over the two tiles either side');
+
+    const assembly = methodBody(terrainSource, 'waterAssembly');
+    assert.ok(assembly, 'js/terrain.js should work that assembly out in a method of its own');
+
+    assert.match(assembly, /tilesTouching\(tile\.index\)/,
+        'which is every tile touching one handed over, because a neighbour redrawn here '
+      + 'also meets the tiles further out');
 });
 
 // --- The controls for a machine with no keys -------------------------------
