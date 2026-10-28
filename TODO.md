@@ -61,43 +61,32 @@ its context survives being archived.
     the one surface the branch reached for that main still offers.
   - From: World & Environment
 
-### UI/UX Override - the water across a tile join
-
-#### Resolve Issues
-
-- [ ] Water Join 1
-  - **Issue**: the ground either side of a join meets exactly - 4797 shared
-    boundary vertices a four-by-four block, agreeing to `1.53e-5` world units,
-    which is float32 rounding on a 16000-unit tile - but the water on it does
-    not. Read off the geometry buffers in a browser, `lakeside` disagrees at 16
-    shared wet vertices and `river-basin` at 4, by up to 0.3333 world units of
-    height and 0.0685 per colour channel. Both tiles agree what the water rests
-    at; what they disagree about is `open`, the shoreline fade `animateWater`
-    multiplies the swell and the glint by, because `openness` and the smoothing
-    pass under it in `js/environment/elements.js` each read one field and take
-    the neighbour that is off it as water. Rendered straight down on the worst
-    of them, the two quads meeting at the vertex differ by 16/255 in red.
-  - **Goal**: Resolve to [water-join.prompt.md](.claude/prompts/water-join.prompt.md)
-  - From: World & Environment
+### Code Review Override - the openness a block settles on
 
 #### Found Issues
 
-- [ ] Laying a tile recomputes every neighbour's normals over the whole mesh
-  - **Issue**: `redrawTile` in `js/terrain.js` is written to avoid rebuilding a
-    neighbour's geometry - its own note says building a whole plane "would spend
-    the cost of generating a tile to redraw a strip of it" - and then calls
-    `computeVertexNormals()` on all 201 by 201 of it, which spends most of what
-    that saved. Measured in a browser, one `addTile` costs 38.6ms with nothing
-    beside it and 61ms with four tiles beside it; of the ~22ms the join adds,
-    26.7ms is the normals pass over eight neighbours. The join itself moves
-    vertices no further than `SEAM_BLEND` - three - in from one edge.
-  - **Goal**: recompute normals over the strip the join actually moved rather
-    than the whole plane. The moved vertices are the ones `applySeams` wrote,
-    which is a band `SEAM_BLEND` deep along whichever sides were settled, so the
-    faces needing new normals are the ones touching that band. Leave the
-    height and colour writes alone - they measured 4ms for all eight neighbours
-    together, which is not where the time goes.
-  - From: UI/UX Override - the water across a tile join
+- [ ] Settling the water a tile at a time drifts off what the block settles on
+  - **Issue**: `matchWater` averages the surfaces it is handed, and
+    `Terrain.addTile` hands it a mixture. The tiles `redrawTile` just drew again
+    carry the openness read fresh off their fields; the tiles further out carry
+    an average settled on an earlier frame. Averaging a fresh value against an
+    already-averaged one over-weights whichever tile was laid first, so the
+    value a place settles on depends on the order the ground was drawn in.
+    Simulated over a three-by-three block of flooded tiles laid nearest-first,
+    all 425 shared places still agree exactly between their tiles - no join is
+    visible, which is what the override asked for - but the value they agree on
+    is up to 0.125 of the shoreline fade away from what one `matchWater` over
+    the nine fresh surfaces settles on. `animateWater` scales both the swell and
+    the glint by it, so a shoreline reads a little differently depending on
+    which way the aircraft first flew into it.
+  - **Goal**: decide whether the settled value should be the same however the
+    block was assembled. If it should, keep the openness one tile alone makes of
+    a place beside the settled one - `waterSurface` already works it out - and
+    average that rather than the value a previous frame left behind. If the
+    drift is an accepted cost of settling a tile at a time, say so on
+    `matchWater`, whose comment currently reads as though the result is the
+    average of what each tile makes of the place.
+  - From: Code Review Override - the openness a block settles on
 
 ## Game UI/UX
 
@@ -278,35 +267,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 275 earlier items in `TODO-archive.md`, newest last.
+> 277 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Prune the archived item still listed under `#### Canyon Run`
-  - `Pin the way a cut is drawn against the way a cut is tested` sits unchecked
-    under `#### Canyon Run` and checked in `TODO-archive.md`, archived with its
-    `From: Game Modes UI/UX -> Improve Existing Game Modes -> Canyon Run` path.
-  - It is built. `test/page.test.js` reads `js/walls.js` as source text and pins
-    both halves the item asked for - `buildBeam` turning the cylinder with
-    `quaternion.setFromUnitVectors` to the normalized across vector, and
-    `buildCut` taking `const acrossX = section.dirZ` - each bounded to the
-    function it is anchored on. Read those assertions against the module before
-    checking the item off.
-  - From: Documentation & Polish `->` Pruning the Roadmap
-- [x] Reassemble the five environments once the seamless algorithm lands, so
-  each is an endless world with no join anywhere in it
-  - The algorithm landed and the reassembly did not: `matchEdges` is called
-    from `js/api/matter.js` only, so a host assembling its own world gets
-    settled joins and the simulator does not. `Terrain.addTile` in
-    `js/terrain.js` builds each tile with `buildEnvironment` and adds the mesh
-    to the scene without ever settling it against the tiles beside it.
-  - The base is seamless already and that is what hides this: `applyBase`
-    samples the noise at `fieldX`/`fieldZ`, which are world coordinates, so the
-    ground runs on across a join whatever tile draws it. What does not run on is
-    anything an element added, because elements are placed from a per-tile
-    `tileSeed` - a peak whose radius reaches past the edge is raised on one side
-    of it and not the other.
-  - Settle a tile against the tiles already drawn beside it as it is added, and
-    leave the budget `drawTiles` spends per frame intact while doing it.
-  - From: World & Environment
 - [x] **Mountain** length: a checkbox-gated `min` and `max` length
   (*required*)
   - No `length` range is declared today; `radius` is the only footprint span.
@@ -416,3 +378,33 @@ how the simulator got here rather than as a list still to be worked.
     not to this repository, so what gets queued in place of a seventh pruning
     item is a request against the tool.
   - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Water Join 1
+  - **Issue**: the ground either side of a join meets exactly - 4797 shared
+    boundary vertices a four-by-four block, agreeing to `1.53e-5` world units,
+    which is float32 rounding on a 16000-unit tile - but the water on it does
+    not. Read off the geometry buffers in a browser, `lakeside` disagrees at 16
+    shared wet vertices and `river-basin` at 4, by up to 0.3333 world units of
+    height and 0.0685 per colour channel. Both tiles agree what the water rests
+    at; what they disagree about is `open`, the shoreline fade `animateWater`
+    multiplies the swell and the glint by, because `openness` and the smoothing
+    pass under it in `js/environment/elements.js` each read one field and take
+    the neighbour that is off it as water. Rendered straight down on the worst
+    of them, the two quads meeting at the vertex differ by 16/255 in red.
+  - **Goal**: Resolve to [water-join.prompt.md](.claude/prompts/water-join.prompt.md)
+  - From: World & Environment
+- [x] Laying a tile recomputes every neighbour's normals over the whole mesh
+  - **Issue**: `redrawTile` in `js/terrain.js` is written to avoid rebuilding a
+    neighbour's geometry - its own note says building a whole plane "would spend
+    the cost of generating a tile to redraw a strip of it" - and then calls
+    `computeVertexNormals()` on all 201 by 201 of it, which spends most of what
+    that saved. Measured in a browser, one `addTile` costs 38.6ms with nothing
+    beside it and 61ms with four tiles beside it; of the ~22ms the join adds,
+    26.7ms is the normals pass over eight neighbours. The join itself moves
+    vertices no further than `SEAM_BLEND` - three - in from one edge.
+  - **Goal**: recompute normals over the strip the join actually moved rather
+    than the whole plane. The moved vertices are the ones `applySeams` wrote,
+    which is a band `SEAM_BLEND` deep along whichever sides were settled, so the
+    faces needing new normals are the ones touching that band. Leave the
+    height and colour writes alone - they measured 4ms for all eight neighbours
+    together, which is not where the time goes.
+  - From: UI/UX Override - the water across a tile join
