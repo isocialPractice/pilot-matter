@@ -155,7 +155,7 @@ export {
 // generated from, and the pass that settles what its elements drew at the edges
 // against what its neighbours drew at theirs.
 export {
-    SEAM_BLEND, fieldBounds, tileSeed, matchEdges, waterSurface
+    SEAM_BLEND, fieldBounds, tileSeed, matchEdges, matchWater, waterSurface
 } from '../environment/elements.js';
 
 // Reading a strip: where it runs, how far it reaches, and which end of it a

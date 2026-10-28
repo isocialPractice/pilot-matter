@@ -80,7 +80,11 @@ export function createField({
         runways: [],
         // The level whatever water was laid settled at, for a renderer that
         // wants to move the surface rather than draw it as painted ground.
-        water: null
+        water: null,
+        // Which vertices the last join moved, as a flag each, for a renderer
+        // lighting the strip of a tile that moved rather than the whole plane
+        // of it. Null until something is settled against this field.
+        seam: null
     };
 }
 
@@ -1037,8 +1041,11 @@ export function matchEdges(fields = [], { blend = SEAM_BLEND } = {}) {
         }
     }
 
+    // Each tile keeps the vertices its own correction reached, because the
+    // renderer has to draw that tile again and would otherwise light all 201 by
+    // 201 vertices of it to find the three the join moved.
     if (matched > 0) {
-        for (const field of tiles) applySeams(field, corrections.get(field), ease);
+        for (const field of tiles) field.seam = applySeams(field, corrections.get(field), ease);
     }
 
     return matched;
@@ -1046,16 +1053,18 @@ export function matchEdges(fields = [], { blend = SEAM_BLEND } = {}) {
 
 /** Every vertex on the outside of a field, which is all a neighbour can touch. */
 function boundaryIndices(field) {
-    const { stride } = field;
     const found = [];
-
-    for (let i = 0; i < field.count; i++) {
-        const col = i % stride;
-        const row = Math.floor(i / stride);
-        if (col === 0 || col === stride - 1 || row === 0 || row === stride - 1) found.push(i);
-    }
-
+    for (let i = 0; i < field.count; i++) if (onBoundary(field, i)) found.push(i);
     return found;
+}
+
+/** Whether a vertex is on the outside of a field. */
+function onBoundary(field, index) {
+    const { stride } = field;
+    const col = index % stride;
+    const row = Math.floor(index / stride);
+
+    return col === 0 || col === stride - 1 || row === 0 || row === stride - 1;
 }
 
 /**
@@ -1117,8 +1126,16 @@ function recordSeam(corrections, field, index, target) {
  * result down by whichever of the two it is nearer. On the corner itself both
  * seams are asking for the same thing at full strength, which is what makes a
  * corner close as exactly as an edge does.
+ *
+ * Returns which vertices it moved, as a flag each. Recorded while the pass is
+ * running rather than worked out from the sides afterwards: a side's correction
+ * is held per line, so the vertices it reaches are a band down part of a side
+ * rather than the whole of one, and the only place that is known exactly is
+ * here.
  */
 function applySeams(field, corrections, ease) {
+    const moved = new Uint8Array(field.count);
+
     for (let i = 0; i < field.count; i++) {
         let weight = 0;
         let nearest = 0;
@@ -1147,7 +1164,24 @@ function applySeams(field, corrections, ease) {
         const eased = nearest / weight;
         field.height[i] += height * eased;
         for (let c = 0; c < 3; c++) field.color[i * 3 + c] += color[c] * eased;
+        moved[i] = 1;
     }
+
+    return moved;
+}
+
+/**
+ * The vertices the last join moved, as a flag each, or null for a field nothing
+ * has been settled against - which is a field drawn whole.
+ *
+ * A renderer reads this to light the strip of a tile a join moved rather than
+ * the whole plane of it. A tile is 201 by 201 vertices and a join moves three
+ * in from an edge, so the difference is the cost of generating a tile against
+ * the cost of redrawing a band of one.
+ */
+export function seamBand(field) {
+    const moved = field?.seam;
+    return moved && moved.length === field.count ? moved : null;
 }
 
 // --- The water surface ----------------------------------------------------
@@ -1184,9 +1218,15 @@ export function waterSurface(field) {
         z:     new Float32Array(count),
         rest:  new Float32Array(count),
         color: new Float32Array(count * 3),
-        open:  new Float32Array(count)
+        open:  new Float32Array(count),
+        // Which of them lie on the outside of the field, which is the only
+        // water a tile can share with the tile laid beside it. Recorded here
+        // rather than worked out again, so settling an assembly reads the
+        // vertices of a join instead of every vertex under the level.
+        edge: null
     };
 
+    const rim = [];
     for (let i = 0; i < count; i++) {
         const index = surface.vertices[i];
         surface.x[i]    = fieldX(field, index);
@@ -1194,7 +1234,9 @@ export function waterSurface(field) {
         surface.rest[i] = field.height[index];
         surface.open[i] = openness(field, wet, index);
         for (let c = 0; c < 3; c++) surface.color[i * 3 + c] = field.color[index * 3 + c];
+        if (onBoundary(field, index)) rim.push(i);
     }
+    surface.edge = Int32Array.from(rim);
 
     // One smoothing pass over the shoreline, so the water eases up to the bank
     // across a couple of vertices rather than dropping to nothing at the last
@@ -1219,6 +1261,60 @@ export function waterSurface(field) {
     surface.open.set(eased);
 
     return surface;
+}
+
+/**
+ * Settles an assembly's water everywhere two or more of its tiles call the same
+ * place water, which is the other half of what `matchEdges` does for the land.
+ *
+ * The ground either side of a join already meets exactly, and the water resting
+ * on it is read off that settled ground - so the height it rests at and the
+ * colour it is painted agree to the last bit. What does not agree is `open`:
+ * `openness` counts a water vertex's four neighbours and takes the one off the
+ * field as water, which keeps each tile from drawing a shoreline down the join,
+ * but the neighbour that is *on* the field is a different vertex on each side of
+ * the line. `animateWater` multiplies both the swell and the glint by it, so the
+ * same place rides a different wave and throws back a different amount of light
+ * depending on which tile drew it.
+ *
+ * Takes the surfaces rather than the fields, keyed by the rounded position
+ * `matchEdges` keys a vertex by, so the two passes agree on what counts as the
+ * same place. A vertex only one tile calls water is left exactly as it is:
+ * averaging it against a tile that calls it land would move the bank.
+ *
+ * Returns how many shared vertices were settled.
+ */
+export function matchWater(surfaces = []) {
+    const wet = surfaces.filter(surface => surface && surface.count > 0 && surface.edge);
+    if (wet.length < 2) return 0;
+
+    const shared = new Map();
+    for (const surface of wet) {
+        for (const i of surface.edge) {
+            const key = `${seamKey(surface.x[i])}|${seamKey(surface.z[i])}`;
+            const standing = shared.get(key);
+            if (standing) standing.push({ surface, i });
+            else shared.set(key, [{ surface, i }]);
+        }
+    }
+
+    let matched = 0;
+    for (const group of shared.values()) {
+        if (group.length < 2) continue;
+        matched++;
+
+        // Settled as each group is read rather than after all of them, which is
+        // safe here where it is not in `matchEdges`: a vertex stands in one
+        // place and so belongs to one group, and nothing written here is a
+        // value another group has still to read.
+        let total = 0;
+        for (const { surface, i } of group) total += surface.open[i];
+
+        const open = total / group.length;
+        for (const { surface, i } of group) surface.open[i] = open;
+    }
+
+    return matched;
 }
 
 /** The four vertices around one, with -1 where the field runs out. */

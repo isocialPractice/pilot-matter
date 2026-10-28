@@ -18,7 +18,7 @@
 import * as THREE from 'three';
 import {
     createField, createRandom, applyBase, applyElement, orderPlacements,
-    sampleHeight, matchEdges, waterSurface, tileSeed
+    sampleHeight, matchEdges, matchWater, waterSurface, tileSeed
 } from '../environment/elements.js';
 import { getEnvironment, environmentElements } from '../environment/presets.js';
 import { applyDepth, applyDaylight, SKY_COLOR, FOG_DENSITY } from '../sky.js';
@@ -128,6 +128,13 @@ export function createEnvironment(options = {}) {
          */
         get runways() { return field.runways; },
 
+        /**
+         * The water surface this world settled at, or null for a dry world. Read
+         * by `join`, so an assembly settles the water it shares as well as the
+         * ground under it, and available to a host settling an assembly itself.
+         */
+        get water() { return water; },
+
         /** The terrain contract the Pilot API and any other flight model reads. */
         sampleHeight(x, z) { return sampleHeight(field, x, z); },
 
@@ -159,6 +166,11 @@ export function createEnvironment(options = {}) {
             if (settled > 0) {
                 draw();
                 for (const other of others) other.redraw();
+
+                // After the redraws rather than before them, because each one
+                // reads its surface off the settled field again and so puts
+                // back the openness one tile alone works out at the join.
+                matchWater([water, ...others.map(other => other.water)]);
             }
 
             return settled;
@@ -326,7 +338,15 @@ export function createTiledEnvironment(options = {}) {
     }
 
     const settled = matchEdges(built.map(tile => tile.field), seam ? { blend: seam } : {});
-    if (settled > 0) for (const tile of built) tile.redraw();
+    if (settled > 0) {
+        for (const tile of built) tile.redraw();
+
+        // The water the squares share is settled after they are drawn again,
+        // for the reason `join` does it in that order: a redrawn surface is
+        // read off the settled field and comes back with the openness one
+        // square alone makes of the join.
+        matchWater(built.map(tile => tile.water));
+    }
 
     let sun = null;
     let ambient = null;

@@ -3398,3 +3398,33 @@ still be found by name.
     this run - the item is the look, and the integration is whatever the look
     recommends.
   - From: Documentation & Polish `->` Pruning the Roadmap
+
+## Archived 10-28-26
+
+- [x] Prune the archived item still listed under `#### Canyon Run`
+  - `Pin the way a cut is drawn against the way a cut is tested` sits unchecked
+    under `#### Canyon Run` and checked in `TODO-archive.md`, archived with its
+    `From: Game Modes UI/UX -> Improve Existing Game Modes -> Canyon Run` path.
+  - It is built. `test/page.test.js` reads `js/walls.js` as source text and pins
+    both halves the item asked for - `buildBeam` turning the cylinder with
+    `quaternion.setFromUnitVectors` to the normalized across vector, and
+    `buildCut` taking `const acrossX = section.dirZ` - each bounded to the
+    function it is anchored on. Read those assertions against the module before
+    checking the item off.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Reassemble the five environments once the seamless algorithm lands, so
+  each is an endless world with no join anywhere in it
+  - The algorithm landed and the reassembly did not: `matchEdges` is called
+    from `js/api/matter.js` only, so a host assembling its own world gets
+    settled joins and the simulator does not. `Terrain.addTile` in
+    `js/terrain.js` builds each tile with `buildEnvironment` and adds the mesh
+    to the scene without ever settling it against the tiles beside it.
+  - The base is seamless already and that is what hides this: `applyBase`
+    samples the noise at `fieldX`/`fieldZ`, which are world coordinates, so the
+    ground runs on across a join whatever tile draws it. What does not run on is
+    anything an element added, because elements are placed from a per-tile
+    `tileSeed` - a peak whose radius reaches past the edge is raised on one side
+    of it and not the other.
+  - Settle a tile against the tiles already drawn beside it as it is added, and
+    leave the budget `drawTiles` spends per frame intact while doing it.
+  - From: World & Environment

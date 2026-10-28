@@ -1237,6 +1237,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now
 | `fieldBounds(field)` | The square a field covers, in the world rather than in its own coordinates |
 | `tileSeed(seed, x, z)` | The seed one square of an assembly is laid out from; the middle square is the seed itself, and no two places in a grid share one |
 | `matchEdges(fields, options)` | Settles an assembly wherever its fields meet |
+| `matchWater(surfaces)` | Settles an assembly's water wherever its tiles share a wet vertex |
 | `SEAM_BLEND` | How far a join is eased back into the ground, in vertices |
 | `waterSurface(field)` | The water a world settled at, as the vertices under its level |
 
@@ -1418,6 +1419,7 @@ shore, is not still being moved as though it were.
 | Export | Is |
 |--------|-----|
 | `waterSurface(field)` | The surface a world settled at, or `null` for a dry world |
+| `matchWater(surfaces)` | Settles an assembly's water wherever two of its tiles share a wet vertex |
 | `waveHeight(x, z, time, wave)` | How far the surface stands off its resting level at a point |
 | `waveSpecular(x, z, time, wave)` | How much of the light that point is throwing back |
 | `waterColor(base, specular, options)` | The colour water is showing, with the light laid over it |
@@ -1451,9 +1453,38 @@ color.needsUpdate = true;
 | `rest` | The height each of them rests at |
 | `color` | The colour each of them was painted |
 | `open` | How far from the bank each of them is, `0` to `1` |
+| `edge` | Which of them lie on the outside of the field, as indices into the surface |
 
 `open` is what holds the swell down to nothing at the shoreline, so the water
 meets the bank it was poured against rather than lapping over it.
+
+It is also the one thing an assembly has to settle about its water. The ground
+either side of a join is matched by `matchEdges`, and the surface is read off
+that settled ground - so the height the water rests at and the colour it is
+painted already agree at a join. `open` does not: it counts a vertex's four
+neighbours and reads the one off the field as water, which is what keeps each
+tile from drawing a shoreline down the join, but the neighbour that is *on* the
+field is a different vertex on each side of the line. Left alone, the same place
+rides a different wave and throws back a different amount of light depending on
+which tile drew it.
+
+`matchWater` closes that, over the `edge` vertices rather than over every vertex
+under the level. It is called for an assembly after its surfaces have been read,
+which on `join` and on `createTiledEnvironment` is after the redraws - a surface
+read off the field again comes back with the openness one tile alone makes of
+the join:
+
+```javascript
+import { matchEdges, matchWater, waterSurface } from 'pilot-matter';
+
+matchEdges(fields);
+const surfaces = fields.map(field => waterSurface(field));
+matchWater(surfaces);   // how many shared vertices were settled
+```
+
+A vertex only one tile calls water is left exactly as it is, so a bank never
+moves: averaging it against a tile that calls the same place land is how a
+shoreline walks.
 
 ## The edge of the world
 

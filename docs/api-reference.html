@@ -1079,6 +1079,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
         <tr><td><code>fieldBounds(field)</code></td><td>The square a field covers, in the world rather than in its own coordinates</td></tr>
         <tr><td><code>tileSeed(seed, x, z)</code></td><td>The seed one square of an assembly is laid out from; the middle square is the seed itself, and no two places in a grid share one</td></tr>
         <tr><td><code>matchEdges(fields, options)</code></td><td>Settles an assembly wherever its fields meet</td></tr>
+        <tr><td><code>matchWater(surfaces)</code></td><td>Settles an assembly's water wherever its tiles share a wet vertex</td></tr>
         <tr><td><code>SEAM_BLEND</code></td><td>How far a join is eased back into the ground, in vertices</td></tr>
         <tr><td><code>waterSurface(field)</code></td><td>The water a world settled at, as the vertices under its level</td></tr>
     </tbody>
@@ -1246,6 +1247,7 @@ renderer.setAnimationLoop(() =&gt; {
     <thead><tr><th>Export</th><th>Is</th></tr></thead>
     <tbody>
         <tr><td><code>waterSurface(field)</code></td><td>The surface a world settled at, or <code>null</code> for a dry world</td></tr>
+        <tr><td><code>matchWater(surfaces)</code></td><td>Settles an assembly's water wherever two of its tiles share a wet vertex</td></tr>
         <tr><td><code>waveHeight(x, z, time, wave)</code></td><td>How far the surface stands off its resting level at a point</td></tr>
         <tr><td><code>waveSpecular(x, z, time, wave)</code></td><td>How much of the light that point is throwing back</td></tr>
         <tr><td><code>waterColor(base, specular, options)</code></td><td>The colour water is showing, with the light laid over it</td></tr>
@@ -1278,11 +1280,24 @@ color.needsUpdate = true;</code></pre>
         <tr><td><code>rest</code></td><td>The height each of them rests at</td></tr>
         <tr><td><code>color</code></td><td>The colour each of them was painted</td></tr>
         <tr><td><code>open</code></td><td>How far from the bank each of them is, <code>0</code> to <code>1</code></td></tr>
+        <tr><td><code>edge</code></td><td>Which of them lie on the outside of the field, as indices into the surface</td></tr>
     </tbody>
 </table>
 </div>
 
 <p><code>open</code> is what holds the swell down to nothing at the shoreline, so the water meets the bank it was poured against rather than lapping over it.</p>
+
+<p>It is also the one thing an assembly has to settle about its water. The ground either side of a join is matched by <code>matchEdges</code>, and the surface is read off that settled ground - so the height the water rests at and the colour it is painted already agree at a join. <code>open</code> does not: it counts a vertex's four neighbours and reads the one off the field as water, which is what keeps each tile from drawing a shoreline down the join, but the neighbour that is *on* the field is a different vertex on each side of the line. Left alone, the same place rides a different wave and throws back a different amount of light depending on which tile drew it.</p>
+
+<p><code>matchWater</code> closes that, over the <code>edge</code> vertices rather than over every vertex under the level. It is called for an assembly after its surfaces have been read, which on <code>join</code> and on <code>createTiledEnvironment</code> is after the redraws - a surface read off the field again comes back with the openness one tile alone makes of the join:</p>
+
+<pre><code>import { matchEdges, matchWater, waterSurface } from 'pilot-matter';
+
+matchEdges(fields);
+const surfaces = fields.map(field =&gt; waterSurface(field));
+matchWater(surfaces);   // how many shared vertices were settled</code></pre>
+
+<p>A vertex only one tile calls water is left exactly as it is, so a bank never moves: averaging it against a tile that calls the same place land is how a shoreline walks.</p>
 
 <h2 id="the-edge-of-the-world">The edge of the world</h2>
 
