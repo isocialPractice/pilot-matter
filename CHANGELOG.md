@@ -5,6 +5,99 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.31.0] - 2026-10-28
+
+The two things the last release's joins left behind. The ground either side of a
+join met exactly and the water on it did not, and the pass that lit a settled
+neighbour lit all 201 by 201 vertices of it to find the three the join had moved.
+
+### Added
+
+- **`matchWater(surfaces)`, the water's half of a settled join.** `matchEdges`
+  averages the height and the colour of every vertex an assembly shares, so the
+  ground meets exactly - and the water surface is read off that settled ground,
+  which is why its resting height and its base colour already agreed at a join.
+  What did not agree is `open`, the shoreline fade `animateWater` multiplies both
+  the swell and the glint by.
+
+  `openness` counts a water vertex's four neighbours and reads a neighbour off
+  the field as water. That is deliberate and it is half the answer: it is what
+  keeps each tile from drawing a shoreline down its own edge. But the neighbour
+  that is *on* the field is a different vertex on each side of the line, and the
+  smoothing pass under it skips off-field neighbours outright, so two tiles
+  reached two values for the openness of one place. Measured in a browser over a
+  four-by-four block, `lakeside` disagreed by 0.3333 of the fade at the vertices
+  it shared, which came out as 0.117 world units of height and 16/255 in red
+  between the two quads meeting there.
+
+  `matchWater` settles it the way `matchEdges` settles a height: the average of
+  what every tile at that place had, keyed by the same rounded position
+  `matchEdges` keys a vertex by, so the two passes agree on what counts as the
+  same place. A vertex only one tile calls water is left exactly as it is -
+  averaging it against a tile that calls the same place land is how a bank walks.
+
+  Teaching `openness` to read into a neighbour's field was the alternative and
+  lands in the wrong layer: `waterSurface` takes one field, and handing it an
+  assembly would make a tile's water depend on the order the tiles happened to be
+  laid in.
+
+- **`edge` on a water surface: which of its vertices lie on the outside of the
+  field.** Recorded while the surface is being read rather than worked out again,
+  because it is the only water a tile can share with the tile laid beside it and
+  a flooded tile holds thousands of vertices that cannot be.
+
+### Changed
+
+- **A settled neighbour is lit over the strip the join moved rather than over the
+  whole plane.** `redrawTile` in `js/terrain.js` is written to avoid rebuilding a
+  neighbour's geometry - its own note says building a whole plane "would spend the
+  cost of generating a tile to redraw a strip of it" - and then called
+  `computeVertexNormals()` on all 201 by 201 vertices of it, which spent most of
+  what that saved. Measured in a browser across the ten presets, laying a tile
+  beside others cost 58.5ms against 46.9ms for one laid alone; the strip brings
+  that to 50.2ms, so about seven tenths of what the join was adding has gone.
+
+  `matchEdges` now records on each field which vertices its own correction
+  reached, which it knows exactly - a side's correction is held per line, so the
+  vertices it moves are a band down part of a side rather than the whole of one.
+  `js/terrain-normals.js` reads that band and rebuilds the normals around it.
+
+  The rim is the half of this that is easy to get wrong. A vertex's normal is the
+  sum of the normals of the faces meeting at it, so the normals that change are
+  not only the ones that moved: every vertex sharing a face with a moved vertex
+  changes too. Each of those is rebuilt from nothing over *every* face meeting
+  it, rather than over the faces that moved, which is what makes the band come
+  out bit for bit as a pass over the whole mesh would have lit it rather than
+  close to it. `test/terrain-normals.test.js` holds it against a reference pass
+  over the whole mesh, vertex for vertex, and a version that accumulated only the
+  moved faces fails it.
+
+- **The water of an assembly is settled after its tiles are drawn again, not
+  before.** `Terrain.addTile`, `join` and `createTiledEnvironment` all read a
+  surface off the field again when a join moves the ground under it, so a pass
+  run before the redraws is a pass undone by them.
+
+  `Terrain` settles a wider assembly than the tiles the join moved: every tile
+  touching one of them as well. A redrawn surface comes back with the openness
+  one tile alone makes of *every* join it is on, not only of the one with the
+  tile just laid, and a neighbour redrawn here also meets the tiles further out -
+  whose joins were settled on a frame that is over. Reading those in too is what
+  keeps the world agreeing about its water as the aircraft flies across it rather
+  than only about the join just made.
+
+  Every tile that assembly reaches comes off watered, which is wider than the
+  tiles the join drew again. `Terrain.updateWater` returns early on a tile
+  already written when `dt` is 0 - every frame behind the title screen, a pause,
+  the settings panel or the editor, and the ground is still laid a tile a frame
+  on all of them. Simulated over a three-by-three block of flooded tiles, 12
+  settlings move the openness of a tile already marked watered, which left the
+  water as drawn disagreeing across its joins by up to 0.125 of the shoreline
+  fade until the flight ran again.
+
+- `js/api/matter.js` publishes the water surface a world settled at, as
+  `environment.water`, which is what lets `join` settle an assembly's water
+  without each tile reaching into the next one's closure.
+
 ## [1.0.0-alpha.1.30.0] - 2026-10-27
 
 The endless world stops showing its joins, and the element registry grows the

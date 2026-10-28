@@ -2518,8 +2518,10 @@ test('the water is settled after the ground, over every tile the join rebuilt', 
         'and after the neighbours are drawn again, or the redraw puts back the openness '
       + 'one tile alone works out and the settling is undone by the frame that did it');
 
-    assert.match(added, /matchWater\(this\.waterAssembly\(/,
+    assert.match(added, /this\.waterAssembly\(\[tile, \.\.\.settled\]\)/,
         'over the assembly a join can have unsettled rather than over the two tiles either side');
+    assert.match(added, /matchWater\(assembly\.map\(/,
+        'which is the surface of each of them');
 
     const assembly = methodBody(terrainSource, 'waterAssembly');
     assert.ok(assembly, 'js/terrain.js should work that assembly out in a method of its own');
@@ -2527,6 +2529,34 @@ test('the water is settled after the ground, over every tile the join rebuilt', 
     assert.match(assembly, /tilesTouching\(tile\.index\)/,
         'which is every tile touching one handed over, because a neighbour redrawn here '
       + 'also meets the tiles further out');
+});
+
+/**
+ * And every tile that settling reached is written again. The assembly is wider
+ * than the redraws by design, so `matchWater` moves the openness of tiles
+ * `redrawTile` never touched - and those are still marked watered. `updateWater`
+ * returns early on a watered tile when `dt` is 0, which is every frame behind
+ * the title screen, a pause, the settings panel or the editor, and the ground is
+ * still laid a tile a frame on all of them.
+ *
+ * Simulated over a three-by-three block of flooded tiles: 12 settlings move the
+ * openness of a tile already marked watered, and the water as drawn on a paused
+ * frame is left disagreeing across its joins by up to 0.125 of the shoreline
+ * fade - the defect `matchWater` is there to close, still on screen until the
+ * flight runs again. Marking the assembly unwatered takes it to 0.
+ */
+test('a tile the water settling reached is drawn again, paused or flying', () => {
+    const added = methodBody(terrainSource, 'addTile');
+    assert.ok(added, 'js/terrain.js should lay one tile in a method of its own');
+
+    assert.match(added, /for \(const each of assembly\) each\.watered = false/,
+        'every tile in the assembly comes off watered, or a paused world keeps drawing '
+      + 'the openness each of them worked out alone');
+
+    const settling = added.search(/matchWater\(/);
+    const unwatered = added.search(/each\.watered = false/);
+    assert.ok(settling < unwatered,
+        'and it comes off after the settling rather than before it');
 });
 
 // --- The controls for a machine with no keys -------------------------------
