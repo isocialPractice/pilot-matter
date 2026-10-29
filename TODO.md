@@ -61,32 +61,29 @@ its context survives being archived.
     the one surface the branch reached for that main still offers.
   - From: World & Environment
 
-### Code Review Override - the openness a block settles on
+### Code Review Override - the guard on a surface without `alone`
 
-#### Found Issues
-
-- [ ] Settling the water a tile at a time drifts off what the block settles on
-  - **Issue**: `matchWater` averages the surfaces it is handed, and
-    `Terrain.addTile` hands it a mixture. The tiles `redrawTile` just drew again
-    carry the openness read fresh off their fields; the tiles further out carry
-    an average settled on an earlier frame. Averaging a fresh value against an
-    already-averaged one over-weights whichever tile was laid first, so the
-    value a place settles on depends on the order the ground was drawn in.
-    Simulated over a three-by-three block of flooded tiles laid nearest-first,
-    all 425 shared places still agree exactly between their tiles - no join is
-    visible, which is what the override asked for - but the value they agree on
-    is up to 0.125 of the shoreline fade away from what one `matchWater` over
-    the nine fresh surfaces settles on. `animateWater` scales both the swell and
-    the glint by it, so a shoreline reads a little differently depending on
-    which way the aircraft first flew into it.
-  - **Goal**: decide whether the settled value should be the same however the
-    block was assembled. If it should, keep the openness one tile alone makes of
-    a place beside the settled one - `waterSurface` already works it out - and
-    average that rather than the value a previous frame left behind. If the
-    drift is an accepted cost of settling a tile at a time, say so on
-    `matchWater`, whose comment currently reads as though the result is the
-    average of what each tile makes of the place.
-  - From: Code Review Override - the openness a block settles on
+- [ ] Nothing exercises the `alone` guard `matchWater` now filters on
+  - **Issue**: `matchWater` filters on `surface.alone`
+    (`js/environment/elements.js:1312`) and `docs/api.md` states that contract
+    twice over: a host that builds a surface by hand rather than through
+    `waterSurface` gives it an `alone`, or `matchWater` passes it over. No test
+    reaches the branch. Deleting `&& surface.alone` leaves all 1447 tests
+    passing, so the suite cannot tell the guard's presence from its absence. If
+    it is dropped, the hand-built surface the docs invite makes
+    `surface.alone[i]` undefined, the group total NaN, and every tile at that
+    shared place settles on a NaN `open` - and because `animateWater` multiplies
+    both the swell and the glint by `open`, the NaN lands in the vertex
+    positions and the water mesh corrupts silently rather than throwing. The
+    four sibling guards are covered already at
+    `test/environment-tiles.test.js:640-645` (a tile that does not touch, a
+    single surface, an empty array, a dry neighbour), so the gap is out of step
+    with the file's own convention as well.
+  - **Goal**: assert beside those four that a surface carrying every documented
+    member except `alone` is passed over - `matchWater` settles what it would
+    have settled without it, and the real surface handed in alongside keeps a
+    finite `open` at the places the two share.
+  - From: Code Review Override - the guard on a surface without `alone`
 
 ## Game UI/UX
 
@@ -267,17 +264,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 277 earlier items in `TODO-archive.md`, newest last.
+> 278 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Mountain** length: a checkbox-gated `min` and `max` length
-  (*required*)
-  - No `length` range is declared today; `radius` is the only footprint span.
-  - **This item and the width below it are what force the gated range kind into
-    existence.** The three kinds are `span`, `scalar` and `gradient`, and none
-    is a pair of bounds a checkbox turns on, so a fourth kind has to exist, be
-    resolved by `resolveConfig`, and be drawn by `js/element-editor.js` before
-    either item can be finished. Design it once, for both.
-  - From: Environment Design
 - [x] **Mountain** width: a checkbox-gated `min` and `max` width (*required*)
   - No `width` range is declared either, for the same reason, and it takes the
     gated kind the length item introduces.
@@ -408,3 +396,33 @@ how the simulator got here rather than as a list still to be worked.
     height and colour writes alone - they measured 4ms for all eight neighbours
     together, which is not where the time goes.
   - From: UI/UX Override - the water across a tile join
+- [x] Settling the water a tile at a time drifts off what the block settles on
+  - **Issue**: `matchWater` averages the surfaces it is handed, and
+    `Terrain.addTile` hands it a mixture. The tiles `redrawTile` just drew again
+    carry the openness read fresh off their fields; the tiles further out carry
+    an average settled on an earlier frame. Averaging a fresh value against an
+    already-averaged one over-weights whichever tile was laid first, so the
+    value a place settles on depends on the order the ground was drawn in.
+    Simulated over a three-by-three block of flooded tiles laid nearest-first,
+    all 425 shared places still agree exactly between their tiles - no join is
+    visible, which is what the override asked for - but the value they agree on
+    is up to 0.125 of the shoreline fade away from what one `matchWater` over
+    the nine fresh surfaces settles on. `animateWater` scales both the swell and
+    the glint by it, so a shoreline reads a little differently depending on
+    which way the aircraft first flew into it.
+  - **Goal**: decide whether the settled value should be the same however the
+    block was assembled. If it should, keep the openness one tile alone makes of
+    a place beside the settled one - `waterSurface` already works it out - and
+    average that rather than the value a previous frame left behind. If the
+    drift is an accepted cost of settling a tile at a time, say so on
+    `matchWater`, whose comment currently reads as though the result is the
+    average of what each tile makes of the place.
+  - **Settled**: it should be the same however the block was assembled, so the
+    first branch of the goal was taken. `waterSurface` records `alone` beside
+    `open` - what that field alone makes of each place, written once after the
+    easing pass and never after - and `matchWater` settles from `alone` and
+    writes `open`. Every pass over a place then averages the same numbers, which
+    also makes the settling idempotent by construction rather than by the
+    arithmetic of averaging equal values. The drift was reproduced at exactly
+    0.125 before the change, in the three-by-three test the issue describes.
+  - From: Code Review Override - the openness a block settles on
