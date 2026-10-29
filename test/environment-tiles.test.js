@@ -763,4 +763,41 @@ test('a block laid a tile at a time leaves no join unsettled', () => {
     assert.equal(alone.shared, asDrawn.shared, 'the same places are shared either way');
     assert.ok(alone.worst > 1e-6,
         'one tile alone should disagree with its neighbour, or the settling is settling nothing');
+
+    // Agreeing is half of it. The value they agree on has to be the one the
+    // nine surfaces make of the place between them, and a laying pass settles
+    // a place more than once: a tile laid later moves a neighbour's ground, the
+    // neighbour's surface is read off it again, and the join is settled a
+    // second time. Settling from what an earlier pass already settled weights
+    // whichever tile was laid first, so the shoreline would read differently
+    // depending on which way the aircraft flew into it.
+    const whole = [...laid.values()].map(one => waterSurface(one.field));
+    assert.ok(matchWater(whole) > 0, 'the nine fresh surfaces share water too');
+
+    const standingAt = surfaces => {
+        const found = new Map();
+        for (const surface of surfaces) {
+            for (const i of surface.edge) {
+                const key = place(surface.x[i], surface.z[i]);
+                if (!found.has(key)) found.set(key, []);
+                found.get(key).push(surface.open[i]);
+            }
+        }
+        return found;
+    };
+
+    const laidAt  = standingAt([...laid.values()].map(one => one.water));
+    const wholeAt = standingAt(whole);
+
+    let drift  = 0;
+    let agreed = 0;
+    for (const [key, held] of wholeAt) {
+        if (held.length < 2) continue;
+        agreed++;
+        drift = Math.max(drift, Math.abs(laidAt.get(key)[0] - held[0]));
+    }
+
+    assert.equal(agreed, asDrawn.shared, 'over the same shared places either way');
+    assert.ok(drift < 1e-6,
+        `a place the block laid settled ${drift} away from what its nine surfaces make of it`);
 });

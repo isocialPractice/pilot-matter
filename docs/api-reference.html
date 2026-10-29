@@ -1281,6 +1281,7 @@ color.needsUpdate = true;</code></pre>
         <tr><td><code>color</code></td><td>The colour each of them was painted</td></tr>
         <tr><td><code>open</code></td><td>How far from the bank each of them is, <code>0</code> to <code>1</code></td></tr>
         <tr><td><code>edge</code></td><td>Which of them lie on the outside of the field, as indices into the surface</td></tr>
+        <tr><td><code>alone</code></td><td>What this field alone makes of <code>open</code>, recorded once and left alone</td></tr>
     </tbody>
 </table>
 </div>
@@ -1298,6 +1299,8 @@ const surfaces = fields.map(field =&gt; waterSurface(field));
 matchWater(surfaces);   // how many shared vertices were settled</code></pre>
 
 <p>A vertex only one tile calls water is left exactly as it is, so a bank never moves: averaging it against a tile that calls the same place land is how a shoreline walks.</p>
+
+<p>What it settles *from* is <code>alone</code>, which is why a place comes out at the same value however the world around it was assembled. A world laid a tile at a time settles a place more than once - a tile laid later moves a neighbour's ground, that neighbour's surface is read off the moved ground again, and the join is settled a second time - so averaging <code>open</code> would be averaging a fresh reading against one an earlier pass had already settled, and would weight whichever tile was laid first. A host that writes its own <code>open</code> can leave <code>alone</code> as it is; a host that builds a surface by hand rather than through <code>waterSurface</code> gives it an <code>alone</code>, or <code>matchWater</code> passes it over along with the dry fields.</p>
 
 <h2 id="the-edge-of-the-world">The edge of the world</h2>
 

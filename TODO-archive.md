@@ -3428,3 +3428,15 @@ still be found by name.
   - Settle a tile against the tiles already drawn beside it as it is added, and
     leave the budget `drawTiles` spends per frame intact while doing it.
   - From: World & Environment
+
+## Archived 10-29-26
+
+- [x] **Mountain** length: a checkbox-gated `min` and `max` length
+  (*required*)
+  - No `length` range is declared today; `radius` is the only footprint span.
+  - **This item and the width below it are what force the gated range kind into
+    existence.** The three kinds are `span`, `scalar` and `gradient`, and none
+    is a pair of bounds a checkbox turns on, so a fourth kind has to exist, be
+    resolved by `resolveConfig`, and be drawn by `js/element-editor.js` before
+    either item can be finished. Design it once, for both.
+  - From: Environment Design

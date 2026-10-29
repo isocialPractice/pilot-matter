@@ -1223,7 +1223,15 @@ export function waterSurface(field) {
         // water a tile can share with the tile laid beside it. Recorded here
         // rather than worked out again, so settling an assembly reads the
         // vertices of a join instead of every vertex under the level.
-        edge: null
+        edge: null,
+        // What this tile alone makes of how open each of those places is,
+        // recorded once and never written after. `open` is what the water is
+        // drawn with and what `matchWater` settles; this is what it settles
+        // *from*, so a place comes out at what the tiles sharing it make of it
+        // between them however the block around it was assembled. Settling
+        // from `open` would read a value an earlier pass had already settled
+        // and weight whichever tile was laid first.
+        alone: null
     };
 
     const rim = [];
@@ -1260,6 +1268,11 @@ export function waterSurface(field) {
     }
     surface.open.set(eased);
 
+    // Taken after the easing pass, so what a join settles from is the openness
+    // this tile would have drawn the place with and not a reading from part way
+    // through working it out.
+    surface.alone = Float32Array.from(surface.open);
+
     return surface;
 }
 
@@ -1282,10 +1295,21 @@ export function waterSurface(field) {
  * same place. A vertex only one tile calls water is left exactly as it is:
  * averaging it against a tile that calls it land would move the bank.
  *
+ * Settles from `alone` and writes `open`, which is what makes the value a place
+ * comes out at independent of the order the ground was laid in. A world is not
+ * settled once - it is laid a tile at a time, and a tile laid later moves a
+ * neighbour's ground, has that neighbour's surface read off it again, and
+ * settles the join a second time - so a pass that averaged `open` would be
+ * averaging a fresh reading against one an earlier pass had already settled,
+ * and would weight whichever tile was laid first. `alone` is written once by
+ * `waterSurface` and never after, so every pass over a place averages the same
+ * numbers and arrives at the same answer.
+ *
  * Returns how many shared vertices were settled.
  */
 export function matchWater(surfaces = []) {
-    const wet = surfaces.filter(surface => surface && surface.count > 0 && surface.edge);
+    const wet = surfaces.filter(surface =>
+        surface && surface.count > 0 && surface.edge && surface.alone);
     if (wet.length < 2) return 0;
 
     const shared = new Map();
@@ -1304,11 +1328,12 @@ export function matchWater(surfaces = []) {
         matched++;
 
         // Settled as each group is read rather than after all of them, which is
-        // safe here where it is not in `matchEdges`: a vertex stands in one
-        // place and so belongs to one group, and nothing written here is a
-        // value another group has still to read.
+        // safe here where it is not in `matchEdges`: the pass reads `alone` and
+        // writes `open`, so nothing written here is a value any group has still
+        // to read - and a vertex stands in one place and so belongs to one
+        // group in any case.
         let total = 0;
-        for (const { surface, i } of group) total += surface.open[i];
+        for (const { surface, i } of group) total += surface.alone[i];
 
         const open = total / group.length;
         for (const { surface, i } of group) surface.open[i] = open;

@@ -1454,6 +1454,7 @@ color.needsUpdate = true;
 | `color` | The colour each of them was painted |
 | `open` | How far from the bank each of them is, `0` to `1` |
 | `edge` | Which of them lie on the outside of the field, as indices into the surface |
+| `alone` | What this field alone makes of `open`, recorded once and left alone |
 
 `open` is what holds the swell down to nothing at the shoreline, so the water
 meets the bank it was poured against rather than lapping over it.
@@ -1485,6 +1486,16 @@ matchWater(surfaces);   // how many shared vertices were settled
 A vertex only one tile calls water is left exactly as it is, so a bank never
 moves: averaging it against a tile that calls the same place land is how a
 shoreline walks.
+
+What it settles *from* is `alone`, which is why a place comes out at the same
+value however the world around it was assembled. A world laid a tile at a time
+settles a place more than once - a tile laid later moves a neighbour's ground,
+that neighbour's surface is read off the moved ground again, and the join is
+settled a second time - so averaging `open` would be averaging a fresh reading
+against one an earlier pass had already settled, and would weight whichever tile
+was laid first. A host that writes its own `open` can leave `alone` as it is;
+a host that builds a surface by hand rather than through `waterSurface` gives it
+an `alone`, or `matchWater` passes it over along with the dry fields.
 
 ## The edge of the world
 

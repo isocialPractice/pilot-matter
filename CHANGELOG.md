@@ -5,6 +5,65 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.31.1] - 2026-10-29
+
+The last release settled the water across a join, and settled it to a value that
+depended on the order the ground happened to be laid in. The joins were invisible
+either way, which is why this took a second look to find.
+
+### Fixed
+
+- **A place two tiles share now settles on the same openness however the block
+  around it was assembled.** `matchWater` averaged `open`, the shoreline fade
+  `animateWater` scales both the swell and the glint by, and `open` is not a
+  reading - it is the answer a previous pass wrote there. A world is laid a tile
+  at a time: a tile laid later moves a neighbour's ground, `redrawTile` reads
+  that neighbour's surface off the moved ground again, and the join settles a
+  second time. So the pass was averaging a fresh reading against one it had
+  already settled, and the already-settled one carried the weight of whichever
+  tile went down first.
+
+  Measured over a three-by-three block of flooded tiles laid nearest-first, all
+  425 shared places still agreed exactly between their tiles - no join was
+  visible, which is what the pass is there for - but the value they agreed on sat
+  up to 0.125 of the fade away from what one `matchWater` over the nine fresh
+  surfaces comes to. On screen that is a shoreline reading a little differently
+  depending on which way the aircraft first flew into it.
+
+  `waterSurface` now records `alone` beside `open`: what that field alone makes
+  of how open each place is, written once after the easing pass and never after.
+  `matchWater` settles from `alone` and writes `open`, so every pass over a place
+  averages the same numbers and arrives at the same answer. It also makes the
+  pass idempotent by construction rather than by arithmetic - the old version
+  only held still across a second call because averaging equal values returns
+  them.
+
+  Teaching the settling to recognize an already-averaged value was the
+  alternative and there is nothing to recognize it by: a settled `open` and a
+  read one are both a number between 0 and 1 on the same array.
+
+### Changed
+
+- **`alone` is a documented member of a water surface**, listed with `open` and
+  `edge` in the API reference. A host that builds a surface by hand rather than
+  through `waterSurface` gives it one; `matchWater` passes over a surface without
+  it, the way it already passes over one with no `edge`.
+
+### Testing
+
+- The three-by-three laying pass in `test/environment-tiles.test.js` asked only
+  whether the tiles at a place agreed with each other, which the defect satisfied
+  exactly. It now also holds what they agreed on against one `matchWater` over
+  the nine surfaces read fresh, over the same 425 shared places. It fails at
+  0.125 on the old settling.
+
+- Two mutations, to check the test reads what it claims to: settling from `open`
+  fails the new assertion at 0.125, and taking `alone` before the easing pass
+  rather than after fails "the settled openness is what the tiles had between
+  them" - the easing is part of what one tile makes of a place, so a surface that
+  recorded `alone` half way through working it out would settle every join onto
+  an unsmoothed shoreline while agreeing about it perfectly.
+
 ## [1.0.0-alpha.1.31.0] - 2026-10-28
 
 The two things the last release's joins left behind. The ground either side of a
