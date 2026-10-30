@@ -3440,3 +3440,13 @@ still be found by name.
     resolved by `resolveConfig`, and be drawn by `js/element-editor.js` before
     either item can be finished. Design it once, for both.
   - From: Environment Design
+
+## Archived 10-30-26
+
+- [x] **Mountain** width: a checkbox-gated `min` and `max` width (*required*)
+  - No `width` range is declared either, for the same reason, and it takes the
+    gated kind the length item introduces.
+  - Girth and the bulk range are deliberately not queued with these two: both
+    are cheap once the kind exists, and the bulk range randomizes the three
+    ranges the others declare, so it wants all three in place first.
+  - From: Environment Design

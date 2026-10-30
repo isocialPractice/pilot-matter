@@ -61,30 +61,6 @@ its context survives being archived.
     the one surface the branch reached for that main still offers.
   - From: World & Environment
 
-### Code Review Override - the guard on a surface without `alone`
-
-- [ ] Nothing exercises the `alone` guard `matchWater` now filters on
-  - **Issue**: `matchWater` filters on `surface.alone`
-    (`js/environment/elements.js:1312`) and `docs/api.md` states that contract
-    twice over: a host that builds a surface by hand rather than through
-    `waterSurface` gives it an `alone`, or `matchWater` passes it over. No test
-    reaches the branch. Deleting `&& surface.alone` leaves all 1447 tests
-    passing, so the suite cannot tell the guard's presence from its absence. If
-    it is dropped, the hand-built surface the docs invite makes
-    `surface.alone[i]` undefined, the group total NaN, and every tile at that
-    shared place settles on a NaN `open` - and because `animateWater` multiplies
-    both the swell and the glint by `open`, the NaN lands in the vertex
-    positions and the water mesh corrupts silently rather than throwing. The
-    four sibling guards are covered already at
-    `test/environment-tiles.test.js:640-645` (a tile that does not touch, a
-    single surface, an empty array, a dry neighbour), so the gap is out of step
-    with the file's own convention as well.
-  - **Goal**: assert beside those four that a surface carrying every documented
-    member except `alone` is passed over - `matchWater` settles what it would
-    have settled without it, and the real surface handed in alongside keeps a
-    finite `open` at the places the two share.
-  - From: Code Review Override - the guard on a surface without `alone`
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -264,15 +240,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 278 earlier items in `TODO-archive.md`, newest last.
+> 279 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Mountain** width: a checkbox-gated `min` and `max` width (*required*)
-  - No `width` range is declared either, for the same reason, and it takes the
-    gated kind the length item introduces.
-  - Girth and the bulk range are deliberately not queued with these two: both
-    are cheap once the kind exists, and the bulk range randomizes the three
-    ranges the others declare, so it wants all three in place first.
-  - From: Environment Design
 - [x] Pin the way a cut is drawn against the way a cut is tested, so the two
   cannot drift apart
   - Nothing in `test/` reaches `js/walls.js`. The beam across each cut is the
@@ -426,3 +395,24 @@ how the simulator got here rather than as a list still to be worked.
     arithmetic of averaging equal values. The drift was reproduced at exactly
     0.125 before the change, in the three-by-three test the issue describes.
   - From: Code Review Override - the openness a block settles on
+- [x] Nothing exercises the `alone` guard `matchWater` now filters on
+  - **Issue**: `matchWater` filters on `surface.alone`
+    (`js/environment/elements.js:1312`) and `docs/api.md` states that contract
+    twice over: a host that builds a surface by hand rather than through
+    `waterSurface` gives it an `alone`, or `matchWater` passes it over. No test
+    reaches the branch. Deleting `&& surface.alone` leaves all 1447 tests
+    passing, so the suite cannot tell the guard's presence from its absence. If
+    it is dropped, the hand-built surface the docs invite makes
+    `surface.alone[i]` undefined, the group total NaN, and every tile at that
+    shared place settles on a NaN `open` - and because `animateWater` multiplies
+    both the swell and the glint by `open`, the NaN lands in the vertex
+    positions and the water mesh corrupts silently rather than throwing. The
+    four sibling guards are covered already at
+    `test/environment-tiles.test.js:640-645` (a tile that does not touch, a
+    single surface, an empty array, a dry neighbour), so the gap is out of step
+    with the file's own convention as well.
+  - **Goal**: assert beside those four that a surface carrying every documented
+    member except `alone` is passed over - `matchWater` settles what it would
+    have settled without it, and the real surface handed in alongside keeps a
+    finite `open` at the places the two share.
+  - From: Code Review Override - the guard on a surface without `alone`

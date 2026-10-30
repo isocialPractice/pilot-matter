@@ -645,6 +645,79 @@ test('water only one tile calls water is left where the bank put it', () => {
     assert.equal(matchWater([first, null]), 0, 'and a dry neighbour settles nothing');
 });
 
+/**
+ * The surface `docs/api.md` invites a host to build: every documented member of
+ * one and no `alone`, which is the member only `waterSurface` fills in. Shaped
+ * off a real surface so it stands at the same places, since a surface sharing
+ * nothing would be passed over by the group check whether the guard held or not.
+ */
+function builtByHand(surface) {
+    return {
+        level:    surface.level,
+        count:    surface.count,
+        vertices: Int32Array.from(surface.vertices),
+        x:        Float32Array.from(surface.x),
+        z:        Float32Array.from(surface.z),
+        rest:     Float32Array.from(surface.rest),
+        color:    Float32Array.from(surface.color),
+        open:     Float32Array.from(surface.open),
+        edge:     Int32Array.from(surface.edge)
+    };
+}
+
+/**
+ * The fifth of the guards above. A surface with no `alone` would be settled
+ * *from* a member that is not there, and the two ways that goes wrong are why
+ * both halves of this are asserted. Drop `&& surface.alone` from the filter and
+ * `surface.alone[i]` reads off `undefined` and throws at the first shared place,
+ * which is loud. Keep the filter open but read the member tolerantly - the
+ * obvious repair for that throw - and the group total comes out NaN instead,
+ * every tile at the place settles on a NaN `open`, and because `animateWater`
+ * multiplies both the swell and the glint by `open` the NaN lands in the vertex
+ * positions and the mesh corrupts silently. So what this reads is the real
+ * surfaces handed in alongside, not the hand-built one: the count they settle,
+ * the values they settle on, and that both are still numbers afterwards.
+ */
+test('a surface built without an `alone` is passed over rather than settled from', () => {
+    const here = flooded(0, 0);
+    const east = flooded(1, 0);
+
+    matchEdges([here, east]);
+
+    const { first, second, pairs } = sharedWater(here, east);
+    assert.ok(pairs.length > 10, 'the two should share a run of water, or this proves nothing');
+
+    const byHand = builtByHand(second);
+    const unread = byHand.open.slice();
+    assert.ok(!('alone' in byHand), 'the surface under test is the one the host left an `alone` off');
+    assert.ok(byHand.edge.length > 0, 'and it reaches the join, so the guard is the only thing holding it out');
+
+    // What the pair settles between themselves, read off surfaces of the same
+    // shape rather than inferred from the pass being idempotent.
+    const without = sharedWater(here, east);
+    const settled = matchWater([without.first, without.second]);
+    assert.ok(settled > 0, 'the two have water to settle in the first place');
+
+    assert.equal(matchWater([first, second, byHand]), settled,
+        'the hand-built surface neither adds a place to settle nor takes one away');
+    assert.deepEqual(first.open, without.first.open, 'and the pair settles on what it settles on without it');
+    assert.deepEqual(second.open, without.second.open);
+
+    const time = 7.25;
+    for (const pair of pairs) {
+        assert.ok(Number.isFinite(first.open[pair.here]),
+            `the shared place at ${first.x[pair.here]}, ${first.z[pair.here]} keeps a finite openness`);
+        assert.ok(Number.isFinite(second.open[pair.there]));
+
+        assert.ok(Number.isFinite(drawn(first, pair.here, time).height),
+            'so the swell it is drawn with is a height rather than a NaN');
+        assert.ok(Number.isFinite(drawn(second, pair.there, time).height));
+    }
+
+    assert.deepEqual(byHand.open, unread,
+        'nothing was written into the surface that was passed over either');
+});
+
 test('the corner four tiles meet at settles its water against all four', () => {
     const tiles = [flooded(0, 0), flooded(1, 0), flooded(0, 1), flooded(1, 1)];
     matchEdges(tiles);
