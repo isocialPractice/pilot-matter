@@ -5,6 +5,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.31.2] - 2026-10-30
+
+The guard the last release put on `matchWater` was the one thing in that change
+nothing could tell the presence of from the absence.
+
+### Added
+
+- **A test for the `alone` guard `matchWater` filters its surfaces on.**
+  `matchWater` settles from `alone`, so it passes over any surface that has not
+  got one - and `docs/api.md` states that contract outright: a host that builds
+  a surface by hand rather than through `waterSurface` gives it an `alone`, or
+  the pass leaves it with the dry fields. No test reached the branch. Deleting
+  `&& surface.alone` left all 1447 tests passing, so the suite could not tell
+  the guard was there.
+
+  The new assertion sits beside the four sibling guards it was out of step with
+  - a tile that does not touch, a single surface, an empty array, a dry
+  neighbour. It hands `matchWater` two real surfaces and, alongside them, the
+  surface the docs invite: every documented member of one and no `alone`, shaped
+  off a real surface so it stands at the same places and the guard is the only
+  thing holding it out. The pair has to settle the same count of places on the
+  same values it settles without it, nothing may be written into the surface
+  that was passed over, and every place the two share has to keep an openness
+  that is a number - read both off `open` and off the height `animateWater`
+  draws with it.
+
+  Both halves earn their place, because the guard has two failure modes rather
+  than one. Dropping it from the filter makes `surface.alone[i]` a read off
+  `undefined`, which throws at the first shared place. Leaving the filter open
+  and reading the member tolerantly - the obvious repair for that throw - is the
+  quiet one: the group total comes out NaN at every place the hand-built surface
+  stands, which is all 148 of its edge vertices - 148 NaN openings on the real
+  surface it was shaped off and 36 on the one that shares the join - and since
+  `animateWater` multiplies both the swell and the glint by `open`, the NaN lands
+  in the vertex positions and the mesh corrupts without raising anything. The
+  count assertion catches both: the first as the throw, and the second because
+  settling the hand-built surface rather than passing it over turns 36 shared
+  places into 148. The finiteness assertions are the second line against the
+  quiet one, held on `open` and on the height it is drawn with.
+
 ## [1.0.0-alpha.1.31.1] - 2026-10-29
 
 The last release settled the water across a join, and settled it to a value that
