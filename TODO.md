@@ -54,6 +54,66 @@ its context survives being archived.
     `weatherStep` take a frame that is merely slow and keep the ceiling for
     the one long frame a hidden tab leaves behind.
   - From: UI/UX Override - the weather clock on a slow machine
+- [ ] **Weather Guards**: the two assertions that hold the weather layer to
+  building once pass on text that is not the code they name
+  - **Issue**: both are in
+    `test('the weather is built once and drawn down to the condition in force')`
+    in `test/page.test.js`, and each is satisfied by something other than the
+    line it was written for. `/this\.rain\.count\s*=/` at line 1478 matches the
+    `this.rain.count === 0` comparison in `updateRain`, so deleting the
+    `this.rain.count = Math.min(...)` assignment in `setPrecipitation` leaves
+    the suite green - proven by renaming it to `this.rain.tally`, which keeps
+    `test/page.test.js` at 97 pass and 0 fail. `/PRECIPITATION_MOST/` at line
+    1476 matches the import and the two constructor references, so `addRain`
+    sizing itself with a literal `const count = 5200` passes as well, which is
+    the one regression the test's own comment names.
+  - **Goal**: bound each pattern to the statement it is about - an assignment
+    rather than a comparison, and the figure `addRain` actually sizes itself
+    with - and prove each by mutation before accepting it, the way the three
+    assertions beside them in the same file were proven.
+  - From: UI/UX Override - the weather clock on a slow machine
+- [ ] **Bulk Three**: the bulk mode is documented as reaching all three
+  footprint ranges and reaches two of them
+  - **Issue**: `const stretch = config.girthRange.on;` at
+    `js/environment/elements.js:467` does not read `config.bulk`, so the mode
+    throws `width` and `length` and leaves `girthRange` alone. The behaviour is
+    right and `test/environment-elements.test.js` pins it, but three places say
+    otherwise: the comment at `js/environment/elements.js:444` ("reads the three
+    gated ranges as on"), `docs/api.md:1338` ("every footprint range at once"),
+    and `docs/terrain.html` ("randomizes all three at once"). A host that reads
+    the API doc and sends `{ bulk: true, girthRange: [0.2, 0.9] }` gets no girth
+    variation at all, and the doc's own example at `docs/api.md:1348` says both
+    halves of it - "The three footprint ranges randomized together" one line
+    above "`girth` is spent".
+  - **Goal**: say two rather than three wherever the count is given, and keep
+    the reason the third is untouched: under the mode `length` holds the long
+    axis, so a girth has nothing left to decide either way. `CHEATSHEET.md` and
+    `docs/cheatsheet.html` carry the same "over all three" phrasing, and
+    `docs/api-reference.html` is generated from `docs/api.md`, so run
+    `npm run docs:api` after editing it.
+  - From: UI/UX Override - the weather clock on a slow machine
+
+#### Resolve Issues
+
+- [ ] Weather Lift 1
+  - **Issue**: the cloud deck mirrors nothing. `createCloudDeck` gives about
+    half of the 95 clouds `facing: -1` and `js/weather.js:106` spends it as
+    `sprite.scale.set(cloud.width * cloud.facing, cloud.height, 1)`, but a
+    sprite's size in Three.js r160 - the version `index.html` pins - is
+    `scale.x = length(vec3(modelMatrix[0].xyz))` in its own vertex shader, and
+    `length` discards the sign. So every cloud draws the same unmirrored
+    texture and the deck reads as one shape repeated across the sky, which is
+    the outcome `js/weather-math.js:253` says the flip is there to prevent.
+    `test/weather-math.test.js:136` pins the deck data rather than the render,
+    so the suite is green either way.
+  - **Goal**: put the mirror where a sprite can show it - a second
+    `SpriteMaterial` over a canvas drawn with `ctx.scale(-1, 1)`, picked by
+    `cloud.facing` - and carry the condition's opacity and the hour's colour to
+    both materials, since `setPrecipitation` and `updateClouds` each write to
+    one today. Settle it on a screenshot rather than on the suite: whether a
+    deck stops reading as one repeated shape is not a claim source text can
+    hold.
+  - From: World & Environment
 
 ## Game UI/UX
 
@@ -511,7 +571,8 @@ how the simulator got here rather than as a list still to be worked.
     unconditionally today. This item is what makes it a mode that can be asked
     for.
   - From: Environment Design
-- [x] Lift the weather effects from the `local-weather` branch onto main's own
+- [x] **Weather Lift**: Lift the weather effects from the `local-weather`
+  branch onto main's own
   surfaces: the cloud deck, the rain, the lightning timing and the sun or moon
   sprite
   - Read the answer recorded under the roadmap item on 10.27.2026 before
