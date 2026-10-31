@@ -3450,3 +3450,113 @@ still be found by name.
     are cheap once the kind exists, and the bulk range randomizes the three
     ranges the others declare, so it wants all three in place first.
   - From: Environment Design
+
+## Archived 10-31-26
+
+- [x] Pin the way a cut is drawn against the way a cut is tested, so the two
+  cannot drift apart
+  - Nothing in `test/` reaches `js/walls.js`. The beam across each cut is the
+    piece that was got wrong once, and the only thing that has ever caught it
+    is a pair of eyes on a screenshot or - this run - a browser reading the
+    quaternion back off the live scene. Both are checks that only happen when
+    somebody runs them.
+  - Two things are worth pinning, in the source-text idiom `test/page.test.js`
+    already uses for `js/rings.js` and `js/guidance.js`, since `js/walls.js`
+    imports Three.js and cannot be constructed in Node. First, that `buildBeam`
+    turns the cylinder with `quaternion.setFromUnitVectors` from `(0, 1, 0)` to
+    the across vector rather than by Euler angles - the module's own comment
+    says a pair of Euler angles does not compose in the order Three.js applies
+    them here, and that is the fault in as many words. Second, that `buildCut`
+    takes `acrossX = section.dirZ` and `acrossZ = -section.dirX`, the same span
+    `corridorCrossing` in `js/corridor.js` measures its offset along, so the
+    posts stand where the rule tests. The second is the one with teeth: a
+    corridor that flipped its offset convention would draw its walls on the
+    wrong axis with the suite still green.
+  - Bound each source span with `[^}]*?` the way `test/input-map.test.js`
+    bounds its spans, so neither assertion can run past the function it is
+    anchored on.
+  - From: Game Modes UI/UX `->` Improve Existing Game Modes `->` Canyon Run
+- [x] **Water Join**: Reassemble the five environments once the seamless
+  algorithm lands, so each is an endless world with no join anywhere in it
+  - Left unchecked by the 10.25.2026 pruning. The algorithm landed and the
+    reassembly did not: `matchEdges` is called from `js/api/matter.js` only,
+    by `createEnvironment` and `createTiledEnvironment`, so a host assembling
+    its own world gets settled joins and the simulator does not. `Terrain`
+    in `js/terrain.js` lays each tile with `buildEnvironment` and adds the
+    mesh to the scene without ever settling it against the tiles beside it.
+  - The base is seamless already and that is what hides this: `applyBase`
+    samples the noise at `fieldX`/`fieldZ`, which are world coordinates, so
+    the ground runs on across a join whatever tile it is drawn by. What does
+    not run on is anything an element added, because elements are placed from
+    a per-tile `tileSeed` - a peak whose radius reaches past the edge is
+    raised on one side of it and not the other.
+  - From: World & Environment
+- [x] **Mountain** length: a checkbox-gated `min` and `max` length
+  (*required*)
+  - No `length` range is declared; `radius` is the only footprint span.
+  - From: Environment Design
+- [x] **Mountain** width: a checkbox-gated `min` and `max` width (*required*)
+  - No `width` range is declared either, for the same reason.
+  - From: Environment Design
+- [x] Say whether the `local-weather` branch is ready to be integrated, on the
+  item that asks for it
+  - The branch exists locally and on `origin`, and its item makes the merge
+    conditional on its API having stabilized - a condition nobody has recorded
+    an answer to, so the item cannot be queued or dropped as it stands.
+  - Read the branch rather than merging it: what it adds (clouds, rain, moon,
+    sky styling), what surface it exposes, whether that surface has settled,
+    and what it would cost to bring onto main against the environment pipeline
+    as it now is.
+  - The answer is nested under the item as a note, with the date, so the next
+    run reads a decision rather than asking the question again. Merge nothing
+    this run - the item is the look, and the integration is whatever the look
+    recommends.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Prune the archived item still listed under `#### Canyon Run`
+  - Found by the 10.25.2026 pruning pass, and it is the sixth pruning item this
+    section has produced rather than a new kind of thing: `Pin the way a cut
+    is drawn against the way a cut is tested` sits unchecked under
+    `#### Canyon Run` and checked in `TODO-archive.md`, archived with its
+    `From: Game Modes UI/UX -> Improve Existing Game Modes -> Canyon Run` path.
+  - It is built. `test/page.test.js` reads `js/walls.js` as source text and
+    pins both halves the item asked for - `buildBeam` turning the cylinder with
+    `quaternion.setFromUnitVectors` to the normalized across vector, and
+    `buildCut` taking `const acrossX = section.dirZ` - each bounded to the
+    function it is anchored on. Read those assertions against the module before
+    checking the item off, the way the five sections above were read.
+  - **The counter is pruning items this section has produced, and it stands at
+    six**: the five of the 10.25.2026 sweep, which are the five `Prune ...`
+    items under `## Archived 10-25-26` in `TODO-archive.md`, plus this one.
+    Count them in the archive, which is the full record, rather than in
+    `## Complete`, which is a window onto it:
+    `rollCompleteMethod: recentsByNumber` keeps only the ten newest items
+    visible there, and four more completed items roll the first of the five out
+    of it, so a count taken there would read five and let a seventh pruning item
+    through as the sixth. While all five sit in both files a grep across the two
+    counts each of them twice.
+  - This one was made by the run that finished the work rather than found by a
+    sweep, which is why the five were not the end of it: every run that
+    completes a queued item leaves its roadmap original behind, so pruning is a
+    pass that comes round rather than a job that finishes. **So the seventh is
+    the one not to write.** The fault is upstream rather than here - section 5
+    of the automation copies an item into `## Current` and leaves the original
+    in place, `todo.mjs` carries no notion of item identity across those two
+    copies, and no rule in the instructions covers the original left behind once
+    the copy archives. That makes the change a change to the automation tool and
+    not to this repository, so what gets queued in place of a seventh pruning
+    item is a request against the tool.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Water Join 1
+  - **Issue**: the ground either side of a join meets exactly - 4797 shared
+    boundary vertices a four-by-four block, agreeing to `1.53e-5` world units,
+    which is float32 rounding on a 16000-unit tile - but the water on it does
+    not. Read off the geometry buffers in a browser, `lakeside` disagrees at 16
+    shared wet vertices and `river-basin` at 4, by up to 0.3333 world units of
+    height and 0.0685 per colour channel. Both tiles agree what the water rests
+    at; what they disagree about is `open`, the shoreline fade `animateWater`
+    multiplies the swell and the glint by, because `openness` and the smoothing
+    pass under it in `js/environment/elements.js` each read one field and take
+    the neighbour that is off it as water. Rendered straight down on the worst
+    of them, the two quads meeting at the vertex differ by 16/255 in red.
+  - **Goal**: Resolve to [water-join.prompt.md](.claude/prompts/water-join.prompt.md)
+  - From: World & Environment

@@ -5,6 +5,103 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.32.0] - 2026-10-31
+
+The mountain finishes the footprint work it was left in the middle of, the
+element registry gains the one range kind it was short of, and the weather the
+`local-weather` branch had is on main at last - lifted onto this world's own
+surfaces rather than merged off a branch that has not seen main since February.
+
+### Added
+
+- **A `girth` range, as the pair of bounds the roadmap asked for.** The
+  mountain's `girth` was a `scalar(0, 1, 0)` and the item wanted a switched
+  `min` and `max`, which sounds like changing a range's kind and is not: six
+  presets configure `girth` as a bare number, and a gated range holds an
+  `{ on, range }` with nowhere for that number to live. Changing the kind
+  underneath them would have quietly redrawn six described worlds.
+
+  So the scalar stays and `girthRange` is declared beside it, which is the
+  relationship `width` already has with `radius`: the live range is what the
+  switch gives way to when it is off, and the pair is the same quantity said
+  outright. On, each peak draws a girth of its own out of the bounds - a deck
+  of peaks stretched by varying amounts rather than by one - and the scalar has
+  nothing left to say, exactly as it has nothing to say under a `length` asked
+  for outright.
+
+  The accounting is what makes it safe, and it is what the test holds: the pair
+  is drawn once a peak, in place of the single `random()` the scalar's spread
+  spent, so the stream is the same length whichever way the switch is set. A
+  range that cannot stretch draws the round peak the scalar draws at zero, to
+  the last vertex - which fails loudly if a girth is ever drawn once for the
+  whole element instead of once a peak, because every peak after the first then
+  lands somewhere else.
+
+- **A `bulk` mode over all three footprint ranges.** One switch that says
+  "randomize the lot within the bounds they declare" rather than asking for
+  three to be found and thrown. It reads the gated ranges as on without writing
+  to them, so turning it off puts the element back on whatever each switch was
+  left saying, and it randomizes within the pair each range was configured with
+  rather than within the declared defaults.
+
+  Where two ranges describe the same axis the precedence already in force
+  holds: a length asked for outright wins over a girth, under the mode exactly
+  as it does when a pilot sets both by hand. So the girth is spent under the
+  mode, which is worth saying plainly rather than leaving to be discovered. The
+  rotation the mode is named for is applied to every peak already and always
+  has been, so the mode does not switch it on - it names it.
+
+- **A fifth range kind, `toggle`: a switch with no bounds behind it.** This is
+  the half of `gated` its own comment called "a different thing from either on
+  its own". A mode reaching across several ranges has no pair to carry, and
+  saying it with a scalar would declare a dial from 0 to 1 that only ever means
+  two things, with every value between them a setting the element cannot be in
+  and a figure a pilot can type. The editor draws it as the gate's row without
+  the two bounds under it - the same step of one, the same `OFF` and `ON` in
+  place of a number, the same notice a refused figure is turned down with.
+
+- **The weather effects, lifted from the `local-weather` branch.** A cloud
+  deck, rain that rides with the aircraft and shears downwind, lightning over
+  the sky, and the body the light of the day is coming from. The branch is one
+  commit off the initial commit of February and has never seen main since, so
+  there was nothing to merge; what it had worth having was this layer, and the
+  arithmetic behind it is now `js/weather-math.js` - pure, and unit tested in
+  Node like the rest of the world's arithmetic.
+
+  Three things are this world's rather than the branch's, and each is the
+  branch asking a question answered better here. The **hour**: the branch had a
+  `day` or `night` switch with a fixed light position and a pair of sprite
+  assets hung off it, where this world runs a continuous cycle - so the sky's
+  body is placed on the arc `sunPositionAt` walks and coloured by
+  `daylightAt`, one body that reads as the sun or the moon without anything
+  choosing which. The **condition**: the branch resolved a hand-edited module
+  constant once at import, which is a build-time setting rather than something
+  a pilot can reach - here it is a `WEATHER` row in the settings panel,
+  stepping `CLEAR`, `CLOUDY` and `STORMY`. The **palette**: the branch tinted
+  every colour in the scene by a tone knob, and none of that travels.
+
+  Nothing of `js/weather-style.js` came across either, and nor did its three
+  svg assets: the textures are drawn on a canvas, so the layer ships no files
+  and has nothing to fail to load, which is the same reason the ground, the
+  hoops and the walls are all generated here rather than placed.
+
+- **A lightning flash on the sky.** `Sky.setFlash` washes the sky, the fog it
+  tints and the fill light toward the strike colour by however much of a strike
+  is in force, keeping the hour underneath rather than replacing it, so a
+  strike at dusk comes back to the dusk it interrupted. It is deliberately not
+  folded into the light `applyDaylight` hands back: the water glints by that,
+  and a lake sparkling off lightning at midnight is the bug the separation
+  avoids.
+
+### Changed
+
+- **`applyDaylight` takes a `flash`**, defaulting to none, which is the only
+  change to a surface that was already there. Everything else in this release
+  is a declaration added beside what was there: `girthRange` and `bulk` on the
+  mountain, `toggle` in the registry, and `WEATHER` in the settings panel. The
+  recorded mountain fingerprint is unchanged, which is the claim that no world
+  already described has moved.
+
 ## [1.0.0-alpha.1.31.2] - 2026-10-30
 
 The guard the last release put on `matchWater` was the one thing in that change

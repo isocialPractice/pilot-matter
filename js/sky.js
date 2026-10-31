@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
     createDayNight, advanceDayNight, daylightAt, sunPositionAt, SUN_DISTANCE
 } from './day-night.js';
+import { flashedSky, flashedAmbient } from './weather-math.js';
 
 // The colour the world fades to at midday, and how quickly it gets there.
 // Exported so the Matter API can apply the same depth to a scene that is not
@@ -31,14 +32,21 @@ export function applyDepth(scene, { color = SKY_COLOR, density = FOG_DENSITY } =
  * old ones is not left holding a sky the world has stopped using, and a scene
  * with no fog in it keeps having none.
  *
+ * `flash` is a lightning strike over the top of all that, as a share of a full
+ * one: the sky, the fog it tints and the fill light are all washed brighter by
+ * it, and the hour underneath is kept rather than replaced, so a strike at
+ * dusk comes back to the dusk it interrupted.
+ *
  * Returns the light now in force, which is what anything else keyed to the sun
- * reads.
+ * reads. The strike is not in it: a flash is weather rather than an hour, and
+ * water that glinted by it would glint off a storm at midnight.
  */
 export function applyDaylight(phase, {
-    scene = null, sun = null, ambient = null, density = FOG_DENSITY, distance = SUN_DISTANCE
+    scene = null, sun = null, ambient = null, density = FOG_DENSITY, distance = SUN_DISTANCE,
+    flash = 0
 } = {}) {
     const light = daylightAt(phase);
-    const [r, g, b] = light.sky;
+    const [r, g, b] = flashedSky(light.sky, flash);
 
     if (scene) {
         if (scene.background?.isColor) scene.background.setRGB(r, g, b);
@@ -59,7 +67,7 @@ export function applyDaylight(phase, {
 
     if (ambient) {
         ambient.color.setRGB(...light.ambient.color);
-        ambient.intensity = light.ambient.intensity;
+        ambient.intensity = flashedAmbient(light.ambient.intensity, flash);
     }
 
     return light;
@@ -75,6 +83,7 @@ export class Sky {
     constructor(scene, options = {}) {
         this.scene   = scene;
         this.density = FOG_DENSITY;
+        this.flash   = 0;
         this.cycle   = createDayNight(options.cycle ?? {});
         this.running = options.cycle?.length !== 0;
         this.setup();
@@ -112,7 +121,8 @@ export class Sky {
             scene: this.scene,
             sun: this.sunLight,
             ambient: this.ambientLight,
-            density: this.density
+            density: this.density,
+            flash: this.flash
         });
     }
 
@@ -145,6 +155,26 @@ export class Sky {
         if (this.scene.fog) this.scene.fog.density = this.density;
         return this.density;
     }
+
+    /**
+     * Lights the sky with a lightning strike, as a share of a full one, and
+     * puts it in force at once rather than waiting for the next frame.
+     *
+     * Held rather than applied and forgotten, because the hour is re-applied
+     * every frame and would wash the strike straight back out again. It is the
+     * caller's to clear: a strike that is over is a strike set back to 0, which
+     * is what the weather layer does every frame there is no flash in.
+     *
+     * Returns the level now in force.
+     */
+    setFlash(level = 0) {
+        this.flash = Math.min(Math.max(Number(level) || 0, 0), 1);
+        this.light = this.apply();
+        return this.flash;
+    }
+
+    /** How much of a strike is over the sky, which is normally none of one. */
+    getFlash() { return this.flash; }
 
     getSunPosition() { return this.sunLight.position.clone(); }
 }

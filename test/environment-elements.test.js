@@ -5,7 +5,7 @@ import {
     ELEMENTS, ELEMENTS_BY_ID, ELEMENT_ORDER,
     DEFAULT_SIZE, DEFAULT_SEGMENTS,
     createField, fieldX, fieldZ, paint, readColor, mixColor, slopeAt, sampleHeight,
-    createRandom, pick, span, scalar, gradient, gated, blend,
+    createRandom, pick, span, scalar, gradient, gated, toggle, blend,
     resolveConfig, applyBase, applyElement, orderPlacements,
     getElement, isElementId, carveProfile,
     isOnRunway, waterSurface, clearRunwayGround, RUNWAY_FREEBOARD
@@ -200,7 +200,7 @@ test('an element is data: ranges to configure it and a generator to draw it', ()
         const names = Object.keys(element.ranges);
         assert.ok(names.length > 0, `${element.id} should declare what can be configured about it`);
         for (const [name, range] of Object.entries(element.ranges)) {
-            assert.ok(['span', 'scalar', 'gradient', 'gated'].includes(range.kind),
+            assert.ok(['span', 'scalar', 'gradient', 'gated', 'toggle'].includes(range.kind),
                 `${element.id}.${name} is not a range`);
         }
     }
@@ -538,6 +538,40 @@ test('the gate is held as an answer, so only a yes turns it on', () => {
     }
 });
 
+// --- A mode on its own ----------------------------------------------------
+
+test('a toggle declares a switch and nothing else, and it is off', () => {
+    const range = toggle();
+
+    assert.equal(range.kind, 'toggle');
+    assert.equal(range.default, false);
+    assert.equal(range.low, 0, 'the bounds a switch is stepped between are still declared');
+    assert.equal(range.high, 1);
+    assert.equal(toggle(true).default, true, 'and a mode can be declared already on');
+});
+
+// The same rule the gate is held to, for the same reason: a generator reading
+// `config.bulk` branches on an answer rather than on whatever a preset left
+// there. The one difference is where the answer sits - a toggle *is* the
+// answer, where a gate is one member of the pair beside it.
+test('a toggle is held as an answer, so only a yes turns it on', () => {
+    const element = { ranges: { bulk: toggle() } };
+
+    assert.equal(resolveConfig(element, { bulk: true }).bulk, true);
+
+    for (const given of [false, 1, 'yes', 'true', 0, [0.4, 0.9], { on: true }]) {
+        const held = resolveConfig(element, { bulk: given }).bulk;
+        assert.equal(held, false, `a bulk of ${JSON.stringify(given)} is not a yes`);
+        assert.equal(typeof held, 'boolean', 'and what is held is always an answer');
+    }
+
+    for (const given of [null, undefined]) {
+        assert.equal(resolveConfig(element, { bulk: given }).bulk, false,
+            'nothing asked is the declared default');
+        assert.equal(resolveConfig({ ranges: { bulk: toggle(true) } }, { bulk: given }).bulk, true);
+    }
+});
+
 // --- What the mountain's footprint gates do to the ground ------------------
 
 /** Every peak one mountain configuration lays, as the generator works them out. */
@@ -567,6 +601,10 @@ test('with both gates off a mountain is the mountain the simulator always drew',
         'bounds set behind a switch that is off change nothing');
     assert.deepEqual(peaksFrom({ width: { on: false, range: [200, 300] } }), always,
         'on either gate');
+    assert.deepEqual(peaksFrom({ girthRange: { on: false, range: [0.1, 0.2] } }), always,
+        'or on the third of them');
+    assert.deepEqual(peaksFrom({ bulk: false }), always,
+        'and a mode declined is a mode that did nothing');
     assert.ok(always.some(height => height > 0), 'and the test is reading real ground');
 });
 
@@ -613,6 +651,95 @@ test('a length asked for outright is not stretched by girth as well', () => {
     assert.notDeepEqual(peaksFrom({ ...widthOnly, girth: 0 }), peaksFrom({ ...widthOnly, girth: 1 }));
 });
 
+// --- The girth said as a pair rather than as one value ---------------------
+
+/**
+ * The assertion the girth range was worth adding for, and the one with teeth
+ * in it: a pair that cannot stretch anything draws the round peak the scalar
+ * draws at zero, to the last vertex.
+ *
+ * It pins two claims at once. The arithmetic - a stretch of `1 + 0` is the
+ * round bump - and the accounting, which is the one that would break quietly:
+ * each peak has to draw its own girth out of the pair, in place of the one
+ * `random()` the scalar's spread spent. A generator that drew one girth for
+ * the whole element instead would spend five draws a peak where the stream
+ * holds six, and every peak after the first would be laid somewhere else.
+ */
+test('a girth range that cannot stretch is the round peak the scalar draws at zero', () => {
+    assert.deepEqual(peaksFrom({ girthRange: { on: true, range: [0, 0] } }), peaksFrom({}),
+        'the same ground, so the pair is drawn once a peak like the value it replaces');
+});
+
+test('the girth range stretches each peak by a girth of its own', () => {
+    const flat    = peaksFrom({ girthRange: { on: true, range: [0, 0] } });
+    const stretched = peaksFrom({ girthRange: { on: true, range: [1, 1] } });
+
+    assert.notDeepEqual(stretched, flat, 'a girth of one is not a girth of none');
+
+    // The pair is read as bounds rather than as a setting with a spread around
+    // it, which is what makes it more than a second way to write the scalar: a
+    // range either side of a girth draws peaks the degenerate pair at that same
+    // girth cannot.
+    assert.notDeepEqual(peaksFrom({ girthRange: { on: true, range: [0, 1] } }),
+        peaksFrom({ girthRange: { on: true, range: [0.5, 0.5] } }),
+        'bounds either side of a girth are not that girth');
+});
+
+// The same precedence the length gate has over the girth, one rung down: the
+// pair said outright wins over the value the generator was working the spread
+// out from. Left the other way round, a pilot who set a girth range would
+// watch the preset's own girth go on deciding the stretch.
+test('a girth range asked for leaves the scalar girth with nothing to say', () => {
+    const asked = { girthRange: { on: true, range: [0.3, 0.8] } };
+
+    assert.deepEqual(peaksFrom({ ...asked, girth: 0 }), peaksFrom({ ...asked, girth: 1 }),
+        'with the pair given, the one value is spent');
+
+    // And the scalar is what the switch gives way to, so with it off the girth
+    // is still the whole of the stretch.
+    const off = { girthRange: { on: false, range: [0.3, 0.8] } };
+    assert.notDeepEqual(peaksFrom({ ...off, girth: 0 }), peaksFrom({ ...off, girth: 1 }));
+});
+
+// --- The mode over all three of them --------------------------------------
+
+test('the bulk mode is the three footprint switches thrown at once', () => {
+    assert.deepEqual(peaksFrom({ bulk: true }),
+        peaksFrom({ width: { on: true }, length: { on: true } }),
+        'the mode asks for the same ground the switches do');
+
+    assert.notDeepEqual(peaksFrom({ bulk: true }), peaksFrom({}),
+        'and that is a different world from the one the mode is off in');
+});
+
+// The bounds behind a switch that is off are still bounds, so the mode reads
+// them rather than the declared defaults. Written as a test because the other
+// reading is the tempting one: a mode that threw the switches by writing `on`
+// into them would read the same way here and leave the element in the mode
+// after it was turned off.
+test('the bulk mode randomizes within the bounds each range was configured with', () => {
+    const narrow = { width: { on: false, range: [150, 200] } };
+
+    assert.deepEqual(peaksFrom({ bulk: true, ...narrow }),
+        peaksFrom({ width: { on: true, range: [150, 200] }, length: { on: true } }),
+        'the pair behind an off switch is the pair the mode randomizes in');
+
+    assert.notDeepEqual(peaksFrom({ bulk: true, ...narrow }), peaksFrom({ bulk: true }),
+        'so configuring a range changes what the mode draws');
+});
+
+// The one thing the mode does not do, said plainly because the item it was
+// built for names all three ranges: the long axis is the length's under the
+// mode, so the girth - either form of it - has nothing left to decide. That is
+// the element's existing precedence rather than a rule the mode invents.
+test('under the bulk mode the length holds the long axis and the girth is spent', () => {
+    const bulk = { bulk: true };
+
+    assert.deepEqual(peaksFrom({ ...bulk, girth: 0 }), peaksFrom({ ...bulk, girth: 1 }));
+    assert.deepEqual(peaksFrom({ ...bulk, girthRange: { on: true, range: [0, 0] } }),
+        peaksFrom({ ...bulk, girthRange: { on: true, range: [1, 1] } }));
+});
+
 /**
  * The ground a seeded mountain run lays, as one value.
  *
@@ -654,4 +781,8 @@ test('the ground a seeded mountain lays is the ground it laid before the gates e
         MOUNTAIN_GROUND, 'a gate thrown is a different world, or the gate does nothing');
     assert.notEqual(groundFingerprint({ count: 6, length: { on: true, range: [5000, 6000] } }),
         MOUNTAIN_GROUND);
+    assert.notEqual(groundFingerprint({ count: 6, girthRange: { on: true, range: [0.4, 0.9] } }),
+        MOUNTAIN_GROUND, 'and the third gate reaches the ground as well');
+    assert.notEqual(groundFingerprint({ count: 6, bulk: true }), MOUNTAIN_GROUND,
+        'as does the mode over all three');
 });

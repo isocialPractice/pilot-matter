@@ -1120,7 +1120,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
 
 <p>An environment is a description rather than geometry: a name, a seed, the base ground, and the elements placed over it. A host can pass its own list of placements instead of a preset's, and every value in one is clamped into the range the element declares, so a placement cannot configure an element outside what it says it supports.</p>
 
-<p>Every range an element declares says which of four kinds it is, which is what a host reading <code>ELEMENTS</code> has to branch on and what a value handed to <code>resolveConfig</code> is read as:</p>
+<p>Every range an element declares says which of five kinds it is, which is what a host reading <code>ELEMENTS</code> has to branch on and what a value handed to <code>resolveConfig</code> is read as:</p>
 
 <div class="table-wrap">
 <table>
@@ -1130,6 +1130,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
         <tr><td><code>scalar</code></td><td>A number</td><td>One number, clamped</td></tr>
         <tr><td><code>gradient</code></td><td><code>{light, dark}</code></td><td>A base hue as its two ends, each a colour triple</td></tr>
         <tr><td><code>gated</code></td><td><code>{on, range}</code>, or a bare <code>[low, high]</code></td><td><code>{on, range}</code> - a pair of bounds and whether they apply</td></tr>
+        <tr><td><code>toggle</code></td><td><code>true</code></td><td>A boolean - a mode the element is either in or not</td></tr>
     </tbody>
 </table>
 </div>
@@ -1138,7 +1139,9 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
 
 <p>It is off unless something turns it on, so an element can declare one without moving any world already described: a placement written before the range existed resolves to the ground it always did. A bare pair turns it on, because a caller that troubled to name bounds is asking for them to be used; an <code>on</code> with no bounds beside it takes the declared ones. Anything other than <code>true</code> is read as off, so what comes back is always an answer rather than a value to test for truthiness.</p>
 
-<p>The mountain declares two: <code>length</code> and <code>width</code>, the two axes of the ellipse a peak is drawn on. Off, each gives way to what was always there - <code>width</code> to <code>radius</code>, and <code>length</code> to <code>radius</code> stretched by <code>girth</code> - so a peak is round, stretched by a random amount, or exactly the footprint it was asked for.</p>
+<p>The mountain declares three. <code>length</code> and <code>width</code> are the two axes of the ellipse a peak is drawn on; off, each gives way to what was always there - <code>width</code> to <code>radius</code>, and <code>length</code> to <code>radius</code> stretched by <code>girth</code> - so a peak is round, stretched by a random amount, or exactly the footprint it was asked for. <code>girthRange</code> is the third, and it is the girth said as a pair of bounds rather than as the one value every peak shares: on, each peak draws a girth of its own out of it, and the <code>girth</code> scalar is what it gives way to when it is off.</p>
+
+<p>Where two of them describe the same axis, the one asked for outright wins. A <code>length</code> is the long axis whatever the girth says, and a <code>girthRange</code> is the stretch whatever the <code>girth</code> scalar says.</p>
 
 <pre><code>import { createEnvironment } from 'pilot-matter';
 
@@ -1148,7 +1151,28 @@ createEnvironment({
         { type: 'mountain', config: { count: 8, length: [2600, 3200] } },
         // Both axes given, so `girth` has nothing left to say about the peak
         { type: 'mountain', config: { count: 4, length: { on: true, range: [1800, 1800] },
-                                               width:  { on: true, range: [600, 600] } } }
+                                               width:  { on: true, range: [600, 600] } } },
+        // Peaks stretched by a girth each, drawn between the bounds given
+        { type: 'mountain', config: { count: 6, girthRange: [0.2, 0.9] } }
+    ]
+});</code></pre>
+
+<p>A <code>toggle</code> is a switch with no bounds behind it: a mode an element is either in or not, for something that reaches across several ranges at once and so has no pair of its own to carry. It is off unless something asks for it, and only <code>true</code> asks - anything else is read as off, the way a <code>gated</code> switch is.</p>
+
+<p>The mountain declares one, <code>bulk</code>: every footprint range at once, randomized within the bounds each was configured with. It reads the gated ranges as on without writing to them, so a world put into the mode and taken out of it is back on whatever each switch was left saying.</p>
+
+<pre><code>import { createEnvironment } from 'pilot-matter';
+
+createEnvironment({
+    elements: [
+        // The three footprint ranges randomized together, inside the bounds
+        // given - and `girth` is spent, because `length` holds the long axis
+        { type: 'mountain', config: {
+            count: 10,
+            bulk:  true,
+            width:  { range: [300, 900] },
+            length: { range: [1200, 3000] }
+        } }
     ]
 });</code></pre>
 

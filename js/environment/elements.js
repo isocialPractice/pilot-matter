@@ -264,6 +264,23 @@ export function gated(low, high, defaultLow, defaultHigh, on = false) {
 }
 
 /**
+ * A switch with no bounds behind it: a mode an element is either in or not.
+ *
+ * This is the half of `gated` the comment above calls "a different thing from
+ * either on its own" - the question without the span. A mode that reaches
+ * across several ranges at once has no pair of its own to carry, and saying it
+ * with a scalar instead would be declaring a dial from 0 to 1 that only ever
+ * means two things: every value between them would be a setting the element
+ * cannot be in, reachable by typing one in.
+ *
+ * Off by default, for the reason `gated` is: a mode added to an element leaves
+ * every world already described exactly as it was.
+ */
+export function toggle(on = false) {
+    return { kind: 'toggle', low: 0, high: 1, default: on === true };
+}
+
+/**
  * A colour between the light and the dark end of one base hue. Both ends are
  * given as a colour of the same hue, so a gradient walks a base colour from
  * pale to deep rather than crossing the wheel: no element shifts colour
@@ -301,6 +318,15 @@ function resolveRange(range, given) {
     if (range.kind === 'span') {
         const pair = Array.isArray(given) && given.length === 2 ? given : range.default;
         return clampPair(pair, range, range.default);
+    }
+
+    // A mode is on when it was asked for and off otherwise, which includes
+    // every value that is not an answer to the question: a preset carrying a
+    // number, a string or a null where a mode belongs has not asked for the
+    // mode, and reading one of those as "on" would put a world into a mode it
+    // never named. `true` is the whole of the asking.
+    if (range.kind === 'toggle') {
+        return given == null ? range.default : given === true;
     }
 
     // A gated range is written either way round: `{ on, range }` says both
@@ -383,6 +409,25 @@ const mountain = {
         // Girth stretches a peak along an axis of its own. At 0 the bump is
         // the round one the simulator has always drawn.
         girth:  scalar(0, 1, 0),
+        // The girth said as the pair of bounds a peak draws its own out of,
+        // rather than as the one value every peak in the element shares.
+        //
+        // The scalar above stays, and that is the answer to the question this
+        // range was queued with - what an ungated `girth` means once the scalar
+        // is gone. It does not go: six presets configure `girth` as a number,
+        // and a gated range holds an `{ on, range }` with nowhere for that
+        // number to live, so changing the kind underneath them would quietly
+        // redraw six described worlds. What this declares instead is the
+        // relationship `width` already has with `radius` - the live range is
+        // what the switch gives way to when it is off, and the pair is the same
+        // quantity said outright.
+        //
+        // On, each peak draws a girth of its own from the pair, which is the
+        // random algorithm the range was asked for: a deck of peaks stretched
+        // by varying amounts rather than by one. Off, the scalar is read as it
+        // always was, and a preset that never heard of the switch draws the
+        // ground it always drew.
+        girthRange: gated(0, 1, 0.2, 0.9),
         // The footprint said outright, as the two axes of the ellipse a peak
         // is drawn on, rather than left to `radius` and `girth` to arrive at.
         // Each is switched on by itself, and off each gives way to what was
@@ -391,13 +436,35 @@ const mountain = {
         // exactly the footprint it was asked for, and the first two are what
         // the simulator has always drawn.
         length: gated(100, 7000, 900, 2400),
-        width:  gated(100, 3000, 400, 1100)
+        width:  gated(100, 3000, 400, 1100),
+        // Every footprint range at once: the mode that says "randomize the lot
+        // within the bounds they declare" instead of asking for three switches
+        // to be found and thrown.
+        //
+        // It reads the three gated ranges as on without writing to them, so
+        // turning it off puts the element back on whatever each switch was left
+        // saying rather than on what the mode did to them. Where two of them
+        // describe the same axis the precedence already in force holds: a
+        // length asked for outright wins over a girth, under this mode exactly
+        // as it does when a pilot sets both by hand.
+        //
+        // The rotation the mode is named for is already applied to every peak
+        // and always has been, so this does not switch it on - it is the half
+        // of the mode that was there before the mode was.
+        bulk: toggle()
     },
 
     generate(field, config, random) {
         const total  = config.count > 0 ? Math.round(config.count) : mountainCount(field.size);
         const half   = field.size / 2 - field.size * 0.10;
         const peaks  = [];
+
+        // The bulk mode read once rather than per peak, and as the three
+        // answers it gives rather than as itself, so the loop below reads one
+        // question per axis whichever way the mode is set.
+        const wide    = config.bulk || config.width.on;
+        const long    = config.bulk || config.length.on;
+        const stretch = config.girthRange.on;
 
         for (let i = 0; i < total; i++) {
             // Every value is drawn in the order it has always been drawn in,
@@ -408,6 +475,11 @@ const mountain = {
             // and nothing else about the world - every peak after it stands
             // where it stood, because the stream it is laid out from is the
             // same length whichever way the gates are set.
+            //
+            // Six draws a peak, and the bulk mode is no exception: it answers
+            // two of the three questions below rather than adding a question
+            // of its own, so a world laid in the mode has its peaks in the same
+            // places as the same world laid out of it.
             const x = field.originX + (random() * 2 - 1) * half;
             const z = field.originZ + (random() * 2 - 1) * half;
 
@@ -416,16 +488,23 @@ const mountain = {
             // because that is what `ellipticalDistance` measures with, and
             // because an ungated peak then works out to the exact peak it
             // always was rather than one that rounds to it.
-            const across = config.width.on
+            const across = wide
                 ? pick(random, config.width.range)
                 : pick(random, config.radius);
 
             const peak  = pick(random, config.height);
             const angle = random() * Math.PI * 2;
 
-            const along = config.length.on
+            // Three ways to the long axis and one draw whichever is taken: the
+            // length asked for outright, a girth drawn out of its own bounds,
+            // or the single girth stretched by the generator's own spread.
+            // The order is what gives a range said outright the last word over
+            // one the generator is working out for itself.
+            const along = long
                 ? pick(random, config.length.range)
-                : across * (1 + config.girth * (0.4 + random()));
+                : across * (1 + (stretch
+                    ? pick(random, config.girthRange.range)
+                    : config.girth * (0.4 + random())));
 
             peaks.push({ x, z, radius: across, peak, angle, stretch: along / across });
         }

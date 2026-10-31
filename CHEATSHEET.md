@@ -147,6 +147,7 @@ why the view is the one left out.
 | `CONTROL SENSITIVITY` | 50% to 200% |
 | `ORBIT SWEEP` | `6°/S` to `36°/S`, default `12°/S` |
 | `FOG DENSITY` | `CLEAR` to `THICK` |
+| `WEATHER` | `CLEAR`, `CLOUDY`, `STORMY` |
 | `AIRSPEED IN` | `KNOTS`, `MPH` |
 | `ALTITUDE IN` | `FEET`, `METERS` |
 
@@ -207,7 +208,7 @@ Five more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
 
 | Element | Configured through |
 |---------|--------------------|
-| Mountain | Count, height, radius, girth, length, width |
+| Mountain | Count, height, radius, girth, a girth range, length, width, and a bulk mode over all three |
 | Canyon | Depth, width, steepness, branches, wander |
 | Desert | Dune height, crest spacing, coverage, sand gradient |
 | Grass | Green gradient, height band |

@@ -1391,6 +1391,120 @@ test('the approach marks are turned the way the aircraft is turned', () => {
         'a bearing converted by hand here is the compass frame written out a second time');
 });
 
+/** The effects layer, read off its source: it imports Three.js like the rest. */
+const weatherSource = readFileSync(
+    fileURLToPath(new URL('../js/weather.js', import.meta.url)), 'utf8'
+);
+
+/**
+ * The same source with the prose taken out of it, for the claims that are
+ * about what a module does not do.
+ *
+ * A module that explains what it deliberately left behind names the thing it
+ * left behind, so a bare search of the file finds the word in the paragraph
+ * saying it is gone and reports it as present. The code is where the claim
+ * lives; the comment is where it is argued.
+ */
+const code = (source) => source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+/**
+ * The three things the weather layer was lifted onto rather than lifted with,
+ * each of them a place the branch it came from had an answer this world has a
+ * better one for. All three are the same shape of mistake if they come back:
+ * the layer goes on working and draws a sky that disagrees with the one the
+ * rest of the world is lit by.
+ *
+ * Read off the source because the module imports Three.js and cannot be
+ * constructed in Node, the way the ring colours and the approach marks above
+ * are.
+ */
+test('the weather is drawn in the hour this world runs rather than in a switch', () => {
+    assert.match(weatherSource, /import\s*\{[^}]*celestialAt[^}]*\}\s*from\s*'\.\/weather-math\.js'/,
+        'js/weather.js should place the sky body by the arc the light walks');
+    assert.match(weatherSource, /celestialAt\(/, 'and actually call it');
+
+    const drawn = code(weatherSource);
+
+    assert.ok(!/KEY_LIGHT_POSITION|keyPosition/.test(drawn),
+        'a fixed light position here is the day-or-night switch back again');
+    assert.ok(!/STYLE\b|weather-style/.test(drawn),
+        'and nothing of the resolved style module on the branch travels');
+    assert.ok(!/tone|tint/i.test(drawn),
+        'the tone tint is dropped entirely: the colour here is the colour of the hour');
+});
+
+/**
+ * The condition is a setting rather than a constant, which is the whole reason
+ * the branch's surface was judged unfinished: it was `export const WEATHER`
+ * hand-edited in the module and resolved once at import, with no setter and
+ * nothing a panel could reach.
+ */
+test('the weather condition is asked for rather than written into the module', () => {
+    assert.match(weatherSource, /setPrecipitation\s*\(/,
+        'js/weather.js should take the condition from a caller');
+    assert.ok(!/^export const WEATHER\b/m.test(weatherSource),
+        'and hold none of its own');
+
+    const main = scripts.find(entry => entry.name === 'main.js').source;
+    assert.match(main, /setPrecipitation\(currentOption\([^)]*WEATHER_OPTION\)\)/,
+        'and js/main.js should hand it whatever the settings panel is on');
+});
+
+/**
+ * The layer brings no assets with it. The branch loaded three svgs through a
+ * `TextureLoader` with a fallback blob for when one was missing - which is a
+ * loader, a fallback and three files to deploy, for three shapes a canvas can
+ * draw. Everything else in this world is generated rather than placed, and a
+ * weather layer that shipped files would be the one exception.
+ */
+test('the weather textures are drawn rather than loaded', () => {
+    assert.match(weatherSource, /createElement\('canvas'\)/,
+        'js/weather.js should draw its textures');
+    assert.ok(!/TextureLoader|\.svg|\.png/.test(weatherSource),
+        'and load nothing, so there is no asset to fail to load');
+});
+
+/**
+ * Built to the worst weather and drawn down to the weather in force. The other
+ * way round - building for the condition it was handed - means throwing the
+ * sprites away and building 5200 more on the frame a pilot asks for a storm,
+ * which is a stall in mid-flight to save a few hundred kilobytes.
+ */
+test('the weather is built once and drawn down to the condition in force', () => {
+    assert.match(weatherSource, /PRECIPITATION_MOST/,
+        'js/weather.js should size itself to the worst weather there is');
+    assert.match(weatherSource, /this\.rain\.count\s*=/,
+        'and draw the rain down to the count the condition asks for');
+
+    // Bounded to the method it is anchored on, the way the spans in
+    // `test/input-map.test.js` are: a method body read past its own closing
+    // brace is the whole module tested against a claim about one function.
+    const [body] = weatherSource.match(/setPrecipitation\(id[^]*?\n {4}\}/) ?? [];
+    assert.ok(body, 'js/weather.js should declare the condition setter as a method');
+    assert.ok(!/new THREE\./.test(body),
+        'changing the condition mid-flight should build nothing');
+});
+
+/**
+ * A strike is weather rather than an hour. `applyDaylight` hands back the
+ * light in force and the water glints by what it hands back, so a flash folded
+ * into it would have a lake sparkling off lightning at midnight.
+ */
+test('a lightning flash lights the sky without becoming the hour', () => {
+    const sky = readFileSync(fileURLToPath(new URL('../js/sky.js', import.meta.url)), 'utf8');
+
+    assert.match(sky, /import\s*\{[^}]*flashedSky[^}]*\}\s*from\s*'\.\/weather-math\.js'/,
+        'js/sky.js should take the flash arithmetic from the pure module');
+    assert.match(sky, /flashedSky\(light\.sky,\s*flash\)/, 'and wash the sky with it');
+    assert.match(sky, /flashedAmbient\(light\.ambient\.intensity,\s*flash\)/,
+        'and the fill light with it');
+
+    assert.ok(!/light\.daylight\s*[*+]|flashedDaylight/.test(sky),
+        'but never the daylight, which is what the water reads');
+});
+
 /**
  * The pads take a fixed band off the bottom of the screen and paint over
  * everything in it at z-index 130. The floated readouts were dropped to 180

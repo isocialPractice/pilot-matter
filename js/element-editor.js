@@ -187,6 +187,15 @@ export function rangeRows(name, range) {
         ];
     }
 
+    // A mode is the switch and nothing else, so it is the gate row without the
+    // two bounds under it. `bare` is what says the switch is the whole value
+    // rather than one half of a pair: everything else about the row - the step
+    // of 1, the word it reads as, the notice it refuses a figure with - is the
+    // gate's, because a switch is a switch whatever it is switching.
+    if (range.kind === 'toggle') {
+        return [{ part: 'on', label: label(name), range: GATE_RANGE, gate: true, bare: true }];
+    }
+
     if (range.kind === 'gradient') {
         return [
             { part: 'light', label: `${label(name)} LIGHT`, range: SHADE_RANGE, shade: 'light' },
@@ -389,7 +398,9 @@ export function rowValue(element, name, row) {
     // Both read before `row.at`, which a gated bound carries too: a gated
     // range holds its pair one level in, under `range`, so reading it as a span
     // would read the `on` and the `range` as the two bounds.
-    if (row.gate) return element.config[name].on ? 1 : 0;
+    if (row.gate) {
+        return (row.bare ? element.config[name] : element.config[name].on) ? 1 : 0;
+    }
     if (row.gated) return element.config[name].range[row.at];
     if (row.at != null) return element.config[name][row.at];
     return element.config[name];
@@ -551,7 +562,9 @@ function writeRowValue(element, name, row, value) {
     }
 
     if (row.gate) {
-        element.config[name].on = gateOn(value);
+        const on = gateOn(value);
+        if (row.bare) element.config[name] = on;
+        else element.config[name].on = on;
         return;
     }
 

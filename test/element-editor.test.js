@@ -54,7 +54,7 @@ import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
 import { isMenuControlKey } from '../js/menu.js';
 import {
     ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom,
-    gated
+    gated, toggle
 } from '../js/environment/elements.js';
 import {
     ENVIRONMENTS, getEnvironment, DEFAULT_ENVIRONMENT_ID, buildEnvironment
@@ -1163,4 +1163,77 @@ test('putting the preset back turns the switches back off with it', () => {
     const restored = state.elements.find(entry => entry.type === 'mountain');
     assert.deepEqual(restored.config.width, resolveConfig(getElement('mountain'), {}).width);
     assert.equal(restored.config.width.on, false);
+});
+
+// --- A mode, which is the switch without the bounds ------------------------
+
+/**
+ * A mode is drawn as one row, and it is the gate's row: the same step of one,
+ * the same word in place of a number, the same notice a refused figure is
+ * turned down with. What it carries of its own is `bare`, which says the
+ * switch is the whole value rather than the `on` of a pair beside it - and
+ * that is the only thing either side of the panel has to know about it.
+ */
+test('a mode is drawn as the switch alone', () => {
+    const rows = rangeRows('bulk', toggle());
+
+    assert.equal(rows.length, 1, 'a mode has no bounds to draw under it');
+    assert.equal(rows[0].part, 'on');
+    assert.equal(rows[0].label, 'BULK');
+    assert.equal(rows[0].range, GATE_RANGE, 'stepped as the switch it is');
+    assert.ok(rows[0].gate, 'and read as one');
+    assert.ok(rows[0].bare, 'with the switch standing for the whole value');
+
+    assert.equal(rowValueLabel(rows[0], 0), GATE_OFF_LABEL);
+    assert.equal(rowValueLabel(rows[0], 1), GATE_ON_LABEL);
+    assert.equal(rangeNotice(rows[0]), GATE_OFF_LABEL + ' TO ' + GATE_ON_LABEL);
+});
+
+test('the panel lists the mountain mode as one row, opening off', () => {
+    const { state, element } = openedOnMountain();
+    const entry = editorEntry(state, rowId(element.id, 'bulk', 'on'));
+
+    assert.ok(entry, 'the mode should be drawn');
+    assert.equal(entry.kind, RANGE_ENTRY);
+    assert.equal(entry.value, 0, 'off, as the range declares');
+    assert.ok(entry.text.includes(GATE_OFF_LABEL), 'reading as the word');
+
+    for (const part of ['min', 'max']) {
+        assert.equal(editorEntry(state, rowId(element.id, 'bulk', part)), null,
+            'and a mode has no ' + part + ' row to draw');
+    }
+});
+
+// The write path is the half that differs from a gate: a mode holds its answer
+// where a gated range holds an object, so writing `config.bulk.on` would set a
+// property on a boolean and throw nothing while changing nothing.
+test('throwing a mode holds the answer itself and asks for the ground again', () => {
+    const { state, element } = openedOnMountain();
+    const id = rowId(element.id, 'bulk', 'on');
+
+    assert.equal(element.config.bulk, false);
+    assert.equal(adjustEditorRange(state, id, 1), element.id, 'the ground has to be drawn again');
+    assert.equal(element.config.bulk, true, 'and the mode is the answer rather than holding one');
+    assert.equal(typeof element.config.bulk, 'boolean');
+    assert.ok(editorEntry(state, id).text.includes(GATE_ON_LABEL));
+
+    assert.equal(adjustEditorRange(state, id, 1), null, 'on is as far as it goes');
+
+    assert.equal(adjustEditorRange(state, id, -1), element.id);
+    assert.equal(element.config.bulk, false, 'and it turns back off in one press');
+});
+
+test('a mode survives being handed out as a placement and put back', () => {
+    const { state, element } = openedOnMountain();
+
+    adjustEditorRange(state, rowId(element.id, 'bulk', 'on'), 1);
+
+    const placement = editorPlacements(state).find(entry => entry.type === 'mountain');
+    assert.equal(placement.config.bulk, true);
+    assert.deepEqual(resolveConfig(getElement('mountain'), placement.config), element.config,
+        'and resolves back to the world the panel is reading');
+
+    restoreEditor(state);
+    const restored = state.elements.find(entry => entry.type === 'mountain');
+    assert.equal(restored.config.bulk, false, 'the preset knew nothing of the mode');
 });

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Aircraft }         from './aircraft.js';
 import { Terrain }          from './terrain.js';
 import { Sky }              from './sky.js';
+import { Weather }          from './weather.js';
 import { CameraController } from './camera.js';
 import { HUD }              from './hud.js';
 import { INITIAL_CAMERA_MODE, flightStart } from './flight-state.js';
@@ -24,7 +25,7 @@ import {
     chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
     isSettingsCloseKey, isSettingsOpenKey,
     SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP,
-    SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION,
+    SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION, WEATHER_OPTION,
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
 import {
@@ -185,6 +186,10 @@ class FlightSimulator {
         this.bestTimes = createBestTimesState(defaultStorage());
 
         this.sky     = new Sky(this.scene);
+        // Built beside the sky rather than inside it: the weather reads the
+        // hour off the cycle and hands a strike back to it, which is two
+        // things talking rather than one thing doing both.
+        this.weather = new Weather(this.scene, this.sky);
         // The first world is built from the editor's elements as well, though
         // nobody has moved one yet: the ground is compared against what it was
         // asked for, and asking for the same world a second way would throw the
@@ -436,6 +441,7 @@ class FlightSimulator {
         this.aircraft.setSensitivity(currentOption(this.settings, SENSITIVITY_OPTION));
         this.camera2.setOrbitRate(currentOption(this.settings, ORBIT_RATE_OPTION));
         this.sky.setFogDensity(currentOption(this.settings, FOG_OPTION));
+        this.weather.setPrecipitation(currentOption(this.settings, WEATHER_OPTION));
         this.hud.setUnits({
             speed:    currentOption(this.settings, SPEED_UNIT_OPTION),
             altitude: currentOption(this.settings, ALTITUDE_UNIT_OPTION)
@@ -2023,6 +2029,12 @@ class FlightSimulator {
         // throw back is whatever the sky is giving it at that hour.
         this.sky.update(dt);
         this.terrain.updateWater(dt, this.sky.getDaylight());
+
+        // Drawn after the camera has been placed and the hour has moved on,
+        // because all three of those are what the layer is positioned by: the
+        // rain rides with the camera, the deck wraps around it, and the sky's
+        // body stands on the arc the light of that hour is coming from.
+        this.weather.update(dt, this.camera, this.sky.getPhase());
 
         this.hud.update(this.aircraft, this.camera2, frozen || capturing);
 

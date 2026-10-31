@@ -22,6 +22,7 @@ import {
     START_FIELDS, START_FIELD_IDS, CHOICE_FIELD, TOGGLE_FIELD, resolveStart, runwayForced
 } from './config.js';
 import { ORBIT_RATE, ORBIT_RATES } from './camera-math.js';
+import { DEFAULT_PRECIPITATION } from './weather-math.js';
 import {
     typedCharacter, startsTypedValue, readTypedKey, typedValueLabel
 } from './typed-value.js';
@@ -65,6 +66,7 @@ export const OPTION_GROUP = 'options';
 export const SENSITIVITY_OPTION   = 'sensitivity';
 export const ORBIT_RATE_OPTION    = 'orbitRate';
 export const FOG_OPTION           = 'fog';
+export const WEATHER_OPTION       = 'weather';
 export const SPEED_UNIT_OPTION    = 'speedUnit';
 export const ALTITUDE_UNIT_OPTION = 'altitudeUnit';
 
@@ -118,6 +120,22 @@ export const FLIGHT_OPTIONS = [
             { value: 1,    label: 'NORMAL' },
             { value: 1.5,  label: 'HEAVY'  },
             { value: 2,    label: 'THICK'  }
+        ]
+    },
+    {
+        // The condition the world is flown in, which used to be a constant
+        // hand-edited into a module on the branch the effects came from. The
+        // values are the ids `js/weather-math.js` declares rather than labels
+        // of their own, so the dial cannot offer a condition the layer has
+        // never heard of.
+        id: WEATHER_OPTION,
+        label: 'WEATHER',
+        note: 'the cloud, rain and lightning the world is flown in',
+        default: DEFAULT_PRECIPITATION,
+        values: [
+            { value: 'clear',  label: 'CLEAR'  },
+            { value: 'cloudy', label: 'CLOUDY' },
+            { value: 'stormy', label: 'STORMY' }
         ]
     },
     {

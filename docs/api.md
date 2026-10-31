@@ -1275,7 +1275,7 @@ placements instead of a preset's, and every value in one is clamped into the
 range the element declares, so a placement cannot configure an element outside
 what it says it supports.
 
-Every range an element declares says which of four kinds it is, which is what a
+Every range an element declares says which of five kinds it is, which is what a
 host reading `ELEMENTS` has to branch on and what a value handed to
 `resolveConfig` is read as:
 
@@ -1285,6 +1285,7 @@ host reading `ELEMENTS` has to branch on and what a value handed to
 | `scalar` | A number | One number, clamped |
 | `gradient` | `{light, dark}` | A base hue as its two ends, each a colour triple |
 | `gated` | `{on, range}`, or a bare `[low, high]` | `{on, range}` - a pair of bounds and whether they apply |
+| `toggle` | `true` | A boolean - a mode the element is either in or not |
 
 A `gated` range is a pair of bounds that only sometimes applies, for a footprint
 an element otherwise works out for itself. A `span` always applies, so the only
@@ -1300,10 +1301,18 @@ bounds beside it takes the declared ones. Anything other than `true` is read as
 off, so what comes back is always an answer rather than a value to test for
 truthiness.
 
-The mountain declares two: `length` and `width`, the two axes of the ellipse a
-peak is drawn on. Off, each gives way to what was always there - `width` to
-`radius`, and `length` to `radius` stretched by `girth` - so a peak is round,
-stretched by a random amount, or exactly the footprint it was asked for.
+The mountain declares three. `length` and `width` are the two axes of the
+ellipse a peak is drawn on; off, each gives way to what was always there -
+`width` to `radius`, and `length` to `radius` stretched by `girth` - so a peak
+is round, stretched by a random amount, or exactly the footprint it was asked
+for. `girthRange` is the third, and it is the girth said as a pair of bounds
+rather than as the one value every peak shares: on, each peak draws a girth of
+its own out of it, and the `girth` scalar is what it gives way to when it is
+off.
+
+Where two of them describe the same axis, the one asked for outright wins. A
+`length` is the long axis whatever the girth says, and a `girthRange` is the
+stretch whatever the `girth` scalar says.
 
 ```javascript
 import { createEnvironment } from 'pilot-matter';
@@ -1314,7 +1323,36 @@ createEnvironment({
         { type: 'mountain', config: { count: 8, length: [2600, 3200] } },
         // Both axes given, so `girth` has nothing left to say about the peak
         { type: 'mountain', config: { count: 4, length: { on: true, range: [1800, 1800] },
-                                               width:  { on: true, range: [600, 600] } } }
+                                               width:  { on: true, range: [600, 600] } } },
+        // Peaks stretched by a girth each, drawn between the bounds given
+        { type: 'mountain', config: { count: 6, girthRange: [0.2, 0.9] } }
+    ]
+});
+```
+
+A `toggle` is a switch with no bounds behind it: a mode an element is either in
+or not, for something that reaches across several ranges at once and so has no
+pair of its own to carry. It is off unless something asks for it, and only
+`true` asks - anything else is read as off, the way a `gated` switch is.
+
+The mountain declares one, `bulk`: every footprint range at once, randomized
+within the bounds each was configured with. It reads the gated ranges as on
+without writing to them, so a world put into the mode and taken out of it is
+back on whatever each switch was left saying.
+
+```javascript
+import { createEnvironment } from 'pilot-matter';
+
+createEnvironment({
+    elements: [
+        // The three footprint ranges randomized together, inside the bounds
+        // given - and `girth` is spent, because `length` holds the long axis
+        { type: 'mountain', config: {
+            count: 10,
+            bulk:  true,
+            width:  { range: [300, 900] },
+            length: { range: [1200, 3000] }
+        } }
     ]
 });
 ```

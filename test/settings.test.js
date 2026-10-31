@@ -25,6 +25,7 @@ import {
     SENSITIVITY_OPTION,
     ORBIT_RATE_OPTION,
     FOG_OPTION,
+    WEATHER_OPTION,
     SPEED_UNIT_OPTION,
     ALTITUDE_UNIT_OPTION,
     defaultSettings,
@@ -59,6 +60,7 @@ import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
 import { isMenuControlKey } from '../js/menu.js';
 import { ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from '../js/environment/presets.js';
 import { SPEED_UNITS, ALTITUDE_UNITS } from '../js/units.js';
+import { PRECIPITATION_IDS, DEFAULT_PRECIPITATION } from '../js/weather-math.js';
 import {
     START_FIELDS, START_FIELD_IDS, START_MODES, START_FLYING, START_TAKEOFF, startDefaults
 } from '../js/config.js';
@@ -107,6 +109,29 @@ test('the instrument scales are ones the instruments can be read on', () => {
         for (const entry of settingsOption(id).values) {
             assert.ok(scales[entry.value], `${entry.value} is offered but is not a scale js/units.js knows`);
         }
+    }
+});
+
+/**
+ * The weather dial offers the conditions the effects layer declares and no
+ * others, read off `js/weather-math.js` rather than written out here.
+ *
+ * It is the one option whose values are another module's vocabulary, which is
+ * what this holds: a condition offered that the layer has never heard of
+ * draws a clear sky and says nothing, so the panel would read as a dial with
+ * a dead position on it.
+ */
+test('the weather dial offers the conditions the effects layer has', () => {
+    const offered = settingsOption(WEATHER_OPTION).values.map(entry => entry.value);
+
+    assert.deepEqual(offered, [...PRECIPITATION_IDS],
+        'every condition, in the order the layer declares them');
+    assert.equal(defaultSettings()[WEATHER_OPTION], DEFAULT_PRECIPITATION,
+        'and a world opens in the condition the layer opens in');
+
+    for (const entry of settingsOption(WEATHER_OPTION).values) {
+        assert.equal(entry.label, entry.value.toUpperCase(),
+            'the panel reads a condition as its own name rather than as a figure');
     }
 });
 
