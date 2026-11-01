@@ -208,7 +208,7 @@ Five more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
 
 | Element | Configured through |
 |---------|--------------------|
-| Mountain | Count, height, radius, girth, a girth range, length, width, and a bulk mode over all three |
+| Mountain | Count, height, radius, girth, a girth range, length, width, and a bulk mode over the two axes said outright |
 | Canyon | Depth, width, steepness, branches, wander |
 | Desert | Dune height, crest spacing, coverage, sand gradient |
 | Grass | Green gradient, height band |

@@ -1159,13 +1159,15 @@ createEnvironment({
 
 <p>A <code>toggle</code> is a switch with no bounds behind it: a mode an element is either in or not, for something that reaches across several ranges at once and so has no pair of its own to carry. It is off unless something asks for it, and only <code>true</code> asks - anything else is read as off, the way a <code>gated</code> switch is.</p>
 
-<p>The mountain declares one, <code>bulk</code>: every footprint range at once, randomized within the bounds each was configured with. It reads the gated ranges as on without writing to them, so a world put into the mode and taken out of it is back on whatever each switch was left saying.</p>
+<p>The mountain declares one, <code>bulk</code>: the footprint randomized at once, inside the bounds each range was configured with. It reads <code>length</code> and <code>width</code> as on without writing to them, so a world put into the mode and taken out of it is back on whatever each switch was left saying.</p>
+
+<p>Two of the three footprint ranges, and <code>girthRange</code> is the one it leaves alone. Under the mode <code>length</code> holds the long axis, so a girth - the scalar or the range - has nothing left to decide either way, and a host sending <code>{ bulk: true, girthRange: [0.2, 0.9] }</code> gets the length's own spread rather than a girth's. That is the precedence <code>length</code> already has over <code>girth</code> outside the mode, not a rule the mode invents.</p>
 
 <pre><code>import { createEnvironment } from 'pilot-matter';
 
 createEnvironment({
     elements: [
-        // The three footprint ranges randomized together, inside the bounds
+        // The two footprint ranges randomized together, inside the bounds
         // given - and `girth` is spent, because `length` holds the long axis
         { type: 'mountain', config: {
             count: 10,

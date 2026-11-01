@@ -3560,3 +3560,93 @@ still be found by name.
     of them, the two quads meeting at the vertex differ by 16/255 in red.
   - **Goal**: Resolve to [water-join.prompt.md](.claude/prompts/water-join.prompt.md)
   - From: World & Environment
+
+## Archived 11-01-26
+
+- [x] Laying a tile recomputes every neighbour's normals over the whole mesh
+  - **Issue**: `redrawTile` in `js/terrain.js` is written to avoid rebuilding a
+    neighbour's geometry - its own note says building a whole plane "would spend
+    the cost of generating a tile to redraw a strip of it" - and then calls
+    `computeVertexNormals()` on all 201 by 201 of it, which spends most of what
+    that saved. Measured in a browser, one `addTile` costs 38.6ms with nothing
+    beside it and 61ms with four tiles beside it; of the ~22ms the join adds,
+    26.7ms is the normals pass over eight neighbours. The join itself moves
+    vertices no further than `SEAM_BLEND` - three - in from one edge.
+  - **Goal**: recompute normals over the strip the join actually moved rather
+    than the whole plane. The moved vertices are the ones `applySeams` wrote,
+    which is a band `SEAM_BLEND` deep along whichever sides were settled, so the
+    faces needing new normals are the ones touching that band. Leave the
+    height and colour writes alone - they measured 4ms for all eight neighbours
+    together, which is not where the time goes.
+  - From: UI/UX Override - the water across a tile join
+- [x] Settling the water a tile at a time drifts off what the block settles on
+  - **Issue**: `matchWater` averages the surfaces it is handed, and
+    `Terrain.addTile` hands it a mixture. The tiles `redrawTile` just drew again
+    carry the openness read fresh off their fields; the tiles further out carry
+    an average settled on an earlier frame. Averaging a fresh value against an
+    already-averaged one over-weights whichever tile was laid first, so the
+    value a place settles on depends on the order the ground was drawn in.
+    Simulated over a three-by-three block of flooded tiles laid nearest-first,
+    all 425 shared places still agree exactly between their tiles - no join is
+    visible, which is what the override asked for - but the value they agree on
+    is up to 0.125 of the shoreline fade away from what one `matchWater` over
+    the nine fresh surfaces settles on. `animateWater` scales both the swell and
+    the glint by it, so a shoreline reads a little differently depending on
+    which way the aircraft first flew into it.
+  - **Goal**: decide whether the settled value should be the same however the
+    block was assembled. If it should, keep the openness one tile alone makes of
+    a place beside the settled one - `waterSurface` already works it out - and
+    average that rather than the value a previous frame left behind. If the
+    drift is an accepted cost of settling a tile at a time, say so on
+    `matchWater`, whose comment currently reads as though the result is the
+    average of what each tile makes of the place.
+  - **Settled**: it should be the same however the block was assembled, so the
+    first branch of the goal was taken. `waterSurface` records `alone` beside
+    `open` - what that field alone makes of each place, written once after the
+    easing pass and never after - and `matchWater` settles from `alone` and
+    writes `open`. Every pass over a place then averages the same numbers, which
+    also makes the settling idempotent by construction rather than by the
+    arithmetic of averaging equal values. The drift was reproduced at exactly
+    0.125 before the change, in the three-by-three test the issue describes.
+  - From: Code Review Override - the openness a block settles on
+- [x] Nothing exercises the `alone` guard `matchWater` now filters on
+  - **Issue**: `matchWater` filters on `surface.alone`
+    (`js/environment/elements.js:1312`) and `docs/api.md` states that contract
+    twice over: a host that builds a surface by hand rather than through
+    `waterSurface` gives it an `alone`, or `matchWater` passes it over. No test
+    reaches the branch. Deleting `&& surface.alone` leaves all 1447 tests
+    passing, so the suite cannot tell the guard's presence from its absence. If
+    it is dropped, the hand-built surface the docs invite makes
+    `surface.alone[i]` undefined, the group total NaN, and every tile at that
+    shared place settles on a NaN `open` - and because `animateWater` multiplies
+    both the swell and the glint by `open`, the NaN lands in the vertex
+    positions and the water mesh corrupts silently rather than throwing. The
+    four sibling guards are covered already at
+    `test/environment-tiles.test.js:640-645` (a tile that does not touch, a
+    single surface, an empty array, a dry neighbour), so the gap is out of step
+    with the file's own convention as well.
+  - **Goal**: assert beside those four that a surface carrying every documented
+    member except `alone` is passed over - `matchWater` settles what it would
+    have settled without it, and the real surface handed in alongside keeps a
+    finite `open` at the places the two share.
+  - From: Code Review Override - the guard on a surface without `alone`
+- [x] **Mountain** girth: a checkbox-gated `min` and `max` girth
+  (*optional*); on, the form is generated by a random algorithm; off, the
+  form is generated as mountains render today
+  - The kind to build it with landed 10.27.2026: `gated` in
+    `js/environment/elements.js`, as `length` and `width` already use. Copy that
+    pair rather than designing it again - three editor rows, off by default, one
+    draw off the random stream either way.
+  - **What makes this one different from those two, and the thing to settle
+    before writing any of it**: `girth` is read today and they were new. It is
+    `scalar(0, 1, 0)`, the generator stretches every peak by
+    `1 + girth * (0.4 + random())`, and the item asks for a `min` and `max`
+    pair - so this is a change of kind on a live range, not a range being added.
+    Decide what an ungated `girth` means once the scalar is gone, because that
+    is what every preset is currently configured with.
+  - The off state has to go on drawing exactly what it draws now. The guard is
+    already written: the recorded fingerprint in
+    `test/environment-elements.test.js` pins a seeded mountain world against
+    what it was before the gates existed. Extend that test rather than writing a
+    second one, and expect it to fail loudly if the stream moves.
+  - From: Environment Design

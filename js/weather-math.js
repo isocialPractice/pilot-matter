@@ -97,12 +97,31 @@ export const STRIKE_GAP    = Object.freeze({ min: 3.5, max: 11 });
 export const STRIKE_LENGTH = 0.42;
 
 /**
- * The longest frame the weather is stepped by. A delta longer than this means
- * the tab was hidden or the machine stalled, and applying it would teleport
- * the whole layer in one frame - the deck past its own wrap and every drop
- * through the floor.
+ * The longest frame the weather is stepped by: a ceiling on a delta that is
+ * not really a frame at all - a hidden tab, or a stall long enough that the
+ * number describes a gap rather than a moment.
+ *
+ * It is deliberately not a ceiling on a machine that is merely slow, and that
+ * is the whole of why it is 0.25 rather than the 0.05 it was. Nothing else in
+ * the simulation holds its own frame, so a layer clamping at a twentieth of a
+ * second is a layer keeping a clock of its own: measured over 30 seconds of a
+ * storm on the software renderer, at 7.5 frames a second the day still ran its
+ * 30 seconds while a strike lasted 0.96s against the 0.42s `STRIKE_LENGTH`
+ * declares, and one strike landed where three had. The ground rushed past at
+ * full speed with the rain falling at a little over a third of it.
+ *
+ * The weather is the layer that has to agree with the rest rather than the
+ * other way round: holding the whole simulation to the same ceiling would put
+ * every slow machine into slow motion, which trades a storm at the wrong speed
+ * for a world at the wrong speed.
+ *
+ * What bounds the value is the shortest thing a single frame could step clean
+ * over. A strike runs for `STRIKE_LENGTH`, so a step at or past that length
+ * could begin one and end it inside the same frame and flash nothing. 0.25s is
+ * four frames a second - slower than any machine that is drawing this world at
+ * all - and comfortably under the strike.
  */
-export const MAX_STEP = 0.05;
+export const MAX_STEP = 0.25;
 
 /** A frame's length as the weather is willing to take it: forwards, and short. */
 export function weatherStep(dt) {

@@ -701,9 +701,9 @@ test('a girth range asked for leaves the scalar girth with nothing to say', () =
     assert.notDeepEqual(peaksFrom({ ...off, girth: 0 }), peaksFrom({ ...off, girth: 1 }));
 });
 
-// --- The mode over all three of them --------------------------------------
+// --- The mode over the two of them ----------------------------------------
 
-test('the bulk mode is the three footprint switches thrown at once', () => {
+test('the bulk mode is the two footprint switches thrown at once', () => {
     assert.deepEqual(peaksFrom({ bulk: true }),
         peaksFrom({ width: { on: true }, length: { on: true } }),
         'the mode asks for the same ground the switches do');
@@ -784,5 +784,5 @@ test('the ground a seeded mountain lays is the ground it laid before the gates e
     assert.notEqual(groundFingerprint({ count: 6, girthRange: { on: true, range: [0.4, 0.9] } }),
         MOUNTAIN_GROUND, 'and the third gate reaches the ground as well');
     assert.notEqual(groundFingerprint({ count: 6, bulk: true }), MOUNTAIN_GROUND,
-        'as does the mode over all three');
+        'as does the mode over the two of them');
 });

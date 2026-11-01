@@ -1335,17 +1335,24 @@ or not, for something that reaches across several ranges at once and so has no
 pair of its own to carry. It is off unless something asks for it, and only
 `true` asks - anything else is read as off, the way a `gated` switch is.
 
-The mountain declares one, `bulk`: every footprint range at once, randomized
-within the bounds each was configured with. It reads the gated ranges as on
+The mountain declares one, `bulk`: the footprint randomized at once, inside the
+bounds each range was configured with. It reads `length` and `width` as on
 without writing to them, so a world put into the mode and taken out of it is
 back on whatever each switch was left saying.
+
+Two of the three footprint ranges, and `girthRange` is the one it leaves alone.
+Under the mode `length` holds the long axis, so a girth - the scalar or the
+range - has nothing left to decide either way, and a host sending
+`{ bulk: true, girthRange: [0.2, 0.9] }` gets the length's own spread rather
+than a girth's. That is the precedence `length` already has over `girth`
+outside the mode, not a rule the mode invents.
 
 ```javascript
 import { createEnvironment } from 'pilot-matter';
 
 createEnvironment({
     elements: [
-        // The three footprint ranges randomized together, inside the bounds
+        // The two footprint ranges randomized together, inside the bounds
         // given - and `girth` is spent, because `length` holds the long axis
         { type: 'mountain', config: {
             count: 10,

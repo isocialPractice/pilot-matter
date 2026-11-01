@@ -437,16 +437,18 @@ const mountain = {
         // the simulator has always drawn.
         length: gated(100, 7000, 900, 2400),
         width:  gated(100, 3000, 400, 1100),
-        // Every footprint range at once: the mode that says "randomize the lot
-        // within the bounds they declare" instead of asking for three switches
-        // to be found and thrown.
+        // The footprint randomized at once: the mode that says "randomize the
+        // lot within the bounds they declare" instead of asking for the
+        // switches to be found and thrown.
         //
-        // It reads the three gated ranges as on without writing to them, so
+        // It reads `length` and `width` as on without writing to them, so
         // turning it off puts the element back on whatever each switch was left
-        // saying rather than on what the mode did to them. Where two of them
-        // describe the same axis the precedence already in force holds: a
-        // length asked for outright wins over a girth, under this mode exactly
-        // as it does when a pilot sets both by hand.
+        // saying rather than on what the mode did to them. Two rather than
+        // three, and `girthRange` is the one left alone: under the mode
+        // `length` holds the long axis, so a girth - either form of it - has
+        // nothing left to decide either way. That is the precedence already in
+        // force rather than a rule the mode invents, and it is the same answer
+        // a pilot gets from setting a length and a girth by hand.
         //
         // The rotation the mode is named for is already applied to every peak
         // and always has been, so this does not switch it on - it is the half
@@ -459,9 +461,12 @@ const mountain = {
         const half   = field.size / 2 - field.size * 0.10;
         const peaks  = [];
 
-        // The bulk mode read once rather than per peak, and as the three
-        // answers it gives rather than as itself, so the loop below reads one
-        // question per axis whichever way the mode is set.
+        // The bulk mode read once rather than per peak, and as the two answers
+        // it gives rather than as itself, so the loop below reads one question
+        // per axis whichever way the mode is set. The third question is asked
+        // of `girthRange` alone: the mode reaches the two axes said outright,
+        // and under it `long` is already true, so there is no girth left to
+        // draw whatever that switch says.
         const wide    = config.bulk || config.width.on;
         const long    = config.bulk || config.length.on;
         const stretch = config.girthRange.on;

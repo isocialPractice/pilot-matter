@@ -93,17 +93,33 @@ export class Weather {
 
     // --- The cloud deck ---------------------------------------------------
 
+    /**
+     * The deck, as one sprite a cloud over two materials - the cloud texture
+     * and the same texture mirrored.
+     *
+     * Two materials because a sprite cannot be mirrored by its scale, which is
+     * what a negative width here used to mean. The sprite shader reads a
+     * sprite's size out of its own model matrix as
+     * `length(vec3(modelMatrix[0].xyz))`, and a length has no sign in it, so a
+     * width of `-400` was drawn at 400 and `facing` was spent on nothing: every
+     * cloud showed the same unmirrored shape and the deck read as one cloud
+     * repeated across the sky, which is the outcome the flip in
+     * `createCloudDeck` is there to prevent.
+     *
+     * The cost is one more 256 by 162 texture and one more draw call for the
+     * deck, against a sky that reads as weather rather than as wallpaper.
+     */
     addClouds() {
-        this.cloudMaterial = new THREE.SpriteMaterial({
-            map:         cloudTexture(),
+        this.cloudMaterials = [false, true].map(mirrored => new THREE.SpriteMaterial({
+            map:         cloudTexture(mirrored),
             transparent: true,
             depthWrite:  false
-        });
+        }));
 
         this.cloudGroup = new THREE.Group();
         this.clouds = this.deck.map(cloud => {
-            const sprite = new THREE.Sprite(this.cloudMaterial);
-            sprite.scale.set(cloud.width * cloud.facing, cloud.height, 1);
+            const sprite = new THREE.Sprite(this.cloudMaterials[cloud.facing < 0 ? 1 : 0]);
+            sprite.scale.set(cloud.width, cloud.height, 1);
             sprite.position.set(cloud.x, cloud.y, cloud.z);
             this.cloudGroup.add(sprite);
             return sprite;
@@ -172,7 +188,9 @@ export class Weather {
         const precip = precipitationAt(id);
         this.precipitation = precip;
 
-        this.cloudMaterial.opacity = precip.cloudOpacity;
+        // Both materials, because the deck is drawn from two and either one
+        // left behind is half a sky at the wrong density.
+        for (const material of this.cloudMaterials) material.opacity = precip.cloudOpacity;
         this.clouds.forEach((sprite, i) => { sprite.visible = i < precip.clouds; });
 
         if (this.rain) {
@@ -222,7 +240,10 @@ export class Weather {
     updateClouds(dt, phase, at) {
         if (this.precipitation.clouds === 0) return;
 
-        this.cloudMaterial.color.setRGB(...litShade(DECK_COLOR, phase));
+        // The hour goes to both materials for the same reason the condition
+        // does: a mirrored cloud is the same cloud and is lit by the same sky.
+        const shade = litShade(DECK_COLOR, phase);
+        for (const material of this.cloudMaterials) material.color.setRGB(...shade);
 
         driftClouds(this.deck, dt, at);
         for (let i = 0; i < this.precipitation.clouds; i++) {
@@ -309,9 +330,20 @@ function discTexture() {
  * A cloud: a lumpy mound built of overlapping blobs, flat along the bottom and
  * taller on one side, so a deck of them mirrored half the time reads as
  * weather rather than as a row of circles.
+ *
+ * Mirrored here rather than by the sprite that shows it, because this is the
+ * one place in the chain where the flip survives: a sprite's scale is read as
+ * a length and loses the sign, while a canvas drawn backwards stays drawn
+ * backwards. The translate is what keeps the flipped drawing on the canvas -
+ * scaling by -1 alone puts every blob off the left edge.
  */
-function cloudTexture() {
+function cloudTexture(mirrored = false) {
     const { canvas, ctx } = surface(256, 162);
+
+    if (mirrored) {
+        ctx.translate(256, 0);
+        ctx.scale(-1, 1);
+    }
 
     for (const [x, y, radius, alpha] of [
         [ 92, 112, 58, 0.9 ],
