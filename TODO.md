@@ -32,88 +32,48 @@ its context survives being archived.
   own frame, with the weight function every later item reads
   - From: Interactive Build Mode
 
-### UI/UX Override - the weather clock on a slow machine
+### Code Review Override - the comments the cloud mirror left behind
 
 #### Found Issues
 
-- [ ] **Slow Weather**: the weather keeps a clock of its own on a machine
-  under 20 frames a second, so the storm runs at a share of the speed the
-  world it is over runs at
-  - **Issue**: `weatherStep` in `js/weather-math.js` holds a frame to
-    `MAX_STEP`, 0.05s, and nothing else in the simulation holds its own -
-    `simulationDelta` hands the frame on as it came. Measured over 30
-    seconds of `STORMY` on one machine and one build: at 60 frames a second
-    the day ran 30.0s of its 900 and a strike was on screen for 0.40s
-    against the 0.42s `STRIKE_LENGTH` declares; on the software renderer at
-    7.5 frames a second the day still ran 30.3s, a strike was on screen for
-    0.96s, and one strike landed where three had. So on a slow machine the
-    ground rushes past at full speed while the rain falls, the deck drifts
-    and the lightning strikes at a little over a third of it.
-  - **Goal**: settle which clock the weather keeps and make the two agree -
-    either hold the simulation's own frame to the same ceiling, or let
-    `weatherStep` take a frame that is merely slow and keep the ceiling for
-    the one long frame a hidden tab leaves behind.
-  - From: UI/UX Override - the weather clock on a slow machine
-- [ ] **Weather Guards**: the two assertions that hold the weather layer to
-  building once pass on text that is not the code they name
-  - **Issue**: both are in
-    `test('the weather is built once and drawn down to the condition in force')`
-    in `test/page.test.js`, and each is satisfied by something other than the
-    line it was written for. `/this\.rain\.count\s*=/` at line 1478 matches the
-    `this.rain.count === 0` comparison in `updateRain`, so deleting the
-    `this.rain.count = Math.min(...)` assignment in `setPrecipitation` leaves
-    the suite green - proven by renaming it to `this.rain.tally`, which keeps
-    `test/page.test.js` at 97 pass and 0 fail. `/PRECIPITATION_MOST/` at line
-    1476 matches the import and the two constructor references, so `addRain`
-    sizing itself with a literal `const count = 5200` passes as well, which is
-    the one regression the test's own comment names.
-  - **Goal**: bound each pattern to the statement it is about - an assignment
-    rather than a comparison, and the figure `addRain` actually sizes itself
-    with - and prove each by mutation before accepting it, the way the three
-    assertions beside them in the same file were proven.
-  - From: UI/UX Override - the weather clock on a slow machine
-- [ ] **Bulk Three**: the bulk mode is documented as reaching all three
-  footprint ranges and reaches two of them
-  - **Issue**: `const stretch = config.girthRange.on;` at
-    `js/environment/elements.js:467` does not read `config.bulk`, so the mode
-    throws `width` and `length` and leaves `girthRange` alone. The behaviour is
-    right and `test/environment-elements.test.js` pins it, but three places say
-    otherwise: the comment at `js/environment/elements.js:444` ("reads the three
-    gated ranges as on"), `docs/api.md:1338` ("every footprint range at once"),
-    and `docs/terrain.html` ("randomizes all three at once"). A host that reads
-    the API doc and sends `{ bulk: true, girthRange: [0.2, 0.9] }` gets no girth
-    variation at all, and the doc's own example at `docs/api.md:1348` says both
-    halves of it - "The three footprint ranges randomized together" one line
-    above "`girth` is spent".
-  - **Goal**: say two rather than three wherever the count is given, and keep
-    the reason the third is untouched: under the mode `length` holds the long
-    axis, so a girth has nothing left to decide either way. `CHEATSHEET.md` and
-    `docs/cheatsheet.html` carry the same "over all three" phrasing, and
-    `docs/api-reference.html` is generated from `docs/api.md`, so run
-    `npm run docs:api` after editing it.
-  - From: UI/UX Override - the weather clock on a slow machine
-
-#### Resolve Issues
-
-- [ ] Weather Lift 1
-  - **Issue**: the cloud deck mirrors nothing. `createCloudDeck` gives about
-    half of the 95 clouds `facing: -1` and `js/weather.js:106` spends it as
-    `sprite.scale.set(cloud.width * cloud.facing, cloud.height, 1)`, but a
-    sprite's size in Three.js r160 - the version `index.html` pins - is
-    `scale.x = length(vec3(modelMatrix[0].xyz))` in its own vertex shader, and
-    `length` discards the sign. So every cloud draws the same unmirrored
-    texture and the deck reads as one shape repeated across the sky, which is
-    the outcome `js/weather-math.js:253` says the flip is there to prevent.
-    `test/weather-math.test.js:136` pins the deck data rather than the render,
-    so the suite is green either way.
-  - **Goal**: put the mirror where a sprite can show it - a second
-    `SpriteMaterial` over a canvas drawn with `ctx.scale(-1, 1)`, picked by
-    `cloud.facing` - and carry the condition's opacity and the hour's colour to
-    both materials, since `setPrecipitation` and `updateClouds` each write to
-    one today. Settle it on a screenshot rather than on the suite: whether a
-    deck stops reading as one repeated shape is not a claim source text can
-    hold.
-  - From: World & Environment
+- [ ] **Deck Comment**: the comment on `facing` still says the deck is drawn
+  from one texture and mirrored on x, which is the bug that was just removed
+  - **Issue**: `createCloudDeck` in `js/weather-math.js:272` carries "Every
+    cloud is drawn from one texture, so mirroring half of them on x is the
+    cheapest way to stop a deck reading as one shape repeated across the sky."
+    Both halves are now false. `addClouds` builds two `SpriteMaterial`s over
+    two textures, and `facing` picks between them rather than mirroring
+    anything on x - mirroring on x is exactly what `sprite.scale.set(cloud.width
+    * cloud.facing, ...)` did, which `js/weather.js:100-107` and the assertion
+    at `test/page.test.js:1486` now both say is a sprite not mirrored at all.
+    A reader working from this comment is told to do the thing the release
+    stopped doing, and this is the comment the completed item's own issue
+    pointed at as the statement of intent the renderer was failing.
+  - **Goal**: say what `facing` now is - which of the two cloud textures a
+    cloud is drawn from - and keep the reason it exists, which is the only part
+    still true: half a deck reversed stops it reading as one shape repeated
+    across the sky. Leave the mechanism to `js/weather.js`, where it is
+    described at length already, rather than restating it in a pure module
+    that draws nothing.
+  - From: Code Review Override - the comments the cloud mirror left behind
+- [ ] **Deck Cost**: the second cloud material is costed at one more draw call,
+  and a sprite is already a draw call of its own
+  - **Issue**: `js/weather.js:109` reads "The cost is one more 256 by 162
+    texture and one more draw call for the deck". The texture is right; the
+    draw call is not a figure the renderer supports. A `THREE.Sprite` in r160
+    is pushed into the render list as an object of its own and drawn with its
+    own call, so a 95-cloud deck is 95 calls whether the sprites share one
+    material or two. What the second material actually adds is material state
+    changes, and because the deck is transparent and therefore depth-sorted,
+    the two materials interleave down the sorted list - so it is many bindings
+    rather than one call. A reader sizing a third texture off this line would
+    budget it wrongly in both directions.
+  - **Goal**: cost it as what it is - one more texture, and the material
+    bindings an interleaved sort costs - or drop the figure rather than carry
+    an unmeasured one. Nothing in the repository reads
+    `renderer.info.render.calls`, so settle it there if a number is wanted:
+    draw a 95-cloud storm and read the count with one material and with two.
+  - From: Code Review Override - the comments the cloud mirror left behind
 
 ## Game UI/UX
 
@@ -470,95 +430,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 286 earlier items in `TODO-archive.md`, newest last.
+> 290 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Laying a tile recomputes every neighbour's normals over the whole mesh
-  - **Issue**: `redrawTile` in `js/terrain.js` is written to avoid rebuilding a
-    neighbour's geometry - its own note says building a whole plane "would spend
-    the cost of generating a tile to redraw a strip of it" - and then calls
-    `computeVertexNormals()` on all 201 by 201 of it, which spends most of what
-    that saved. Measured in a browser, one `addTile` costs 38.6ms with nothing
-    beside it and 61ms with four tiles beside it; of the ~22ms the join adds,
-    26.7ms is the normals pass over eight neighbours. The join itself moves
-    vertices no further than `SEAM_BLEND` - three - in from one edge.
-  - **Goal**: recompute normals over the strip the join actually moved rather
-    than the whole plane. The moved vertices are the ones `applySeams` wrote,
-    which is a band `SEAM_BLEND` deep along whichever sides were settled, so the
-    faces needing new normals are the ones touching that band. Leave the
-    height and colour writes alone - they measured 4ms for all eight neighbours
-    together, which is not where the time goes.
-  - From: UI/UX Override - the water across a tile join
-- [x] Settling the water a tile at a time drifts off what the block settles on
-  - **Issue**: `matchWater` averages the surfaces it is handed, and
-    `Terrain.addTile` hands it a mixture. The tiles `redrawTile` just drew again
-    carry the openness read fresh off their fields; the tiles further out carry
-    an average settled on an earlier frame. Averaging a fresh value against an
-    already-averaged one over-weights whichever tile was laid first, so the
-    value a place settles on depends on the order the ground was drawn in.
-    Simulated over a three-by-three block of flooded tiles laid nearest-first,
-    all 425 shared places still agree exactly between their tiles - no join is
-    visible, which is what the override asked for - but the value they agree on
-    is up to 0.125 of the shoreline fade away from what one `matchWater` over
-    the nine fresh surfaces settles on. `animateWater` scales both the swell and
-    the glint by it, so a shoreline reads a little differently depending on
-    which way the aircraft first flew into it.
-  - **Goal**: decide whether the settled value should be the same however the
-    block was assembled. If it should, keep the openness one tile alone makes of
-    a place beside the settled one - `waterSurface` already works it out - and
-    average that rather than the value a previous frame left behind. If the
-    drift is an accepted cost of settling a tile at a time, say so on
-    `matchWater`, whose comment currently reads as though the result is the
-    average of what each tile makes of the place.
-  - **Settled**: it should be the same however the block was assembled, so the
-    first branch of the goal was taken. `waterSurface` records `alone` beside
-    `open` - what that field alone makes of each place, written once after the
-    easing pass and never after - and `matchWater` settles from `alone` and
-    writes `open`. Every pass over a place then averages the same numbers, which
-    also makes the settling idempotent by construction rather than by the
-    arithmetic of averaging equal values. The drift was reproduced at exactly
-    0.125 before the change, in the three-by-three test the issue describes.
-  - From: Code Review Override - the openness a block settles on
-- [x] Nothing exercises the `alone` guard `matchWater` now filters on
-  - **Issue**: `matchWater` filters on `surface.alone`
-    (`js/environment/elements.js:1312`) and `docs/api.md` states that contract
-    twice over: a host that builds a surface by hand rather than through
-    `waterSurface` gives it an `alone`, or `matchWater` passes it over. No test
-    reaches the branch. Deleting `&& surface.alone` leaves all 1447 tests
-    passing, so the suite cannot tell the guard's presence from its absence. If
-    it is dropped, the hand-built surface the docs invite makes
-    `surface.alone[i]` undefined, the group total NaN, and every tile at that
-    shared place settles on a NaN `open` - and because `animateWater` multiplies
-    both the swell and the glint by `open`, the NaN lands in the vertex
-    positions and the water mesh corrupts silently rather than throwing. The
-    four sibling guards are covered already at
-    `test/environment-tiles.test.js:640-645` (a tile that does not touch, a
-    single surface, an empty array, a dry neighbour), so the gap is out of step
-    with the file's own convention as well.
-  - **Goal**: assert beside those four that a surface carrying every documented
-    member except `alone` is passed over - `matchWater` settles what it would
-    have settled without it, and the real surface handed in alongside keeps a
-    finite `open` at the places the two share.
-  - From: Code Review Override - the guard on a surface without `alone`
-- [x] **Mountain** girth: a checkbox-gated `min` and `max` girth
-  (*optional*); on, the form is generated by a random algorithm; off, the
-  form is generated as mountains render today
-  - The kind to build it with landed 10.27.2026: `gated` in
-    `js/environment/elements.js`, as `length` and `width` already use. Copy that
-    pair rather than designing it again - three editor rows, off by default, one
-    draw off the random stream either way.
-  - **What makes this one different from those two, and the thing to settle
-    before writing any of it**: `girth` is read today and they were new. It is
-    `scalar(0, 1, 0)`, the generator stretches every peak by
-    `1 + girth * (0.4 + random())`, and the item asks for a `min` and `max`
-    pair - so this is a change of kind on a live range, not a range being added.
-    Decide what an ungated `girth` means once the scalar is gone, because that
-    is what every preset is currently configured with.
-  - The off state has to go on drawing exactly what it draws now. The guard is
-    already written: the recorded fingerprint in
-    `test/environment-elements.test.js` pins a seeded mountain world against
-    what it was before the gates existed. Extend that test rather than writing a
-    second one, and expect it to fail loudly if the stream moves.
-  - From: Environment Design
 - [x] **Mountain** bulk range: an apply-to-all mode that randomizes length,
   width, and girth within range and applies transform effects such as
   rotation
@@ -675,3 +548,97 @@ how the simulator got here rather than as a list still to be worked.
     break it into items here as its stages become clear - one item for twelve
     tools is not a queue, it is a heading.
   - From: Interactive Build Mode
+- [x] **Slow Weather**: the weather keeps a clock of its own on a machine
+  under 20 frames a second, so the storm runs at a share of the speed the
+  world it is over runs at
+  - **Issue**: `weatherStep` in `js/weather-math.js` holds a frame to
+    `MAX_STEP`, 0.05s, and nothing else in the simulation holds its own -
+    `simulationDelta` hands the frame on as it came. Measured over 30
+    seconds of `STORMY` on one machine and one build: at 60 frames a second
+    the day ran 30.0s of its 900 and a strike was on screen for 0.40s
+    against the 0.42s `STRIKE_LENGTH` declares; on the software renderer at
+    7.5 frames a second the day still ran 30.3s, a strike was on screen for
+    0.96s, and one strike landed where three had. So on a slow machine the
+    ground rushes past at full speed while the rain falls, the deck drifts
+    and the lightning strikes at a little over a third of it.
+  - **Goal**: settle which clock the weather keeps and make the two agree -
+    either hold the simulation's own frame to the same ceiling, or let
+    `weatherStep` take a frame that is merely slow and keep the ceiling for
+    the one long frame a hidden tab leaves behind.
+  - **Settled**: the weather keeps the world's clock, so the second branch was
+    taken - `MAX_STEP` is 0.25s and guards a delta that is not a frame at all
+    rather than a machine that is merely slow. The first branch was declined
+    because it agrees the two clocks by putting every slow machine into slow
+    motion, and because it reaches the flight model, the stage timers and the
+    recorded times on the way, none of which this issue is about. What bounds
+    the value is `STRIKE_LENGTH`: a step at or past 0.42s could begin a strike
+    and end it inside one frame, so the suite asserts `MAX_STEP < STRIKE_LENGTH`
+    rather than the number. Measured again on the software renderer at the same
+    7.5 frames a second: 36.3% of the world's clock before, 100.0% after.
+  - From: UI/UX Override - the weather clock on a slow machine
+- [x] **Weather Guards**: the two assertions that hold the weather layer to
+  building once pass on text that is not the code they name
+  - **Issue**: both are in
+    `test('the weather is built once and drawn down to the condition in force')`
+    in `test/page.test.js`, and each is satisfied by something other than the
+    line it was written for. `/this\.rain\.count\s*=/` at line 1478 matches the
+    `this.rain.count === 0` comparison in `updateRain`, so deleting the
+    `this.rain.count = Math.min(...)` assignment in `setPrecipitation` leaves
+    the suite green - proven by renaming it to `this.rain.tally`, which keeps
+    `test/page.test.js` at 97 pass and 0 fail. `/PRECIPITATION_MOST/` at line
+    1476 matches the import and the two constructor references, so `addRain`
+    sizing itself with a literal `const count = 5200` passes as well, which is
+    the one regression the test's own comment names.
+  - **Goal**: bound each pattern to the statement it is about - an assignment
+    rather than a comparison, and the figure `addRain` actually sizes itself
+    with - and prove each by mutation before accepting it, the way the three
+    assertions beside them in the same file were proven.
+  - From: UI/UX Override - the weather clock on a slow machine
+- [x] **Bulk Three**: the bulk mode is documented as reaching all three
+  footprint ranges and reaches two of them
+  - **Issue**: `const stretch = config.girthRange.on;` at
+    `js/environment/elements.js:467` does not read `config.bulk`, so the mode
+    throws `width` and `length` and leaves `girthRange` alone. The behaviour is
+    right and `test/environment-elements.test.js` pins it, but three places say
+    otherwise: the comment at `js/environment/elements.js:444` ("reads the three
+    gated ranges as on"), `docs/api.md:1338` ("every footprint range at once"),
+    and `docs/terrain.html` ("randomizes all three at once"). A host that reads
+    the API doc and sends `{ bulk: true, girthRange: [0.2, 0.9] }` gets no girth
+    variation at all, and the doc's own example at `docs/api.md:1348` says both
+    halves of it - "The three footprint ranges randomized together" one line
+    above "`girth` is spent".
+  - **Goal**: say two rather than three wherever the count is given, and keep
+    the reason the third is untouched: under the mode `length` holds the long
+    axis, so a girth has nothing left to decide either way. `CHEATSHEET.md` and
+    `docs/cheatsheet.html` carry the same "over all three" phrasing, and
+    `docs/api-reference.html` is generated from `docs/api.md`, so run
+    `npm run docs:api` after editing it.
+  - From: UI/UX Override - the weather clock on a slow machine
+- [x] Weather Lift 1
+  - **Issue**: the cloud deck mirrors nothing. `createCloudDeck` gives about
+    half of the 95 clouds `facing: -1` and `js/weather.js:106` spends it as
+    `sprite.scale.set(cloud.width * cloud.facing, cloud.height, 1)`, but a
+    sprite's size in Three.js r160 - the version `index.html` pins - is
+    `scale.x = length(vec3(modelMatrix[0].xyz))` in its own vertex shader, and
+    `length` discards the sign. So every cloud draws the same unmirrored
+    texture and the deck reads as one shape repeated across the sky, which is
+    the outcome `js/weather-math.js:253` says the flip is there to prevent.
+    `test/weather-math.test.js:136` pins the deck data rather than the render,
+    so the suite is green either way.
+  - **Goal**: put the mirror where a sprite can show it - a second
+    `SpriteMaterial` over a canvas drawn with `ctx.scale(-1, 1)`, picked by
+    `cloud.facing` - and carry the condition's opacity and the hour's colour to
+    both materials, since `setPrecipitation` and `updateClouds` each write to
+    one today. Settle it on a screenshot rather than on the suite: whether a
+    deck stops reading as one repeated shape is not a claim source text can
+    hold.
+  - **Settled**: built as the goal describes - two `SpriteMaterial`s over two
+    canvases, the second drawn through `ctx.scale(-1, 1)` after a translate
+    that keeps it on the canvas, picked by `cloud.facing`, with the opacity and
+    the colour written to both. Confirmed on the running page rather than in
+    the suite: the two textures are each other reversed pixel for pixel, no
+    sprite carries a negative scale any more, and a 95-cloud storm drew 38
+    clouds from one material and 57 from the other. The source-text half of the
+    claim is held by a new assertion in `test/page.test.js`, proven by mutation;
+    how the sky reads is for the GUI test this run requested.
+  - From: World & Environment

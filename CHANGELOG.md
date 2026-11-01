@@ -5,6 +5,107 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.33.0] - 2026-11-01
+
+Four things the weather release left behind, three of them found by looking at
+it rather than by running it: a layer keeping a clock of its own, a mirror that
+was never drawn, two test assertions passing on text that was not the code they
+named, and a count of three given for a mode that reaches two.
+
+### Fixed
+
+- **The weather keeps the world's clock rather than one of its own.** Every
+  frame was held to `MAX_STEP`, a twentieth of a second, and nothing else in
+  the simulation holds its own frame - so on a machine drawing fewer than 20
+  frames a second the ground rushed past at full speed while the rain fell at a
+  share of it. Measured here over 20 seconds on the software renderer at 7.5
+  frames a second: the weather spent 7.30 of the world's 20.09 seconds, 36.3%
+  of them, and a strike declared at 0.42s stayed on screen for the best part of
+  a second.
+
+  The ceiling is 0.25s now and means what it was always described as meaning: a
+  guard against a delta that is not a frame at all, a hidden tab or a stall,
+  rather than against a machine that is merely slow. The same measurement after
+  the change reads 20.12 seconds of weather against 20.12 of world, at the same
+  7.5 frames a second.
+
+  The other branch - holding the whole simulation to the weather's ceiling -
+  was declined on purpose. It would agree the two clocks by putting every slow
+  machine into slow motion, which trades a storm at the wrong speed for a world
+  at the wrong speed, and it would reach the flight model, the stage timers and
+  the recorded times on the way. What bounds the new value is `STRIKE_LENGTH`:
+  a step at or past 0.42s could begin a strike and end it inside one frame and
+  flash nothing, so the ceiling sits under it with room, and the suite asserts
+  that relationship rather than the number.
+
+  One test was written against the old ceiling without saying so.
+  `a storm strikes, flashes, and goes quiet again` runs a strike out over a
+  fixed 40 frames of `MAX_STEP`, which was two seconds and is now ten - past
+  `STRIKE_GAP`, so the storm schedules its next strike inside the window and
+  the figure read afterwards belongs to that one rather than to the strike under
+  test. It failed for any gap drawn between 5.26s and 9.75s, about one run in
+  seven, which is the shape of flake that gets re-run rather than read. The
+  window is the strike's own length in frames now, one frame more than it needs,
+  so it holds at whatever the ceiling is.
+
+- **The cloud deck is mirrored by the texture it is drawn from.**
+  `createCloudDeck` gives about half of the 95 clouds a `facing` of `-1` and
+  the deck spent it as `sprite.scale.set(cloud.width * cloud.facing, ...)` - but
+  a sprite's size in Three.js r160 is read in the sprite shader as
+  `length(vec3(modelMatrix[0].xyz))`, and a length has no sign in it. The
+  negative width arrived positive, every cloud drew the same unmirrored shape,
+  and the deck read as one cloud repeated across the sky, which is the outcome
+  the flip was added to prevent.
+
+  The flip is drawn on the canvas now, where it survives: two `SpriteMaterial`s
+  over two textures, the second drawn through `ctx.scale(-1, 1)`, picked by the
+  cloud's own `facing`. Both carry the condition's opacity and the hour's
+  colour, since `setPrecipitation` and `updateClouds` each wrote to the one
+  material there used to be. Confirmed on the running page: the two textures
+  are each other reversed pixel for pixel, and a 95-cloud storm drew 38 clouds
+  from one and 57 from the other.
+
+- **Two weather assertions bound to the statements they are about.** Both were
+  in `the weather is built once and drawn down to the condition in force` and
+  both passed on text that was not the code they named.
+  `/this\.rain\.count\s*=/` matched the `this.rain.count === 0` comparison in
+  `updateRain`, so the assignment in `setPrecipitation` could be deleted with
+  the suite green; `/PRECIPITATION_MOST/` matched the import and the
+  constructor, so `addRain` could size the instanced mesh with a literal 5200 -
+  the one regression the test's own comment names - and pass.
+
+  Each claim is now read inside the method it is about, the way the spans in
+  `test/input-map.test.js` are, and each was proven by mutation before being
+  accepted: renaming the count, sizing the mesh with a literal, and sizing
+  either array with a literal each fail their own assertion and nothing else.
+
+  A third assertion, added in this release for the cloud mirror above, had the
+  same looseness: `/function cloudTexture\(mirrored[^]*?ctx\.scale\(-1, 1\)/`
+  was read over the whole module, so the flip could be lifted out of
+  `cloudTexture` into `streakTexture` - leaving every cloud drawn unmirrored,
+  which is the bug that test exists for - with the suite green. It is bounded
+  to the function and then to the `mirrored` branch inside it, and the lift,
+  the deletion and an unconditional mirror each fail it now.
+
+### Changed
+
+- **The mountain's `bulk` mode is documented as reaching two footprint ranges
+  rather than three.** The behaviour was right and
+  `test/environment-elements.test.js` pinned it, but everywhere the count was
+  given said otherwise: the registry's own comments, `docs/api.md` and the
+  reference page generated from it, `docs/terrain.html`, `CHEATSHEET.md`,
+  `docs/cheatsheet.html`, the headings of the tests that pin the behaviour, and
+  the 1.32.0 note below. A host reading the API doc and sending
+  `{ bulk: true, girthRange: [0.2, 0.9] }` got no girth variation at all, and
+  the doc's own example said both halves of it one line apart.
+
+  The reason the third is untouched travels with the count wherever it is
+  given: under the mode `length` holds the long axis, so a girth - the scalar
+  or the range - has nothing left to decide either way. That is the precedence
+  `length` already has over `girth` outside the mode rather than a rule the
+  mode invents, which is what makes "two" the right number rather than a gap to
+  be filled in later.
+
 ## [1.0.0-alpha.1.32.0] - 2026-10-31
 
 The mountain finishes the footprint work it was left in the middle of, the
@@ -37,12 +138,12 @@ surfaces rather than merged off a branch that has not seen main since February.
   whole element instead of once a peak, because every peak after the first then
   lands somewhere else.
 
-- **A `bulk` mode over all three footprint ranges.** One switch that says
-  "randomize the lot within the bounds they declare" rather than asking for
-  three to be found and thrown. It reads the gated ranges as on without writing
-  to them, so turning it off puts the element back on whatever each switch was
-  left saying, and it randomizes within the pair each range was configured with
-  rather than within the declared defaults.
+- **A `bulk` mode over the footprint ranges that say an axis outright.** One
+  switch that says "randomize the lot within the bounds they declare" rather
+  than asking for the switches to be found and thrown. It reads `length` and
+  `width` as on without writing to them, so turning it off puts the element
+  back on whatever each switch was left saying, and it randomizes within the
+  pair each range was configured with rather than within the declared defaults.
 
   Where two ranges describe the same axis the precedence already in force
   holds: a length asked for outright wins over a girth, under the mode exactly
