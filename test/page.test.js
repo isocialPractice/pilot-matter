@@ -1467,23 +1467,97 @@ test('the weather textures are drawn rather than loaded', () => {
 });
 
 /**
+ * Half the deck is drawn mirrored, and a sprite's scale is not where that can
+ * be said. The sprite shader reads a sprite's size out of its own model matrix
+ * as `length(vec3(modelMatrix[0].xyz))`, so a negative width arrives positive
+ * and the flip is spent on nothing: `sprite.scale.set(cloud.width *
+ * cloud.facing, ...)` drew 95 copies of one unmirrored shape, which is the
+ * outcome `createCloudDeck`'s own comment says the flip exists to prevent.
+ *
+ * `test/weather-math.test.js` pins the deck data and cannot see this - a
+ * `facing` of `-1` is there in the arrangement either way - so the claim is
+ * read off the renderer, and whether the sky then stops reading as one repeated
+ * shape is settled on a screenshot rather than here.
+ */
+test('the cloud deck is mirrored by the texture it is drawn from, not by its scale', () => {
+    const [built] = weatherSource.match(/\n {4}addClouds\(\) \{[^]*?\n {4}\}/) ?? [];
+    assert.ok(built, 'js/weather.js should declare the deck builder as a method');
+
+    assert.ok(!/scale\.set\([^)]*facing/.test(built),
+        'a sprite mirrored by its scale is a sprite not mirrored at all');
+    assert.match(built, /cloudTexture\(mirrored\)|cloudTexture\(true\)/,
+        'so one of the deck materials should carry a mirrored texture');
+    assert.match(built, /new THREE\.Sprite\(this\.cloudMaterials\[[^\]]*cloud\.facing/,
+        'and the facing should pick which material a cloud is drawn with');
+
+    // Bounded to the function and then to the branch, for the same reason the
+    // spans above are. Read over the whole module this was satisfied by a
+    // `ctx.scale(-1, 1)` anywhere in it: the flip could be lifted out of
+    // `cloudTexture` into `streakTexture`, which leaves every cloud drawn
+    // unmirrored - the bug this test exists for - with the suite green.
+    const [drawn] = weatherSource.match(/\nfunction cloudTexture\([^]*?\n\}/) ?? [];
+    assert.ok(drawn, 'js/weather.js should declare the cloud texture as a function of its own');
+    assert.match(drawn, /if \(mirrored\) \{[^}]*ctx\.scale\(-1, 1\)/,
+        'and draw the mirror on the canvas under that flag, which is where it survives');
+
+    // Two materials are two places every per-frame write has to reach. Each
+    // writer wrote to the one material there was, and either left behind is
+    // half a deck at the wrong density or lit by the wrong hour.
+    //
+    // The method name is anchored to a declaration rather than matched loose,
+    // because `update` calls both of these: a span opened on the call site runs
+    // to the end of `update` and holds neither body.
+    //
+    // And the write is read as the collection rather than as the name: a bare
+    // `/this\.cloudMaterials/` is satisfied by `this.cloudMaterials[0]`, which
+    // is the one-material bug back again under the plural name.
+    for (const [method, what] of [['setPrecipitation', 'the condition'], ['updateClouds', 'the hour']]) {
+        const [body] = weatherSource.match(new RegExp(`\\n {4}${method}\\([^]*?\\n {4}\\}`)) ?? [];
+        assert.ok(body, `js/weather.js should declare ${method} as a method`);
+        assert.match(body, /this\.cloudMaterials(?!\s*\[)/,
+            `${what} should be written to every material rather than to one of them`);
+    }
+});
+
+/**
  * Built to the worst weather and drawn down to the weather in force. The other
  * way round - building for the condition it was handed - means throwing the
  * sprites away and building 5200 more on the frame a pilot asks for a storm,
  * which is a stall in mid-flight to save a few hundred kilobytes.
  */
 test('the weather is built once and drawn down to the condition in force', () => {
-    assert.match(weatherSource, /PRECIPITATION_MOST/,
-        'js/weather.js should size itself to the worst weather there is');
-    assert.match(weatherSource, /this\.rain\.count\s*=/,
-        'and draw the rain down to the count the condition asks for');
-
-    // Bounded to the method it is anchored on, the way the spans in
-    // `test/input-map.test.js` are: a method body read past its own closing
+    // Every claim here is bounded to the method it is about, the way the spans
+    // in `test/input-map.test.js` are: a method body read past its own closing
     // brace is the whole module tested against a claim about one function.
-    const [body] = weatherSource.match(/setPrecipitation\(id[^]*?\n {4}\}/) ?? [];
-    assert.ok(body, 'js/weather.js should declare the condition setter as a method');
-    assert.ok(!/new THREE\./.test(body),
+    //
+    // Two of them were not, and each passed on text that was not the code it
+    // named. `/PRECIPITATION_MOST/` over the whole source matched the import
+    // and the constructor, so `addRain` could size the instanced mesh with a
+    // literal 5200 - the one regression this test's own comment names - and
+    // stay green. `/this\.rain\.count\s*=/` matched the `this.rain.count === 0`
+    // guard in `updateRain`, so the assignment it was written for could be
+    // deleted and stay green with it. A pattern that matches a comparison when
+    // it means an assignment, or a name when it means a figure, is a pattern
+    // bounded to the module rather than to the statement.
+    const [opens] = weatherSource.match(/constructor\(scene[^]*?\n {4}\}/) ?? [];
+    assert.ok(opens, 'js/weather.js should build the layer in its constructor');
+    assert.match(opens, /createCloudDeck\(PRECIPITATION_MOST\.clouds\)/,
+        'js/weather.js should size the deck to the worst weather there is');
+    assert.match(opens, /createDrops\(PRECIPITATION_MOST\.rainDrops\)/,
+        'and the rain box with it');
+
+    const [built] = weatherSource.match(/\n {4}addRain\(\) \{[^]*?\n {4}\}/) ?? [];
+    assert.ok(built, 'js/weather.js should declare the rain builder as a method');
+    assert.match(built, /const count\s*=\s*PRECIPITATION_MOST\.rainDrops\s*;/,
+        'and draw as many instances as the worst weather asks for');
+    assert.match(built, /new THREE\.InstancedMesh\([^)]*,\s*count\)/,
+        'which is the figure the mesh is built with rather than one of its own');
+
+    const [set] = weatherSource.match(/setPrecipitation\(id[^]*?\n {4}\}/) ?? [];
+    assert.ok(set, 'js/weather.js should declare the condition setter as a method');
+    assert.match(set, /this\.rain\.count\s*=\s*Math\.min\(\s*precip\.rainDrops\s*,/,
+        'and draw the rain down to the count the condition asks for');
+    assert.ok(!/new THREE\./.test(set),
         'changing the condition mid-flight should build nothing');
 });
 

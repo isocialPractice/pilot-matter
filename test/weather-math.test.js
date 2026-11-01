@@ -435,7 +435,16 @@ test('a storm strikes, flashes, and goes quiet again', () => {
     // Running it out leaves nothing behind: the layer hands the sky whatever
     // comes back here every frame, so a level left standing is a sky stuck
     // bright until the next strike.
-    for (let i = 0; i < 40; i++) advanceStrikes(strikes, MAX_STEP, () => 0);
+    //
+    // Stepped by the frames this strike takes rather than by a fixed count of
+    // them. A fixed 40 was ten seconds at the current ceiling, which runs past
+    // `STRIKE_GAP` and schedules the next strike, so what is read below was
+    // that one's remainder rather than this one's nothing - for a gap drawn
+    // anywhere between 5.26s and 9.75s, which is about one run in seven. This
+    // count is a frame more than the strike has left in it, and that frame is
+    // the one that says the zero holds.
+    const left = Math.ceil(STRIKE_LENGTH / MAX_STEP);
+    for (let i = 0; i < left; i++) advanceStrikes(strikes, MAX_STEP, () => 0);
     assert.equal(strikes.remaining, 0, 'the strike is spent');
     assert.ok(strikes.next > 0, 'and the next one is waiting rather than due');
 });
