@@ -79,23 +79,115 @@ test('a condition from somewhere else reads as a clear sky rather than throwing'
 
 /**
  * A delta long enough to mean the tab was hidden is clamped rather than
- * applied, and this is the claim behind that: unclamped, one such frame falls
- * a drop further than the whole box is deep and drifts the deck past its own
- * wrap, so the layer teleports on the frame a machine comes back to life.
+ * applied, because unclamped one such frame falls a drop further than the
+ * whole box is deep and runs a strike out without flashing it.
+ *
+ * The other half of the claim is where the ceiling is *not*: nothing else in
+ * the simulation holds its own frame, so a ceiling tight enough to catch a
+ * slow machine is the weather keeping a clock of its own. At 0.05s it did -
+ * measured on the software renderer at 7.5 frames a second, the day ran its
+ * full 30 seconds while the storm ran a little over a third of them.
  */
 test('a frame is taken forwards and short', () => {
     assert.equal(weatherStep(0.016), 0.016);
     assert.equal(weatherStep(MAX_STEP), MAX_STEP);
     assert.equal(weatherStep(4), MAX_STEP, 'a stalled frame is clamped, not applied');
 
+    // The frame rate the drift was measured at, taken whole: a machine that is
+    // merely slow spends the same second the ground under it spends.
+    assert.equal(weatherStep(1 / 7.5), 1 / 7.5, 'a slow frame is a frame, not a stall');
+    assert.ok(MAX_STEP >= 1 / 4,
+        'and the ceiling is past any frame rate this world is still being drawn at');
+
     for (const dt of [0, -1, NaN, undefined, null, 'x']) {
         assert.equal(weatherStep(dt), 0, `${JSON.stringify(dt)} moves nothing`);
     }
 
+    assert.ok(MAX_STEP < STRIKE_LENGTH,
+        'a clamped frame cannot begin a strike and end it without flashing it');
     assert.ok(RAIN_SPEED * MAX_STEP < RAIN_BOX.height,
-        'a clamped frame cannot fall a drop through the floor');
+        'or fall a drop through the floor');
     assert.ok(CLOUD_DRIFT * MAX_STEP < CLOUD_SPREAD,
         'or drift the deck past its own wrap');
+});
+
+/**
+ * The ceiling as the layer feels it rather than as one call answers it.
+ *
+ * The test above pins `weatherStep` at a frame, which is the claim at its own
+ * altitude. This is the same claim where a pilot meets it: all three of the
+ * things the ceiling is spent on, stepped through thirty seconds of frames at
+ * 7.5 a second - the rate the software renderer draws a 95-cloud storm at -
+ * and each asked for the thirty seconds' worth it should have moved.
+ *
+ * It is a claim the per-frame test cannot make, because nothing about one
+ * clamped frame says what a window of them comes to. At the 0.05s ceiling this
+ * had, every one of the three came to the same 37.5% of its own rate: the deck
+ * drifted a third of the distance, a drop crossed the box ten times rather
+ * than twenty-eight, and a strike that declares 0.42s stayed on screen for
+ * 1.2s. A ceiling put back, or a second one added inside any of the three,
+ * fails here and nowhere else in this file.
+ */
+test('a slow machine spends the seconds the world spends', () => {
+    const FRAME  = 1 / 7.5;
+    const frames = 225;                       // thirty seconds of them
+    const spent  = frames * FRAME;
+
+    // --- The deck drifts its own rate, not a share of it ---
+    const deck = createCloudDeck(1, scripted([0.5]));
+    const from = deck[0].x;
+    for (let i = 0; i < frames; i++) driftClouds(deck, FRAME);
+
+    const drifted = deck[0].x - from;
+    const wanted  = CLOUD_DRIFT * CLOUD_WIND.x * spent;
+    assert.ok(Math.abs(drifted) < CLOUD_SPREAD,
+        'the window has to be short enough not to wrap, or this measures nothing');
+    assert.ok(Math.abs(drifted - wanted) < 1,
+        `the deck drifted ${drifted.toFixed(1)} units where ${wanted.toFixed(1)} is ${spent.toFixed(0)}s of its own rate`);
+
+    // --- A drop falls its own rate, counted by the crossings it makes ---
+    //
+    // Counted rather than summed: a drop that passes the floor is put back at
+    // the top, and the part of the frame it fell before that is not in its
+    // position afterwards. A crossing is a whole box deep and has no such
+    // remainder in it.
+    const drops = createDrops(1, scripted([0.9]));
+    const floor = -RAIN_BOX.height / 2;
+    const first = drops[1] - floor;
+    let crossings = 0, last = drops[1];
+
+    for (let i = 0; i < frames; i++) {
+        advanceDrops(drops, FRAME, scripted([0.9]));
+        if (drops[1] > last) crossings++;
+        last = drops[1];
+    }
+
+    const expected = 1 + Math.floor((RAIN_SPEED * spent - first) / RAIN_BOX.height);
+    assert.ok(Math.abs(crossings - expected) <= 1,
+        `a drop crossed the box ${crossings} times where ${spent.toFixed(0)}s of falling is ${expected}`);
+
+    // --- A strike runs for as long as it says, and they land as often ---
+    const storm = createStrikes(scripted([0]));          // every gap at its shortest
+    let landed = 0, run = 0, longest = 0;
+
+    for (let i = 0; i < frames; i++) {
+        if (advanceStrikes(storm, FRAME, scripted([0])) > 0) {
+            longest = Math.max(longest, ++run);
+        } else {
+            if (run) landed++;
+            run = 0;
+        }
+    }
+
+    // A strike ends on the frame after the one that took it to zero, so its
+    // time on screen is a frame's worth coarse either way and no more.
+    const onScreen = longest * FRAME;
+    assert.ok(Math.abs(onScreen - STRIKE_LENGTH) <= FRAME,
+        `a strike stayed on screen ${onScreen.toFixed(2)}s against the ${STRIKE_LENGTH}s it declares`);
+
+    const due = Math.floor(spent / (STRIKE_GAP.min + STRIKE_LENGTH));
+    assert.ok(Math.abs(landed - due) <= 1,
+        `${landed} strikes landed in ${spent.toFixed(0)}s where the shortest gap gives ${due}`);
 });
 
 test('a value is folded back into the span it belongs to, however far out it is', () => {
