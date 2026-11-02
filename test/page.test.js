@@ -1520,6 +1520,46 @@ test('the cloud deck is mirrored by the texture it is drawn from, not by its sca
 });
 
 /**
+ * The doc block above `anchor` in `source`, taken as the last one to open
+ * before it. Comments are the one part of a module nothing else here reads,
+ * which is how the deck's own note on cost came to carry a figure nothing
+ * measures.
+ */
+function docAbove(source, anchor) {
+    const at = source.indexOf(anchor);
+    assert.ok(at > 0, `${anchor} should be in the source being read`);
+
+    const blocks = source.slice(0, at).match(/\/\*\*[^]*?\*\//g) ?? [];
+    return blocks.at(-1) ?? '';
+}
+
+/**
+ * The second cloud material was costed at "one more draw call for the deck",
+ * which is not a figure this renderer supports. A sprite is pushed into the
+ * render list as an object of its own and drawn with its own call, so the deck
+ * costs a call for every cloud in frame whether the sprites share one material
+ * or two: read off `renderer.info.render` on the running page, a 95-cloud storm
+ * held whole in frame drew 95 calls over one material and 95 over two. What the
+ * second one costs is material changes - the deck is transparent and so sorted
+ * back to front, and with `facing` drawn at random the two interleave, which
+ * came out at 43 changes over the 94 steps of one sorted deck.
+ *
+ * Both directions of that matter to a reader sizing a third texture: the call
+ * count is already the cloud count and will not grow, and the bindings do.
+ */
+test('the second cloud material is costed as the bindings it is, not as a draw call', () => {
+    const doc = docAbove(weatherSource, '\n    addClouds() {');
+
+    assert.match(doc, /cost/, 'the deck builder should say what its second material costs');
+    assert.ok(!/draw call for the deck/.test(doc),
+        'and not count it as a draw call, which every sprite already is on its own');
+    assert.match(doc, /binding|material change/,
+        'but as the material changes a sorted, interleaved deck costs');
+    assert.match(doc, /call of its own|its own call|a call for every cloud|a call a cloud/,
+        'and say what a call belongs to, which is a sprite rather than a deck');
+});
+
+/**
  * Built to the worst weather and drawn down to the weather in force. The other
  * way round - building for the condition it was handed - means throwing the
  * sprites away and building 5200 more on the frame a pilot asks for a storm,

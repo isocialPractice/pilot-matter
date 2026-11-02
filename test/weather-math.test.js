@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
     PRECIPITATION, PRECIPITATION_IDS, PRECIPITATION_MOST, DEFAULT_PRECIPITATION,
     isPrecipitationId, precipitationAt,
@@ -14,6 +16,33 @@ import {
     CELESTIAL_DISTANCE, CELESTIAL_SIZE
 } from '../js/weather-math.js';
 import { daylightAt, sunPositionAt, NIGHT_ELEVATION } from '../js/day-night.js';
+
+// The module as text, for the one claim in it that is written in a comment
+// rather than in code.
+const mathSource = readFileSync(
+    fileURLToPath(new URL('../js/weather-math.js', import.meta.url)),
+    'utf8'
+);
+
+/**
+ * The comment block sitting directly above `anchor` in `source`, as one string.
+ * Walks back from the anchor while the lines are comment lines, the way
+ * `test/input-map.test.js` does - a run of `//` lines above a property is the
+ * only shape read here.
+ */
+function commentAbove(source, anchor) {
+    const lines = source.split('\n');
+    const at = lines.findIndex(line => line.includes(anchor));
+    assert.ok(at > 0, `${anchor} should be in the source being read`);
+
+    const comment = [];
+    for (let index = at - 1; index >= 0; index--) {
+        const line = lines[index].trim();
+        if (line === '' || !/^(\/\/|\/\*|\*)/.test(line)) break;
+        comment.unshift(line);
+    }
+    return comment.join('\n');
+}
 
 /** A `random` that walks a list, so a draw can be put where the test wants it. */
 function scripted(values) {
@@ -227,6 +256,34 @@ test('a deck is laid inside its spread, under its ceiling, and mirrored both way
 
     assert.ok(deck.some(cloud => cloud.facing === -1), 'with some of them mirrored');
     assert.ok(deck.some(cloud => cloud.facing === 1), 'and some of them not');
+});
+
+/**
+ * The comment on `facing` outlived the code under it. It said every cloud was
+ * drawn from one texture and that mirroring half of them on x was the cheapest
+ * way to break the repetition - and both halves stopped being true when the
+ * mirror moved onto the canvas: the renderer picks between two textures now,
+ * and a sprite mirrored on x is a sprite not mirrored at all, which is the
+ * defect that move was made to fix.
+ *
+ * Read as text, the way `test/input-map.test.js` reads the comments nearest
+ * the level off. A comment is the one part of a module nothing else looks at,
+ * which is how this one stayed a release behind the deck it described while
+ * being the statement of intent the renderer was measured against.
+ */
+test('the facing is described as the texture it chooses rather than a flip on x', () => {
+    const comment = commentAbove(mathSource, 'facing: random()');
+
+    assert.match(comment, /texture/,
+        'the comment on `facing` should say which cloud texture a cloud is drawn from');
+    assert.ok(!/\bon x\b/.test(comment),
+        'and not mirroring on x, which is the thing a sprite loses the sign of');
+    assert.ok(!/\bone texture\b/.test(comment),
+        'nor one texture, now that there are two');
+    assert.match(comment, /repeated/,
+        'while keeping the reason the draw is here, which is the only part still true');
+    assert.match(comment, /weather\.js/,
+        'and leaving how a texture is reversed to the module that draws');
 });
 
 test('a deck of no clouds is no clouds rather than a crash', () => {

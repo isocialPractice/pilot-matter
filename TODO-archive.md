@@ -3650,3 +3650,36 @@ still be found by name.
     what it was before the gates existed. Extend that test rather than writing a
     second one, and expect it to fail loudly if the stream moves.
   - From: Environment Design
+
+## Archived 11-02-26
+
+- [x] **Mountain** bulk range: an apply-to-all mode that randomizes length,
+  width, and girth within range and applies transform effects such as
+  rotation
+  - Queued after the girth item deliberately, and dependent on it: this
+    randomizes the three ranges the others declare, and `girth` is the third of
+    them, so there is nothing to randomize until that gate exists.
+  - What is left is the mode rather than the behaviour. The generator already
+    turns each peak by a random `angle` and stretches it by
+    `1 + girth * (0.4 + random())`, so randomize-and-rotate runs
+    unconditionally today. This item is what makes it a mode that can be asked
+    for.
+  - From: Environment Design
+- [x] **Weather Lift**: Lift the weather effects from the `local-weather`
+  branch onto main's own
+  surfaces: the cloud deck, the rain, the lightning timing and the sun or moon
+  sprite
+  - Read the answer recorded under the roadmap item on 10.27.2026 before
+    starting. It is not a merge: `git merge local-weather` conflicts across
+    about a hundred files and resolves to deleting main, because the branch is
+    one commit off the initial commit of 02.21.2026.
+  - Take `js/weather.js` and nothing from `js/weather-style.js`. The style
+    module's `day`/`night` switch is superseded by the continuous cycle in
+    `js/day-night.js`, and its shared terrain colouring function has no seam to
+    attach to the element registry.
+  - Place the celestial sprite with `sunPositionAt(phase)` and light it with
+    `daylightAt(phase)` rather than with the branch's fixed `KEY_LIGHT_POSITION`,
+    read the precipitation from a settings option rather than a module constant,
+    and drop the tone tint entirely. `Sky.getSunPosition()` already exists and is
+    the one surface the branch reached for that main still offers.
+  - From: World & Environment

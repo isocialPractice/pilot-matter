@@ -106,8 +106,16 @@ export class Weather {
      * repeated across the sky, which is the outcome the flip in
      * `createCloudDeck` is there to prevent.
      *
-     * The cost is one more 256 by 162 texture and one more draw call for the
-     * deck, against a sky that reads as weather rather than as wallpaper.
+     * The cost is one more 256 by 162 texture, and material changes rather
+     * than a draw call. A sprite is pushed into the render list as an object of
+     * its own and drawn with a call of its own, so the deck costs a call for
+     * every cloud in frame however many materials they share between them:
+     * measured on the running page, a 95-cloud storm held whole in frame drew
+     * 95 calls over one material and 95 over two. What the second one adds is
+     * bindings - the deck is transparent and so sorted back to front, and
+     * `facing` is drawn at random, so the two interleave and the sort changes
+     * material at about half its steps. Against a sky that reads as weather
+     * rather than as wallpaper.
      */
     addClouds() {
         this.cloudMaterials = [false, true].map(mirrored => new THREE.SpriteMaterial({

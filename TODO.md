@@ -32,49 +32,6 @@ its context survives being archived.
   own frame, with the weight function every later item reads
   - From: Interactive Build Mode
 
-### Code Review Override - the comments the cloud mirror left behind
-
-#### Found Issues
-
-- [ ] **Deck Comment**: the comment on `facing` still says the deck is drawn
-  from one texture and mirrored on x, which is the bug that was just removed
-  - **Issue**: `createCloudDeck` in `js/weather-math.js:272` carries "Every
-    cloud is drawn from one texture, so mirroring half of them on x is the
-    cheapest way to stop a deck reading as one shape repeated across the sky."
-    Both halves are now false. `addClouds` builds two `SpriteMaterial`s over
-    two textures, and `facing` picks between them rather than mirroring
-    anything on x - mirroring on x is exactly what `sprite.scale.set(cloud.width
-    * cloud.facing, ...)` did, which `js/weather.js:100-107` and the assertion
-    at `test/page.test.js:1486` now both say is a sprite not mirrored at all.
-    A reader working from this comment is told to do the thing the release
-    stopped doing, and this is the comment the completed item's own issue
-    pointed at as the statement of intent the renderer was failing.
-  - **Goal**: say what `facing` now is - which of the two cloud textures a
-    cloud is drawn from - and keep the reason it exists, which is the only part
-    still true: half a deck reversed stops it reading as one shape repeated
-    across the sky. Leave the mechanism to `js/weather.js`, where it is
-    described at length already, rather than restating it in a pure module
-    that draws nothing.
-  - From: Code Review Override - the comments the cloud mirror left behind
-- [ ] **Deck Cost**: the second cloud material is costed at one more draw call,
-  and a sprite is already a draw call of its own
-  - **Issue**: `js/weather.js:109` reads "The cost is one more 256 by 162
-    texture and one more draw call for the deck". The texture is right; the
-    draw call is not a figure the renderer supports. A `THREE.Sprite` in r160
-    is pushed into the render list as an object of its own and drawn with its
-    own call, so a 95-cloud deck is 95 calls whether the sprites share one
-    material or two. What the second material actually adds is material state
-    changes, and because the deck is transparent and therefore depth-sorted,
-    the two materials interleave down the sorted list - so it is many bindings
-    rather than one call. A reader sizing a third texture off this line would
-    budget it wrongly in both directions.
-  - **Goal**: cost it as what it is - one more texture, and the material
-    bindings an interleaved sort costs - or drop the figure rather than carry
-    an unmeasured one. Nothing in the repository reads
-    `renderer.info.render.calls`, so settle it there if a number is wanted:
-    draw a 95-cloud storm and read the count with one material and with two.
-  - From: Code Review Override - the comments the cloud mirror left behind
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -430,38 +387,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 290 earlier items in `TODO-archive.md`, newest last.
+> 292 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Mountain** bulk range: an apply-to-all mode that randomizes length,
-  width, and girth within range and applies transform effects such as
-  rotation
-  - Queued after the girth item deliberately, and dependent on it: this
-    randomizes the three ranges the others declare, and `girth` is the third of
-    them, so there is nothing to randomize until that gate exists.
-  - What is left is the mode rather than the behaviour. The generator already
-    turns each peak by a random `angle` and stretches it by
-    `1 + girth * (0.4 + random())`, so randomize-and-rotate runs
-    unconditionally today. This item is what makes it a mode that can be asked
-    for.
-  - From: Environment Design
-- [x] **Weather Lift**: Lift the weather effects from the `local-weather`
-  branch onto main's own
-  surfaces: the cloud deck, the rain, the lightning timing and the sun or moon
-  sprite
-  - Read the answer recorded under the roadmap item on 10.27.2026 before
-    starting. It is not a merge: `git merge local-weather` conflicts across
-    about a hundred files and resolves to deleting main, because the branch is
-    one commit off the initial commit of 02.21.2026.
-  - Take `js/weather.js` and nothing from `js/weather-style.js`. The style
-    module's `day`/`night` switch is superseded by the continuous cycle in
-    `js/day-night.js`, and its shared terrain colouring function has no seam to
-    attach to the element registry.
-  - Place the celestial sprite with `sunPositionAt(phase)` and light it with
-    `daylightAt(phase)` rather than with the branch's fixed `KEY_LIGHT_POSITION`,
-    read the precipitation from a settings option rather than a module constant,
-    and drop the tone tint entirely. `Sky.getSunPosition()` already exists and is
-    the one surface the branch reached for that main still offers.
-  - From: World & Environment
 - [x] Lift the weather effects from the `local-weather` branch onto main's own
   surfaces: the cloud deck, the rain, the lightning timing and the sun or moon
   sprite
@@ -642,3 +569,41 @@ how the simulator got here rather than as a list still to be worked.
     claim is held by a new assertion in `test/page.test.js`, proven by mutation;
     how the sky reads is for the GUI test this run requested.
   - From: World & Environment
+- [x] **Deck Comment**: the comment on `facing` still says the deck is drawn
+  from one texture and mirrored on x, which is the bug that was just removed
+  - **Issue**: `createCloudDeck` in `js/weather-math.js:272` carries "Every
+    cloud is drawn from one texture, so mirroring half of them on x is the
+    cheapest way to stop a deck reading as one shape repeated across the sky."
+    Both halves are now false. `addClouds` builds two `SpriteMaterial`s over
+    two textures, and `facing` picks between them rather than mirroring
+    anything on x - mirroring on x is exactly what `sprite.scale.set(cloud.width
+    * cloud.facing, ...)` did, which `js/weather.js:100-107` and the assertion
+    at `test/page.test.js:1486` now both say is a sprite not mirrored at all.
+    A reader working from this comment is told to do the thing the release
+    stopped doing, and this is the comment the completed item's own issue
+    pointed at as the statement of intent the renderer was failing.
+  - **Goal**: say what `facing` now is - which of the two cloud textures a
+    cloud is drawn from - and keep the reason it exists, which is the only part
+    still true: half a deck reversed stops it reading as one shape repeated
+    across the sky. Leave the mechanism to `js/weather.js`, where it is
+    described at length already, rather than restating it in a pure module
+    that draws nothing.
+  - From: Code Review Override - the comments the cloud mirror left behind
+- [x] **Deck Cost**: the second cloud material is costed at one more draw call,
+  and a sprite is already a draw call of its own
+  - **Issue**: `js/weather.js:109` reads "The cost is one more 256 by 162
+    texture and one more draw call for the deck". The texture is right; the
+    draw call is not a figure the renderer supports. A `THREE.Sprite` in r160
+    is pushed into the render list as an object of its own and drawn with its
+    own call, so a 95-cloud deck is 95 calls whether the sprites share one
+    material or two. What the second material actually adds is material state
+    changes, and because the deck is transparent and therefore depth-sorted,
+    the two materials interleave down the sorted list - so it is many bindings
+    rather than one call. A reader sizing a third texture off this line would
+    budget it wrongly in both directions.
+  - **Goal**: cost it as what it is - one more texture, and the material
+    bindings an interleaved sort costs - or drop the figure rather than carry
+    an unmeasured one. Nothing in the repository reads
+    `renderer.info.render.calls`, so settle it there if a number is wanted:
+    draw a 95-cloud storm and read the count with one material and with two.
+  - From: Code Review Override - the comments the cloud mirror left behind

@@ -269,9 +269,11 @@ export function createCloudDeck(count, random = Math.random) {
             z: (random() * 2 - 1) * CLOUD_SPREAD,
             width,
             height: width / CLOUD_ASPECT,
-            // Every cloud is drawn from one texture, so mirroring half of them
-            // on x is the cheapest way to stop a deck reading as one shape
-            // repeated across the sky.
+            // Which of the two cloud textures this one is drawn from: `-1` the
+            // reversed one, `1` the plain one. Half a deck reversed stops it
+            // reading as one shape repeated across the sky, which is the whole
+            // of why the draw is here. How a texture is reversed is
+            // `js/weather.js`'s to say, since nothing in this module draws.
             facing: random() < 0.5 ? -1 : 1
         });
     }

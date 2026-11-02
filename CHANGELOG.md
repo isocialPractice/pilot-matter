@@ -5,6 +5,54 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.33.1] - 2026-11-02
+
+The two comments the cloud mirror left saying the old thing, and the first
+reading this project has taken of what a second cloud material costs.
+
+### Fixed
+
+- **The comment on `facing` says which texture it picks rather than a flip on
+  x.** `createCloudDeck` described the deck as drawn from one texture, with
+  mirroring half of them on x as the cheapest way to break the repetition. Both
+  halves stopped being true in `1.0.0-alpha.1.33.0`: the renderer carries two
+  `SpriteMaterial`s over two textures and `facing` picks between them, and
+  mirroring on x is precisely what a sprite's scale cannot express - the thing
+  that release removed. A reader working from the comment was told to put the
+  flip back where the sprite shader loses its sign, and this was the comment
+  the fix itself was measured against as the statement of intent.
+
+  It now says what the value is, which of the two textures a cloud is drawn
+  from, keeps the one part still true - that half a deck reversed stops it
+  reading as one shape repeated across the sky - and leaves how a texture is
+  reversed to `js/weather.js`, where it is described at length. A module that
+  draws nothing is no place to describe drawing.
+
+- **The second cloud material is costed as the bindings it is.** `addClouds`
+  put it at "one more 256 by 162 texture and one more draw call for the deck".
+  The texture was right; the draw call was a figure nothing here had ever
+  measured, and `renderer.info.render` is read nowhere in the project.
+
+  Measured now on the running page, over a camera wide enough to hold the whole
+  spread so nothing is culled: a sprite is pushed into the render list as an
+  object of its own and drawn with its own call, so a 95-cloud storm drew 95
+  calls and 190 triangles over one material and 95 calls and 190 triangles over
+  two. The second material costs no call at all. What it does cost is material
+  changes - the deck is transparent and therefore sorted back to front, and
+  with `facing` drawn at random the two interleave down that sort: 40, 41, 49,
+  49 and 51 changes over the 94 steps of five decks, which is about half of
+  them. The comment says that much and carries no count, so a reader sizing a
+  third texture budgets the bindings rather than a call the renderer was never
+  going to make.
+
+- **Both comments are read by the suite now**, which is what let them sit a
+  release behind the code under them. `test/weather-math.test.js` reads the run
+  of `//` lines above `facing`, and `test/page.test.js` reads the doc block
+  above `addClouds`, each in the shape `test/input-map.test.js` already uses for
+  the comments nearest the level off: name what is meant, and reject the stale
+  claim by name. Both were proven by mutation - with the shipped comments put
+  back, those two tests fail and the other 1498 pass.
+
 ## [1.0.0-alpha.1.33.0] - 2026-11-01
 
 Four things the weather release left behind, three of them found by looking at
