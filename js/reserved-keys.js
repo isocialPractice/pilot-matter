@@ -33,7 +33,7 @@ import { PAUSE_KEY }         from './pause.js';
 import { HELP_KEY }          from './controls-help.js';
 import { MUTE_KEY }          from './audio.js';
 import { SETTINGS_OPEN_KEYS } from './settings.js';
-import { EDITOR_OPEN_KEYS }  from './element-editor.js';
+import { BUILDER_OPEN_KEYS } from './build-mode.js';
 import { PHOTO_KEY }         from './photo.js';
 import { CAMERA_CYCLE_KEY }  from './camera-math.js';
 
@@ -59,7 +59,7 @@ function reservedRoles() {
         { role: 'CONTROL LIST',   codes: [HELP_KEY] },
         { role: 'MUTE',           codes: [MUTE_KEY] },
         { role: 'SETTINGS',       codes: [...SETTINGS_OPEN_KEYS] },
-        { role: 'ELEMENT EDITOR', codes: [...EDITOR_OPEN_KEYS] },
+        { role: 'ENVIRONMENT BUILDER', codes: [...BUILDER_OPEN_KEYS] },
         { role: 'PHOTO',          codes: [PHOTO_KEY] },
         { role: 'CAMERA',         codes: [CAMERA_CYCLE_KEY] }
     ];

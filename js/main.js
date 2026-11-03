@@ -11,8 +11,20 @@ import { createTitleState, startFlight, titleShowing, preFlightDelta }    from '
 import {
     createMenuState, resetSelection, applyMenuKey, applyMenuPointer, isMenuKey, selectedId,
     isMenuAdjustKey, isMenuControlKey, menuAdjustStep, setMenuEntries,
-    MenuList, followPointers, START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
+    MenuList, followPointers, pauseMenuEntries,
+    START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
+import {
+    createBuildState, openBuildMode, closeBuildMode, buildModeShowing,
+    buildModePicking, buildModeDrawing, buildModeFrom, beginCanvas,
+    isBuilderOpenKey, isBuilderCloseKey, BUILDER_ENTRY_ID,
+    BUILD_FROM_TITLE, BUILD_FROM_PAUSE
+} from './build-mode.js';
+import {
+    createPickerState, pickerEntries, choosePickerEntry,
+    CARD_ENTRY, PICKER_STARTED, PICKER_LEFT
+} from './build-picker.js';
+import { canvasCamera, canvasFarPlane, CANVAS_FOG } from './build-camera.js';
 import {
     createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines
 } from './controls-help.js';
@@ -70,7 +82,7 @@ import {
     createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
     typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
-    setEditorClearance, isEditorOpenKey, isEditorCloseKey, EDITOR_BACK_ID
+    setEditorClearance, isEditorCloseKey, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
@@ -231,6 +243,18 @@ class FlightSimulator {
         this.controlState   = createMenuState(this.controlSettings.entries);
         this.editorState    = createMenuState(this.editor.entries);
         this.modesState     = createMenuState(gameModeEntries());
+
+        // The builder's session, the canvas its picker has settled on, and the
+        // picker drawn as one menu across its cards and the two rows under
+        // them.
+        this.builder     = createBuildState();
+        this.picker      = createPickerState();
+        this.pickerState = createMenuState(pickerEntries(this.picker));
+
+        // Whether the pause menu is currently carrying the builder's entry, so
+        // the card is drawn again when that changes rather than on every frame
+        // something else did.
+        this.pauseBuilderReady = null;
         // The list opens the way the pilot last left it, which the control
         // panel remembers beside the rest of what it holds: the H key's answer
         // is the same question the panel is already asking.
@@ -295,6 +319,7 @@ class FlightSimulator {
             settings:  document.getElementById('settings'),
             controls:  document.getElementById('control-settings'),
             editor:    document.getElementById('element-editor'),
+            picker:    document.getElementById('build-picker'),
             gameModes: document.getElementById('game-modes'),
             objective: document.getElementById('game-mode'),
             hud:       document.getElementById('hud'),
@@ -332,6 +357,25 @@ class FlightSimulator {
         this.pauseMenu.followPointer((index, choose) => this.onPausePointer(index, choose));
         this.modesMenu.followPointer((index, choose) => this.onGameModesPointer(index, choose));
         this.editorMenu.followPointer((index, choose, step) => this.onEditorPointer(index, choose, step));
+
+        // The picker is two lists under one cursor: the six canvases as cards
+        // in two columns, and `START` and `BACK` beneath them. Split for the
+        // same reason the settings panel's three lists are - the cards are a
+        // grid and the answers are rows - and walked as the one menu the cursor
+        // already treats them as.
+        this.pickerCards = new MenuList(
+            document.getElementById('build-picker-cards'), this.pickerState,
+            entry => entry.kind === CARD_ENTRY
+        );
+        this.pickerActions = new MenuList(
+            document.getElementById('build-picker-actions'), this.pickerState,
+            entry => entry.kind !== CARD_ENTRY
+        );
+
+        followPointers(
+            [this.pickerCards, this.pickerActions],
+            (index, choose) => this.onPickerPointer(index, choose)
+        );
 
         // One cursor, three lists: the worlds under one heading of the panel,
         // the start state under the next, and the options that hold whichever
@@ -744,6 +788,7 @@ class FlightSimulator {
             || settingsShowing(this.settings)
             || controlSettingsShowing(this.controlSettings)
             || editorShowing(this.editor)
+            || buildModeShowing(this.builder)
             || this.pauseState.paused;
     }
 
@@ -816,18 +861,24 @@ class FlightSimulator {
             return;
         }
 
+        if (buildModeShowing(this.builder)) {
+            this.onBuilderKey(e);
+            return;
+        }
+
         if (isSettingsOpenKey(e.code) && !e.repeat) {
             this.openSettingsPanel();
             this.syncOverlays();
             return;
         }
 
-        // The world can be edited before the flight it will be flown over has
+        // The world can be built before the flight it will be flown over has
         // begun, which is the natural time to do it - unless a mode has been
-        // chosen, which brings its own ground and leaves the editor nothing to
-        // edit.
-        if (isEditorOpenKey(e.code) && !e.repeat && !isRunning(this.run)) {
-            this.openEditorPanel();
+        // chosen, which brings its own ground and leaves the builder nothing to
+        // be building. `builderReady` is that one predicate, and the pause
+        // menu's entry reads it too.
+        if (isBuilderOpenKey(e.code) && !e.repeat && this.builderReady()) {
+            this.openBuilder(BUILD_FROM_TITLE);
             this.syncOverlays();
             return;
         }
@@ -870,6 +921,11 @@ class FlightSimulator {
                 break;
             case 'settings':
                 this.openSettingsPanel();
+                break;
+            case BUILDER_ENTRY_ID:
+                // The same entry the pause menu carries, opening the same
+                // builder through the same function the L key opens it with.
+                this.openBuilder(BUILD_FROM_TITLE);
                 break;
         }
     }
@@ -927,15 +983,22 @@ class FlightSimulator {
             return;
         }
 
+        if (buildModeShowing(this.builder)) {
+            this.onBuilderKey(e);
+            return;
+        }
+
         let changed = false;
 
         if (isSettingsOpenKey(e.code) && !e.repeat) {
             this.openSettingsPanel();
             changed = true;
-        } else if (isEditorOpenKey(e.code) && !e.repeat && !isRunning(this.run)) {
+        } else if (isBuilderOpenKey(e.code) && !e.repeat && this.builderReady()) {
             // A mode brings its own ground with it, so there is nothing here
-            // for the editor to be editing while one is being played.
-            this.openEditorPanel();
+            // for the builder to be building while one is being played. The
+            // pause menu's entry comes off under the same predicate rather than
+            // being shown doing nothing.
+            this.openBuilder(BUILD_FROM_PAUSE);
             changed = true;
         } else if (applyMuteKey(this.audioState, e.code, true, e.repeat)) {
             changed = true;
@@ -982,6 +1045,9 @@ class FlightSimulator {
             case 'settings':
                 this.openSettingsPanel();
                 break;
+            case BUILDER_ENTRY_ID:
+                this.openBuilder(BUILD_FROM_PAUSE);
+                break;
         }
     }
 
@@ -1022,6 +1088,7 @@ class FlightSimulator {
         this.modesOpen = false;
         closeEditor(this.editor);
         closeControlSettings(this.controlSettings);
+        this.leaveBuilder();
         openSettings(this.settings);
         resetSelection(this.settingsState);
     }
@@ -1133,6 +1200,7 @@ class FlightSimulator {
         this.modesOpen = false;
         closeSettings(this.settings);
         closeEditor(this.editor);
+        this.leaveBuilder();
         openControlSettings(this.controlSettings);
         resetSelection(this.controlState);
     }
@@ -1339,6 +1407,7 @@ class FlightSimulator {
         closeSettings(this.settings);
         this.modesOpen = false;
         closeControlSettings(this.controlSettings);
+        this.leaveBuilder();
         openEditor(this.editor);
         this.redrawEditor();
         resetSelection(this.editorState);
@@ -1359,9 +1428,11 @@ class FlightSimulator {
             }
         }
 
-        // The key that opens the panel closes it again, the way O does the
-        // settings panel.
-        if (isEditorCloseKey(e.code) || (isEditorOpenKey(e.code) && !e.repeat)) {
+        // Escape and Backspace are the way off the panel. The key that used to
+        // open it - and so close it again, the way O does the settings panel -
+        // opens the interactive environment builder now, which is where this
+        // panel is reached from.
+        if (isEditorCloseKey(e.code)) {
             closeEditor(this.editor);
             this.syncOverlays();
             return;
@@ -1455,12 +1526,195 @@ class FlightSimulator {
         this.refreshWorld();
     }
 
+    // --- The builder -----------------------------------------------------
+
+    /**
+     * Whether the builder can be opened at all.
+     *
+     * The one predicate the menu entry and the `L` key both read, so the two
+     * cannot come to disagree about when the builder is reachable. A game mode
+     * brings its own ground with it, and the comment the key handler has always
+     * carried says why: there is nothing there for the editor to be editing
+     * while one is being played.
+     */
+    builderReady() {
+        return !isRunning(this.run);
+    }
+
+    /**
+     * Opens the builder, remembering what opened it.
+     *
+     * The title screen's entry, the pause menu's entry and the `L` key all come
+     * here, so the three cannot drift into opening slightly different things,
+     * and `from` is what the way out returns to.
+     *
+     * Every other panel is closed on the way in, the way each of them closes
+     * the others: a panel left open behind this one would come back out from
+     * under it.
+     *
+     * Returns true when a session was opened.
+     */
+    openBuilder(from = BUILD_FROM_TITLE) {
+        if (!this.builderReady()) return false;
+
+        closeSettings(this.settings);
+        this.modesOpen = false;
+        closeControlSettings(this.controlSettings);
+        closeEditor(this.editor);
+
+        openBuildMode(this.builder, from);
+        this.redrawPicker();
+        resetSelection(this.pickerState);
+
+        return true;
+    }
+
+    /**
+     * Draws the picker again from the entries it now has. Built rather than
+     * redrawn because the card marked as chosen moves, and the mark is drawn
+     * into the row rather than onto it.
+     */
+    redrawPicker() {
+        setMenuEntries(this.pickerState, pickerEntries(this.picker));
+        this.pickerCards.rebuild(this.pickerState);
+        this.pickerActions.rebuild(this.pickerState);
+    }
+
+    /**
+     * Leaves the builder for whichever menu opened it: the title screen, or the
+     * pause menu with the flight still behind it.
+     *
+     * The flight's own world comes back with it. A canvas is one tile and a
+     * flight is an endless grid of them, so the ground has to be laid again
+     * rather than left as the square the builder was working on.
+     */
+    leaveBuilder() {
+        const canvas = buildModeDrawing(this.builder);
+
+        closeBuildMode(this.builder);
+
+        if (canvas) {
+            this.terrain.setCanvas(false);
+            this.releaseCanvasView();
+            this.refreshWorld();
+            this.flyOver(this.aircraft.getPosition());
+        }
+    }
+
+    /**
+     * Opens the canvas on the chosen environment.
+     *
+     * The world is drawn as the one tile that canvas is, with no strip in it -
+     * a runway is a place rather than ground that repeats, and one is placed
+     * here rather than searched for - and the camera is held over it.
+     */
+    startCanvas(environmentId) {
+        if (!beginCanvas(this.builder, environmentId)) return false;
+
+        this.terrain.setCanvas(true);
+        this.terrain.setEnvironment(environmentId, { runway: false });
+        this.bounds = this.terrain.getBounds();
+        this.hud.setBounds(this.bounds);
+
+        this.holdCanvasView();
+
+        return true;
+    }
+
+    /**
+     * Holds the camera over the canvas, and clears the air over it.
+     *
+     * Both are the flight's settings being stood down rather than changed. The
+     * far plane is as far as the ground is drawn for a flight, which is shorter
+     * than the diagonal of one tile, and the fog is thick on purpose - between
+     * them they are what keeps the end of the world out of frame. A canvas is
+     * the opposite case: its four edges are the extent of what is being built,
+     * and they are there to be seen.
+     */
+    holdCanvasView() {
+        this.camera.far = canvasFarPlane(this.terrain.size);
+        this.camera.updateProjectionMatrix();
+        this.sky.setFogDensity(CANVAS_FOG);
+    }
+
+    /** Puts both back as the flight had them, which is what leaving restores. */
+    releaseCanvasView() {
+        this.camera.far = TILE_REACH;
+        this.camera.updateProjectionMatrix();
+        this.sky.setFogDensity(currentOption(this.settings, FOG_OPTION));
+    }
+
+    /**
+     * Stands the camera over the canvas for this frame.
+     *
+     * Written every frame rather than once, because the flight camera is what
+     * would otherwise have placed it: `js/camera.js` chases an aircraft, and a
+     * canvas has no aircraft to chase.
+     */
+    trackCanvasCamera() {
+        const { position, target } = canvasCamera(this.terrain.size);
+
+        this.camera.up.set(0, 1, 0);
+        this.camera.position.set(position.x, position.y, position.z);
+        this.camera.lookAt(target.x, target.y, target.z);
+    }
+
+    onBuilderKey(e) {
+        // The picker is the builder's first screen rather than a gate in front
+        // of it, so the way off it is the way out of the builder.
+        if (isBuilderCloseKey(e.code)) {
+            this.leaveBuilder();
+            this.syncOverlays();
+            return;
+        }
+
+        if (!buildModePicking(this.builder) || !isMenuKey(e.code)) return;
+
+        // Space and the arrow keys scroll a page given the chance
+        e.preventDefault();
+
+        const chosen = applyMenuKey(this.pickerState, e.code, true, e.repeat);
+        if (chosen) this.choosePickerRow(chosen);
+        this.syncOverlays();
+    }
+
+    /**
+     * The picker under the mouse. Every choice it offers goes through the same
+     * place a chosen row does, so a click on a card chooses that canvas and a
+     * click on `START` opens it - the same answers the keys get.
+     */
+    onPickerPointer(index, choose) {
+        const chosen = applyMenuPointer(this.pickerState, index, choose);
+        if (chosen) this.choosePickerRow(chosen);
+        this.syncOverlays();
+    }
+
+    choosePickerRow(id) {
+        const chosen = choosePickerEntry(this.picker, id);
+        if (chosen == null) return;
+
+        if (chosen.action === PICKER_LEFT) {
+            this.leaveBuilder();
+            return;
+        }
+
+        if (chosen.action === PICKER_STARTED) {
+            this.startCanvas(chosen.environment);
+            return;
+        }
+
+        // A card moves the choice without leaving the picker, so the six can be
+        // read over before one is settled on.
+        this.redrawPicker();
+    }
+
     // --- The modes -------------------------------------------------------
 
     openGameModesPanel() {
         closeSettings(this.settings);
         closeEditor(this.editor);
         closeControlSettings(this.controlSettings);
+        this.leaveBuilder();
         this.modesOpen = true;
         resetSelection(this.modesState);
     }
@@ -1874,14 +2128,20 @@ class FlightSimulator {
         // every overlay comes off, so the screen the shutter falls on is the
         // frame that ends up in the file.
         const photo    = photoPending(this.photoState);
-        const onTitle  = !photo && titleShowing(this.titleState);
-        const modes    = !photo && this.modesOpen;
-        const settings = !photo && !modes && settingsShowing(this.settings);
-        const controls = !photo && !modes && !settings && controlSettingsShowing(this.controlSettings);
-        const editor   = !photo && !modes && !settings && !controls && editorShowing(this.editor);
-        const panel    = modes || settings || controls || editor;
-        const paused   = !photo && !onTitle && this.pauseState.paused;
-        const chrome   = !photo && !onTitle && !panel && this.hudVisibility.visible;
+        // The builder is the world rather than a card over it: a session has
+        // the screen, so neither card is drawn behind it and none of the
+        // flight's own chrome is drawn over it. Its picker is the one modal
+        // screen it has, and that is a panel like any other.
+        const builder  = !photo && buildModeShowing(this.builder);
+        const picker   = builder && buildModePicking(this.builder);
+        const onTitle  = !photo && !builder && titleShowing(this.titleState);
+        const modes    = !photo && !builder && this.modesOpen;
+        const settings = !photo && !builder && !modes && settingsShowing(this.settings);
+        const controls = !photo && !builder && !modes && !settings && controlSettingsShowing(this.controlSettings);
+        const editor   = !photo && !builder && !modes && !settings && !controls && editorShowing(this.editor);
+        const panel    = modes || settings || controls || editor || picker;
+        const paused   = !photo && !builder && !onTitle && this.pauseState.paused;
+        const chrome   = !photo && !builder && !onTitle && !panel && this.hudVisibility.visible;
         // The pads belong to a flight being flown, the same as the instruments,
         // and to a machine with no keys to fly it with. Taking them off lets go
         // of whatever they were holding, which is why a pause takes them off
@@ -1898,6 +2158,7 @@ class FlightSimulator {
         this.overlays.settings.style.display  = settings ? 'block' : 'none';
         this.overlays.controls.style.display  = controls ? 'block' : 'none';
         this.overlays.editor.style.display    = editor ? 'block' : 'none';
+        this.overlays.picker.style.display    = picker ? 'block' : 'none';
         this.overlays.gameModes.style.display = modes ? 'block' : 'none';
         this.overlays.paused.style.display    = paused && !panel ? 'block' : 'none';
         this.overlays.hud.style.display       = chrome ? 'block' : 'none';
@@ -1931,6 +2192,7 @@ class FlightSimulator {
         this.overlays.objective.classList.toggle('floated', pads);
 
         syncGameModeEntries(this.modesState.entries, this.run);
+        this.syncPauseMenu();
 
         this.startMenu.render(this.startMenuState);
         this.pauseMenu.render(this.pauseMenuState);
@@ -1940,6 +2202,31 @@ class FlightSimulator {
         this.settingsOptions.render(this.settingsState);
         for (const menu of this.controlMenus) menu.render(this.controlState);
         this.editorMenu.render(this.editorState);
+        this.pickerCards.render(this.pickerState);
+        this.pickerActions.render(this.pickerState);
+    }
+
+    /**
+     * Puts the builder's entry on the pause menu or takes it off, and draws the
+     * card again when that has changed.
+     *
+     * A row that opened nothing is the one thing a row under the cursor should
+     * never do, so the entry comes off while a game mode is running rather than
+     * being shown doing nothing - which is the same answer the `L` key has
+     * always given, read off the same predicate.
+     *
+     * Only a change rebuilds the list. The rows carry their place in the menu,
+     * so a menu that has grown or shrunk has to be built again to be walked at
+     * all, and a rebuild on every frame would be the card redrawn under the
+     * pointer that is working it.
+     */
+    syncPauseMenu() {
+        const ready = this.builderReady();
+        if (ready === this.pauseBuilderReady) return;
+
+        this.pauseBuilderReady = ready;
+        setMenuEntries(this.pauseMenuState, pauseMenuEntries(ready));
+        this.pauseMenu.rebuild(this.pauseMenuState);
     }
 
     /**
@@ -1993,7 +2280,18 @@ class FlightSimulator {
             || this.pauseState.paused
             || settingsShowing(this.settings)
             || editorShowing(this.editor)
+            || buildModeShowing(this.builder)
             || this.modesOpen;
+
+        // A canvas is the world being built rather than flown, so the flight
+        // stands down for as long as one is open: the ground is not laid out
+        // around the aircraft, and the camera is held over the canvas rather
+        // than chasing something that is not moving.
+        //
+        // The picker is not one of those frames. It is a modal over the live
+        // world, which goes on being drawn behind it exactly as it was - the
+        // flight is frozen, so the chase camera holds where it was left.
+        const canvas = buildModeDrawing(this.builder);
 
         const dt = frozen ? 0 : preFlightDelta(this.titleState, simulationDelta(this.pauseState, elapsed));
 
@@ -2015,7 +2313,11 @@ class FlightSimulator {
         // edge the fog used to be hiding is never there to be reached. Drawn
         // before the camera is placed, so the chase view never swings out over
         // ground that has not been laid yet.
-        this.flyOver(this.aircraft.getPosition());
+        //
+        // A canvas is the one world this does not apply to. It is one tile with
+        // four edges, and laying ground around the aircraft would be laying the
+        // grid back out under a session that is deliberately not drawing it.
+        if (!canvas) this.flyOver(this.aircraft.getPosition());
 
         this.trackCourse();
         this.trackStage(dt);
@@ -2023,7 +2325,8 @@ class FlightSimulator {
         this.trackRescue();
         this.advanceRun(dt);
 
-        this.camera2.update(dt);
+        if (canvas) this.trackCanvasCamera();
+        else this.camera2.update(dt);
 
         // The day moves on and the water moves with it: what the surface has to
         // throw back is whatever the sky is giving it at that hour.

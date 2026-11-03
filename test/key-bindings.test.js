@@ -51,7 +51,7 @@ import { PAUSE_KEY }         from '../js/pause.js';
 import { HELP_KEY }          from '../js/controls-help.js';
 import { MUTE_KEY }          from '../js/audio.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
-import { EDITOR_OPEN_KEYS }  from '../js/element-editor.js';
+import { BUILDER_OPEN_KEYS } from '../js/build-mode.js';
 import { PHOTO_KEY }         from '../js/photo.js';
 import { CAMERA_CYCLE_KEY }  from '../js/camera-math.js';
 
@@ -179,7 +179,7 @@ test('the way out of the wait and the way to clear are not keys to bind', () => 
 test('the keys the game reads for itself are not the map\'s to take', () => {
     const owned = [
         HUD_TOGGLE_KEY, PAUSE_KEY, HELP_KEY, MUTE_KEY,
-        ...SETTINGS_OPEN_KEYS, ...EDITOR_OPEN_KEYS, PHOTO_KEY, CAMERA_CYCLE_KEY
+        ...SETTINGS_OPEN_KEYS, ...BUILDER_OPEN_KEYS, PHOTO_KEY, CAMERA_CYCLE_KEY
     ];
 
     assert.deepEqual([...reservedKeys()].sort(), [...new Set(owned)].sort(),

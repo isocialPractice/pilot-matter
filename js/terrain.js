@@ -7,8 +7,9 @@ import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './envi
 import { animateWater } from './water.js';
 import { updateNormals } from './terrain-normals.js';
 import {
-    TILE_REACH, tileIndexAt, tileKey, tileBounds, tileCenter, tilesInReach,
-    tileWorthKeeping, sameTile, isHomeTile, tilesTouching
+    TILE_REACH, TILE_KEEP, CANVAS_REACH, CANVAS_KEEP, tileIndexAt, tileKey,
+    tileBounds, tileCenter, tilesInReach, tileWorthKeeping, sameTile, isHomeTile,
+    tilesTouching
 } from './world-tiles.js';
 import { recordWorld, sameWorld } from './world-record.js';
 
@@ -38,6 +39,13 @@ export class Terrain {
         // place is answered from.
         this.tiles = new Map();
         this.focus = { x: 0, z: 0 };
+
+        // How far the ground runs past whatever is being looked at, and how far
+        // past that a tile is kept. Held rather than read off the constants
+        // because a build canvas is one tile and a flight is an endless grid of
+        // them, and that is the whole of the difference between the two.
+        this.reach = TILE_REACH;
+        this.keep  = TILE_KEEP;
 
         // How long the water has been moving. Time the flight did not spend
         // flying is time the surface does not spend running, so a paused world
@@ -139,7 +147,7 @@ export class Terrain {
         this.addTile(tileIndexAt(x, z, this.size));
 
         let spent = 0;
-        for (const index of tilesInReach(x, z, this.size, TILE_REACH)) {
+        for (const index of tilesInReach(x, z, this.size, this.reach)) {
             if (this.tiles.has(tileKey(index))) continue;
             if (spent >= budget) break;
             this.addTile(index);
@@ -152,9 +160,44 @@ export class Terrain {
             // about the runway has an answer however far the aircraft has flown
             // from it.
             if (isHomeTile(tile.index)) continue;
-            if (tileWorthKeeping(tile.index, x, z, this.size)) continue;
+            if (tileWorthKeeping(tile.index, x, z, this.size, this.reach, this.keep)) continue;
             this.dropTile(key, tile);
         }
+    }
+
+    /**
+     * Draws the world as one tile rather than as a grid of them, which is what
+     * a build canvas is: a square with four edges, sized as the world was sized
+     * before the endless grid replaced it, and those edges are the extent of
+     * what is being built rather than a wall anything can reach.
+     *
+     * Nothing is resized. One tile is already that square, so what changes is
+     * how many of them are drawn - and `TILE_REACH` is left exactly as it is,
+     * because the flight it belongs to still has no end to reach.
+     *
+     * Every tile is released on the way in and on the way out, so neither mode
+     * is left standing round the other. The caller rebuilds the world
+     * afterwards, which is what lays the one tile the canvas is or the grid the
+     * flight is flown over.
+     *
+     * Returns true when the mode actually changed.
+     */
+    setCanvas(on = false) {
+        const canvas = on === true;
+        if (canvas === (this.reach === CANVAS_REACH)) return false;
+
+        this.reach = canvas ? CANVAS_REACH : TILE_REACH;
+        this.keep  = canvas ? CANVAS_KEEP  : TILE_KEEP;
+
+        this.release();
+        this.focus = { x: 0, z: 0 };
+
+        return true;
+    }
+
+    /** True while the world is the one tile a canvas is rather than a grid of them. */
+    get canvas() {
+        return this.reach === CANVAS_REACH;
     }
 
     /**

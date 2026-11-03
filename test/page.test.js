@@ -13,7 +13,10 @@ import { MINIMAP_SIZE } from '../js/minimap.js';
 import { LOADING_STEPS, LOADING_FADE_MS } from '../js/loading.js';
 import { MUTE_KEY } from '../js/audio.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
-import { EDITOR_TITLE, EDITOR_HEADING, EDITOR_OPEN_KEYS } from '../js/element-editor.js';
+import { EDITOR_TITLE, EDITOR_HEADING } from '../js/element-editor.js';
+import { BUILDER_OPEN_KEYS, BUILDER_LABEL } from '../js/build-mode.js';
+import { START_MENU_ENTRIES, PAUSE_MENU_ENTRIES } from '../js/menu.js';
+import { PICKER_TITLE, PICKER_HEADING, pickerCards } from '../js/build-picker.js';
 import {
     CONTROL_SETTINGS_TITLE, CONTROL_AXES_HEADING, CONTROL_TILT_HEADING,
     CONTROL_ATTITUDE_HEADING, CONTROL_LEVEL_OFF_HEADING, CONTROL_KEYS_HEADING,
@@ -318,6 +321,7 @@ const CONTROL_LISTS = CONTROL_GROUPS.map(entry => entry.list);
 // lists the two biggest panels are split across.
 const MENU_LISTS = [
     'start-menu', 'pause-menu', 'game-modes-menu', 'element-editor-menu',
+    'build-picker-cards', 'build-picker-actions',
     'settings-menu', 'settings-start', 'settings-options',
     ...CONTROL_LISTS
 ];
@@ -1038,8 +1042,9 @@ test('the control list names the keys the flight is worked with', () => {
     for (const code of SETTINGS_OPEN_KEYS) {
         assert.ok(list.includes(`${code.replace('Key', '')} -`), 'and the one that opens the settings');
     }
-    for (const code of EDITOR_OPEN_KEYS) {
-        assert.ok(list.includes(`${code.replace('Key', '')} -`), 'and the one that opens the element editor');
+    for (const code of BUILDER_OPEN_KEYS) {
+        assert.ok(list.includes(`${code.replace('Key', '')} -`),
+            'and the one that opens the interactive environment builder');
     }
     assert.ok(list.includes(`${PHOTO_KEY} -`), 'and the one that takes a picture');
 });
@@ -3245,4 +3250,168 @@ test('the muted notice is floated into the band the two left it', () => {
     assert.equal(pixels(indexHtml, '#audio-muted.floated', 'left'),
         pixels(indexHtml, '#attitude.floated', 'left'),
         'on the left edge the ladder and the readouts share, clear of the chart on the right');
+});
+
+// --- The interactive environment builder ----------------------------------
+
+/**
+ * A panel added to the markup and not to the stylesheet is a card with no card
+ * around it: the rows draw as bullets over the world and the title has no box.
+ */
+test('the builder picker is styled as a card like the panels beside it', () => {
+    const rule = styleRule(indexHtml, 'build-picker');
+    assert.ok(rule, 'index.html should style #build-picker');
+    assert.ok(/display:\s*none/.test(rule), 'and it should start hidden');
+    assert.ok(/position:\s*fixed/.test(rule), 'and lie over the world rather than in the page');
+    assert.ok(/overflow-y:\s*auto/.test(rule),
+        'and scroll rather than running off the bottom of a short window');
+
+    for (const selector of ['#build-picker h2', '#build-picker h3', '#build-picker small']) {
+        assert.ok(new RegExp(`${selector}[,\\s]`).test(indexHtml), `index.html should style ${selector}`);
+    }
+});
+
+test('the picker is headed with the name of the entry that opens it', () => {
+    assert.ok(indexHtml.includes(`<h2>${PICKER_TITLE}</h2>`),
+        `index.html should head the picker ${PICKER_TITLE}`);
+    assert.ok(indexHtml.includes(`<h3>${PICKER_HEADING}</h3>`),
+        `and say what the cards under it are`);
+    assert.equal(PICKER_TITLE, BUILDER_LABEL,
+        'which is the one name, on the entry and on the screen it opens');
+});
+
+// The six canvases are read off the environment registry, so a preset added
+// later is a card without an edit to the page.
+test('the picker leaves its two lists empty for the registry to fill', () => {
+    for (const id of ['build-picker-cards', 'build-picker-actions']) {
+        assert.ok(new RegExp(`<ul id="${id}">\\s*</ul>`).test(indexHtml),
+            `the entries are drawn from js/build-picker.js, so the page should leave #${id} empty`);
+    }
+
+    for (const card of pickerCards()) {
+        assert.ok(!indexHtml.includes(card.label),
+            `index.html names the ${card.label} canvas, which the registry publishes`);
+    }
+});
+
+// Two columns, which is how the walkthrough lays the six out, and a card is
+// taller than a row because it carries a line about the ground it starts from.
+test('the canvases are drawn as cards in two columns rather than as a list', () => {
+    assert.ok(styled(indexHtml, '#build-picker-cards', /display:\s*grid/),
+        'the cards should be laid out as a grid');
+    assert.ok(styled(indexHtml, '#build-picker-cards', /grid-template-columns:\s*repeat\(2/),
+        'in two columns');
+    assert.ok(styled(indexHtml, '#build-picker-cards li', /min-height/),
+        'and a card should have a height to carry its label and its line');
+    assert.ok(/#build-picker-cards li\[data-note\]::after[,\s]/.test(indexHtml),
+        'index.html should draw the line under a card');
+});
+
+/**
+ * The builder's entry is 31 characters, nearly twice the next longest label
+ * either card carries, and at the spacing the rows are set at it is wider than
+ * a 320-pixel screen.
+ *
+ * A browserless suite cannot measure text, so what it can hold is that the two
+ * cards close up at a width where the longest label would not otherwise fit -
+ * which is the check the card-height work recommended for exactly this case.
+ */
+test('the two menu cards close up where the longest label would not fit', () => {
+    const longest = [...START_MENU_ENTRIES, ...PAUSE_MENU_ENTRIES]
+        .reduce((worst, entry) => Math.max(worst, entry.label.length), 0);
+
+    assert.equal(longest, BUILDER_LABEL.length,
+        'the builder should be the longest label either menu carries');
+
+    const narrow = indexHtml.match(/@media \(max-width: 480px\) \{[\s\S]*?\n        \}/);
+    assert.ok(narrow, 'index.html should carry a narrow-screen rule for the two cards');
+    assert.ok(/#pause-menu li,\s*\n\s*#start-menu li \{/.test(narrow[0]),
+        'and it should be the two cards the long label is drawn on');
+    assert.ok(/letter-spacing:\s*1px/.test(narrow[0]), 'closing the space between the letters');
+    assert.ok(/font-size:\s*12px/.test(narrow[0]), 'and setting the row smaller');
+});
+
+test('the control list names the builder as what L opens', () => {
+    const { body: list } = elementBody(indexHtml, 'controls-help-list');
+    assert.match(list, /L - Interactive Environment Builder/,
+        'the list should say what L opens now');
+    assert.ok(!/L - Element Editor/.test(list), 'and not what it used to open');
+});
+
+/**
+ * The entry and the key read one predicate, so the menu and the keyboard cannot
+ * come to disagree about when the builder is reachable.
+ *
+ * js/main.js imports Three.js and cannot be imported here, so this is read off
+ * its source the way every other wiring check in this file is.
+ */
+test('the menu entry and the key both ask whether the builder is ready', () => {
+    const predicate = mainSource.match(/builderReady\(\)\s*\{([\s\S]*?)\n    \}/);
+    assert.ok(predicate, 'js/main.js should define builderReady()');
+    assert.match(predicate[1], /!isRunning\(this\.run\)/,
+        'a game mode brings its own ground, so there is nothing to be building while one runs');
+
+    const keyed = mainSource.match(/isBuilderOpenKey\(e\.code\)[^\n]*/g) ?? [];
+    assert.equal(keyed.length, 2, 'the key is read on the title screen and over a flight');
+    for (const read of keyed) {
+        assert.match(read, /this\.builderReady\(\)/, `${read.trim()} should read the one predicate`);
+    }
+
+    assert.match(mainSource, /const ready = this\.builderReady\(\);/,
+        'and the pause menu reads it once rather than working it out a second way');
+    assert.match(mainSource, /setMenuEntries\(this\.pauseMenuState, pauseMenuEntries\(ready\)\)/,
+        'building its entries from that same answer');
+});
+
+test('both menus open the builder through the one function the key opens it with', () => {
+    const opens = mainSource.match(/case BUILDER_ENTRY_ID:[\s\S]*?break;/g) ?? [];
+    assert.equal(opens.length, 2, 'the start menu and the pause menu should both carry the entry');
+
+    for (const open of opens) {
+        assert.match(open, /this\.openBuilder\(BUILD_FROM_(TITLE|PAUSE)\)/,
+            'and each should say where it was chosen from');
+    }
+
+    const body = mainSource.match(/openBuilder\(from = BUILD_FROM_TITLE\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(body, 'js/main.js should define openBuilder(from)');
+    assert.match(body[0], /openBuildMode\(this\.builder, from\)/,
+        'carrying what opened it into the session');
+});
+
+/**
+ * A canvas is the world being built rather than flown, so the flight stands
+ * down for as long as one is open.
+ *
+ * Both halves matter and neither is visible from the other. Laying ground
+ * around the aircraft would put the grid back out under a session that is
+ * deliberately drawing one tile; letting the chase camera place the view would
+ * leave it standing behind an aircraft nobody is flying.
+ */
+test('a canvas stands the flight down rather than being drawn behind it', () => {
+    const frame = mainSource.match(/animate\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(frame, 'js/main.js should define animate()');
+
+    assert.match(frame[0], /const canvas = buildModeDrawing\(this\.builder\);/,
+        'the frame should know whether a canvas is open');
+    assert.match(frame[0], /if \(!canvas\) this\.flyOver\(/,
+        'and not lay the grid out around the aircraft while one is');
+    assert.match(frame[0], /if \(canvas\) this\.trackCanvasCamera\(\);\s*\n\s*else this\.camera2\.update\(dt\);/,
+        'and hold the camera over the canvas rather than behind the aircraft');
+    assert.match(frame[0], /buildModeShowing\(this\.builder\)/,
+        'and freeze the clock for the whole session, picker included');
+});
+
+test('opening a canvas draws one tile of it, with no strip and the camera held over it', () => {
+    const body = mainSource.match(/startCanvas\(environmentId\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(body, 'js/main.js should define startCanvas()');
+
+    assert.match(body[0], /this\.terrain\.setCanvas\(true\)/, 'one tile rather than nine');
+    assert.match(body[0], /setEnvironment\(environmentId, \{ runway: false \}\)/,
+        'on the canvas the picker chose, with nothing prepared to arrive on');
+    assert.match(body[0], /this\.holdCanvasView\(\)/, 'and the camera held over it');
+
+    const leaving = mainSource.match(/leaveBuilder\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(leaving, 'js/main.js should define leaveBuilder()');
+    assert.match(leaving[0], /this\.terrain\.setCanvas\(false\)/, 'and leaving puts the grid back');
+    assert.match(leaving[0], /this\.releaseCanvasView\(\)/, 'with the flight camera and its fog');
 });

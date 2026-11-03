@@ -6,24 +6,47 @@
  * every menu on screen is one of them.
  */
 
+import { BUILDER_ENTRY_ID, BUILDER_LABEL } from './build-mode.js';
+
 // The menu the game opens on, before the first flight.
 export const START_MENU_ENTRIES = [
     { id: 'start',    label: 'START FLIGHT' },
     { id: 'modes',    label: 'GAME MODES' },
     { id: 'controls', label: 'CONTROL SETTINGS' },
-    { id: 'settings', label: 'SETTINGS' }
+    { id: 'settings', label: 'SETTINGS' },
+    { id: BUILDER_ENTRY_ID, label: BUILDER_LABEL }
 ];
 
-// The menu over a paused flight. Game Modes, Control Settings, and Settings
-// answer to the same ids the start menu uses, so both screens open the same
-// thing.
+// The menu over a paused flight. Game Modes, Control Settings, Settings and the
+// builder answer to the same ids the start menu uses, so both screens open the
+// same thing.
 export const PAUSE_MENU_ENTRIES = [
     { id: 'resume',   label: 'RESUME' },
     { id: 'reset',    label: 'RESET FLIGHT' },
     { id: 'modes',    label: 'GAME MODES' },
     { id: 'controls', label: 'CONTROL SETTINGS' },
-    { id: 'settings', label: 'SETTINGS' }
+    { id: 'settings', label: 'SETTINGS' },
+    { id: BUILDER_ENTRY_ID, label: BUILDER_LABEL }
 ];
+
+/**
+ * The pause menu for a flight the builder can or cannot be opened from.
+ *
+ * A game mode brings its own ground with it, so there is nothing there for the
+ * builder to be editing - which is why the `L` key has always been ignored
+ * while one is running. A row that opened nothing would be the one thing a row
+ * under the cursor should never do, so the entry comes off the menu instead of
+ * being shown doing nothing.
+ *
+ * `ready` is the answer to the one predicate the key handler reads, handed in
+ * rather than worked out again here: the menu and the key cannot disagree about
+ * when the builder is reachable if there is only one reading of it.
+ */
+export function pauseMenuEntries(ready = true) {
+    return ready
+        ? PAUSE_MENU_ENTRIES
+        : PAUSE_MENU_ENTRIES.filter(entry => entry.id !== BUILDER_ENTRY_ID);
+}
 
 // The cursor moves on the same keys the aircraft pitches with, so a hand
 // already on the controls never has to go looking for the menu.

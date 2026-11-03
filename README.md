@@ -34,7 +34,8 @@ two pages as Markdown, for reading without a browser.
 
 - **Arcade flight model** - pitch, roll, and bank through coordinated turns, with a throttle lever the airspeed chases, airspeed-driven lift, and a wing that stalls when the speed decays
 - **The world as data** - eleven environment elements, each declaring the ranges it can be configured through and the algorithm that draws it, assembled into five worlds and regenerated on the spot
-- **An element editor** - open the world being flown, move any range an element declares, and watch the ground drawn again from the algorithm
+- **An element editor** - the world being flown as the elements it was assembled from, with any range one of them declares movable and the ground drawn again from the algorithm. `L` opens the builder now, so the panel has no key of its own until the builder carries it
+- **An environment builder** - `L`, or the last entry on either menu, opens the world as a canvas: six to start from, Blank Canvas among them, drawn as the one tile the endless world repeats with the camera held over it
 - **A world with no edge** - the square an environment describes is one tile of an endless grid of them, drawn out further than the camera can see, so there is always more ground ahead, and each tile settled against the tiles beside it as it is laid, so there is no join anywhere in it
 - **A day to fly through** - the sun walks across the sky and the light, the fog, and the water's sheen warm and cool with it
 - **Weather to fly in** - a cloud deck, rain that rides with the aircraft and shears downwind, and lightning over the sky, set from the settings panel and lit by whatever hour the day has reached
@@ -97,7 +98,7 @@ Then open `http://localhost:8080` in your browser.
 | `C` | Cycle camera (chase, cockpit, orbit) |
 | `P` | Pause / resume, and open the pause menu |
 | `O` | Open the settings panel, and close it again |
-| `L` | Open the element editor, and close it again |
+| `L` | Open the interactive environment builder, and `Esc` to leave it |
 | `M` | Mute or unmute the engine and wind |
 | `H` | Collapse the control list to a hint line, and open it again |
 | `Tab` | Show or hide the instruments |

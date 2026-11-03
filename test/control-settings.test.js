@@ -521,22 +521,29 @@ test('opening the panel closes whatever other panel was over the flight', () => 
  * So each opener states what it closes, rather than resting on the order
  * something else happens to rank them in.
  */
-test('every panel opener closes the other three', () => {
+test('every panel opener closes the other four', () => {
     const CLOSES = {
         settings: 'closeSettings(this.settings)',
         editor:   'closeEditor(this.editor)',
         modes:    'this.modesOpen = false',
-        controls: 'closeControlSettings(this.controlSettings)'
+        controls: 'closeControlSettings(this.controlSettings)',
+        // The builder is the one of the five that is the world rather than a
+        // card over it, so standing it down puts the flight's own ground and
+        // camera back as well as closing the session.
+        builder:  'this.leaveBuilder()'
     };
     const OPENERS = {
         openSettingsPanel:        'settings',
         openEditorPanel:          'editor',
         openGameModesPanel:       'modes',
-        openControlSettingsPanel: 'controls'
+        openControlSettingsPanel: 'controls',
+        openBuilder:              'builder'
     };
 
     for (const [opener, panel] of Object.entries(OPENERS)) {
-        const body = mainSource.match(new RegExp(`${opener}\\(\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
+        // An opener may take an argument - the builder's remembers which menu
+        // opened it - so the signature is read rather than assumed to be empty.
+        const body = mainSource.match(new RegExp(`${opener}\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n    \\}`));
         assert.ok(body, `js/main.js should define ${opener}()`);
 
         for (const [other, closing] of Object.entries(CLOSES)) {

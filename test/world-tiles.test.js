@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-    TILE_REACH, TILE_KEEP,
+    TILE_REACH, TILE_KEEP, CANVAS_REACH, CANVAS_KEEP,
     tileIndexAt, tileKey, tileCenter, tileBounds, tilesInReach,
     tileWorthKeeping, sameTile, isHomeTile, tilesTouching
 } from '../js/world-tiles.js';
@@ -311,4 +311,57 @@ test('the sides are settled before the corners, so a longer join is never the on
 test('a tile with no place in the grid has no neighbours rather than eight wrong ones', () => {
     assert.deepEqual(tilesTouching(null), []);
     assert.deepEqual(tilesTouching(undefined), []);
+});
+
+// --- The one tile a build canvas is ---------------------------------------
+
+/**
+ * A build canvas is one tile, and its four edges are the extent of what is
+ * being built rather than a wall anything can be flown at.
+ *
+ * It goes through the same arithmetic the endless grid does, asked for a reach
+ * of nothing, rather than through a second code path with its own idea of which
+ * tile is which. These are what say that arithmetic answers with one tile.
+ */
+test('a canvas is the middle tile and nothing around it', () => {
+    assert.deepEqual(tilesInReach(0, 0, SIZE, CANVAS_REACH), [{ x: 0, z: 0 }]);
+    assert.ok(isHomeTile(tilesInReach(0, 0, SIZE, CANVAS_REACH)[0]));
+});
+
+test('a canvas lets go of every tile the flight before it had laid', () => {
+    for (const index of [{ x: 1, z: 0 }, { x: 0, z: -1 }, { x: -1, z: 1 }, { x: 3, z: 3 }]) {
+        assert.equal(tileWorthKeeping(index, 0, 0, SIZE, CANVAS_REACH, CANVAS_KEEP), false,
+            `${tileKey(index)} is not part of the canvas`);
+    }
+
+    assert.equal(tileWorthKeeping({ x: 0, z: 0 }, 0, 0, SIZE, CANVAS_REACH, CANVAS_KEEP), true,
+        'and keeps the one tile it is');
+});
+
+test('a canvas is the size the world was before the grid replaced it', () => {
+    const bounds = tileBounds({ x: 0, z: 0 }, SIZE);
+
+    assert.equal(SIZE, 16000, 'which is the terrain bounds the bounded world had');
+    assert.equal(bounds.maxX - bounds.minX, SIZE);
+    assert.equal(bounds.maxZ - bounds.minZ, SIZE);
+    assert.deepEqual(tileCenter({ x: 0, z: 0 }, SIZE), { x: 0, z: 0 },
+        'laid out from the middle, which is what the camera is held over');
+});
+
+/**
+ * And none of it touches the flight.
+ *
+ * The one-tile mode is the canvas's, and the ground a flight is flown over goes
+ * on having no end to reach - which is the whole of what the endless grid was
+ * built for, and the thing easiest to undo by accident while giving the builder
+ * its four edges.
+ */
+test('the flight keeps the reach it had, and the ground with no end to it', () => {
+    assert.equal(TILE_REACH, 12000);
+    assert.equal(TILE_KEEP, 2000);
+    assert.ok(CANVAS_REACH < TILE_REACH, 'a canvas sees less ground, not more');
+
+    assert.equal(tilesInReach(0, 0, SIZE, TILE_REACH).length, 9,
+        'a flight over the middle still lays the nine tiles round it');
+    assert.ok(tileWorthKeeping({ x: 1, z: 0 }, 0, 0, SIZE), 'and still keeps the ground beside it');
 });

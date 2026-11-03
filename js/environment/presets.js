@@ -132,6 +132,38 @@ export const ENVIRONMENTS = [highlands, riverBasin, canyonCountry, duneSea, lake
 
 export const DEFAULT_ENVIRONMENT_ID = highlands.id;
 
+/**
+ * Flat ground under grass and nothing else - the canvas the interactive
+ * environment builder starts from when it is starting from nothing.
+ *
+ * It needs no new machinery. `maxHeight` bottoms out at 50 and `scale` at 0.5,
+ * so this is the least shape the base can be given: a roll of at most 50 units
+ * across 16000, which is flat at anything the aircraft flies at, and still
+ * ground with a normal to catch the light rather than a plane with none.
+ */
+const blankCanvas = {
+    id: 'blank-canvas',
+    label: 'BLANK CANVAS',
+    description: 'Flat ground and nothing on it, to build on from nothing',
+    seed: 20260918,
+    base: { maxHeight: 50, scale: 0.5 },
+    elements: [{ type: 'grass', config: { band: [0, 50] } }]
+};
+
+export const BLANK_CANVAS_ID = blankCanvas.id;
+
+/**
+ * The canvases the builder can start from: the five worlds to choose between,
+ * and the blank one.
+ *
+ * Blank Canvas sits here rather than in `ENVIRONMENTS` on purpose. Everything
+ * in that list is offered by the settings panel and named by the documentation
+ * tests, and flat green country is a poor thing to fly over - it is a thing to
+ * build on. So the builder's list is the five plus the one, and the settings
+ * panel goes on offering the five.
+ */
+export const BUILDER_ENVIRONMENTS = [...ENVIRONMENTS, blankCanvas];
+
 // --- The worlds the game modes are flown over ------------------------------
 
 /**
@@ -255,7 +287,7 @@ export const SURVEY_COUNTRY_ID  = surveyCountry.id;
 
 const LISTED = new Map(ENVIRONMENTS.map(environment => [environment.id, environment]));
 const BY_ID  = new Map(
-    [...ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(environment => [environment.id, environment])
+    [...BUILDER_ENVIRONMENTS, ...MODE_ENVIRONMENTS].map(environment => [environment.id, environment])
 );
 
 /**

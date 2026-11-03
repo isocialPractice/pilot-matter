@@ -4,6 +4,7 @@ import {
     MenuList,
     PAUSE_MENU_ENTRIES,
     START_MENU_ENTRIES,
+    pauseMenuEntries,
     MENU_SELECT_KEYS,
     MENU_LEFT_KEYS,
     MENU_RIGHT_KEYS,
@@ -25,30 +26,68 @@ import {
     followPointers
 } from '../js/menu.js';
 import { createInputState, applyKeyToInput, DEFAULT_KEYMAP } from '../js/input-map.js';
+import { BUILDER_ENTRY_ID, BUILDER_LABEL } from '../js/build-mode.js';
 
-test('the pause menu offers a way out, a way back to the start, and the three panels', () => {
+test('the pause menu offers a way out, a way back to the start, and the four panels', () => {
     const ids = PAUSE_MENU_ENTRIES.map(entry => entry.id);
-    assert.deepEqual(ids, ['resume', 'reset', 'modes', 'controls', 'settings']);
+    assert.deepEqual(ids, ['resume', 'reset', 'modes', 'controls', 'settings', BUILDER_ENTRY_ID]);
     assert.equal(new Set(ids).size, ids.length, 'two entries answering to one id is one entry too many');
     for (const entry of PAUSE_MENU_ENTRIES) {
         assert.ok(entry.label.length > 0, `${entry.id} needs a label to be read by`);
     }
 });
 
-test('the start menu begins the flight, and reaches the three panels', () => {
+test('the start menu begins the flight, and reaches the four panels', () => {
     const ids = START_MENU_ENTRIES.map(entry => entry.id);
-    assert.deepEqual(ids, ['start', 'modes', 'controls', 'settings']);
+    assert.deepEqual(ids, ['start', 'modes', 'controls', 'settings', BUILDER_ENTRY_ID]);
     assert.equal(selectedId(createMenuState(START_MENU_ENTRIES)), 'start',
         'the cursor should open on the entry that starts flying');
 });
 
-// Both screens open the same three panels, so the entries that do it answer to
+// Both screens open the same four panels, so the entries that do it answer to
 // the same ids rather than to two names for one thing.
 test('the entries the two menus share are the same entries', () => {
-    for (const id of ['modes', 'controls', 'settings']) {
+    for (const id of ['modes', 'controls', 'settings', BUILDER_ENTRY_ID]) {
         assert.ok(START_MENU_ENTRIES.some(entry => entry.id === id), `the start menu should offer ${id}`);
         assert.ok(PAUSE_MENU_ENTRIES.some(entry => entry.id === id), `the pause menu should offer ${id}`);
     }
+});
+
+// The builder is last on both, which is where the walkthrough puts it, and one
+// name on both, so a pilot who chooses it on one screen is choosing the same
+// thing they would on the other.
+test('the builder is the last entry of both menus, under one name', () => {
+    for (const entries of [START_MENU_ENTRIES, PAUSE_MENU_ENTRIES]) {
+        const last = entries[entries.length - 1];
+        assert.equal(last.id, BUILDER_ENTRY_ID);
+        assert.equal(last.label, BUILDER_LABEL);
+    }
+});
+
+/**
+ * The entry and the key read one predicate, so the menu and the keyboard cannot
+ * come to disagree about when the builder is reachable.
+ *
+ * A game mode brings its own ground with it, which is why `L` has always been
+ * ignored while one is running. The entry comes off the card then rather than
+ * being shown doing nothing - and `js/main.js` hands the same `builderReady()`
+ * to both, which is what this is holding the menu half of.
+ */
+test('the pause menu built for a running game mode has no builder entry', () => {
+    const ready = pauseMenuEntries(true).map(entry => entry.id);
+    const held  = pauseMenuEntries(false).map(entry => entry.id);
+
+    assert.deepEqual(ready, PAUSE_MENU_ENTRIES.map(entry => entry.id),
+        'with nothing running the menu is the whole list');
+    assert.ok(!held.includes(BUILDER_ENTRY_ID), 'and with a mode running the entry is gone');
+    assert.deepEqual(held, ready.filter(id => id !== BUILDER_ENTRY_ID),
+        'with nothing else taken off it');
+});
+
+test('the menu the entry comes off is still a menu the cursor can walk', () => {
+    const state = createMenuState(pauseMenuEntries(false));
+    moveSelection(state, -1);
+    assert.equal(selectedId(state), 'settings', 'up from the top lands on the last row there is');
 });
 
 test('the menu opens on its first entry, so resuming is one key press away', () => {
@@ -66,7 +105,7 @@ test('the cursor walks the list in both directions', () => {
 
 test('the cursor wraps rather than stopping dead at either end', () => {
     const state = createMenuState();
-    assert.equal(moveSelection(state, -1).id, 'settings', 'up from the top lands on the bottom');
+    assert.equal(moveSelection(state, -1).id, BUILDER_ENTRY_ID, 'up from the top lands on the bottom');
     assert.equal(moveSelection(state, 1).id, 'resume', 'down from the bottom lands on the top');
 });
 
@@ -80,7 +119,7 @@ test('the pitch keys move the cursor, so a hand on the controls stays there', ()
     for (const code of ['KeyW', 'ArrowUp']) {
         resetSelection(state);
         assert.equal(applyMenuKey(state, code, true), null);
-        assert.equal(selectedId(state), 'settings');
+        assert.equal(selectedId(state), BUILDER_ENTRY_ID);
     }
 });
 
@@ -440,7 +479,7 @@ test('the cursor is redrawn on the entry the pointer moved it to', () => {
 
     list.children[3].fire('mouseenter');
     assert.deepEqual(list.children.map(item => item.classes.has('selected')),
-        [false, false, false, true, false]);
+        [false, false, false, true, false, false]);
 });
 
 test('an empty menu has nothing to select and does not fall over being asked', () => {

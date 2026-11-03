@@ -19,7 +19,7 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `C` | Cycle camera: chase, cockpit, orbit |
 | `P` | Pause, and the pause menu |
 | `O` | Settings panel, and close it |
-| `L` | Element editor, and close it |
+| `L` | Interactive environment builder, and `Esc` to leave it |
 | `M` | Mute the engine and wind |
 | `H` | Collapse the control list |
 | `Tab` | Show or hide the instruments |
@@ -225,8 +225,9 @@ runway last.
 
 ## Element editor
 
-`L` opens the world being flown as the elements it was assembled from. Enter
-opens an element onto its ranges; `A`/`D` step the range under the cursor.
+The world being flown as the elements it was assembled from. Enter opens an
+element onto its ranges; `A`/`D` step the range under the cursor. `L` opens the
+builder now, so the panel has no key of its own until the builder carries it.
 
 | Row | Reads |
 |-----|-------|

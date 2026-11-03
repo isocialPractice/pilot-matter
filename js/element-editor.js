@@ -30,14 +30,13 @@ import {
 export const EDITOR_TITLE = 'ELEMENT EDITOR';
 export const EDITOR_HEADING = 'PLACED ELEMENTS';
 
-// `L` for the level editor this is the lightest version of. Every other letter
-// the panel might have wanted already flies the aircraft.
-export const EDITOR_OPEN_KEYS  = ['KeyL'];
+// The panel has no key of its own. `L` was it, and `L` now opens the
+// interactive environment builder - which is the editor this was the lightest
+// version of, and the one place both scopes of editing the world belong. The
+// panel is still what moves an environment's ranges across the whole world, and
+// the builder is where it is reached from; `BUILDER_OPEN_KEYS` in
+// `js/build-mode.js` is where the key itself lives now.
 export const EDITOR_CLOSE_KEYS = ['Escape', 'Backspace'];
-
-export function isEditorOpenKey(code) {
-    return EDITOR_OPEN_KEYS.includes(code);
-}
 
 export function isEditorCloseKey(code) {
     return EDITOR_CLOSE_KEYS.includes(code);

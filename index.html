@@ -687,7 +687,8 @@
         #settings,
         #control-settings,
         #game-modes,
-        #element-editor {
+        #element-editor,
+        #build-picker {
             display: none;
             position: fixed;
             top: 50%;
@@ -712,7 +713,8 @@
         #settings h2,
         #control-settings h2,
         #game-modes h2,
-        #element-editor h2 {
+        #element-editor h2,
+        #build-picker h2 {
             font-size: 26px;
             letter-spacing: 6px;
             padding-left: 6px;
@@ -723,7 +725,8 @@
            read as three sections rather than as one run of entries. */
         #settings h3,
         #control-settings h3,
-        #element-editor h3 {
+        #element-editor h3,
+        #build-picker h3 {
             margin-top: 14px;
             color: #f0f2f3;
             font-size: 24pt;
@@ -738,6 +741,7 @@
         #control-settings small,
         #game-modes small,
         #element-editor small,
+        #build-picker small,
         #paused small {
             display: block;
             color: #f0f2f3;
@@ -773,6 +777,8 @@
         #start-menu,
         #game-modes-menu,
         #element-editor-menu,
+        #build-picker-cards,
+        #build-picker-actions,
         #settings-menu,
         #settings-start,
         #settings-options,
@@ -790,6 +796,8 @@
         #start-menu li,
         #game-modes-menu li,
         #element-editor-menu li,
+        #build-picker-cards li,
+        #build-picker-actions li,
         #settings-menu li,
         #settings-start li,
         #settings-options li,
@@ -819,6 +827,8 @@
         #start-menu li.selected,
         #game-modes-menu li.selected,
         #element-editor-menu li.selected,
+        #build-picker-cards li.selected,
+        #build-picker-actions li.selected,
         #settings-menu li.selected,
         #settings-start li.selected,
         #settings-options li.selected,
@@ -842,6 +852,28 @@
         #start-menu,
         #pause-menu {
             pointer-events: auto;
+        }
+
+        /* The builder's entry is 31 characters, nearly twice the next longest
+           label either card carries, and at the spacing the rows are set at it
+           is wider than a 320-pixel screen. So both cards close up below 480:
+           less space between the letters, and less padding round the pause
+           card, which is the one with any. That keeps the longest row on one
+           line rather than wrapping it past the height the card was given,
+           which is the failure this project has already spent two releases on
+           at exactly that width. */
+        @media (max-width: 480px) {
+            #paused {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            #pause-menu li,
+            #start-menu li {
+                padding: 5px 6px;
+                font-size: 12px;
+                letter-spacing: 1px;
+            }
         }
 
         /* Three lists under three headings sit closer together than one list on
@@ -888,6 +920,7 @@
         #settings-menu li.current,
         #settings-start li.current,
         #element-editor-menu li.current,
+        #build-picker-cards li.current,
         #game-modes-menu li.current {
             border-color: rgba(0, 255, 0, 0.55);
         }
@@ -895,6 +928,7 @@
         #settings-menu li.current::before,
         #settings-start li.current::before,
         #element-editor-menu li.current::before,
+        #build-picker-cards li.current::before,
         #game-modes-menu li.current::before {
             content: '\203A\00a0';
         }
@@ -915,6 +949,7 @@
         #control-settings-keys li[data-note]::after,
         #control-settings-reference li[data-note]::after,
         #element-editor-menu li[data-note]::after,
+        #build-picker-cards li[data-note]::after,
         #game-modes-menu li[data-note]::after {
             content: attr(data-note);
             display: block;
@@ -922,6 +957,29 @@
             font-size: 10px;
             letter-spacing: 1px;
             opacity: 0.72;
+        }
+
+        /* The canvases are cards rather than rows: two columns of them, each a
+           label band over the line that says what ground it starts from. The
+           picture of that ground is art the builder ships and arrives with it;
+           until then the band and the line are the card. */
+        #build-picker-cards {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        #build-picker-cards li {
+            min-height: 58px;
+            border-color: rgba(0, 255, 0, 0.25);
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        /* The two answers under the cards read as answers rather than as two
+           more canvases, so they are drawn across the whole card and apart from
+           the grid above them. */
+        #build-picker-actions {
+            margin-top: 12px;
         }
 
         #low-altitude {
@@ -1383,6 +1441,14 @@
         <small>W/S OR ↑/↓ TO SELECT &middot; A/D OR ←/→ TO ADJUST &middot; TYPE A NUMBER TO SET IT &middot; ENTER OR CLICK TO OPEN &middot; ESC TO CLOSE</small>
     </div>
 
+    <div id="build-picker">
+        <h2>INTERACTIVE ENVIRONMENT BUILDER</h2>
+        <h3>CHOOSE A CANVAS</h3>
+        <ul id="build-picker-cards"></ul>
+        <ul id="build-picker-actions"></ul>
+        <small>W/S, ↑/↓ OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO LEAVE</small>
+    </div>
+
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>
 
     <div id="crashed">CRASHED<small>RESETTING FLIGHT</small></div>
@@ -1467,7 +1533,7 @@
             H - Collapse List<br>
             M - Mute Audio<br>
             O - Settings<br>
-            L - Element Editor<br>
+            L - Interactive Environment Builder<br>
             P - Pause<br>
             <span data-help-row="reset">R - Reset Position</span><br>
             F2 - Photo

@@ -39,6 +39,23 @@ export const TILE_REACH = 12000;
  */
 export const TILE_KEEP = 2000;
 
+/**
+ * How far past a build canvas the ground runs, which is nowhere: a canvas is
+ * one tile, and its four edges are the extent of what is being built rather
+ * than a wall anything can be flown at.
+ *
+ * Written as a reach of nothing rather than as a tile list, so the one-tile
+ * case goes through the same arithmetic the endless grid does: asked for every
+ * tile within no distance of the middle, `tilesInReach` answers with the middle
+ * tile and `tileWorthKeeping` keeps that one and lets go of the rest. A second
+ * code path would be a second set of rules about which tile is which.
+ *
+ * This says nothing about the flight. `TILE_REACH` is untouched, and the ground
+ * a flight is flown over goes on having no end to reach.
+ */
+export const CANVAS_REACH = 0;
+export const CANVAS_KEEP  = 0;
+
 /** Which tile a coordinate falls in on one axis. Tile `i` is centred on `i * size`. */
 function indexOn(value, size) {
     if (!Number.isFinite(value) || !Number.isFinite(size) || size <= 0) return 0;

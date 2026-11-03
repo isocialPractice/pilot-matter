@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    EDITOR_OPEN_KEYS,
     EDITOR_CLOSE_KEYS,
     EDITOR_BACK_ID,
     EDITOR_RESTORE_ID,
@@ -12,7 +11,6 @@ import {
     ELEMENT_OPEN_MARK,
     ELEMENT_SHUT_MARK,
     SHADE_RANGE,
-    isEditorOpenKey,
     isEditorCloseKey,
     label,
     rangeStep,
@@ -50,6 +48,9 @@ import {
     GATE_OFF_LABEL,
     gateOn
 } from '../js/element-editor.js';
+// Read as a namespace as well, so the test below can ask what the module
+// does *not* export without the import itself failing to resolve.
+import * as editor from '../js/element-editor.js';
 import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
 import { isMenuControlKey } from '../js/menu.js';
 import {
@@ -67,19 +68,16 @@ import { HUD_TOGGLE_KEY } from '../js/hud-visibility.js';
 
 const highlands = getEnvironment('highlands');
 
-// The keys the panel opens on cannot be keys that already do something, or the
-// pilot who reaches for the editor pitches the aircraft instead.
-test('the key that opens the editor is a key nothing else has taken', () => {
-    const taken = new Set([
-        ...Object.values(DEFAULT_KEYMAP).flat(),
-        ...RESET_KEYS, ...SETTINGS_OPEN_KEYS,
-        HELP_KEY, MUTE_KEY, HUD_TOGGLE_KEY
-    ]);
-
-    for (const code of EDITOR_OPEN_KEYS) {
-        assert.ok(!taken.has(code), `${code} already does something else`);
-        assert.ok(isEditorOpenKey(code));
-    }
+// The panel has no key of its own any more: `L` opens the interactive
+// environment builder, which is where the panel is reached from. So what is
+// held here is that it declares none - a second key for the one editor is
+// exactly what moving `L` was for, and a key left declared in here would be
+// read by the reserved-key guard as a second thing `L` does.
+test('the panel declares no key of its own', () => {
+    assert.equal(editor.EDITOR_OPEN_KEYS, undefined,
+        'the key the panel opened on belongs to the builder now, in js/build-mode.js');
+    assert.equal(editor.isEditorOpenKey, undefined,
+        'and so is the question of whether a press was it');
 });
 
 test('the panel is backed out of the way every other panel is', () => {

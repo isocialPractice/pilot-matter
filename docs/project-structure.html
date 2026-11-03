@@ -126,6 +126,9 @@
 │   ├── settings.js     # Pure settings panel state, its options, and their storage
 │   ├── control-settings.js # Pure control settings panel: the axes, the tilt, the attitude bound, what ends a level off, the keys, and their storage
 │   ├── element-editor.js # Pure element editor state: the placed elements and their ranges
+│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, and which screen is showing
+│   ├── build-picker.js # Pure picker: the six canvases a session can start from, and which is chosen
+│   ├── build-camera.js # Pure placement of the camera held over a canvas, and the air cleared over it
 │   ├── typed-value.js  # Pure keypad both number-holding panels read a typed figure through
 │   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
 │   ├── audio.js        # Pure engine and wind mix, and the graph it is played through
@@ -140,6 +143,7 @@
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
 │   ├── environment/
 │   │   ├── elements.js # Pure element registry, the field, and every generator
+│   │   ├── footprints.js # Pure region on a placement: the five kinds a pointer draws, and how much of one covers a point
 │   │   └── presets.js  # Pure assembled environments, and the builder
 │   ├── api/
 │   │   ├── index.js    # The public entry point, re-exporting both halves
