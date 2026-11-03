@@ -11,25 +11,64 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **The builder in the menus**: `INTERACTIVE ENVIRONMENT BUILDER` last on
-  the title screen and on the pause menu, dropped from the pause menu while a
-  game mode is running, and opened through the one function `L` uses too
+- [ ] **A way back to the element editor**: the panel that moves an
+  environment's own ranges across the whole world, reachable again now that
+  `L` opens the builder
   - From: Interactive Build Mode
-- [ ] **Blank Canvas**: a sixth environment for the editor to start from, flat
-  ground under grass and nothing else, declared beside `ENVIRONMENTS` rather
-  than in them so it is a thing to build on rather than a thing to fly over
+- [ ] **Footprints wrap**: a region drawn over one edge of the canvas continuing
+  across the opposite one, so the built tile meets itself
   - From: Interactive Build Mode
-- [ ] **Start picker**: the six cards the editor opens on, read off the
-  environment registry rather than written out, with Highlands the default and
-  a way back out
+- [ ] **Footprinted elements**: an element drawn only where a footprint reaches,
+  by compositing a draft field, so no generator in the registry is changed
   - From: Interactive Build Mode
-- [ ] **The canvas**: one tile drawn rather than nine, at the size the world was
-  before the endless grid replaced it, with the camera held over it and nothing
-  about the flight's own edges touched
+- [ ] **The built tile as a pattern**: a placement landing at the same canvas
+  coordinate on every tile, continuous across the seams, with anything levelled
+  to the ground levelled on the tile it is drawn on
   - From: Interactive Build Mode
-- [ ] **Footprints**: a region on a placement, as the five kinds a pointer can
-  draw - a disc, a ring, a stroke, a rectangle and an ellipse - in the canvas's
-  own frame, with the weight function every later item reads
+
+### UI/UX Override - the builder's way in, and the flight under a canvas
+
+#### Resolve Issues
+
+- [ ] The canvas 1: leaving a canvas puts the paused flight back at its start
+  - **Issue**: a flight paused mid-air, taken into the builder and onto any
+    canvas, comes back to the pause card with the aircraft returned to the
+    start of the flight. Driven in Chromium with the flight paused either side
+    of the session, so nothing but the session could have moved it: the
+    aircraft went from `-85.3, 455.8, 154.3` yaw `-0.665` to `0, 423.8, 0` yaw
+    `0`, a shift of 179 units, and again from `-76.4, 449.0, 112.1` to the same
+    place on a second run. A session that opens the picker and leaves it
+    without starting a canvas is the control and loses nothing at all, so what
+    moves the aircraft is the canvas being put back rather than the builder
+    being opened. Everything else about leaving was verified correct in the
+    same run - nine tiles, the right environment, the fog, the far plane, the
+    chase camera in place on the first frame, and ground under the aircraft on
+    that frame. `leaveBuilder()` calls `refreshWorld()`, which resets the
+    aircraft whenever `buildWorld()` reports a rebuild, and restoring the
+    flight's ground after a canvas always reports one.
+  - **Goal**: Resolve to [canvas-leave-resets-the-flight.prompt.md](.claude/prompts/canvas-leave-resets-the-flight.prompt.md)
+  - From: Interactive Build Mode
+- [ ] The builder in the menus 1: the title screen keeps the builder's entry
+  while a game mode is chosen, where it opens nothing
+  - **Issue**: a game mode can be chosen from the title screen's own `GAME
+    MODES` panel before any flight has begun, and `startRun` makes
+    `isRunning(this.run)` true from that moment. The pause menu answers for
+    this and drops the row; the title screen does not. Observed on the title
+    screen with `RUNWAY LANDING` chosen: the start menu still reads `START
+    FLIGHT, GAME MODES, CONTROL SETTINGS, SETTINGS, INTERACTIVE ENVIRONMENT
+    BUILDER` while `builderReady()` reports false, and both choosing that row
+    and pressing `L` leave `builder.screen` null with no picker drawn. That is
+    the dead row the pause menu's own comment calls the one thing a row under
+    the cursor should never be.
+  - **Goal**: hold the start menu's entry to the same predicate the pause menu
+    is held to. `js/menu.js` already has `pauseMenuEntries(ready)` filtering on
+    `BUILDER_ENTRY_ID`; a matching reading of `START_MENU_ENTRIES` built the
+    same way, rebuilt from `syncPauseMenu`'s one place rather than a second
+    one, is the shape - and `setMenuEntries` already clamps a cursor left past
+    the end, which was verified holding on the pause menu. Leaving the row
+    drawn and giving it something to open is the other answer, but it is a
+    larger decision than this item: a mode brings its own ground, which is the
+    reason the builder is refused in the first place.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -99,25 +138,21 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Blank Canvas**: a sixth environment for the editor to start from,
-  flat ground under grass and nothing else, declared beside `ENVIRONMENTS`
-  rather than in them so it is a thing to build on rather than a thing to fly
-  over
-- [ ] **The builder in the menus**: `INTERACTIVE ENVIRONMENT BUILDER` last on
-  the title screen and on the pause menu, dropped from the pause menu while a
-  game mode is running, and short enough to stay on one line on a phone
-- [ ] **One way in**: the title entry, the pause entry and the `L` key all
-  opening the builder through one function that remembers which of them it came
-  from
-- [ ] **Start picker**: the six cards the editor opens on, read off the
-  environment registry rather than written out, with Highlands the default and
-  a way back out to whichever menu opened it
-- [ ] **The canvas**: one tile drawn rather than nine, at the size the world
-  was before the endless grid replaced it, with the camera held over it and
-  nothing about the flight's own edges touched
-- [ ] **Footprints**: a region on a placement, as the five kinds a pointer can
-  draw - a disc, a ring, a stroke, a rectangle and an ellipse - in the canvas's
-  own frame, with the weight function every later item reads
+- [ ] **A way back to the element editor**: the panel that moves an
+  environment's own ranges across the whole world, reachable again now that
+  `L` opens the builder
+  - `1.0.0-alpha.1.34.0` moved `L` onto the builder, which was the only way
+    into the element editor. The panel, its state module, its tests and its
+    place in `index.html` are untouched and still do the one thing the builder
+    does not yet offer; nothing reaches them.
+  - The plan's answer is a section of Select's panel under the camera fields,
+    so there is one editor with two scopes rather than two editors - and that
+    waits on **One properties panel** and on **Select panel**. The plan listed
+    it as open rather than taken, because it retires the entry point of a
+    feature that has shipped.
+  - So the decision is whether to wait. Either name a way in that holds until
+    Select carries it, or say the panel stays unreachable until then and let
+    this item close when **Select shows what is selected** does.
 - [ ] **Footprints wrap**: a region drawn over one edge of the canvas continuing
   across the opposite one, so the built tile meets itself
 - [ ] **Footprinted elements**: an element drawn only where a footprint reaches,
@@ -387,122 +422,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 292 earlier items in `TODO-archive.md`, newest last.
+> 297 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Lift the weather effects from the `local-weather` branch onto main's own
-  surfaces: the cloud deck, the rain, the lightning timing and the sun or moon
-  sprite
-  - Answered 10.27.2026, and the answer replaces the condition this item used
-    to carry. It read "once its API stabilizes", and that condition will never
-    be met: the branch's surface is `export const WEATHER` hand-edited in the
-    module and `export const STYLE = resolve(WEATHER)` resolved once at import.
-    That is not an API settling down, it is a build-time constant, and there is
-    no setter, no event and nothing a settings panel can reach. So the merge is
-    off and the lift is on.
-  - Nothing of `js/weather-style.js` comes across. Its `timeOfDay` is a `day` or
-    `night` switch, and main runs a continuous cycle - `js/day-night.js` carries
-    `DAY_STOPS`, `daylightAt`, `sunPositionAt` and `clockAt` over 900 seconds,
-    which `Sky` walks the sun along. Taking the branch's knob would be a
-    regression rather than a merge. Its `heightToColor` is one shared terrain
-    colouring function from a repository where `js/terrain.js` was a single fBm
-    heightfield; ground is coloured through the element registry here, per
-    element, and there is no seam to attach it to.
-  - What has no counterpart on main, and is the whole of what is worth having,
-    is `js/weather.js`: the cloud deck, the rain box with its shear, the strike
-    timing, and the celestial sprite. Its own comments say the constants at the
-    top of it are layout rather than palette, which is exactly why that half
-    travels and the style module does not.
-  - Lift it against main's surfaces rather than the branch's: precipitation read
-    from a settings option, the sprite placed by `sunPositionAt(phase)` and lit
-    by `daylightAt(phase)` instead of by `KEY_LIGHT_POSITION`, and the tone tint
-    dropped entirely. `Sky.getSunPosition()` already exists and is the one thing
-    the branch reached for that main still offers.
-  - Do not merge the branch, and do not read its `local-weather-style/STYLE.md`
-    as current. It is one commit off the initial commit of 02.21.2026, made
-    08.07.2026, and has never seen main past that point; it describes a
-    repository with no test suite, no tiles, no presets, no element registry and
-    no water. `git merge local-weather` conflicts across about a hundred files
-    and resolves to deleting main.
-  - From: World & Environment
-- [x] **Mountain** bulk range: an apply-to-all mode that randomizes length,
-  width, and girth within range and applies transform effects such as
-  rotation
-  - Left unchecked by the 10.25.2026 pruning, with the three below it. This
-    is the shape the pruning item said to read against the registry before
-    calling it built, and the registry declares a different one: `mountain`
-    in `js/environment/elements.js` carries `count`, `height`, `radius` and
-    `girth`, where `radius` is one span standing for the whole footprint and
-    `girth` is `scalar(0, 1, 0)`.
-  - The gate these were blocked on exists as of 10.27.2026. `gated(low, high,
-    defaultLow, defaultHigh)` is the fourth range kind, `resolveConfig`
-    resolves it to `{ on, range }`, and `js/element-editor.js` draws it as
-    three rows - a switch reading `OFF` or `ON`, then its `MIN` and `MAX`. It
-    is off unless something turns it on, so declaring one moves no world
-    already described. The length and width items above are built on it; this
-    item and the girth below it are what is left.
-  - What this one still needs is the mode rather than the kind: it randomizes
-    the three ranges the others declare, so it wants `girth` gated too before
-    there are three to randomize.
-  - What is built already covers part of the behaviour, which is worth
-    knowing before the gate is added rather than after: the generator picks
-    each peak's `radius` out of its span, turns it by a random `angle`, and
-    stretches it by `1 + girth * (0.4 + random())`, so the randomize-and-
-    rotate half of this item is there unconditionally rather than as a mode.
-  - From: Environment Design
-- [x] **Mountain** girth: a checkbox-gated `min` and `max` girth
-  (*optional*); on, the form is generated by a random algorithm; off, the
-  form is generated as mountains render today
-  - The off state is honoured - at `girth: 0` the bump is the round one the
-    simulator has always drawn - but by the value being zero rather than by a
-    checkbox, and the one scalar is not the `min` and `max` pair asked for.
-  - The kind to build it with is there as of 10.27.2026: `gated` in
-    `js/environment/elements.js`, as `length` and `width` already use. What
-    makes this one more than a third copy of them is that `girth` is read
-    today and the other two were new, so the gate has to leave `girth: 0`
-    drawing exactly the round bump it draws now - the length and width items
-    hold that line with a recorded fingerprint in
-    `test/environment-elements.test.js`, which is the test to extend rather
-    than to write again.
-  - From: Environment Design
-- [x] Carry out the interactive build mode plan
-  - The plan is `.claude/prompts/interactive-mode-plan.prompt.md`. It is named
-    here rather than linked as a goal, because a completed item's goal file is
-    deleted, and this one is untracked and has no other copy: keep it when
-    this item closes.
-  - The plan states the twelve tools, the two-column palette, the per-tool
-    panel and how each is configured, and says outright that this is not a
-    second element editor. Work it from there rather than from this item, and
-    break it into items here as its stages become clear - one item for twelve
-    tools is not a queue, it is a heading.
-  - From: Interactive Build Mode
-- [x] **Slow Weather**: the weather keeps a clock of its own on a machine
-  under 20 frames a second, so the storm runs at a share of the speed the
-  world it is over runs at
-  - **Issue**: `weatherStep` in `js/weather-math.js` holds a frame to
-    `MAX_STEP`, 0.05s, and nothing else in the simulation holds its own -
-    `simulationDelta` hands the frame on as it came. Measured over 30
-    seconds of `STORMY` on one machine and one build: at 60 frames a second
-    the day ran 30.0s of its 900 and a strike was on screen for 0.40s
-    against the 0.42s `STRIKE_LENGTH` declares; on the software renderer at
-    7.5 frames a second the day still ran 30.3s, a strike was on screen for
-    0.96s, and one strike landed where three had. So on a slow machine the
-    ground rushes past at full speed while the rain falls, the deck drifts
-    and the lightning strikes at a little over a third of it.
-  - **Goal**: settle which clock the weather keeps and make the two agree -
-    either hold the simulation's own frame to the same ceiling, or let
-    `weatherStep` take a frame that is merely slow and keep the ceiling for
-    the one long frame a hidden tab leaves behind.
-  - **Settled**: the weather keeps the world's clock, so the second branch was
-    taken - `MAX_STEP` is 0.25s and guards a delta that is not a frame at all
-    rather than a machine that is merely slow. The first branch was declined
-    because it agrees the two clocks by putting every slow machine into slow
-    motion, and because it reaches the flight model, the stage timers and the
-    recorded times on the way, none of which this issue is about. What bounds
-    the value is `STRIKE_LENGTH`: a step at or past 0.42s could begin a strike
-    and end it inside one frame, so the suite asserts `MAX_STEP < STRIKE_LENGTH`
-    rather than the number. Measured again on the software renderer at the same
-    7.5 frames a second: 36.3% of the world's clock before, 100.0% after.
-  - From: UI/UX Override - the weather clock on a slow machine
 - [x] **Weather Guards**: the two assertions that hold the weather layer to
   building once pass on text that is not the code they name
   - **Issue**: both are in
@@ -607,3 +528,23 @@ how the simulator got here rather than as a list still to be worked.
     `renderer.info.render.calls`, so settle it there if a number is wanted:
     draw a 95-cloud storm and read the count with one material and with two.
   - From: Code Review Override - the comments the cloud mirror left behind
+- [x] **The builder in the menus**: `INTERACTIVE ENVIRONMENT BUILDER` last on
+  the title screen and on the pause menu, dropped from the pause menu while a
+  game mode is running, and opened through the one function `L` uses too
+  - From: Interactive Build Mode
+- [x] **Blank Canvas**: a sixth environment for the editor to start from, flat
+  ground under grass and nothing else, declared beside `ENVIRONMENTS` rather
+  than in them so it is a thing to build on rather than a thing to fly over
+  - From: Interactive Build Mode
+- [x] **Start picker**: the six cards the editor opens on, read off the
+  environment registry rather than written out, with Highlands the default and
+  a way back out
+  - From: Interactive Build Mode
+- [x] **The canvas**: one tile drawn rather than nine, at the size the world was
+  before the endless grid replaced it, with the camera held over it and nothing
+  about the flight's own edges touched
+  - From: Interactive Build Mode
+- [x] **Footprints**: a region on a placement, as the five kinds a pointer can
+  draw - a disc, a ring, a stroke, a rectangle and an ellipse - in the canvas's
+  own frame, with the weight function every later item reads
+  - From: Interactive Build Mode
