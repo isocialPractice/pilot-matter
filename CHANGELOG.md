@@ -5,6 +5,120 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.34.0] - 2026-11-03
+
+The first five items of the interactive environment builder: the way in, the
+canvas to start from, the picker that chooses one, the one tile a canvas is,
+and the vocabulary every drawing tool after them is written against.
+
+### Added
+
+- **The builder is on both menus, and on the key that already meant edit the
+  world.** `INTERACTIVE ENVIRONMENT BUILDER` is the last entry on the title
+  screen and on the pause menu, and `L` opens the same thing. All three go
+  through one function, which remembers which of them was used so the way out
+  returns there - three ways into one editor are three things that can
+  otherwise drift into opening slightly different ones.
+
+  The entry comes off the pause menu while a game mode is running, under the
+  one predicate the key has always been ignored by: a mode brings its own
+  ground with it, so there is nothing there for the builder to be building. The
+  menu and the key read that predicate once rather than each working it out, so
+  the card and the keyboard cannot come to disagree about when the builder is
+  reachable - and a row that opened nothing is the one thing a row under the
+  cursor should never do.
+
+  The entry is 31 characters, nearly twice the next longest label either card
+  carries. Both cards close up below 480 pixels wide - less space between the
+  letters, less padding round the pause card - so the longest row stays on one
+  line at 320 rather than wrapping past the height the card was given.
+
+- **Blank Canvas, a sixth environment to build on.** Flat ground under grass
+  and nothing else: `maxHeight` at 50 and `scale` at 0.5, which is the least
+  shape the base range allows and still ground with a normal to catch the light
+  rather than a plane with none.
+
+  It sits beside `ENVIRONMENTS` rather than in it. Everything in that list is a
+  world the settings panel offers to fly and the documentation tests are held
+  to, and flat green country is a poor thing to fly over - it is a thing to
+  build on. So `BUILDER_ENVIRONMENTS` is the five plus the one, `getEnvironment`
+  resolves it by name like any other world, and `isEnvironmentId` still answers
+  for the five.
+
+- **The picker the builder opens on.** Six cards in two columns, each a label
+  band over the line that says what ground it starts from, with `START` and
+  `BACK` beneath them and Highlands marked as the canvas chosen. One menu under
+  one cursor across two lists, the way the settings panel is drawn.
+
+  The five preset cards are read off the environment registry rather than
+  written out, so a preset added later is a card without an edit here. The
+  picker is the builder's first screen rather than a gate in front of it, so
+  `BACK` - and `Esc` - leave the builder entirely, for whichever menu opened it.
+
+- **The canvas is one tile.** A build session draws the square an environment
+  describes and nothing around it: 16000 units, which is what one tile already
+  is, so nothing is resized and what changes is how many are drawn. The four
+  edges are the extent of what is being built rather than a wall anything can
+  reach.
+
+  It goes through the arithmetic the endless grid already uses, asked for a
+  reach of nothing, rather than down a second path with its own idea of which
+  tile is which. The camera is held over the middle of it, and the two things
+  that keep the end of the world out of frame during a flight - the far plane
+  at `TILE_REACH` and the fog - are stood down for as long as the canvas is
+  open, so its far corner reads as ground. Leaving puts all of it back.
+
+  **The flight's own ground is untouched.** `TILE_REACH` is what it was, the
+  nine tiles are laid out again on the way out, and nothing wraps an aircraft
+  position.
+
+- **Footprints: a region on a placement.** `js/environment/footprints.js`
+  declares the five kinds a pointer can draw - a disc, a closed outline, a
+  dragged stroke, a rectangle and an ellipse - in the canvas's own frame, and
+  `footprintWeight` says how much of one covers a point: nothing outside it,
+  everything well inside, and eased across the feather at its edge.
+
+  The frame is the canvas's rather than the world's because that is what makes
+  a built tile a pattern: each tile subtracts its own origin before asking, so
+  the same region lands in the same place on every tile. The feather defaults
+  to a multiple of the field's own sampling rather than to a number, so the
+  softness of an edge is a property of how finely the world is drawn - a region
+  that ended inside one cell would end at a cliff whatever that cliff was drawn
+  at. `footprintBounds` is the square round a region, which is the only thing
+  the tiling needs from one.
+
+  A stroke is one stamp swept whole along the way the drag went, so the swathe
+  follows the drag in whatever direction it was made rather than only along an
+  axis, and the suite reads it at every 15 degrees of the circle - the error a
+  turned stamp can carry comes back to nothing on both axes, so a single
+  diagonal would pin one sample of it.
+
+  Nothing generates from a footprint yet. It is the vocabulary every drawing
+  tool after this reads, and a placement with no footprint is exactly what a
+  placement is today - so every preset, every test and the element editor are
+  unchanged.
+
+### Changed
+
+- **`L` opens the builder rather than the element editor.** The key already
+  meant "edit the world" and the builder is what that means now, so the
+  constant moved to `js/build-mode.js` and the reserved-key guard says
+  `ENVIRONMENT BUILDER` is what the key is already doing - a notice that still
+  named the old panel would be the panel telling a pilot the wrong thing about
+  a key it does not open.
+
+  The element editor is otherwise unchanged and still does the one thing the
+  builder does not yet offer, which is moving an environment's own ranges
+  across the whole world. It has no key of its own in the meantime; its home
+  inside the builder is queued work and a decision the plan deliberately left
+  open.
+
+- **Every panel opener stands the builder down**, the way each of them already
+  closes the other three. A panel left open behind another is one that comes
+  back out from under it, and the builder is the one of the five that is the
+  world rather than a card over it - so standing it down puts the flight's
+  ground, camera and fog back as well as closing the session.
+
 ## [1.0.0-alpha.1.33.1] - 2026-11-02
 
 The two comments the cloud mirror left saying the old thing, and the first
