@@ -144,7 +144,8 @@
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
 │   ├── environment/
 │   │   ├── elements.js # Pure element registry, the field, and every generator
-│   │   ├── footprints.js # Pure region on a placement: the five kinds a pointer draws, and how much of one covers a point
+│   │   ├── footprints.js # Pure region on a placement: the five kinds a pointer draws, and how much of one covers a point, repeating across the canvas's edges
+│   │   ├── footprinted.js # Pure compositing of an element drawn on a copy of the field back through its footprint
 │   │   └── presets.js  # Pure assembled environments, and the builder
 │   ├── api/
 │   │   ├── index.js    # The public entry point, re-exporting both halves

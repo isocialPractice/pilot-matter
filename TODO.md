@@ -11,15 +11,17 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Footprints wrap**: a region drawn over one edge of the canvas continuing
-  across the opposite one, so the built tile meets itself
+- [ ] **Build mode state**: the twelve tools, the draft, and the rule that an
+  accept always commits while a cancel always discards, as a pure module with
+  its own tests
   - From: Interactive Build Mode
-- [ ] **Footprinted elements**: an element drawn only where a footprint reaches,
-  by compositing a draft field, so no generator in the registry is changed
+- [ ] **Re-edit a committed element**: a draft that knows what it stands on, so
+  accepting swaps the placement it replaces and cancelling puts that placement
+  back rather than deleting it
   - From: Interactive Build Mode
-- [ ] **The built tile as a pattern**: a placement landing at the same canvas
-  coordinate on every tile, continuous across the seams, with anything levelled
-  to the ground levelled on the tile it is drawn on
+- [ ] **Ground picking**: the canvas point under the pointer, raycast against
+  the ground rather than projected onto a plane, so a tilted view still lands on
+  what it is pointing at
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -89,13 +91,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Footprints wrap**: a region drawn over one edge of the canvas continuing
-  across the opposite one, so the built tile meets itself
-- [ ] **Footprinted elements**: an element drawn only where a footprint reaches,
-  by compositing a draft field, so no generator in the registry is changed
-- [ ] **The built tile as a pattern**: a placement landing at the same canvas
-  coordinate on every tile, continuous across the seams, with anything levelled
-  to the ground levelled on the tile it is drawn on
 - [ ] **Build mode state**: the twelve tools, the draft, and the rule that an
   accept always commits while a cancel always discards, as a pure module with
   its own tests
@@ -359,49 +354,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 305 earlier items in `TODO-archive.md`, newest last.
+> 308 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **The canvas**: one tile drawn rather than nine, at the size the world was
-  before the endless grid replaced it, with the camera held over it and nothing
-  about the flight's own edges touched
-  - From: Interactive Build Mode
-- [x] **Footprints**: a region on a placement, as the five kinds a pointer can
-  draw - a disc, a ring, a stroke, a rectangle and an ellipse - in the canvas's
-  own frame, with the weight function every later item reads
-  - From: Interactive Build Mode
-- [x] The canvas 1: leaving a canvas puts the paused flight back at its start
-  - **Issue**: a flight paused mid-air, taken into the builder and onto any
-    canvas, comes back to the pause card with the aircraft returned to the
-    start of the flight. Driven in Chromium with the flight paused either side
-    of the session, so nothing but the session could have moved it: the
-    aircraft went from `-85.3, 455.8, 154.3` yaw `-0.665` to `0, 423.8, 0` yaw
-    `0`, a shift of 179 units, and again from `-76.4, 449.0, 112.1` to the same
-    place on a second run. A session that opens the picker and leaves it
-    without starting a canvas is the control and loses nothing at all, so what
-    moves the aircraft is the canvas being put back rather than the builder
-    being opened. Everything else about leaving was verified correct in the
-    same run - nine tiles, the right environment, the fog, the far plane, the
-    chase camera in place on the first frame, and ground under the aircraft on
-    that frame. `leaveBuilder()` calls `refreshWorld()`, which resets the
-    aircraft whenever `buildWorld()` reports a rebuild, and restoring the
-    flight's ground after a canvas always reports one.
-  - **Goal**: Resolve to [canvas-leave-resets-the-flight.prompt.md](.claude/prompts/canvas-leave-resets-the-flight.prompt.md)
-  - **Settled**: resolved the second way the prompt offered - `refreshWorld`
-    takes `{ restored }` now, and `leaveBuilder` passes it for any flight that
-    has begun, with the seven other callers passing nothing and behaving exactly
-    as they did. The conclusion drawn from a rebuild moved out to `startsAfresh`
-    in `js/flight-state.js`, where `test/flight-state.test.js` drives it over a
-    stand-in aircraft: a restored world leaves position, rotation, speed,
-    throttle and `airborne` untouched, and a rebuilt one still restarts the
-    flight. The sequence in `leaveBuilder` itself cannot be reached without a
-    renderer to lay ground in, which the prompt asked be said rather than
-    papered over, so what it passes is read off the source in
-    `test/page.test.js` - proven against three mutations, each of which that
-    assertion rejects. Confirmed on the running page, which is where the claim
-    actually lives: the three sessions the defect was measured in now move the
-    aircraft 0 units, and with the fix taken back out the canvas session shifts
-    it 88.8 units to the start again.
-  - From: Interactive Build Mode
 - [x] The builder in the menus 1: the title screen keeps the builder's entry
   while a game mode is chosen, where it opens nothing
   - **Issue**: a game mode can be chosen from the title screen's own `GAME
@@ -538,4 +492,35 @@ how the simulator got here rather than as a list still to be worked.
     off in `1.0.0-alpha.1.37.0` with that item rather than queued: confirmed in
     Chromium, a drag begun on the canvas and carried over the palette stayed
     the orbit it began as and pressed nothing.
+  - From: Interactive Build Mode
+- [x] **Footprints wrap**: a region drawn over one edge of the canvas continuing
+  across the opposite one, so the built tile meets itself
+  - **Settled**: `footprintWeight` takes a `wrap`, the canvas size, and weighs a
+    region against the strongest of its nine repeats a width apart;
+    `footprintSampler` is the same answer worked out once per region, for the
+    40,401 vertices a tile asks it at. A region in the middle of the canvas
+    weighs exactly what it did.
+  - From: Interactive Build Mode
+- [x] **Footprinted elements**: an element drawn only where a footprint reaches,
+  by compositing a draft field, so no generator in the registry is changed
+  - **Settled**: `applyFootprintedElement` in the new
+    `js/environment/footprinted.js` draws the element on `cloneField`'s copy and
+    blends it back through the weight, and `buildEnvironment` and the Matter
+    API's `createEnvironment` both draw through it. The element takes from the
+    seeded stream what it always did, a strip the copy cut is recorded, and a
+    drawn body of water leaves the sea's level alone rather than flooding the
+    tile under the line it was drawn at - the plan's first sketch carried the
+    level across, and its own later decision says drawing water never moves
+    the sea, so the decision was followed.
+  - From: Interactive Build Mode
+- [x] **The built tile as a pattern**: a placement landing at the same canvas
+  coordinate on every tile, continuous across the seams, with anything levelled
+  to the ground levelled on the tile it is drawn on
+  - **Settled**: a footprint is weighed with the tile's own origin taken off
+    each vertex and the canvas size as its wrap, so the same placement covers
+    the same vertices on tiles four apart and the ground at a seam is the same
+    from both tiles. The element is drawn on each tile's own ground, so a level
+    fills each tile's own low ground inside the one footprint.
+    `tileElements` needed no change: a footprinted placement goes to every tile
+    and a runway still to the home tile alone.
   - From: Interactive Build Mode

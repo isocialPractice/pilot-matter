@@ -59,12 +59,70 @@ export const DEFAULT_FEATHER = featherFor(DEFAULT_SIZE / DEFAULT_SEGMENTS);
  * drawing a tile subtracts that tile's origin before asking. A footprint that
  * is not one of the kinds above covers nothing rather than everything, because
  * a region nobody can read is not a region every point is inside.
+ *
+ * Given a `wrap` - the canvas size - the region is measured against the nearest
+ * of its repeats rather than only against itself, so one drawn over an edge of
+ * the canvas goes on across the opposite edge. See `footprintSampler`.
  */
-export function footprintWeight(footprint, x, z) {
+export function footprintWeight(footprint, x, z, wrap = 0) {
+    if (wrap > 0) return footprintSampler(footprint, wrap)(x, z);
+
     const inside = insideDistance(footprint, x, z);
     if (inside == null) return 0;
 
     return falloff(inside, feather(footprint));
+}
+
+/**
+ * The places a region repeats at, in canvas widths: itself and the eight around
+ * it. A region drawn on the canvas sits inside it, so a point on the canvas is
+ * never more than one width from the nearest repeat that can reach it.
+ */
+const REPEATS = Object.freeze([
+    [0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]
+]);
+
+/**
+ * A footprint made ready to be weighed at many points: a function of `x` and
+ * `z`, in the canvas's frame, that answers what `footprintWeight` would.
+ *
+ * Worked out once rather than per point, because the callers that weigh a
+ * region weigh it at every vertex of a tile - 40,401 of them at the default
+ * sampling - and the square round a long stroke or a freehand outline is a walk
+ * over every one of its points.
+ *
+ * With a `wrap`, the canvas tiles the world and a region is one of a grid of
+ * repeats a canvas width apart. The weight is the strongest of the repeats that
+ * reach the point - the union, which is what a region overlapping a copy of
+ * itself across a seam is - and the square check means a repeat that cannot
+ * reach the point costs a comparison, not a distance. Without one, the region
+ * stands alone, which is what it always did.
+ */
+export function footprintSampler(footprint, wrap = 0) {
+    const square = footprintBounds(footprint);
+    if (square == null) return () => 0;
+
+    const edge   = feather(footprint);
+    const across = Number(wrap) > 0 ? Number(wrap) : 0;
+    const shifts = across > 0 ? REPEATS.map(([i, j]) => [i * across, j * across]) : [[0, 0]];
+
+    return function weigh(x, z) {
+        let best = 0;
+
+        for (const [shiftX, shiftZ] of shifts) {
+            // A repeat moved a width one way is the region seen from a point
+            // moved a width the other, which is the cheaper of the two to ask.
+            const px = x - shiftX;
+            const pz = z - shiftZ;
+            if (px < square.minX || px > square.maxX || pz < square.minZ || pz > square.maxZ) continue;
+
+            const weight = falloff(insideDistance(footprint, px, pz), edge);
+            if (weight >= 1) return 1;
+            if (weight > best) best = weight;
+        }
+
+        return best;
+    };
 }
 
 /**

@@ -88,6 +88,27 @@ export function createField({
     };
 }
 
+/**
+ * A field to draw on without touching the one it was copied from: the heights,
+ * the colours, the strips and the water record each its own, everything else -
+ * the size, the sampling, the origin - read off the original.
+ *
+ * It is how an element is drawn only where a footprint reaches. The element is
+ * run on a copy as the whole-world algorithm it was written as, and the copy is
+ * blended back through the footprint, so no generator has to know a footprint
+ * exists.
+ */
+export function cloneField(field) {
+    return {
+        ...field,
+        height:  new Float32Array(field.height),
+        color:   new Float32Array(field.color),
+        runways: [...field.runways],
+        water:   field.water ? { ...field.water } : null,
+        seam:    field.seam?.slice ? field.seam.slice() : field.seam ?? null
+    };
+}
+
 export function fieldX(field, index) {
     return field.originX - field.size / 2 + (index % field.stride) * field.step;
 }

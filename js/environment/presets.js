@@ -14,9 +14,10 @@
  */
 
 import {
-    createField, createRandom, applyBase, applyElement, orderPlacements,
+    createField, createRandom, applyBase, orderPlacements,
     DEFAULT_SIZE, DEFAULT_SEGMENTS
 } from './elements.js';
+import { applyFootprintedElement } from './footprinted.js';
 
 /**
  * The world the simulator has always generated, and the one a fresh install
@@ -337,6 +338,11 @@ export function environmentElements(environment, runway = false) {
  * `seed` builds the same description as a different world, which is what lets
  * one preset stand behind several stages of a game mode without any of them
  * being the same ground twice.
+ *
+ * A placement may carry a `footprint`, a region in the canvas's frame, and is
+ * then drawn only where the region reaches - on this field, wherever in the
+ * world it was laid, and continuing across the field's edges. A placement with
+ * none is drawn across the whole field as it always was.
  */
 export function buildEnvironment(environment = getEnvironment(), options = {}) {
     const { runway = false, base, elements, seed, ...size } = options;
@@ -345,7 +351,7 @@ export function buildEnvironment(environment = getEnvironment(), options = {}) {
 
     applyBase(field, { ...environment.base, ...base });
     for (const placement of orderPlacements(elements ?? environmentElements(environment, runway))) {
-        applyElement(field, placement, random);
+        applyFootprintedElement(field, placement, random);
     }
 
     return field;

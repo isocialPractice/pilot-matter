@@ -5,6 +5,64 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.38.0] - 2026-11-04
+
+A region drawn on a placement becomes ground: an element is drawn only where
+its footprint reaches, the same on every tile of the world, and continuous
+across the seams between them.
+
+### Added
+
+- **Footprinted elements.** A placement may carry a `footprint`, and is then
+  drawn only where it reaches. No generator in the registry was changed, and no
+  generator reads one: `applyFootprintedElement` in the new
+  `js/environment/footprinted.js` runs the element on a copy of the field
+  (`cloneField` in `js/environment/elements.js`) exactly as it was written, and
+  blends the copy back through the footprint's weight - all of it inside, none
+  outside, in proportion across the feather. So an element added later is
+  clippable without having been written to be. The element takes from the
+  seeded stream what it always took, whatever the footprint covers, so every
+  placement after a clipped one is laid out as it would have been. A strip the
+  copy cut is recorded on the field, where the flight model finds it. A drawn
+  body of water leaves the sea's level where it was: the level is what a
+  renderer animates across the whole tile, and raising it to a body drawn on
+  high ground would flood the tile below that line. `buildEnvironment` and the
+  Matter API's `createEnvironment` both draw through it, so a host and the game
+  still lay the same world from the same description, and a placement with no
+  footprint is drawn exactly as before.
+- **Footprints wrap.** Given the canvas size, `footprintWeight` measures a
+  region against the nearest of its repeats a canvas width apart rather than
+  only against itself, so a region drawn over one edge of the canvas carries on
+  across the opposite edge. `footprintSampler` is the same answer made ready to
+  be asked at every vertex of a tile: the square round the region is worked out
+  once, and a repeat that cannot reach a point costs a comparison rather than a
+  distance. The repeats are a union - a point weighs the strongest of them -
+  and a region in the middle of the canvas weighs exactly what it did.
+- **The built tile as a pattern.** A footprint is read in the canvas's frame,
+  each vertex with its own tile's origin taken off, so the same placement lands
+  at the same canvas coordinate on every tile and the built square is the
+  pattern the endless world repeats rather than an island in the middle of it.
+  It is drawn on each tile's own ground, generated from that tile's own seed,
+  so anything an element works out from the ground is worked out where it
+  lands. `docs/api.md` describes the `footprint` a host can now hand the Matter
+  API, and `docs/terrain.html` how one is drawn.
+
+Held in Node by `test/footprints.test.js` - a region over either edge weighs
+the same either side of it, the seam's two edges weigh the same only with the
+wrap on, a region in the middle is unchanged, and the repeats never weaken a
+weight or push it past whole - by the new `test/footprinted.test.js` - no
+footprint draws what it always drew, the whole element inside and bare ground
+outside with a proportional blend between, the seeded stream kept, the sea left
+at its level, a strip recorded, and no generator in the registry reading a
+footprint - and by `test/environment-tiles.test.js`, which lays the tiles the
+way the terrain does: the same placement covering the same vertices on tiles
+four apart, the ground at a seam the same from both tiles, and a level filling
+each tile's own low ground inside one footprint. Each of those rejected the
+defect it names when it was put back: the compositor left unwrapped, a region
+read in the world frame, a drawn body raising the sea, a strip lost from the
+copy, the wrap trying only the region itself, and an unreadable footprint
+skipping its element and its draw from the stream.
+
 ## [1.0.0-alpha.1.37.0] - 2026-11-04
 
 The pointer and the keys reach a canvas: the view over one can be turned,

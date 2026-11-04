@@ -1120,6 +1120,17 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
 
 <p>An environment is a description rather than geometry: a name, a seed, the base ground, and the elements placed over it. A host can pass its own list of placements instead of a preset's, and every value in one is clamped into the range the element declares, so a placement cannot configure an element outside what it says it supports.</p>
 
+<p>A placement may also carry a <code>footprint</code>, and is then drawn only where the footprint reaches rather than across the whole square:</p>
+
+<pre><code>{
+    type: 'grass',
+    config: { band: [0, 400] },
+    // A disc 900 units across the middle of it, east and south of the centre.
+    footprint: { kind: 'disc', x: 2000, z: -1500, radius: 900 }
+}</code></pre>
+
+<p>The kinds are <code>disc</code> (<code>x</code>, <code>z</code>, <code>radius</code>), <code>ring</code> (<code>points</code>, a closed outline of <code>[x, z]</code> pairs), <code>stroke</code> (<code>points</code> with a <code>stamp</code> of <code>width</code>, <code>depth</code> and <code>corner</code> swept along them), <code>rect</code> (<code>x</code>, <code>z</code>, <code>width</code>, <code>depth</code>, <code>angle</code>, <code>corner</code>) and <code>ellipse</code> (<code>x</code>, <code>z</code>, <code>radiusX</code>, <code>radiusZ</code>, <code>angle</code>), each with an optional <code>feather</code>: the width in world units of the band the element fades out across at the edge, two cells of the sampling where none is given. The coordinates are the square's own, measured from its middle, so the same footprint lands in the same place on every tile of a tiled world, and one drawn over an edge of the square carries on across the opposite edge - which is what lets a built square repeat as a world without a cut at its seams. The element is drawn on each square's own ground, so anything it works out from the ground is worked out where it lands. A placement without a footprint is drawn exactly as it always was.</p>
+
 <p>Every range an element declares says which of five kinds it is, which is what a host reading <code>ELEMENTS</code> has to branch on and what a value handed to <code>resolveConfig</code> is read as:</p>
 
 <div class="table-wrap">

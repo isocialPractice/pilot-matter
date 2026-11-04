@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    footprintWeight, footprintBounds, isFootprint, featherFor,
+    footprintWeight, footprintBounds, footprintSampler, isFootprint, featherFor,
     FOOTPRINT_KINDS, FEATHER_CELLS, DEFAULT_FEATHER
 } from '../js/environment/footprints.js';
 import { DEFAULT_SIZE, DEFAULT_SEGMENTS, createField } from '../js/environment/elements.js';
@@ -339,5 +339,100 @@ test('a region is read in the canvas frame, so every tile puts it in the same pl
 
         assert.equal(footprintWeight(region, worldX - field.originX, worldZ - field.originZ), 1,
             `the region should land 2000 east of the middle of the tile at ${origin}`);
+    }
+});
+
+// --- The wrap ----------------------------------------------------------------
+
+const HALF = DEFAULT_SIZE / 2;
+
+/**
+ * A region drawn over one edge of the canvas carries on across the opposite
+ * edge, because the canvas is the tile the world repeats: what reaches past
+ * the east edge of one tile is the ground at the west edge of the next.
+ */
+test('a region over one edge of the canvas carries on across the opposite one', () => {
+    const over = { kind: 'disc', x: HALF, z: 0, radius: 1000, feather: 300 };
+
+    for (const inward of [0, 200, 500, 800, 990]) {
+        const east = footprintWeight(over, HALF - inward, 0, DEFAULT_SIZE);
+        const west = footprintWeight(over, -HALF + inward, 0, DEFAULT_SIZE);
+
+        assert.ok(east > 0, `${inward} in from the east edge should be inside the disc`);
+        assert.ok(Math.abs(east - west) < 1e-12,
+            `${inward} in from either edge should weigh the same, and it was ${east} against ${west}`);
+    }
+});
+
+/**
+ * The seam itself: the east edge of one tile and the west edge of the next are
+ * the same ground, so a region has to weigh the same at both - and only the
+ * wrap makes it, which is what this pins.
+ */
+test('the two edges of a seam weigh the same, and only because of the wrap', () => {
+    const over = { kind: 'stroke', points: [[HALF - 600, -900], [HALF + 600, 900]],
+        stamp: { width: 500, depth: 300, corner: 100 }, feather: 200 };
+
+    let reached = 0;
+    for (let z = -HALF; z <= HALF; z += 80) {
+        const leaving  = footprintWeight(over, HALF, z, DEFAULT_SIZE);
+        const arriving = footprintWeight(over, -HALF, z, DEFAULT_SIZE);
+        assert.ok(Math.abs(leaving - arriving) < 1e-12, `the seam steps at z ${z}: ${leaving} against ${arriving}`);
+        if (leaving > 0) reached++;
+    }
+    assert.ok(reached > 0, 'the stroke should cross the seam somewhere along it');
+
+    const unwrapped = footprintWeight(over, -HALF, 0);
+    const wrapped   = footprintWeight(over, -HALF, 0, DEFAULT_SIZE);
+    assert.equal(unwrapped, 0, 'with the wrap off, the far side of the seam is bare');
+    assert.ok(wrapped > 0, 'and with it on, the stroke carries across');
+});
+
+test('the wrap leaves a region in the middle of the canvas exactly as it was', () => {
+    for (const [name, footprint] of EVERY_KIND) {
+        for (let x = -3000; x <= 3000; x += 250) {
+            for (let z = -3000; z <= 3000; z += 250) {
+                assert.equal(footprintWeight(footprint, x, z, DEFAULT_SIZE), footprintWeight(footprint, x, z),
+                    `${name} at ${x},${z} should weigh what it always did`);
+            }
+        }
+    }
+});
+
+// A union never takes away: a point weighs at least what the region alone gave
+// it, and never more than all of it, however the repeats overlap.
+test('the repeats are a union, never weaker than the region and never more than whole', () => {
+    const wide = { kind: 'rect', x: HALF - 2000, z: HALF - 1000, width: 9000, depth: 7000, angle: 0.3, corner: 400 };
+
+    for (let x = -HALF; x <= HALF; x += 400) {
+        for (let z = -HALF; z <= HALF; z += 400) {
+            const alone   = footprintWeight(wide, x, z);
+            const wrapped = footprintWeight(wide, x, z, DEFAULT_SIZE);
+            assert.ok(wrapped >= alone, `${x},${z} lost weight to the wrap`);
+            assert.ok(wrapped <= 1, `${x},${z} weighs more than all of itself`);
+        }
+    }
+});
+
+test('a sampler answers what the weight answers, wrapped or not', () => {
+    for (const [name, footprint] of EVERY_KIND) {
+        const plain   = footprintSampler(footprint);
+        const wrapped = footprintSampler({ ...footprint, x: (footprint.x ?? 0) + HALF - 300 }, DEFAULT_SIZE);
+
+        for (let x = -HALF; x <= HALF; x += 500) {
+            for (let z = -HALF; z <= HALF; z += 500) {
+                assert.equal(plain(x, z), footprintWeight(footprint, x, z), `${name} unwrapped at ${x},${z}`);
+                assert.equal(wrapped(x, z),
+                    footprintWeight({ ...footprint, x: (footprint.x ?? 0) + HALF - 300 }, x, z, DEFAULT_SIZE),
+                    `${name} wrapped at ${x},${z}`);
+            }
+        }
+    }
+});
+
+test('a region nobody can read covers nothing, wrapped or not', () => {
+    for (const nothing of [null, { kind: 'disc', radius: 0 }, { kind: 'cloud' }]) {
+        assert.equal(footprintWeight(nothing, 0, 0, DEFAULT_SIZE), 0);
+        assert.equal(footprintSampler(nothing, DEFAULT_SIZE)(HALF, HALF), 0);
     }
 });

@@ -1275,6 +1275,32 @@ placements instead of a preset's, and every value in one is clamped into the
 range the element declares, so a placement cannot configure an element outside
 what it says it supports.
 
+A placement may also carry a `footprint`, and is then drawn only where the
+footprint reaches rather than across the whole square:
+
+```js
+{
+    type: 'grass',
+    config: { band: [0, 400] },
+    // A disc 900 units across the middle of it, east and south of the centre.
+    footprint: { kind: 'disc', x: 2000, z: -1500, radius: 900 }
+}
+```
+
+The kinds are `disc` (`x`, `z`, `radius`), `ring` (`points`, a closed outline of
+`[x, z]` pairs), `stroke` (`points` with a `stamp` of `width`, `depth` and
+`corner` swept along them), `rect` (`x`, `z`, `width`, `depth`, `angle`,
+`corner`) and `ellipse` (`x`, `z`, `radiusX`, `radiusZ`, `angle`), each with an
+optional `feather`: the width in world units of the band the element fades out
+across at the edge, two cells of the sampling where none is given. The
+coordinates are the square's own, measured from its middle, so the same
+footprint lands in the same place on every tile of a tiled world, and one drawn
+over an edge of the square carries on across the opposite edge - which is what
+lets a built square repeat as a world without a cut at its seams. The element
+is drawn on each square's own ground, so anything it works out from the ground
+is worked out where it lands. A placement without a footprint is drawn exactly
+as it always was.
+
 Every range an element declares says which of five kinds it is, which is what a
 host reading `ELEMENTS` has to branch on and what a value handed to
 `resolveConfig` is read as:

@@ -9,6 +9,8 @@ import {
 import { animateWater } from '../js/water.js';
 import { updateNormals } from '../js/terrain-normals.js';
 import { boundsFromSize, tileOrigin, resolveEnvironmentOptions } from '../js/api/contract.js';
+import { buildEnvironment, getEnvironment } from '../js/environment/presets.js';
+import { footprintWeight } from '../js/environment/footprints.js';
 
 const SIZE = 4000;
 const SEGMENTS = 40;
@@ -873,4 +875,127 @@ test('a block laid a tile at a time leaves no join unsettled', () => {
     assert.equal(agreed, asDrawn.shared, 'over the same shared places either way');
     assert.ok(drift < 1e-6,
         `a place the block laid settled ${drift} away from what its nine surfaces make of it`);
+});
+
+// --- The built tile as a pattern -------------------------------------------
+
+/**
+ * One tile of a world built from footprinted placements, laid the way the
+ * terrain lays one: its own place in the grid, its own seed, the same
+ * placements on every tile.
+ */
+function builtTile(x, z, elements, base) {
+    const blank = getEnvironment('blank-canvas');
+    return buildEnvironment(blank, {
+        size: SIZE, segments: SEGMENTS,
+        originX: x * SIZE, originZ: z * SIZE,
+        seed: tileSeed(blank.seed, x, z),
+        elements,
+        ...(base ? { base } : {})
+    });
+}
+
+/** Every vertex index a placement left at exactly a height, which is where it covered fully. */
+function coveredAt(field, height) {
+    const found = [];
+    for (let i = 0; i < field.count; i++) if (Math.abs(field.height[i] - height) < 1e-3) found.push(i);
+    return found;
+}
+
+/**
+ * The test the plan calls the one worth writing first. A placement is held in
+ * the canvas's frame, so it lands at the same canvas coordinate on every tile -
+ * the built tile is the pattern the world repeats rather than an island in the
+ * middle of it.
+ */
+test('a footprinted placement lands at the same canvas coordinate on every tile', () => {
+    const flood = { type: 'water', config: { level: 600, flatten: 1 },
+        footprint: { kind: 'disc', x: 800, z: -600, radius: 500, feather: 0 } };
+
+    const home = coveredAt(builtTile(0, 0, [flood]), 600);
+    assert.ok(home.length > 0, 'the placement should cover something on the home tile');
+
+    for (const [x, z] of [[4, -2], [-3, 5], [1, 0]]) {
+        assert.deepEqual(coveredAt(builtTile(x, z, [flood]), 600), home,
+            `the tile at ${x},${z} should be covered at the same vertices as the home tile`);
+    }
+});
+
+/**
+ * And the pattern meets itself. A region over the east edge of the canvas is
+ * the same region at the west edge of the next tile along, so the ground at the
+ * seam the two share is the same ground from either side of it.
+ */
+test('a footprint over the canvas edge is continuous across the seam between tiles', () => {
+    const flood = { type: 'water', config: { level: 600, flatten: 1 },
+        footprint: { kind: 'disc', x: SIZE / 2, z: 200, radius: 900, feather: 300 } };
+
+    const east = builtTile(0, 0, [flood]);
+    const west = builtTile(1, 0, [flood]);
+
+    const leaving  = edge(east, 'maxX');
+    const arriving = edge(west, 'minX');
+
+    let raised = 0;
+    for (let line = 0; line < leaving.length; line++) {
+        assert.ok(Math.abs(leaving[line].height - arriving[line].height) < 1e-3,
+            `the seam steps at row ${line}: ${leaving[line].height} against ${arriving[line].height}`);
+        if (leaving[line].height > 300) raised++;
+    }
+    assert.ok(raised > 0, 'the region should reach the seam and raise the ground at it');
+
+    // And the far side of the seam is raised at all only because the region
+    // carries across: the next tile's west edge is outside the disc as drawn.
+    assert.equal(footprintWeight(flood.footprint, -SIZE / 2, 200), 0,
+        'with no wrap the next tile would have had nothing at its west edge');
+});
+
+/**
+ * Each tile is generated from its own seed, so the ground under a canvas
+ * coordinate is different on every tile - and an element reading the ground
+ * reads the tile it lands on. Water fills what is under its level on each
+ * tile's own ground, so where it fills differs from tile to tile inside the
+ * very same footprint.
+ */
+test('anything worked out from the ground is worked out on the tile it is drawn on', () => {
+    // Ground with relief, and a level taken from the two tiles' own ground so
+    // it cuts across both of them - Blank Canvas is too flat for a level to
+    // tell two tiles apart.
+    const relief = { maxHeight: 480, scale: 3.5 };
+    const places = [[0, 0], [2, -1]];
+    const footprint = { kind: 'rect', x: 0, z: 0, width: 3000, depth: 3000, angle: 0, corner: 0, feather: 0 };
+    const covered = (field, i) =>
+        footprintWeight(footprint, fieldX(field, i) - field.originX, fieldZ(field, i) - field.originZ, SIZE) === 1;
+
+    const bares = places.map(([x, z]) => builtTile(x, z, [], relief));
+    const heights = bares.flatMap(bare => [...bare.height].filter((_, i) => covered(bare, i))).sort((a, b) => a - b);
+    const level = heights[Math.floor(heights.length / 2)];
+    const pool = { type: 'water', config: { level, flatten: 1 }, footprint };
+
+    const filled = [];
+    places.forEach(([x, z], at) => {
+        const bare  = bares[at];
+        const built = builtTile(x, z, [pool], relief);
+        const raised = new Set();
+        let left = 0;
+
+        for (let i = 0; i < built.count; i++) {
+            if (!covered(built, i)) continue;
+
+            const own = bare.height[i];
+            const expected = own < level ? level : own;
+            assert.ok(Math.abs(built.height[i] - expected) < 1e-3,
+                `tile ${x},${z} vertex ${i}: ground ${own} should fill to ${expected}, not ${built.height[i]}`);
+            if (own < level) raised.add(i);
+            else left++;
+        }
+
+        assert.ok(raised.size > 0 && left > 0,
+            `the level ${level} should cut across tile ${x},${z}: ${raised.size} under it, ${left} over it`);
+        filled.push(raised);
+    });
+
+    const [home, away] = filled;
+    const same = home.size === away.size && [...home].every(i => away.has(i));
+    assert.equal(same, false, 'two tiles with their own ground should fill different vertices');
 });

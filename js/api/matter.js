@@ -17,10 +17,11 @@
 
 import * as THREE from 'three';
 import {
-    createField, createRandom, applyBase, applyElement, orderPlacements,
+    createField, createRandom, applyBase, orderPlacements,
     sampleHeight, matchEdges, matchWater, waterSurface, tileSeed
 } from '../environment/elements.js';
 import { getEnvironment, environmentElements } from '../environment/presets.js';
+import { applyFootprintedElement } from '../environment/footprinted.js';
 import { applyDepth, applyDaylight, SKY_COLOR, FOG_DENSITY } from '../sky.js';
 import { animateWater } from '../water.js';
 import {
@@ -72,10 +73,13 @@ export function createEnvironment(options = {}) {
         });
         applyBase(field, preset.base);
 
+        // A placement with a footprint is drawn only where it reaches, in the
+        // square's own frame, through the same pass the simulator builds with -
+        // so a host and the game lay the same world from the same description.
         const random = createRandom(seed());
         const placements = resolved.elements ?? environmentElements(preset, resolved.runway);
         for (const placement of orderPlacements(placements)) {
-            applyElement(field, placement, random);
+            applyFootprintedElement(field, placement, random);
         }
 
         draw();
