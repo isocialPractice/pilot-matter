@@ -17,16 +17,18 @@ import {
 import {
     createBuildState, openBuildMode, closeBuildMode, buildModeShowing,
     buildModePicking, buildModeDrawing, buildModeFrom, beginCanvas,
-    isBuilderOpenKey, isBuilderCloseKey, BUILDER_ENTRY_ID,
+    buildModeTool, chooseBuildTool, requestLeave, leavesBuilder,
+    isBuilderOpenKey, BUILDER_ENTRY_ID,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
+import { paletteTools, ACCEPT_TOOL } from './build-tools.js';
 import {
     createPickerState, pickerEntries, choosePickerEntry,
     CARD_ENTRY, PICKER_STARTED, PICKER_LEFT
 } from './build-picker.js';
 import { canvasCamera, canvasFarPlane, CANVAS_FOG } from './build-camera.js';
 import {
-    createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines
+    createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines, buildHelpLines
 } from './controls-help.js';
 import {
     createHudVisibilityState, applyHudToggleKey, isHudToggleKey, defaultStorage
@@ -251,6 +253,10 @@ class FlightSimulator {
         this.picker      = createPickerState();
         this.pickerState = createMenuState(pickerEntries(this.picker));
 
+        // The builder's own control list, open when a canvas first opens - a
+        // canvas is a screen with nothing else on it to say what it answers to.
+        this.buildHelpState = createHelpState(true);
+
         // Whether the two menus are currently carrying the builder's entry, so
         // a card is drawn again when that changes rather than on every frame
         // something else did.
@@ -333,7 +339,14 @@ class FlightSimulator {
             // of the list names keys nothing rebinds and is left as the page
             // writes it.
             helpRows:  document.querySelectorAll('#controls-help-list [data-help-row]'),
-            touch:     document.getElementById('touch-controls')
+            touch:     document.getElementById('touch-controls'),
+            // The builder's palette and its control list, which are a canvas's
+            // only chrome.
+            palette:       document.getElementById('build-palette'),
+            buildHelp:     document.getElementById('build-help'),
+            buildHelpList: document.getElementById('build-help-list'),
+            buildHelpHint: document.getElementById('build-help-hint'),
+            buildHelpRows: document.getElementById('build-help-rows')
         };
 
         // The pads write the same input state the keys do, which is what lets
@@ -447,6 +460,13 @@ class FlightSimulator {
         // menus with the mouse: clicking the list collapses it, and clicking
         // what is left opens it again.
         this.overlays.help.addEventListener('click', () => this.onHelpClick());
+
+        // A canvas's palette and control list are drawn once, from the tools
+        // that work and the bindings a canvas reads, and shown or hidden with
+        // the canvas. The list is worked with a click as the flight's is.
+        this.drawPalette();
+        this.drawBuildHelp();
+        this.overlays.buildHelp.addEventListener('click', () => this.onBuildHelpClick());
 
         this.setupKeys();
         this.applySettings();
@@ -1673,10 +1693,19 @@ class FlightSimulator {
     }
 
     onBuilderKey(e) {
+        // H opens and collapses the canvas's control list the way it does the
+        // flight's, so the key that says how to work a screen is the same key
+        // on both.
+        if (buildModeDrawing(this.builder) && applyHelpKey(this.buildHelpState, e.code, true, e.repeat)) {
+            this.syncOverlays();
+            return;
+        }
+
         // The picker is the builder's first screen rather than a gate in front
-        // of it, so the way off it is the way out of the builder.
-        if (isBuilderCloseKey(e.code)) {
-            this.leaveBuilder();
+        // of it, so the way off it is the way out of the builder - by either of
+        // a panel's two close keys there, and by Escape alone on a canvas.
+        if (leavesBuilder(this.builder, e.code)) {
+            this.requestLeaveBuilder();
             this.syncOverlays();
             return;
         }
@@ -1707,7 +1736,7 @@ class FlightSimulator {
         if (chosen == null) return;
 
         if (chosen.action === PICKER_LEFT) {
-            this.leaveBuilder();
+            this.requestLeaveBuilder();
             return;
         }
 
@@ -1719,6 +1748,78 @@ class FlightSimulator {
         // A card moves the choice without leaving the picker, so the six can be
         // read over before one is settled on.
         this.redrawPicker();
+    }
+
+    /**
+     * Asks to leave the builder, and leaves when the answer is to go.
+     *
+     * The accept tool, Escape and the picker's BACK all come here, so the three
+     * ways out cannot come to ask different questions. Nothing a session could
+     * keep exists yet, so the answer is always to go; the confirms that ask
+     * first arrive with the accept tool's own item, through this same call.
+     */
+    requestLeaveBuilder() {
+        const asked = requestLeave(this.builder);
+        if (asked?.leave) this.leaveBuilder();
+    }
+
+    /**
+     * Draws the palette's tiles: the tools that work, in the order of the
+     * twelve, each a button named for its tool. Drawn once, because which tools
+     * are built does not change while the page is open; which one is live is
+     * marked on them by `syncOverlays`.
+     */
+    drawPalette() {
+        const palette = this.overlays.palette;
+        palette.replaceChildren();
+
+        for (const tool of paletteTools()) {
+            const tile = document.createElement('button');
+            tile.type = 'button';
+            tile.dataset.tool = tool.id;
+            tile.textContent = tool.label;
+            tile.title = tool.hint;
+            tile.addEventListener('click', (event) => {
+                this.onPaletteClick(tool.id);
+                // A tile clicked with the pointer gives the focus back, or the
+                // next Enter would press it again; one reached by the keyboard
+                // keeps it, which is how the keyboard works a row of buttons.
+                if (event.detail > 0) tile.blur();
+            });
+            palette.append(tile);
+        }
+    }
+
+    /**
+     * A tile pressed. The accept tool asks to leave, through the same call
+     * Escape makes; any other tile makes its tool the live one.
+     */
+    onPaletteClick(id) {
+        if (!buildModeDrawing(this.builder)) return;
+
+        if (id === ACCEPT_TOOL) this.requestLeaveBuilder();
+        else chooseBuildTool(this.builder, id);
+
+        this.syncOverlays();
+    }
+
+    /** Writes the canvas's control list from the bindings a canvas reads. */
+    drawBuildHelp() {
+        const rows = this.overlays.buildHelpRows;
+        rows.replaceChildren();
+
+        for (const line of buildHelpLines()) {
+            const row = document.createElement('div');
+            row.dataset.buildHelpRow = line.id;
+            row.textContent = line.text;
+            rows.append(row);
+        }
+    }
+
+    /** A click on the canvas's control list collapses it, and a click on what is left opens it. */
+    onBuildHelpClick() {
+        toggleHelp(this.buildHelpState);
+        this.syncOverlays();
     }
 
     // --- The modes -------------------------------------------------------
@@ -2147,6 +2248,9 @@ class FlightSimulator {
         // screen it has, and that is a panel like any other.
         const builder  = !photo && buildModeShowing(this.builder);
         const picker   = builder && buildModePicking(this.builder);
+        // A canvas's own chrome - the palette and the control list - is all it
+        // carries, and it is what says how to work the canvas and how to leave.
+        const canvas   = builder && buildModeDrawing(this.builder);
         const onTitle  = !photo && !builder && titleShowing(this.titleState);
         const modes    = !photo && !builder && this.modesOpen;
         const settings = !photo && !builder && !modes && settingsShowing(this.settings);
@@ -2172,6 +2276,19 @@ class FlightSimulator {
         this.overlays.controls.style.display  = controls ? 'block' : 'none';
         this.overlays.editor.style.display    = editor ? 'block' : 'none';
         this.overlays.picker.style.display    = picker ? 'block' : 'none';
+        this.overlays.palette.style.display   = canvas ? 'grid' : 'none';
+        this.overlays.buildHelp.style.display = canvas ? 'block' : 'none';
+        this.overlays.buildHelpList.style.display = this.buildHelpState.expanded ? 'block' : 'none';
+        this.overlays.buildHelpHint.style.display = this.buildHelpState.expanded ? 'none' : 'block';
+
+        // The live tool is lit, and said to be pressed, so the palette reads as
+        // which tool the canvas is being worked with. The accept tool is a way
+        // out rather than a mode, so it is a plain button and never a toggle.
+        const live = buildModeTool(this.builder);
+        for (const tile of this.overlays.palette.children) {
+            if (tile.dataset.tool === ACCEPT_TOOL) continue;
+            tile.setAttribute('aria-pressed', String(tile.dataset.tool === live));
+        }
         this.overlays.gameModes.style.display = modes ? 'block' : 'none';
         this.overlays.paused.style.display    = paused && !panel ? 'block' : 'none';
         this.overlays.hud.style.display       = chrome ? 'block' : 'none';

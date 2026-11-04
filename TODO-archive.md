@@ -3869,3 +3869,23 @@ still be found by name.
     claim is held by a new assertion in `test/page.test.js`, proven by mutation;
     how the sky reads is for the GUI test this run requested.
   - From: World & Environment
+- [x] **Deck Comment**: the comment on `facing` still says the deck is drawn
+  from one texture and mirrored on x, which is the bug that was just removed
+  - **Issue**: `createCloudDeck` in `js/weather-math.js:272` carries "Every
+    cloud is drawn from one texture, so mirroring half of them on x is the
+    cheapest way to stop a deck reading as one shape repeated across the sky."
+    Both halves are now false. `addClouds` builds two `SpriteMaterial`s over
+    two textures, and `facing` picks between them rather than mirroring
+    anything on x - mirroring on x is exactly what `sprite.scale.set(cloud.width
+    * cloud.facing, ...)` did, which `js/weather.js:100-107` and the assertion
+    at `test/page.test.js:1486` now both say is a sprite not mirrored at all.
+    A reader working from this comment is told to do the thing the release
+    stopped doing, and this is the comment the completed item's own issue
+    pointed at as the statement of intent the renderer was failing.
+  - **Goal**: say what `facing` now is - which of the two cloud textures a
+    cloud is drawn from - and keep the reason it exists, which is the only part
+    still true: half a deck reversed stops it reading as one shape repeated
+    across the sky. Leave the mechanism to `js/weather.js`, where it is
+    described at length already, rather than restating it in a pure module
+    that draws nothing.
+  - From: Code Review Override - the comments the cloud mirror left behind

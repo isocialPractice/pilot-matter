@@ -13,8 +13,12 @@ import {
     applyHelpKey,
     helpRowKeys,
     helpRowText,
-    helpRowLines
+    helpRowLines,
+    BUILD_HELP_ROWS,
+    buildHelpLines
 } from '../js/controls-help.js';
+import { CANVAS_LEAVE_KEYS, PICKER_CLOSE_KEYS } from '../js/build-mode.js';
+import { PHOTO_KEY } from '../js/photo.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 import { CONTROL_REFERENCE_LABEL } from '../js/control-settings.js';
 import {
@@ -194,4 +198,53 @@ test('the script writes every row the page marks, and marks every row it writes'
         'js/main.js should write the rows from the map the panel holds');
     assert.ok(/querySelectorAll\('#controls-help-list \[data-help-row\]'\)/.test(mainSource),
         'reading the rows off the page by the mark they carry');
+});
+
+// --- The builder's control list --------------------------------------------
+
+/**
+ * The builder's list names what a canvas answers to and nothing else, so every
+ * row is written from the constant its handler reads rather than from a
+ * spelling of it. A row that named a key nothing reads would be a list
+ * promising what the canvas does not do, which is the defect the list was
+ * written to end.
+ */
+test('every row of the builder list is a key some builder handler reads', () => {
+    const rows = Object.fromEntries(BUILD_HELP_ROWS.map(row => [row.id, row.codes]));
+
+    assert.equal(rows.leave, CANVAS_LEAVE_KEYS, 'the way out is read from the keys that leave a canvas');
+    assert.deepEqual(rows.help, [HELP_KEY], 'the list is collapsed by the same key as the flight\'s');
+    assert.deepEqual(rows.photo, [PHOTO_KEY], 'and a picture can be taken of a canvas like any screen');
+
+    const read = new Set([...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY]);
+    for (const row of BUILD_HELP_ROWS) {
+        for (const code of row.codes) assert.ok(read.has(code), `${code} on the ${row.id} row is read by nothing`);
+    }
+});
+
+test('the builder list never offers the key a canvas leaves free', () => {
+    const named = BUILD_HELP_ROWS.flatMap(row => row.codes);
+    for (const code of PICKER_CLOSE_KEYS.filter(code => !CANVAS_LEAVE_KEYS.includes(code))) {
+        assert.ok(!named.includes(code), `${code} leaves the picker but not a canvas`);
+    }
+});
+
+test('the builder list reads as keys and then what they do', () => {
+    assert.deepEqual(buildHelpLines().map(line => line.text), [
+        'Esc - Leave the Builder',
+        'H - Collapse List',
+        'F2 - Photo'
+    ]);
+    assert.deepEqual(buildHelpLines().map(line => line.id), BUILD_HELP_ROWS.map(row => row.id));
+});
+
+// The rows come from the module, so the page carries the box and the script
+// carries what goes in it - the way the picker's cards are drawn.
+test('the page leaves the builder list for the script to write', () => {
+    assert.match(indexHtml, /<div id="build-help-rows">\s*<\/div>/,
+        'index.html should leave #build-help-rows empty');
+    assert.match(indexHtml, new RegExp(`<div id="build-help-hint">${HELP_HINT}</div>`),
+        'and collapse the list to the same hint the flight\'s leaves');
+    assert.ok(/for \(const line of buildHelpLines\(\)\)/.test(mainSource),
+        'js/main.js should write the rows from the builder\'s list');
 });

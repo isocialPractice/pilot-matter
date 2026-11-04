@@ -5,6 +5,65 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.36.0] - 2026-11-04
+
+A started canvas says how to leave it, and can be left by a pointer and a
+finger as well as by a key.
+
+### Fixed
+
+- **A canvas has a way out on it.** A canvas started from the picker drew its
+  tile and then answered nothing a pilot would try. Driven in Chromium from the
+  title screen and from the pause menu: a click, a drag, the wheel and a right
+  click left the camera where the hold put it, and `P`, `Enter`, the arrows,
+  `H` and `Tab` changed nothing. `Escape` and `Backspace` did leave, but
+  nothing on the canvas named either one - the picker's `ESC TO LEAVE` went
+  with the picker, the flight's control list came off with the flight's chrome
+  - and there was nothing to click, so a pilot without those keys in mind had no
+  way back and a pilot on a touch screen had none at all. Nothing was broken in
+  the item that drew the canvas; everything that gives a canvas a surface had
+  been queued behind work that draws nothing a pilot can see.
+
+  A canvas now carries a **palette** down the left. It holds only the tools
+  that work, read off `paletteTools` in the new `js/build-tools.js`, so it opens
+  as `SELECT`, lit as the live tool, and `ACCEPT AND EXIT` across the foot of
+  the column - buttons named in text until the builder's marks are in the
+  repository, each tall enough for a fingertip. Every tool joins it as it is
+  built, in the place the twelve give it, so the column never offers a tile that
+  does nothing.
+
+  The tile, `Escape` on a canvas and the picker's `BACK` are **one way out**:
+  each calls `requestLeave` in `js/build-mode.js`, and leaves on its answer. With
+  nothing a session could keep, the answer is to go, and it returns to
+  whichever menu opened the builder with a paused flight where the pause left
+  it. The confirms that ask first will be asked from that same call, so the
+  three ways out cannot come to ask different questions.
+
+  **`Backspace` comes off the canvas.** It still leaves the picker, which is a
+  panel like any other, but on a canvas it is kept for deleting a placement -
+  the key labelled delete on a Mac - and a key that left the builder in one
+  press would be the worst key to share with a delete. The one list of close
+  keys is now `PICKER_CLOSE_KEYS` and `CANVAS_LEAVE_KEYS`, read by
+  `leavesBuilder` for whichever screen is showing.
+
+  And the canvas has its own **control reference**, drawn the way the flight's
+  is, in the same corner and under the same name: open when a canvas opens,
+  collapsed to `H - CONTROL REFERENCE` and opened again by `H` or a click. Its
+  rows are `BUILD_HELP_ROWS` in `js/controls-help.js`, each written from the
+  constant its handler reads, so it lists `Esc`, `H` and `F2` - the keys a
+  canvas answers to - and nothing planned.
+
+  Held in Node by `test/build-mode.test.js`, the new `test/build-tools.test.js`
+  and `test/controls-help.test.js`; the wiring is read off `js/main.js` in
+  `test/page.test.js`, and each new assertion there rejected the defect it
+  names when it was put back - the tile leaving without asking, the picker's
+  `BACK` doing the same, leaving without reading the answer, the palette drawn
+  over the picker, and `H` read after the way out. Settled in Chromium from both
+  menus, by the tile and by `Escape`: each lands on the menu that opened the
+  builder, the paused flight does not move, `Backspace` leaves the canvas where
+  it is and still leaves the picker, and on a 390-pixel touch screen a tap on
+  the 44-pixel tile leaves.
+
 ## [1.0.0-alpha.1.35.0] - 2026-11-04
 
 The two things the builder's first release got wrong about the screens either

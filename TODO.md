@@ -36,52 +36,6 @@ its context survives being archived.
   to the ground levelled on the tile it is drawn on
   - From: Interactive Build Mode
 
-### User Overrides
-
-#### Resolve Issues
-
-- [ ] The canvas 2: a started canvas answers nothing but two keys it never
-  names, so a pilot cannot find the way back
-  - **Issue**: chosen from either menu, a canvas started from the picker draws
-    the tile and then takes no input a pilot would try. Driven in Chromium from
-    the title screen and from the pause menu with a flight behind it: a click,
-    a left drag, the wheel and a right click leave the camera where the hold
-    put it, at `0, 12451, 8718`, and `P`, `Enter`, the arrows, `H` and `Tab`
-    change nothing. It is not a crash - 66 frames are drawn in the second after
-    `START` - and `Escape` and `Backspace` do leave, to the right menu with the
-    flight kept. But nothing on the canvas names either key: the picker's
-    `ESC TO LEAVE` goes with the picker, the flight's control list comes off
-    with the flight's chrome, and there is nothing to click. A pilot without
-    those two keys in mind has no way back, and a pilot on a touch screen has
-    none at all. No handler is on the renderer's canvas, which is the element
-    under the pointer everywhere on that screen.
-  - **This is the order the work was queued in, not a fault in the item.** The
-    canvas did what it said. Everything that gives it a surface - the camera's
-    gestures, the palette, the accept tool, the control list - was queued
-    behind footprint work that draws nothing a pilot can see.
-  - **Goal**: a canvas that can be left by the mouse, the keys and a finger,
-    and says how. One way out, `requestLeave` in `js/build-mode.js`, which the
-    picker's `BACK`, `Escape` on the canvas and an exit tile all call, and
-    which leaves on the spot while nothing can be kept. The exit tile is the
-    accept tool, at the foot of a palette column that also carries Select, lit:
-    two `<button>` tiles named in text, drawn from `paletteTools` in
-    `js/build-tools.js`, which draws only tools that work. `Backspace` comes off
-    the canvas and stays on the picker. And the builder's own control list,
-    read from `BUILD_HELP_ROWS` in `js/controls-help.js`, expanded when the
-    canvas opens and collapsed by `H` the way the flight's is, listing only
-    what works.
-  - **Done when**: from the title screen and from the pause menu, `START` and
-    then a click on the exit tile lands on the menu that opened the builder,
-    with a paused flight where it was, and so does `Escape`; `Backspace` on the
-    canvas does nothing and still leaves the picker; and the control list is on
-    screen when the canvas opens, naming every key the canvas answers to and no
-    other.
-  - **Where it lives**: the plan's "The base every tool stands on" is the
-    design, under "One way out", "A palette that holds only what works" and
-    "The screen says how". The pointer and the camera are the two items queued
-    beside this, not this item.
-  - From: Interactive Build Mode
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -442,28 +396,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 300 earlier items in `TODO-archive.md`, newest last.
+> 301 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Deck Comment**: the comment on `facing` still says the deck is drawn
-  from one texture and mirrored on x, which is the bug that was just removed
-  - **Issue**: `createCloudDeck` in `js/weather-math.js:272` carries "Every
-    cloud is drawn from one texture, so mirroring half of them on x is the
-    cheapest way to stop a deck reading as one shape repeated across the sky."
-    Both halves are now false. `addClouds` builds two `SpriteMaterial`s over
-    two textures, and `facing` picks between them rather than mirroring
-    anything on x - mirroring on x is exactly what `sprite.scale.set(cloud.width
-    * cloud.facing, ...)` did, which `js/weather.js:100-107` and the assertion
-    at `test/page.test.js:1486` now both say is a sprite not mirrored at all.
-    A reader working from this comment is told to do the thing the release
-    stopped doing, and this is the comment the completed item's own issue
-    pointed at as the statement of intent the renderer was failing.
-  - **Goal**: say what `facing` now is - which of the two cloud textures a
-    cloud is drawn from - and keep the reason it exists, which is the only part
-    still true: half a deck reversed stops it reading as one shape repeated
-    across the sky. Leave the mechanism to `js/weather.js`, where it is
-    described at length already, rather than restating it in a pure module
-    that draws nothing.
-  - From: Code Review Override - the comments the cloud mirror left behind
 - [x] **Deck Cost**: the second cloud material is costed at one more draw call,
   and a sprite is already a draw call of its own
   - **Issue**: `js/weather.js:109` reads "The cost is one more 256 by 162
@@ -572,4 +506,58 @@ how the simulator got here rather than as a list still to be worked.
     on the title screen with the builder's row under the cursor, and from one
     opened on the pause menu it lands on the pause card with the flight still
     paused where it was. Driven in Chromium.
+  - From: Interactive Build Mode
+- [x] The canvas 2: a started canvas answers nothing but two keys it never
+  names, so a pilot cannot find the way back
+  - **Issue**: chosen from either menu, a canvas started from the picker draws
+    the tile and then takes no input a pilot would try. Driven in Chromium from
+    the title screen and from the pause menu with a flight behind it: a click,
+    a left drag, the wheel and a right click leave the camera where the hold
+    put it, at `0, 12451, 8718`, and `P`, `Enter`, the arrows, `H` and `Tab`
+    change nothing. It is not a crash - 66 frames are drawn in the second after
+    `START` - and `Escape` and `Backspace` do leave, to the right menu with the
+    flight kept. But nothing on the canvas names either key: the picker's
+    `ESC TO LEAVE` goes with the picker, the flight's control list comes off
+    with the flight's chrome, and there is nothing to click. A pilot without
+    those two keys in mind has no way back, and a pilot on a touch screen has
+    none at all. No handler is on the renderer's canvas, which is the element
+    under the pointer everywhere on that screen.
+  - **This is the order the work was queued in, not a fault in the item.** The
+    canvas did what it said. Everything that gives it a surface - the camera's
+    gestures, the palette, the accept tool, the control list - was queued
+    behind footprint work that draws nothing a pilot can see.
+  - **Goal**: a canvas that can be left by the mouse, the keys and a finger,
+    and says how. One way out, `requestLeave` in `js/build-mode.js`, which the
+    picker's `BACK`, `Escape` on the canvas and an exit tile all call, and
+    which leaves on the spot while nothing can be kept. The exit tile is the
+    accept tool, at the foot of a palette column that also carries Select, lit:
+    two `<button>` tiles named in text, drawn from `paletteTools` in
+    `js/build-tools.js`, which draws only tools that work. `Backspace` comes off
+    the canvas and stays on the picker. And the builder's own control list,
+    read from `BUILD_HELP_ROWS` in `js/controls-help.js`, expanded when the
+    canvas opens and collapsed by `H` the way the flight's is, listing only
+    what works.
+  - **Done when**: from the title screen and from the pause menu, `START` and
+    then a click on the exit tile lands on the menu that opened the builder,
+    with a paused flight where it was, and so does `Escape`; `Backspace` on the
+    canvas does nothing and still leaves the picker; and the control list is on
+    screen when the canvas opens, naming every key the canvas answers to and no
+    other.
+  - **Where it lives**: the plan's "The base every tool stands on" is the
+    design, under "One way out", "A palette that holds only what works" and
+    "The screen says how". The pointer and the camera are the two items queued
+    beside this, not this item.
+  - **Settled**: built as the goal describes. `requestLeave` in
+    `js/build-mode.js` is the one way out, and `requestLeaveBuilder` in
+    `js/main.js` is the only place a tile, a key or the picker's `BACK` leaves
+    from. `PICKER_CLOSE_KEYS` and `CANVAS_LEAVE_KEYS` replace the one list, read
+    by `leavesBuilder` for the screen showing. The palette is drawn from
+    `paletteTools` in the new `js/build-tools.js` as two buttons, and the
+    canvas's control list from `BUILD_HELP_ROWS`, each row the constant its
+    handler reads - `Esc`, `H` and `F2`. The wiring checks in
+    `test/page.test.js` each rejected the defect they name when it was put
+    back. Confirmed in Chromium from both menus, by the tile and by `Escape`:
+    each lands on the menu that opened the builder, the paused flight moves 0
+    units, `Backspace` leaves the canvas where it is and still leaves the
+    picker, and a tap on the 44-pixel tile leaves on a 390-pixel touch screen.
   - From: Interactive Build Mode

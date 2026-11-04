@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {
     createBuildState, openBuildMode, closeBuildMode, buildModeShowing,
     buildModePicking, buildModeDrawing, buildModeEnvironment, buildModeFrom,
-    beginCanvas, isBuilderOpenKey, isBuilderCloseKey,
-    BUILDER_LABEL, BUILDER_ENTRY_ID, BUILDER_OPEN_KEYS, BUILDER_CLOSE_KEYS,
+    beginCanvas, isBuilderOpenKey, isPickerCloseKey, isCanvasLeaveKey, leavesBuilder,
+    requestLeave, buildModeTool, chooseBuildTool,
+    BUILDER_LABEL, BUILDER_ENTRY_ID, BUILDER_OPEN_KEYS, PICKER_CLOSE_KEYS, CANVAS_LEAVE_KEYS,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE, BUILD_PICKER, BUILD_CANVAS
 } from '../js/build-mode.js';
+import { SELECT_TOOL, ACCEPT_TOOL, BUILD_TOOL_IDS, BUILT_TOOLS } from '../js/build-tools.js';
 import { DEFAULT_KEYMAP, RESET_KEYS } from '../js/input-map.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { HELP_KEY } from '../js/controls-help.js';
@@ -174,10 +176,104 @@ test('the reserved-key guard says the builder is what L is already doing', () =>
     }
 });
 
-test('the builder is backed out of the way every other panel is', () => {
-    assert.deepEqual(BUILDER_CLOSE_KEYS, ['Escape', 'Backspace']);
-    for (const code of BUILDER_CLOSE_KEYS) assert.ok(isBuilderCloseKey(code));
-    assert.equal(isBuilderCloseKey('KeyZ'), false);
+// --- The way out ---------------------------------------------------------
+
+test('the picker is backed out of the way every other panel is', () => {
+    assert.deepEqual(PICKER_CLOSE_KEYS, ['Escape', 'Backspace']);
+    for (const code of PICKER_CLOSE_KEYS) assert.ok(isPickerCloseKey(code));
+    assert.equal(isPickerCloseKey('KeyZ'), false);
+});
+
+/**
+ * A canvas is left by Escape alone. Backspace is kept for deleting a placement,
+ * which is what the key labelled delete on a Mac is - and a key that left the
+ * builder in one press is the worst key to share with a delete.
+ */
+test('a canvas is left by Escape and not by Backspace', () => {
+    assert.deepEqual(CANVAS_LEAVE_KEYS, ['Escape']);
+    assert.ok(isCanvasLeaveKey('Escape'));
+    assert.equal(isCanvasLeaveKey('Backspace'), false);
+});
+
+test('which keys leave depends on the screen the session is on', () => {
+    const state = createBuildState();
+    assert.equal(leavesBuilder(state, 'Escape'), false, 'a closed session has nothing to leave');
+
+    openBuildMode(state, BUILD_FROM_TITLE);
+    assert.equal(leavesBuilder(state, 'Escape'), true, 'Escape leaves the picker');
+    assert.equal(leavesBuilder(state, 'Backspace'), true, 'and so does Backspace');
+    assert.equal(leavesBuilder(state, 'KeyZ'), false);
+
+    beginCanvas(state, 'highlands');
+    assert.equal(leavesBuilder(state, 'Escape'), true, 'Escape leaves the canvas');
+    assert.equal(leavesBuilder(state, 'Backspace'), false, 'and Backspace does not');
+});
+
+/**
+ * Nothing a session could keep exists yet, so asking to leave is leaving - from
+ * the picker and from a canvas alike. The confirms are asked from this same
+ * call once a tool can write something worth keeping.
+ */
+test('asking to leave an open session leaves, from either screen', () => {
+    const picking = createBuildState();
+    openBuildMode(picking, BUILD_FROM_PAUSE);
+    assert.deepEqual(requestLeave(picking), { leave: true });
+
+    const drawing = createBuildState();
+    openBuildMode(drawing, BUILD_FROM_TITLE);
+    beginCanvas(drawing, 'blank-canvas');
+    assert.deepEqual(requestLeave(drawing), { leave: true });
+
+    assert.equal(buildModeShowing(drawing), true,
+        'asking is not leaving - the caller leaves on the answer');
+});
+
+test('a session that is not open has nothing to ask about leaving', () => {
+    for (const closed of [createBuildState(), null, undefined]) {
+        assert.equal(requestLeave(closed), null);
+    }
+});
+
+// --- The live tool -------------------------------------------------------
+
+test('a canvas opens on Select, which is the navigation state', () => {
+    const state = createBuildState();
+    openBuildMode(state, BUILD_FROM_TITLE);
+    assert.equal(buildModeTool(state), null, 'the picker has no tool');
+
+    beginCanvas(state, 'highlands');
+    assert.equal(buildModeTool(state), SELECT_TOOL);
+
+    closeBuildMode(state);
+    assert.equal(buildModeTool(state), null, 'and leaving takes the tool with it');
+});
+
+test('only a built tool that is a mode can be the live one', () => {
+    const state = createBuildState();
+    openBuildMode(state, BUILD_FROM_TITLE);
+    beginCanvas(state, 'highlands');
+
+    assert.equal(chooseBuildTool(state, ACCEPT_TOOL), false,
+        'the accept tool is a way out, never the tool a canvas is worked with');
+    assert.equal(buildModeTool(state), SELECT_TOOL);
+
+    for (const id of BUILD_TOOL_IDS.filter(id => !BUILT_TOOLS.includes(id))) {
+        assert.equal(chooseBuildTool(state, id), false, `${id} is not built, so it cannot be chosen`);
+    }
+    assert.equal(chooseBuildTool(state, 'not-a-tool'), false);
+    assert.equal(buildModeTool(state), SELECT_TOOL, 'and nothing refused moved the live tool');
+
+    assert.equal(chooseBuildTool(state, SELECT_TOOL), false,
+        'choosing the tool already live is not a change');
+});
+
+test('a tool is chosen on a canvas and nowhere else', () => {
+    const state = createBuildState();
+    assert.equal(chooseBuildTool(state, SELECT_TOOL), false);
+
+    openBuildMode(state, BUILD_FROM_TITLE);
+    assert.equal(chooseBuildTool(state, SELECT_TOOL), false, 'the picker has no tool to change');
+    assert.equal(state.tool, null);
 });
 
 // One name, spelled with the second N, on the entry and on the picker it opens.

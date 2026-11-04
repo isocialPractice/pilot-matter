@@ -3472,3 +3472,80 @@ test('leaving a canvas restores the flight world rather than choosing a new one'
     assert.ok(!/this\.refreshWorld\(\);/.test(leaving[0]),
         'and never ask for the plain refresh, which reads a restore as a world that changed');
 });
+
+// --- The canvas's way out, palette and control list --------------------------
+
+/**
+ * A started canvas once answered nothing but two keys it never named. What a
+ * canvas carries now is the chrome that says how to work it and how to leave
+ * it: a palette and a control list, each hidden until a canvas is open.
+ */
+test('a canvas carries a palette and a control list, styled and hidden until one opens', () => {
+    for (const id of ['build-palette', 'build-help']) {
+        const rule = styleRule(indexHtml, id);
+        assert.ok(rule, `index.html should style #${id}`);
+        assert.match(rule, /display:\s*none/, `#${id} should start hidden`);
+        assert.match(rule, /position:\s*fixed/, 'and lie over the canvas rather than in the page');
+    }
+
+    assert.ok(styled(indexHtml, '#build-palette button', /min-height:\s*44px/),
+        'a tile should be tall enough for a fingertip, the only way out a touch screen has');
+    assert.ok(styled(indexHtml, '#build-palette button[data-tool="accept"]', /grid-column:\s*1\s*\/\s*-1/),
+        'and the way out should run across the foot of the column');
+    assert.ok(styled(indexHtml, '#build-palette button[aria-pressed="true"]', /background:\s*#0f0/),
+        'with the live tool lit');
+});
+
+test('the palette is drawn from the tools that work rather than written into the page', () => {
+    assert.match(indexHtml, /<nav id="build-palette" aria-label="Builder tools"><\/nav>/,
+        'index.html should leave the palette empty for the registry to fill');
+
+    const drawn = methodBody(mainSource, 'drawPalette');
+    assert.ok(drawn, 'js/main.js should define drawPalette()');
+    assert.match(drawn, /for \(const tool of paletteTools\(\)\)/, 'one tile per tool that works');
+    assert.match(drawn, /document\.createElement\('button'\)/,
+        'each a button, which focus and a screen reader can find as well as a pointer');
+    assert.match(drawn, /tile\.type = 'button'/);
+});
+
+/**
+ * Three ways out - the accept tile, Escape on a canvas and the picker's BACK -
+ * reach one call, so they cannot come to ask different questions once the
+ * confirms are asked from it.
+ */
+test('the tile, the key and the picker leave through the one way out', () => {
+    const asked = methodBody(mainSource, 'requestLeaveBuilder');
+    assert.ok(asked, 'js/main.js should define requestLeaveBuilder()');
+    assert.match(asked, /requestLeave\(this\.builder\)/, 'asking the session');
+    assert.match(asked, /if \(asked\?\.leave\) this\.leaveBuilder\(\);/, 'and leaving only on its answer');
+
+    assert.match(methodBody(mainSource, 'onPaletteClick'),
+        /if \(id === ACCEPT_TOOL\) this\.requestLeaveBuilder\(\);/, 'the accept tile asks');
+    assert.match(methodBody(mainSource, 'onBuilderKey'),
+        /if \(leavesBuilder\(this\.builder, e\.code\)\) \{\s*this\.requestLeaveBuilder\(\);/,
+        'Escape asks, by the keys the screen it is on is left by');
+    assert.match(methodBody(mainSource, 'choosePickerRow'),
+        /PICKER_LEFT\) \{\s*this\.requestLeaveBuilder\(\);/, 'and the picker\'s BACK asks');
+
+    assert.ok(!/isBuilderCloseKey/.test(mainSource),
+        'and no handler reads one list of close keys for both screens');
+});
+
+test('the palette and the control list are shown for a canvas and for nothing else', () => {
+    const sync = methodBody(mainSource, 'syncOverlays');
+    assert.match(sync, /const canvas\s*=\s*builder && buildModeDrawing\(this\.builder\);/,
+        'the overlays should know whether a canvas is open, not only whether the builder is');
+    assert.match(sync, /this\.overlays\.palette\.style\.display\s*=\s*canvas \? 'grid' : 'none';/);
+    assert.match(sync, /this\.overlays\.buildHelp\.style\.display\s*=\s*canvas \? 'block' : 'none';/);
+});
+
+test('H works the canvas\'s list before the way out reads the key', () => {
+    const keyed = methodBody(mainSource, 'onBuilderKey');
+    const help  = keyed.indexOf('applyHelpKey(this.buildHelpState');
+    const leave = keyed.indexOf('leavesBuilder(this.builder');
+
+    assert.ok(help >= 0, 'the builder should read H for its own list');
+    assert.ok(help < leave, 'ahead of the way out');
+    assert.match(keyed, /buildModeDrawing\(this\.builder\) && applyHelpKey/,
+        'and only on a canvas, where the list is');
+});

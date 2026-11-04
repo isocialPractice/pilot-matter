@@ -18,6 +18,8 @@
  * opens on without pulling in a renderer to do it.
  */
 
+import { SELECT_TOOL, isChoosableTool } from './build-tools.js';
+
 /**
  * The one name, on the menu entry and on the picker that entry opens. A pilot
  * who chooses one name should land on a screen carrying the same one.
@@ -39,19 +41,37 @@ export function isBuilderOpenKey(code) {
 }
 
 /**
- * The keys that leave the builder, which are the two every other panel here is
- * left by.
- *
- * Leaving properly is two confirms in sequence - whether to accept the pending
- * edit, then whether to save and leave - and that is the accept tool's, which
- * arrives with the tools. These are the way out in the meantime, and the way
- * out of the picker for good: a screen with no way off it is worse than one
- * whose way off it is not the final one.
+ * The keys that leave the picker, which are the two every other panel here is
+ * left by. The picker is a panel like any other, so it is closed like one.
  */
-export const BUILDER_CLOSE_KEYS = ['Escape', 'Backspace'];
+export const PICKER_CLOSE_KEYS = ['Escape', 'Backspace'];
 
-export function isBuilderCloseKey(code) {
-    return BUILDER_CLOSE_KEYS.includes(code);
+/**
+ * The key that asks to leave a canvas, which is the accept tool's key.
+ *
+ * One key rather than the picker's two. `Backspace` is kept off the canvas
+ * because deleting a placement will want it - on a Mac the key labelled delete
+ * is `Backspace` - and a key that leaves the builder in one press is the worst
+ * key there is to share with a delete.
+ */
+export const CANVAS_LEAVE_KEYS = ['Escape'];
+
+export function isPickerCloseKey(code) {
+    return PICKER_CLOSE_KEYS.includes(code);
+}
+
+export function isCanvasLeaveKey(code) {
+    return CANVAS_LEAVE_KEYS.includes(code);
+}
+
+/**
+ * True for a key that asks to leave the builder from the screen it is on: either
+ * close key off the picker, and only `Escape` off a canvas.
+ */
+export function leavesBuilder(state, code) {
+    if (buildModePicking(state)) return isPickerCloseKey(code);
+    if (buildModeDrawing(state)) return isCanvasLeaveKey(code);
+    return false;
 }
 
 /** What the way out returns to, which is whichever menu the builder was opened from. */
@@ -76,7 +96,10 @@ export function createBuildState() {
         // The canvas the session is building on, and null until the picker has
         // said which. It is the environment the ground is generated from, so a
         // session carries an id rather than a field.
-        environment: null
+        environment: null,
+        // The tool the canvas is being worked with, and null until there is a
+        // canvas to work.
+        tool: null
     };
 }
 
@@ -92,6 +115,7 @@ export function openBuildMode(state, from = BUILD_FROM_TITLE) {
     state.screen = BUILD_PICKER;
     state.from = from === BUILD_FROM_PAUSE ? BUILD_FROM_PAUSE : BUILD_FROM_TITLE;
     state.environment = null;
+    state.tool = null;
     return state;
 }
 
@@ -99,7 +123,27 @@ export function openBuildMode(state, from = BUILD_FROM_TITLE) {
 export function closeBuildMode(state) {
     state.screen = null;
     state.environment = null;
+    state.tool = null;
     return state;
+}
+
+/**
+ * Asks to leave the builder. The accept tool, `Escape` and the picker's `BACK`
+ * all come here.
+ *
+ * One function, for the reason there is one way in: three ways out are three
+ * things that can drift into asking different questions. Nothing a session
+ * could keep exists yet - no tool writes a placement - so it leaves on the
+ * spot. The two confirms, whether to accept the pending edit and then whether
+ * to save and leave, are asked from here once a session can hold work, so a
+ * key that leaves is never a key that drops work without asking.
+ *
+ * Returns what to do - `{ leave: true }` - or null for a session that is not
+ * open, which has nothing to leave.
+ */
+export function requestLeave(state) {
+    if (!buildModeShowing(state)) return null;
+    return { leave: true };
 }
 
 export function buildModeShowing(state) {
@@ -139,5 +183,29 @@ export function beginCanvas(state, environmentId) {
 
     state.screen = BUILD_CANVAS;
     state.environment = environmentId;
+    // Select is the navigation state, so a canvas opens on looking at it.
+    state.tool = SELECT_TOOL;
+    return true;
+}
+
+/** The tool the canvas is being worked with, and null while there is no canvas. */
+export function buildModeTool(state) {
+    return buildModeDrawing(state) ? state.tool : null;
+}
+
+/**
+ * Makes a tool the live one.
+ *
+ * Refused off a canvas, for a tool that is not built, and for the accept tool,
+ * which is a way out rather than a mode. Choosing the tool already live is not
+ * a change and is answered as one.
+ *
+ * Returns true when the live tool changed.
+ */
+export function chooseBuildTool(state, id) {
+    if (!buildModeDrawing(state) || !isChoosableTool(id)) return false;
+    if (state.tool === id) return false;
+
+    state.tool = id;
     return true;
 }

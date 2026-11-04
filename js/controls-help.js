@@ -6,6 +6,8 @@
  */
 
 import { DEFAULT_BINDINGS, keyLabel, UNBOUND_LABEL } from './key-bindings.js';
+import { CANVAS_LEAVE_KEYS } from './build-mode.js';
+import { PHOTO_KEY } from './photo.js';
 
 export const HELP_KEY = 'KeyH';
 
@@ -71,6 +73,35 @@ export function helpRowLines(bindings = DEFAULT_BINDINGS) {
 // swapping it for something else. The key stays at the front because saying
 // which key brings the list back is the whole reason the line is left behind.
 export const HELP_HINT = 'H - CONTROL REFERENCE';
+
+/**
+ * The builder's control list: what a canvas answers to, and nothing that is
+ * planned.
+ *
+ * Each row carries the codes its handler reads rather than a spelling of them,
+ * so the list cannot name a key the canvas does not answer to, and a key moved
+ * in the module that reads it is a row that moves with it. A binding the
+ * builder gains adds its row here in the same commit, the way a tool adds its
+ * tile to the palette.
+ *
+ * The rows hold codes and are turned into text by `buildHelpLines`, not here:
+ * `keyLabel` belongs to a module this one is in an import cycle with, and a
+ * label worked out at load would read it before it exists - the trap
+ * `js/reserved-keys.js` describes.
+ */
+export const BUILD_HELP_ROWS = Object.freeze([
+    { id: 'leave', label: 'Leave the Builder', codes: CANVAS_LEAVE_KEYS },
+    { id: 'help',  label: 'Collapse List',     codes: [HELP_KEY] },
+    { id: 'photo', label: 'Photo',             codes: [PHOTO_KEY] }
+].map(row => Object.freeze(row)));
+
+/** The builder's list, as the lines it is written on screen, in its order. */
+export function buildHelpLines() {
+    return BUILD_HELP_ROWS.map(row => ({
+        id: row.id,
+        text: `${row.codes.map(keyLabel).join('/')} - ${row.label}`
+    }));
+}
 
 export function createHelpState(expanded = true) {
     return { expanded };

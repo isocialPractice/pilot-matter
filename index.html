@@ -982,6 +982,86 @@
             margin-top: 12px;
         }
 
+        /* The builder's palette: the tools down the left of a canvas, as a
+           column of tiles two wide. It holds only the tools that work, so it
+           starts as two - Select, lit as the live tool, and the accept tool
+           across the foot of the column, which is the way out a pointer and a
+           finger can find. A tile is tall enough for a fingertip, and named in
+           text until the marks the builder ships are in the repository. */
+        #build-palette {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            grid-template-columns: repeat(2, 88px);
+            gap: 6px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(0, 255, 0, 0.4);
+            border-radius: 8px;
+            z-index: 120;
+        }
+
+        #build-palette button {
+            min-height: 44px;
+            padding: 6px 4px;
+            color: #f0f2f3;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid rgba(0, 255, 0, 0.25);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #build-palette button:hover,
+        #build-palette button:focus-visible {
+            border-color: #0f0;
+        }
+
+        /* The live tool is lit the way the entry under a menu's cursor is. */
+        #build-palette button[aria-pressed="true"] {
+            color: #000;
+            background: #0f0;
+            border-color: #0f0;
+        }
+
+        #build-palette button[data-tool="accept"] {
+            grid-column: 1 / -1;
+        }
+
+        /* The builder's control list, drawn the way the flight's is and in the
+           same corner: open when a canvas opens, collapsed to its hint line by H
+           or a click, and opened again the same way. Its rows are written from
+           js/controls-help.js, so the page leaves them empty. */
+        #build-help {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 120;
+        }
+
+        #build-help h3 {
+            margin-bottom: 8px;
+            color: #0f0;
+        }
+
+        #build-help-hint {
+            display: none;
+            color: #0f0;
+            letter-spacing: 1px;
+        }
+
         #low-altitude {
             display: none;
             position: fixed;
@@ -1447,6 +1527,16 @@
         <ul id="build-picker-cards"></ul>
         <ul id="build-picker-actions"></ul>
         <small>W/S, ↑/↓ OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO LEAVE</small>
+    </div>
+
+    <nav id="build-palette" aria-label="Builder tools"></nav>
+
+    <div id="build-help">
+        <div id="build-help-list">
+            <h3>CONTROL REFERENCE</h3>
+            <div id="build-help-rows"></div>
+        </div>
+        <div id="build-help-hint">H - CONTROL REFERENCE</div>
     </div>
 
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>
