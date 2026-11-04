@@ -3841,3 +3841,31 @@ still be found by name.
     `docs/api-reference.html` is generated from `docs/api.md`, so run
     `npm run docs:api` after editing it.
   - From: UI/UX Override - the weather clock on a slow machine
+- [x] Weather Lift 1
+  - **Issue**: the cloud deck mirrors nothing. `createCloudDeck` gives about
+    half of the 95 clouds `facing: -1` and `js/weather.js:106` spends it as
+    `sprite.scale.set(cloud.width * cloud.facing, cloud.height, 1)`, but a
+    sprite's size in Three.js r160 - the version `index.html` pins - is
+    `scale.x = length(vec3(modelMatrix[0].xyz))` in its own vertex shader, and
+    `length` discards the sign. So every cloud draws the same unmirrored
+    texture and the deck reads as one shape repeated across the sky, which is
+    the outcome `js/weather-math.js:253` says the flip is there to prevent.
+    `test/weather-math.test.js:136` pins the deck data rather than the render,
+    so the suite is green either way.
+  - **Goal**: put the mirror where a sprite can show it - a second
+    `SpriteMaterial` over a canvas drawn with `ctx.scale(-1, 1)`, picked by
+    `cloud.facing` - and carry the condition's opacity and the hour's colour to
+    both materials, since `setPrecipitation` and `updateClouds` each write to
+    one today. Settle it on a screenshot rather than on the suite: whether a
+    deck stops reading as one repeated shape is not a claim source text can
+    hold.
+  - **Settled**: built as the goal describes - two `SpriteMaterial`s over two
+    canvases, the second drawn through `ctx.scale(-1, 1)` after a translate
+    that keeps it on the canvas, picked by `cloud.facing`, with the opacity and
+    the colour written to both. Confirmed on the running page rather than in
+    the suite: the two textures are each other reversed pixel for pixel, no
+    sprite carries a negative scale any more, and a 95-cloud storm drew 38
+    clouds from one material and 57 from the other. The source-text half of the
+    claim is held by a new assertion in `test/page.test.js`, proven by mutation;
+    how the sky reads is for the GUI test this run requested.
+  - From: World & Environment

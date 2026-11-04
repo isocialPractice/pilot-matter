@@ -11,6 +11,16 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
+- [ ] **Builder pointer**: one router on the renderer's canvas, live only while
+  a canvas is open, capturing every drag at the press, keeping the wheel and the
+  context menu from the page and a finger from scrolling it, and handing the
+  pointer to the live tool
+  - From: Interactive Build Mode
+- [ ] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
+  hold, so a session opens on the frame it always has, with the wheel zooming no
+  further out than the hold, dragging orbiting and panning, the arrows and
+  `WASD` moving the target across the ground, and `Home` putting the hold back
+  - From: Interactive Build Mode
 - [ ] **A way back to the element editor**: the panel that moves an
   environment's own ranges across the whole world, reachable again now that
   `L` opens the builder
@@ -24,6 +34,52 @@ its context survives being archived.
 - [ ] **The built tile as a pattern**: a placement landing at the same canvas
   coordinate on every tile, continuous across the seams, with anything levelled
   to the ground levelled on the tile it is drawn on
+  - From: Interactive Build Mode
+
+### User Overrides
+
+#### Resolve Issues
+
+- [ ] The canvas 2: a started canvas answers nothing but two keys it never
+  names, so a pilot cannot find the way back
+  - **Issue**: chosen from either menu, a canvas started from the picker draws
+    the tile and then takes no input a pilot would try. Driven in Chromium from
+    the title screen and from the pause menu with a flight behind it: a click,
+    a left drag, the wheel and a right click leave the camera where the hold
+    put it, at `0, 12451, 8718`, and `P`, `Enter`, the arrows, `H` and `Tab`
+    change nothing. It is not a crash - 66 frames are drawn in the second after
+    `START` - and `Escape` and `Backspace` do leave, to the right menu with the
+    flight kept. But nothing on the canvas names either key: the picker's
+    `ESC TO LEAVE` goes with the picker, the flight's control list comes off
+    with the flight's chrome, and there is nothing to click. A pilot without
+    those two keys in mind has no way back, and a pilot on a touch screen has
+    none at all. No handler is on the renderer's canvas, which is the element
+    under the pointer everywhere on that screen.
+  - **This is the order the work was queued in, not a fault in the item.** The
+    canvas did what it said. Everything that gives it a surface - the camera's
+    gestures, the palette, the accept tool, the control list - was queued
+    behind footprint work that draws nothing a pilot can see.
+  - **Goal**: a canvas that can be left by the mouse, the keys and a finger,
+    and says how. One way out, `requestLeave` in `js/build-mode.js`, which the
+    picker's `BACK`, `Escape` on the canvas and an exit tile all call, and
+    which leaves on the spot while nothing can be kept. The exit tile is the
+    accept tool, at the foot of a palette column that also carries Select, lit:
+    two `<button>` tiles named in text, drawn from `paletteTools` in
+    `js/build-tools.js`, which draws only tools that work. `Backspace` comes off
+    the canvas and stays on the picker. And the builder's own control list,
+    read from `BUILD_HELP_ROWS` in `js/controls-help.js`, expanded when the
+    canvas opens and collapsed by `H` the way the flight's is, listing only
+    what works.
+  - **Done when**: from the title screen and from the pause menu, `START` and
+    then a click on the exit tile lands on the menu that opened the builder,
+    with a paused flight where it was, and so does `Escape`; `Backspace` on the
+    canvas does nothing and still leaves the picker; and the control list is on
+    screen when the canvas opens, naming every key the canvas answers to and no
+    other.
+  - **Where it lives**: the plan's "The base every tool stands on" is the
+    design, under "One way out", "A palette that holds only what works" and
+    "The screen says how". The pointer and the camera are the two items queued
+    beside this, not this item.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -93,6 +149,14 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
+- [ ] **Builder pointer**: one router on the renderer's canvas, live only while
+  a canvas is open, capturing every drag at the press, keeping the wheel and the
+  context menu from the page and a finger from scrolling it, and handing the
+  pointer to the live tool
+- [ ] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
+  hold, so a session opens on the frame it always has, with the wheel zooming no
+  further out than the hold, dragging orbiting and panning, the arrows and
+  `WASD` moving the target across the ground, and `Home` putting the hold back
 - [ ] **A way back to the element editor**: the panel that moves an
   environment's own ranges across the whole world, reachable again now that
   `L` opens the builder
@@ -118,8 +182,6 @@ the order the work unblocks itself in.
 - [ ] **Build mode state**: the twelve tools, the draft, and the rule that an
   accept always commits while a cancel always discards, as a pure module with
   its own tests
-- [ ] **Build camera**: a target, a distance, a yaw and a pitch, with the wheel
-  zooming and dragging orbiting and panning
 - [ ] **Select panel**: the camera written out as the fields the tour shows -
   camera, target, rotate, zoom, pan, field of view and move - reading back what
   a gesture just did and writing what is typed into it
@@ -147,8 +209,9 @@ the order the work unblocks itself in.
 - [ ] **Builder art in the repository**: the marks, panels and thumbnails the
   builder ships copied into `assets/builder/` from an explicit list, renamed on
   the way in, so the site and CI have every file the markup names
-- [ ] **Tool palette**: the two-column palette down the left, carrying the marks
-  from `assets/builder/` with the live tool reading as live
+- [ ] **Tool palette**: the marks from `assets/builder/` on the two-column
+  palette the base put down, replacing its text tiles, with each name moved to
+  `title` and `aria-label` and the live tool reading as live
 - [ ] **Hide the tool palette**: the palette collapsing to a chevron and coming
   back on a click, so the canvas is clear while a handle is being dragged near
   where it sits
@@ -224,6 +287,9 @@ the order the work unblocks itself in.
   editor's
 - [ ] **Drags keep the pointer**: every stroke, lasso and handle drag capturing
   the pointer at the press, so the palette and the camera never see it
+  - Built by **Builder pointer**, which captures every drag at the press, so
+    every stroke, lasso and handle drag after it inherits the capture. Check
+    this off when that item lands rather than queue it.
 - [ ] **Placed runway**: a strip inserted where it was asked for rather than
   where the site search found room, graded to the ground under it on each tile
   and lifted clear of any water, with width, length and a rotation about its
@@ -314,13 +380,12 @@ the order the work unblocks itself in.
 - [ ] **Auto accept merges**: a draft the setting commits joined to the
   placement before it when nothing about it changed, so auto accept adds a
   placement only where the pilot changed something
-- [ ] **Back where it came from**: build mode returning to the title screen or
-  to the pause menu, whichever opened it
 - [ ] **Re-seat the aircraft**: a flight resumed over ground that changed under
   it put back on top of that ground before the first frame is scored, so a
   mountain built where it was parked is not a crash on resume
-- [ ] **Build mode controls help**: the bindings written where they can be found
-  rather than learned
+- [ ] **Build mode controls help**: the builder's control list, grown by each
+  item as it added a binding, carried into the docs and the cheat sheet beside
+  the flight's and held to the code there the way the flight's is
 
 ## Documentation & Polish
 
@@ -377,36 +442,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 299 earlier items in `TODO-archive.md`, newest last.
+> 300 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Weather Lift 1
-  - **Issue**: the cloud deck mirrors nothing. `createCloudDeck` gives about
-    half of the 95 clouds `facing: -1` and `js/weather.js:106` spends it as
-    `sprite.scale.set(cloud.width * cloud.facing, cloud.height, 1)`, but a
-    sprite's size in Three.js r160 - the version `index.html` pins - is
-    `scale.x = length(vec3(modelMatrix[0].xyz))` in its own vertex shader, and
-    `length` discards the sign. So every cloud draws the same unmirrored
-    texture and the deck reads as one shape repeated across the sky, which is
-    the outcome `js/weather-math.js:253` says the flip is there to prevent.
-    `test/weather-math.test.js:136` pins the deck data rather than the render,
-    so the suite is green either way.
-  - **Goal**: put the mirror where a sprite can show it - a second
-    `SpriteMaterial` over a canvas drawn with `ctx.scale(-1, 1)`, picked by
-    `cloud.facing` - and carry the condition's opacity and the hour's colour to
-    both materials, since `setPrecipitation` and `updateClouds` each write to
-    one today. Settle it on a screenshot rather than on the suite: whether a
-    deck stops reading as one repeated shape is not a claim source text can
-    hold.
-  - **Settled**: built as the goal describes - two `SpriteMaterial`s over two
-    canvases, the second drawn through `ctx.scale(-1, 1)` after a translate
-    that keeps it on the canvas, picked by `cloud.facing`, with the opacity and
-    the colour written to both. Confirmed on the running page rather than in
-    the suite: the two textures are each other reversed pixel for pixel, no
-    sprite carries a negative scale any more, and a 95-cloud storm drew 38
-    clouds from one material and 57 from the other. The source-text half of the
-    claim is held by a new assertion in `test/page.test.js`, proven by mutation;
-    how the sky reads is for the GUI test this run requested.
-  - From: World & Environment
 - [x] **Deck Comment**: the comment on `facing` still says the deck is drawn
   from one texture and mirrored on x, which is the bug that was just removed
   - **Issue**: `createCloudDeck` in `js/weather-math.js:272` carries "Every
@@ -527,4 +564,12 @@ how the simulator got here rather than as a list still to be worked.
     getting a second reading of it. Confirmed in Chromium: choosing `RUNWAY
     LANDING` from the title screen takes the start menu from five rows to four
     with the builder's gone, and the row comes back with the mode.
+  - From: Interactive Build Mode
+- [x] **Back where it came from**: build mode returning to the title screen or
+  to the pause menu, whichever opened it
+  - Built by **Start picker** and **The canvas**, and found so on 11.04.2026
+    rather than queued: `Escape` from a canvas opened on the title screen lands
+    on the title screen with the builder's row under the cursor, and from one
+    opened on the pause menu it lands on the pause card with the flight still
+    paused where it was. Driven in Chromium.
   - From: Interactive Build Mode
