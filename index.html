@@ -934,8 +934,11 @@
         }
 
         /* A box another setting is holding on. It still reads as checked,
-           because it is - it just is not the pilot holding it there. */
-        #settings-start li.locked {
+           because it is - it just is not the pilot holding it there. A range
+           gated shut on the element editor is held the same way: listed, its
+           value kept, and not moved by a press until its gate opens. */
+        #settings-start li.locked,
+        #element-editor-menu li.locked {
             opacity: 0.6;
         }
 

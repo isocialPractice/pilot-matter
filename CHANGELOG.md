@@ -5,6 +5,56 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.40.0] - 2026-11-04
+
+One panel for every range: the element editor's row builder becomes the panel
+every tool's controls will be drawn from, grown by a choice and a gate, and
+held by a test that walks the registry.
+
+### Added
+
+- **The properties panel.** `js/properties-panel.js` is the one row builder
+  every panel of declared ranges is drawn from: what each row is labelled, what
+  it reads, what one press moves it by, what a typed figure means at it, and
+  writing an edited row back. It was the element editor's, lifted out word for
+  word, and the element editor is pointed at it rather than left beside it - it
+  draws its rows through `panelRows` and steps them through `stepRow`, and still
+  publishes every name it always did. Its behaviour did not change by a
+  character: the editor as it was and the editor as it is were driven through
+  the same session over all eleven worlds, both ways round on the runway -
+  opened, every row stepped both ways and past both ends, typed into, refused
+  and restored - and gave the same 27,831 readings.
+- **A `choice` kind**, named for the `CHOICE_FIELD` the start-state fields in
+  `js/config.js` already use, as `toggle` is named for `TOGGLE_FIELD`: one of a
+  list of strings or numbers, so a placement holding one stays JSON-shaped. It
+  resolves to a value on its list or to its default, is one row stepped along
+  the list and stopping at either end, reads as a word, and holds no figure to
+  type.
+- **A `when` gate on any range**: `{ useLength: true }`, `{ shape: ['polygon',
+  'star'] }`, or `{ 'ctx.lasso': false }` for a fact about the session a panel
+  is handed. A range gated shut is listed, drawn held - dimmed on the element
+  editor, as a locked box is on the settings panel - and moved by no press or
+  typed figure until its gate opens, and its value is kept rather than reset, so
+  turning its toggle off and on gives back what was there. No generator reads a
+  gate and `resolveConfig` keeps a gated value either way, so a gate never
+  changes the ground. No element declares one yet; the queued configurable
+  mountain ranges are the first that will.
+- **Panel conformance.** `test/properties-panel.test.js` walks every range of
+  every element in the registry, every range of the base ground, and every
+  range of every tool's element - each of the twelve tools now names the
+  element it places where the registry holds one - and holds each to drawing
+  rows that move and read as something. A range kind the panel has no rows for
+  draws none rather than falling back to a number row it does not know is
+  wrong, so a kind declared without a renderer fails the suite on the commit
+  that declares it.
+
+`docs/api.md` lists the sixth kind and the gate. Each new assertion rejected
+the defect it names when that was put back: a kind losing its renderer, an
+unknown kind falling back to a number row, a gate that never shuts, a session
+gate read off the element, a choice that goes round its ends or resolves to a
+value not on its list, a held row that still steps, a choice that takes a
+typed figure, and a stepper that reports a move it never wrote.
+
 ## [1.0.0-alpha.1.39.0] - 2026-11-04
 
 The draft a tool will make and the point it will be made at: the builder's

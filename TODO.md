@@ -11,18 +11,17 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **One properties panel**: the element editor's row builder lifted into a
-  module of its own and the editor pointed at it, so there is one panel
-  generated from declared ranges rather than one drawn per tool
+- [ ] **Tool controls panel**: the shared panel docked on the right, pointed at
+  one draft placement, with its accept and its cancel, and the split that sends
+  each value to the config or to the footprint
   - From: Interactive Build Mode
-- [ ] **Panel field kinds**: a toggle, a choice and a gate that disables a row
-  while its toggle is off, named for what `js/config.js` already calls them, so
-  the configurable features still queued are a registry edit rather than a
-  panel edit
+- [ ] **Select panel**: the camera written out as the fields the tour shows -
+  camera, target, rotate, zoom, pan, field of view and move - reading back what
+  a gesture just did and writing what is typed into it
   - From: Interactive Build Mode
-- [ ] **Panel conformance**: a test walking every tool and every range it
-  declares, so a kind with no renderer fails the suite on the commit that
-  declares it rather than drawing an empty row later
+- [ ] **A panel that scrolls**: the fields scrolling while the heading and the
+  accept and cancel stay pinned, with the wheel going to the panel under the
+  pointer and to the camera everywhere else
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -119,16 +118,6 @@ the order the work unblocks itself in.
 - [ ] **Hide the tool palette**: the palette collapsing to a chevron and coming
   back on a click, so the canvas is clear while a handle is being dragged near
   where it sits
-- [ ] **One properties panel**: the element editor's row builder lifted into a
-  module of its own and the editor pointed at it, so there is one panel
-  generated from declared ranges rather than one drawn per tool
-- [ ] **Panel field kinds**: a toggle, a choice and a gate that disables a row
-  while its toggle is off, named for what `js/config.js` already calls them, so
-  the configurable features still queued are a registry edit rather than a
-  panel edit
-- [ ] **Panel conformance**: a test walking every tool and every range it
-  declares, so a kind with no renderer fails the suite on the commit that
-  declares it rather than drawing an empty row later
 - [ ] **Tool controls panel**: the shared panel docked on the right, pointed at
   one draft placement, with its accept and its cancel, and the split that sends
   each value to the config or to the footprint
@@ -346,45 +335,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 311 earlier items in `TODO-archive.md`, newest last.
+> 314 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Builder pointer**: one router on the renderer's canvas, live only while
-  a canvas is open, capturing every drag at the press, keeping the wheel and the
-  context menu from the page and a finger from scrolling it, and handing the
-  pointer to the live tool
-  - **Settled**: `setupBuilderPointer` in `js/main.js` attaches the listeners to
-    the renderer's canvas once, and every handler returns off a canvas. A press
-    is the camera's when `cameraGesture` in `js/build-camera.js` makes one of it
-    with the live tool, and is captured; the wheel listener is registered
-    `{ passive: false }`; the context menu is kept off only while a canvas is
-    open; and `touch-action: none` is set from `syncOverlays` for a canvas and
-    taken off with it. `Escape` during a drag ends the drag before it can ask to
-    leave. Confirmed in Chromium: a drag carried over the palette stays an
-    orbit, and over a flight the wheel and the right button are the page's.
-  - From: Interactive Build Mode
-- [x] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
-  hold, so a session opens on the frame it always has, with the wheel zooming no
-  further out than the hold, dragging orbiting and panning, the arrows and
-  `WASD` moving the target across the ground, and `Home` putting the hold back
-  - **Settled**: `createBuildCamera` and the gestures over it in
-    `js/build-camera.js`, each returning new state. A session opens on the hold
-    to the unit; zoom stops at the hold and at 2% of the canvas; the pitch at 10
-    and 85 degrees; the target at the canvas's edge. Held keys move by the
-    clock's real delta at half the distance a second, and the camera is kept 40
-    units clear of the ground. `CANVAS_FAR` went from 2 to 2.5, because a target
-    panned to one corner at the hold's distance sees the opposite corner 34958
-    units away, past the 32000 the old multiple gave. The control list gained
-    the five rows, read from the same gesture table and key lists.
-  - From: Interactive Build Mode
-- [x] **A way back to the element editor**: the panel that moves an
-  environment's own ranges across the whole world, reachable again now that
-  `L` opens the builder
-  - **Settled**: decided by the user on 11.04.2026 - wait. The element editor
-    stays unreachable until **Select shows what is selected** carries it as a
-    section of Select's panel, with no interim key or row added that would have
-    to be retired. That item now says so, so it is the one that brings the
-    panel back.
-  - From: Interactive Build Mode
 - [x] **Drags keep the pointer**: every stroke, lasso and handle drag capturing
   the pointer at the press, so the palette and the camera never see it
   - Built by **Builder pointer**, which captures every drag at the press, so
@@ -457,4 +409,37 @@ how the simulator got here rather than as a list still to be worked.
     consumer is the wheel, which now zooms toward the ground under the pointer.
     Confirmed in Chromium: picks project back to the pixel they were taken at,
     and a zoom leaves the pointed-at ground on the same pixel.
+  - From: Interactive Build Mode
+- [x] **One properties panel**: the element editor's row builder lifted into a
+  module of its own and the editor pointed at it, so there is one panel
+  generated from declared ranges rather than one drawn per tool
+  - **Settled**: `js/properties-panel.js`, lifted word for word, and the
+    element editor drawing through `panelRows` and stepping through `stepRow`
+    while still publishing every name it did. Its behaviour is unchanged by a
+    character: the editor at the commit before and after were driven through
+    the same session over all eleven worlds and gave the same 27,831 readings,
+    and `test/element-editor.test.js` passes untouched.
+  - From: Interactive Build Mode
+- [x] **Panel field kinds**: a toggle, a choice and a gate that disables a row
+  while its toggle is off, named for what `js/config.js` already calls them, so
+  the configurable features still queued are a registry edit rather than a
+  panel edit
+  - **Settled**: `toggle` already existed and is `TOGGLE_FIELD`; `choice` is
+    new and is `CHOICE_FIELD`. The gate is the plan's widened form, a `when`
+    option on any range - a field and the values that open it, or `ctx.<name>`
+    for the session - drawn held and kept rather than reset. The shipped
+    `gated` kind, whose bounds stay settable while its switch is off, is left as
+    it was. `color` is left for **Free paint**, the first thing that needs it.
+  - From: Interactive Build Mode
+- [x] **Panel conformance**: a test walking every tool and every range it
+  declares, so a kind with no renderer fails the suite on the commit that
+  declares it rather than drawing an empty row later
+  - **Settled**: `test/properties-panel.test.js` walks every element, the base
+    ground and every tool's element - the twelve now name theirs where the
+    registry has one - and holds each row to moving and reading as something.
+    A kind the panel cannot draw draws no rows, so declaring one without a
+    renderer fails the walk. The plan pinned the mountain to the artwork's six
+    rows; it now draws sixteen, so the pin is that those six lead in the
+    artwork's order, and which of the other ten Build Mountains shows is
+    **Placed mountains**'s to decide.
   - From: Interactive Build Mode

@@ -3670,3 +3670,10 @@ test('the wheel zooms toward the ground under the pointer', () => {
     assert.match(wheel, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);/);
     assert.match(wheel, /zoomBuildCameraToward\(this\.buildCamera, wheelPixels\(e\.deltaY, e\.deltaMode\), point\)/);
 });
+
+// A range gated shut is held on the element editor the way a locked box is on
+// the settings panel: listed and dimmed rather than drawn as a live row.
+test('a held row on the element editor is drawn dimmed', () => {
+    assert.ok(styled(indexHtml, '#element-editor-menu li.locked', /opacity:\s*0\.6/),
+        'index.html should dim a locked row on the element editor');
+});

@@ -250,19 +250,57 @@ function tileMix(gx, gz) {
 
 // --- Configurable ranges --------------------------------------------------
 
+/**
+ * The options every range kind takes as its last argument. One so far:
+ *
+ * `when` gates the range on a field holding one of a list of values -
+ * `{ useLength: true }`, `{ shape: ['polygon', 'star'] }` - and a key written
+ * `ctx.<name>` reads a fact about the session the panel is handed rather than a
+ * field: `{ 'ctx.lasso': false }`. A panel draws a range whose gate is shut
+ * disabled and keeps its value, so opening the gate again gives back what was
+ * there rather than the default. Generation never reads a gate: what a range
+ * resolves to is the same either way.
+ *
+ * Added to a range only when given, so a range declared without one is the
+ * object it always was.
+ */
+function rangeOptions({ when } = {}) {
+    return when != null && typeof when === 'object' ? { when } : {};
+}
+
 /** A pair of bounds an element generates between, such as a peak height. */
-export function span(low, high, defaultLow, defaultHigh) {
-    return { kind: 'span', low, high, default: [defaultLow, defaultHigh] };
+export function span(low, high, defaultLow, defaultHigh, options) {
+    return { kind: 'span', low, high, default: [defaultLow, defaultHigh], ...rangeOptions(options) };
 }
 
 /** A single configurable value, such as a density or a snow line. */
-export function scalar(low, high, value) {
-    return { kind: 'scalar', low, high, default: value };
+export function scalar(low, high, value, options) {
+    return { kind: 'scalar', low, high, default: value, ...rangeOptions(options) };
 }
 
 /** A base hue given as its light and its dark end, blended across in between. */
-export function gradient(light, dark) {
-    return { kind: 'gradient', default: { light, dark } };
+export function gradient(light, dark, options) {
+    return { kind: 'gradient', default: { light, dark }, ...rangeOptions(options) };
+}
+
+/**
+ * One of a list, which is what a shape, a brush tip and a registered asset all
+ * are. Named for what `js/config.js` already calls it, `CHOICE_FIELD`, so the
+ * project is converging on one vocabulary for a field a panel offers rather
+ * than keeping two.
+ *
+ * The values are what a placement holds - strings or numbers, never objects -
+ * so a placement stays JSON-shaped: an asset is offered by its id, not by the
+ * mesh. A default not in the list is the first value.
+ */
+export function choice(values, defaultValue, options) {
+    const list = Object.freeze([...(values ?? [])]);
+    return {
+        kind: 'choice',
+        values: list,
+        default: list.includes(defaultValue) ? defaultValue : list[0],
+        ...rangeOptions(options)
+    };
 }
 
 /**
@@ -280,8 +318,8 @@ export function gradient(light, dark) {
  * any world already described: every preset written before the range existed
  * resolves to the same ground it always did.
  */
-export function gated(low, high, defaultLow, defaultHigh, on = false) {
-    return { kind: 'gated', low, high, default: { on, range: [defaultLow, defaultHigh] } };
+export function gated(low, high, defaultLow, defaultHigh, on = false, options) {
+    return { kind: 'gated', low, high, default: { on, range: [defaultLow, defaultHigh] }, ...rangeOptions(options) };
 }
 
 /**
@@ -297,8 +335,8 @@ export function gated(low, high, defaultLow, defaultHigh, on = false) {
  * Off by default, for the reason `gated` is: a mode added to an element leaves
  * every world already described exactly as it was.
  */
-export function toggle(on = false) {
-    return { kind: 'toggle', low: 0, high: 1, default: on === true };
+export function toggle(on = false, options) {
+    return { kind: 'toggle', low: 0, high: 1, default: on === true, ...rangeOptions(options) };
 }
 
 /**
@@ -348,6 +386,13 @@ function resolveRange(range, given) {
     // never named. `true` is the whole of the asking.
     if (range.kind === 'toggle') {
         return given == null ? range.default : given === true;
+    }
+
+    // A choice is one of its values or its default: a value that is not on the
+    // list is not a choice the element offers, and taking it would put the
+    // element into a state nothing declared.
+    if (range.kind === 'choice') {
+        return range.values.includes(given) ? given : range.default;
     }
 
     // A gated range is written either way round: `{ on, range }` says both

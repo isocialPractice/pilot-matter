@@ -4052,3 +4052,40 @@ still be found by name.
     units, `Backspace` leaves the canvas where it is and still leaves the
     picker, and a tap on the 44-pixel tile leaves on a 390-pixel touch screen.
   - From: Interactive Build Mode
+- [x] **Builder pointer**: one router on the renderer's canvas, live only while
+  a canvas is open, capturing every drag at the press, keeping the wheel and the
+  context menu from the page and a finger from scrolling it, and handing the
+  pointer to the live tool
+  - **Settled**: `setupBuilderPointer` in `js/main.js` attaches the listeners to
+    the renderer's canvas once, and every handler returns off a canvas. A press
+    is the camera's when `cameraGesture` in `js/build-camera.js` makes one of it
+    with the live tool, and is captured; the wheel listener is registered
+    `{ passive: false }`; the context menu is kept off only while a canvas is
+    open; and `touch-action: none` is set from `syncOverlays` for a canvas and
+    taken off with it. `Escape` during a drag ends the drag before it can ask to
+    leave. Confirmed in Chromium: a drag carried over the palette stays an
+    orbit, and over a flight the wheel and the right button are the page's.
+  - From: Interactive Build Mode
+- [x] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
+  hold, so a session opens on the frame it always has, with the wheel zooming no
+  further out than the hold, dragging orbiting and panning, the arrows and
+  `WASD` moving the target across the ground, and `Home` putting the hold back
+  - **Settled**: `createBuildCamera` and the gestures over it in
+    `js/build-camera.js`, each returning new state. A session opens on the hold
+    to the unit; zoom stops at the hold and at 2% of the canvas; the pitch at 10
+    and 85 degrees; the target at the canvas's edge. Held keys move by the
+    clock's real delta at half the distance a second, and the camera is kept 40
+    units clear of the ground. `CANVAS_FAR` went from 2 to 2.5, because a target
+    panned to one corner at the hold's distance sees the opposite corner 34958
+    units away, past the 32000 the old multiple gave. The control list gained
+    the five rows, read from the same gesture table and key lists.
+  - From: Interactive Build Mode
+- [x] **A way back to the element editor**: the panel that moves an
+  environment's own ranges across the whole world, reachable again now that
+  `L` opens the builder
+  - **Settled**: decided by the user on 11.04.2026 - wait. The element editor
+    stays unreachable until **Select shows what is selected** carries it as a
+    section of Select's panel, with no interim key or row added that would have
+    to be retired. That item now says so, so it is the one that brings the
+    panel back.
+  - From: Interactive Build Mode

@@ -29,16 +29,22 @@ export const ACCEPT_TOOL = 'accept';
  * `mindsLasso` is the tour's own column: a tool that minds it is drawn only
  * inside a live selection, and one that does not - Select, the lasso itself,
  * the runway and the way out - is the same with a selection as without one.
+ *
+ * `element` is the registry element a tool places, whose declared ranges are
+ * its panel: nothing is restated here, so a range added to the element appears
+ * on the tool's panel without this file being opened. A tool whose element is
+ * not in the registry yet - paint, extrude - names it in the commit that adds
+ * it, and the panel's conformance test holds it to the registry from then on.
  */
 export const BUILD_TOOLS = Object.freeze([
     { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false },
     { id: 'lasso',     label: 'LASSO',           hint: 'Draw a region the tools below are clipped to', mindsLasso: false },
-    { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true },
-    { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true },
-    { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true },
-    { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true },
-    { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true },
-    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false },
+    { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true,  element: 'mountain' },
+    { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true,  element: 'grass' },
+    { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand' },
+    { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water' },
+    { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow' },
+    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway' },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },

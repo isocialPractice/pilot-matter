@@ -1301,7 +1301,7 @@ is drawn on each square's own ground, so anything it works out from the ground
 is worked out where it lands. A placement without a footprint is drawn exactly
 as it always was.
 
-Every range an element declares says which of five kinds it is, which is what a
+Every range an element declares says which of six kinds it is, which is what a
 host reading `ELEMENTS` has to branch on and what a value handed to
 `resolveConfig` is read as:
 
@@ -1312,6 +1312,18 @@ host reading `ELEMENTS` has to branch on and what a value handed to
 | `gradient` | `{light, dark}` | A base hue as its two ends, each a colour triple |
 | `gated` | `{on, range}`, or a bare `[low, high]` | `{on, range}` - a pair of bounds and whether they apply |
 | `toggle` | `true` | A boolean - a mode the element is either in or not |
+| `choice` | One of the range's `values` | That value, or the range's `default` for anything not on the list |
+
+`toggle` and `choice` are named for the `TOGGLE_FIELD` and `CHOICE_FIELD` kinds
+the start-state fields in `js/config.js` already use. A `choice` lists strings
+or numbers, never objects, so a placement holding one stays JSON-shaped.
+
+Any range may also carry a `when`: `{ field: value }` or `{ field: [values] }`,
+naming another field of the same element and the values that open it, or
+`{ 'ctx.<name>': value }` for a fact a panel is handed about its session. It
+says when a panel offers the range, and nothing more - a panel draws a range
+gated shut disabled and keeps its value, and `resolveConfig` resolves and keeps
+it the same either way, so a gate never changes the ground.
 
 A `gated` range is a pair of bounds that only sometimes applies, for a footprint
 an element otherwise works out for itself. A `span` always applies, so the only

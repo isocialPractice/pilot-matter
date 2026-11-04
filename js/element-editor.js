@@ -22,10 +22,23 @@ import {
     ELEMENTS_BY_ID, getElement, orderPlacements, resolveConfig
 } from './environment/elements.js';
 import { getEnvironment, environmentElements } from './environment/presets.js';
-import { OPTION_LEFT_MARK, OPTION_RIGHT_MARK } from './settings.js';
+import {
+    rangeStep, stepPlaces, label, rowValue, rangeEntryText,
+    writeRowValue, stepRow, isTypedRow, typedRowValue, rangeNotice, panelRows
+} from './properties-panel.js';
 import {
     typedCharacter, startsTypedValue, readTypedKey, typedValueLabel
 } from './typed-value.js';
+
+// The row builder this editor was the first home of lives in
+// `js/properties-panel.js` now, so every panel that edits declared ranges is
+// drawn from one place. It is published from here as well, under the names it
+// always had, so nothing that read it off the editor has to know it moved.
+export {
+    RANGE_STEPS, rangeStep, stepPlaces, SHADE_RANGE, shadeColor,
+    GATE_RANGE, GATE_ON_LABEL, GATE_OFF_LABEL, gateOn,
+    rangeRows, label, rowValue, rowValueLabel, rangeEntryText, typedRowValue, rangeNotice
+} from './properties-panel.js';
 
 export const EDITOR_TITLE = 'ELEMENT EDITOR';
 export const EDITOR_HEADING = 'PLACED ELEMENTS';
@@ -66,149 +79,6 @@ export const ELEMENT_SHUT_MARK  = '[+]';
 // one the editor may not edit around - and a range moved until it reached the
 // strip has to read as refused rather than as quietly ignored.
 export const EDITOR_CLEARED_NOTE = 'held off the runway';
-
-/**
- * How far one press moves a range: a fiftieth of what the range allows, put on
- * the nearest of 1, 2, or 5 times a power of ten, so a peak height in the
- * hundreds moves by fifties and a ratio between nothing and one moves by
- * hundredths. Read off the declared bounds rather than configured, because a
- * step is a property of the range rather than another thing to keep in sync
- * with it.
- */
-export const RANGE_STEPS = 50;
-
-export function rangeStep(range) {
-    // A range may name its own step, for a row where a fiftieth of the bounds
-    // is the wrong press: a switch is two values and has to move between them
-    // in one, rather than crawl from off to on in fifty hundredths.
-    if (range.step > 0) return range.step;
-
-    const raw = Math.abs(range.high - range.low) / RANGE_STEPS;
-    if (!(raw > 0)) return 1;
-
-    const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
-    for (const nice of [1, 2, 5]) {
-        if (raw <= nice * magnitude) return nice * magnitude;
-    }
-    return 10 * magnitude;
-}
-
-/**
- * How many decimal places a step is written to, which is also how many the
- * value it moves is rounded back to. A hundredth walked twenty times is not a
- * fifth unless it is put back on its own scale each time, and a readout
- * carrying the arithmetic's dust is a readout nobody trusts.
- */
-export function stepPlaces(step) {
-    return Math.max(0, -Math.floor(Math.log10(Math.abs(step))));
-}
-
-function clamp(value, low, high) {
-    return Math.min(Math.max(value, low), high);
-}
-
-function moveValue(value, step, low, high) {
-    return Number(clamp(value + step, low, high).toFixed(stepPlaces(step)));
-}
-
-// --- Colour ----------------------------------------------------------------
-
-/**
- * How far either end of a gradient can be moved, as a multiple of the colour
- * the preset laid it down in.
- *
- * A colour is stepped along its own hue rather than around the wheel: the
- * arrow keys lighten and darken an end of a gradient and nothing else. Two
- * keys cannot walk a colour wheel and leave an element recognisable, and the
- * gradient helper exists precisely so no element shifts colour dramatically
- * across the ground it covers - an editor that let one do it with two presses
- * would be undoing the thing it is editing.
- */
-export const SHADE_RANGE = { kind: 'scalar', low: 0.2, high: 2, default: 1 };
-
-/** A colour lightened or darkened, kept inside what a colour channel holds. */
-export function shadeColor(color, shade) {
-    return color.map(channel => clamp(channel * shade, 0, 1));
-}
-
-// --- The switch on a gated range -------------------------------------------
-
-/**
- * The row a gated range's switch is drawn as.
- *
- * It is a range like any other so the one stepper, the one typing path and the
- * one clamp all reach it - the panel has no second kind of row, and a switch
- * that needed one would need its own key handling, its own refusal notice and
- * its own place in every test that walks the rows. What it declares instead is
- * a step of its own: without it a press would move a fiftieth of the way from
- * off to on, which is a switch nobody can work.
- */
-export const GATE_RANGE = { kind: 'scalar', low: 0, high: 1, default: 0, step: 1 };
-
-/** What the switch reads as, which is a word rather than the number behind it. */
-export const GATE_ON_LABEL  = 'ON';
-export const GATE_OFF_LABEL = 'OFF';
-
-/** True once the switch has been moved far enough to count as thrown. */
-export function gateOn(value) {
-    return Number(value) >= 0.5;
-}
-
-// --- The rows an element's ranges are drawn as -----------------------------
-
-/**
- * The rows one declared range is drawn as, and what each of them reads and
- * writes in the element's configuration.
- *
- * A span is two rows, because a span is two numbers and the pilot means to
- * move one of them. A gradient is two rows for the same reason, one per end.
- * A gated range is three: the switch, and then the two bounds it turns on.
- * Everything else is one row and one number.
- */
-export function rangeRows(name, range) {
-    if (range.kind === 'span') {
-        return [
-            { part: 'min', label: `${label(name)} MIN`, range, at: 0 },
-            { part: 'max', label: `${label(name)} MAX`, range, at: 1 }
-        ];
-    }
-
-    // The switch is listed above the bounds it governs, so a reader meets the
-    // question before the two answers to it. The bounds stay listed while it is
-    // off: a pilot setting a footprint sets the numbers and then turns it on as
-    // often as the other way round, and a pair of rows that appeared and
-    // disappeared under the cursor would move every row below them.
-    if (range.kind === 'gated') {
-        return [
-            { part: 'on',  label: label(name),           range: GATE_RANGE, gate: true },
-            { part: 'min', label: `${label(name)} MIN`,  range, gated: true, at: 0 },
-            { part: 'max', label: `${label(name)} MAX`,  range, gated: true, at: 1 }
-        ];
-    }
-
-    // A mode is the switch and nothing else, so it is the gate row without the
-    // two bounds under it. `bare` is what says the switch is the whole value
-    // rather than one half of a pair: everything else about the row - the step
-    // of 1, the word it reads as, the notice it refuses a figure with - is the
-    // gate's, because a switch is a switch whatever it is switching.
-    if (range.kind === 'toggle') {
-        return [{ part: 'on', label: label(name), range: GATE_RANGE, gate: true, bare: true }];
-    }
-
-    if (range.kind === 'gradient') {
-        return [
-            { part: 'light', label: `${label(name)} LIGHT`, range: SHADE_RANGE, shade: 'light' },
-            { part: 'dark',  label: `${label(name)} DARK`,  range: SHADE_RANGE, shade: 'dark'  }
-        ];
-    }
-
-    return [{ part: 'value', label: label(name), range }];
-}
-
-/** A range's name as the panel writes it: `treeHeight` reads as `TREE HEIGHT`. */
-export function label(name) {
-    return name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toUpperCase();
-}
 
 // --- The world being edited ------------------------------------------------
 
@@ -391,41 +261,8 @@ export function rowId(elementId, name, part) {
     return `${elementId}:${name}:${part}`;
 }
 
-/** What a range row is currently reading, in the element's configuration. */
-export function rowValue(element, name, row) {
-    if (row.shade) return element.shades[name][row.shade];
-    // Both read before `row.at`, which a gated bound carries too: a gated
-    // range holds its pair one level in, under `range`, so reading it as a span
-    // would read the `on` and the `range` as the two bounds.
-    if (row.gate) {
-        return (row.bare ? element.config[name] : element.config[name].on) ? 1 : 0;
-    }
-    if (row.gated) return element.config[name].range[row.at];
-    if (row.at != null) return element.config[name][row.at];
-    return element.config[name];
-}
-
-/**
- * What the panel writes beside a range: the reading, kept to the precision the
- * step moves it by, and a shade as the percentage of the preset's colour it is
- * being drawn at.
- */
-export function rowValueLabel(row, value) {
-    if (row.shade) return `${Math.round(value * 100)}%`;
-    if (row.gate) return gateOn(value) ? GATE_ON_LABEL : GATE_OFF_LABEL;
-    return value.toFixed(stepPlaces(rangeStep(row.range)));
-}
-
 export function elementEntryText(element) {
     return `${element.open ? ELEMENT_OPEN_MARK : ELEMENT_SHUT_MARK} ${element.label}`;
-}
-
-export function rangeEntryText(entry) {
-    // A row being typed into is not being stepped, so the marks that say it is
-    // come off while the typing is in hand - the same reading the settings
-    // panel gives a row of its own being typed into.
-    if (entry.typing) return `${entry.label}  ${entry.valueLabel}`;
-    return `${entry.label}  ${OPTION_LEFT_MARK} ${entry.valueLabel} ${OPTION_RIGHT_MARK}`;
 }
 
 /**
@@ -435,6 +272,11 @@ export function rangeEntryText(entry) {
  * Only an open element's ranges are listed. Five worlds place up to eight
  * elements declaring five ranges each, and a panel that listed all of them at
  * once would be a panel nobody could find anything in.
+ *
+ * The rows themselves are the properties panel's - `panelRows` over the ranges
+ * the element declares and the values it holds - and this decorates them with
+ * the ids, the typing and the text this menu draws. A row whose range is gated
+ * shut is listed held, which the menu draws dimmed and a press does not move.
  */
 export function editorEntries(state) {
     const entries = [];
@@ -454,29 +296,29 @@ export function editorEntries(state) {
 
         if (!element.open) continue;
 
-        for (const [name, range] of Object.entries(getElement(element.type).ranges)) {
-            for (const row of rangeRows(name, range)) {
-                const value  = rowValue(element, name, row);
-                const id     = rowId(element.id, name, row.part);
-                const typing = state.typing?.id === id ? state.typing : null;
-                const entry = {
-                    kind: RANGE_ENTRY,
-                    id,
-                    element: element.id,
-                    name,
-                    row,
-                    label: row.label,
-                    note: '',
-                    value,
-                    typing: typing != null,
-                    valueLabel: typing
-                        ? (typing.notice ?? typedValueLabel(typing.text))
-                        : rowValueLabel(row, value),
-                    current: false
-                };
-                entry.text = rangeEntryText(entry);
-                entries.push(entry);
-            }
+        for (const { name, row, value, valueLabel, live } of panelRows(getElement(element.type).ranges, element)) {
+            const id     = rowId(element.id, name, row.part);
+            const typing = state.typing?.id === id ? state.typing : null;
+            const entry = {
+                kind: RANGE_ENTRY,
+                id,
+                element: element.id,
+                name,
+                row,
+                label: row.label,
+                note: '',
+                value,
+                typing: typing != null,
+                valueLabel: typing
+                    ? (typing.notice ?? typedValueLabel(typing.text))
+                    : valueLabel,
+                current: false
+            };
+            // Only a row gated shut carries the mark, so a row with no gate is
+            // the entry it always was.
+            if (!live) entry.locked = true;
+            entry.text = rangeEntryText(entry);
+            entries.push(entry);
         }
     }
 
@@ -517,6 +359,9 @@ export function editorElement(state, id) {
  * and lowering a maximum stops at the minimum, because a range whose ends have
  * swapped is a range the generator has to guess about.
  *
+ * A row gated shut does not move: its value is held where it was until the
+ * gate opens again.
+ *
  * Returns the id of the element that changed, so the caller knows the ground
  * has to be drawn again, and null when nothing moved.
  */
@@ -524,65 +369,15 @@ export function adjustEditorRange(state, id, step) {
     if (!step) return null;
 
     const entry = editorEntry(state, id);
-    if (entry?.kind !== RANGE_ENTRY) return null;
+    if (entry?.kind !== RANGE_ENTRY || entry.locked) return null;
 
     const element = editorElement(state, entry.element);
     if (!element) return null;
 
-    const { row, name } = entry;
-    const range = row.range;
-    const moved = moveValue(rowValue(element, name, row), step * rangeStep(range), range.low, range.high);
-    if (moved === rowValue(element, name, row)) return null;
+    if (!stepRow(element, entry.name, entry.row, step)) return null;
 
-    writeRowValue(element, name, row, moved);
     syncEditorEntries(state);
     return element.id;
-}
-
-/**
- * Writes one number into the element behind the row that holds it, whichever
- * way the pilot arrived at it.
- *
- * A span cannot be crossed over itself: raising a minimum stops at the maximum
- * and lowering a maximum stops at the minimum, because a range whose ends have
- * swapped is a range the generator has to guess about. A gradient end is held as
- * the shade it is being drawn at, and the colour is worked out from the one the
- * preset laid down, so the preset stays the thing the row is measured against.
- *
- * It is one function rather than a branch in each caller because the stepper and
- * the typing both end here: a typed figure that skipped the span rule would be a
- * way of writing a crossed-over range that stepping cannot produce.
- */
-function writeRowValue(element, name, row, value) {
-    if (row.shade) {
-        element.shades[name][row.shade] = value;
-        element.config[name][row.shade] = shadeColor(element.base[name][row.shade], value);
-        return;
-    }
-
-    if (row.gate) {
-        const on = gateOn(value);
-        if (row.bare) element.config[name] = on;
-        else element.config[name].on = on;
-        return;
-    }
-
-    if (row.gated) {
-        writePair(element.config[name].range, row.at, value);
-        return;
-    }
-
-    if (row.at != null) {
-        writePair(element.config[name], row.at, value);
-        return;
-    }
-
-    element.config[name] = value;
-}
-
-/** One end of a pair of bounds, held to the other so the pair cannot cross. */
-function writePair(pair, at, value) {
-    pair[at] = at === 0 ? Math.min(value, pair[1]) : Math.max(value, pair[0]);
 }
 
 /**
@@ -651,25 +446,14 @@ export function editorPlacements(state) {
 // --- Typing a number into a row --------------------------------------------
 
 /**
- * The value a typed figure stands for, in the units the row reads in.
- *
- * Every row but a gradient end reads the number it holds, so the figure is the
- * value. A gradient end reads as the percentage of the preset's colour it is
- * being drawn at, so a pilot typing 150 at a row reading 150% means a shade of
- * 1.5 - the figure on screen is the figure they are answering.
- */
-export function typedRowValue(row, typed) {
-    if (!Number.isFinite(typed)) return null;
-    return row?.shade ? typed / 100 : typed;
-}
-
-/**
- * True for a row a figure can be typed into, which is any row holding a range.
- * An element's own row, the way back to the preset and the way out hold no
- * number, so a digit pressed at one of them means nothing.
+ * True for a row a figure can be typed into, which is any row holding a number
+ * that is live. An element's own row, the way back to the preset and the way
+ * out hold no number, a choice holds one of a list, and a row gated shut is
+ * held - so a digit pressed at any of them means nothing.
  */
 export function isTypedEditorRow(state, id) {
-    return editorEntry(state, id)?.kind === RANGE_ENTRY;
+    const entry = editorEntry(state, id);
+    return entry?.kind === RANGE_ENTRY && !entry.locked && isTypedRow(entry.row);
 }
 
 /** The row being typed into, or null while none is. */
@@ -680,17 +464,6 @@ export function typedEditorRow(state) {
 /** What has been typed into it so far, or null while nothing is being typed. */
 export function typedEditorText(state) {
     return state?.typing?.text ?? null;
-}
-
-/**
- * What the row says when a press is refused: the bounds the range was declared
- * with, written the way the row writes a value, so a gradient end is refused
- * against percentages and a height against feet.
- */
-export function rangeNotice(row) {
-    const range = row?.range;
-    if (!range) return '';
-    return `${rowValueLabel(row, range.low)} TO ${rowValueLabel(row, range.high)}`;
 }
 
 /**
