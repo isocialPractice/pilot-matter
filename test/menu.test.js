@@ -4,6 +4,7 @@ import {
     MenuList,
     PAUSE_MENU_ENTRIES,
     START_MENU_ENTRIES,
+    startMenuEntries,
     pauseMenuEntries,
     MENU_SELECT_KEYS,
     MENU_LEFT_KEYS,
@@ -84,10 +85,57 @@ test('the pause menu built for a running game mode has no builder entry', () => 
         'with nothing else taken off it');
 });
 
+/**
+ * And the title screen's entry answers to the same predicate, because the mode
+ * can be chosen before anything has flown.
+ *
+ * The start menu's own `GAME MODES` panel starts the run from the title screen,
+ * so the builder is as unreachable there as it is over a flight - which the
+ * pause menu has always answered for and this screen had not.
+ */
+test('the start menu built for a running game mode has no builder entry', () => {
+    const ready = startMenuEntries(true).map(entry => entry.id);
+    const held  = startMenuEntries(false).map(entry => entry.id);
+
+    assert.deepEqual(ready, START_MENU_ENTRIES.map(entry => entry.id),
+        'with nothing running the menu is the whole list');
+    assert.ok(!held.includes(BUILDER_ENTRY_ID), 'and with a mode chosen the entry is gone');
+    assert.deepEqual(held, ready.filter(id => id !== BUILDER_ENTRY_ID),
+        'with nothing else taken off it');
+    assert.deepEqual(held, ['start', 'modes', 'controls', 'settings'],
+        'so the flight can still be started, and the three panels still reached');
+});
+
+// Both menus drop the row for one reason, so they drop it the same way: the
+// entry, and nothing standing in for it.
+test('neither menu leaves a dead builder row behind when the builder is unreachable', () => {
+    for (const entries of [startMenuEntries(false), pauseMenuEntries(false)]) {
+        assert.ok(!entries.some(entry => entry.id === BUILDER_ENTRY_ID));
+        assert.ok(!entries.some(entry => entry.label === BUILDER_LABEL),
+            'a row carrying the label under another id would be the same dead row');
+    }
+
+    assert.equal(startMenuEntries(true), START_MENU_ENTRIES,
+        'and a reachable builder is the list itself rather than a copy of it');
+    assert.equal(pauseMenuEntries(true), PAUSE_MENU_ENTRIES);
+});
+
 test('the menu the entry comes off is still a menu the cursor can walk', () => {
     const state = createMenuState(pauseMenuEntries(false));
     moveSelection(state, -1);
     assert.equal(selectedId(state), 'settings', 'up from the top lands on the last row there is');
+});
+
+// A cursor left on the builder row when the row goes is a cursor pointing past
+// the end of the list, which walks as though the list were still its old length.
+test('a cursor on the builder row is clamped onto the list the entry came off', () => {
+    const state = createMenuState(START_MENU_ENTRIES);
+    moveSelection(state, -1);
+    assert.equal(selectedId(state), BUILDER_ENTRY_ID, 'the row the cursor is on when it goes');
+
+    setMenuEntries(state, startMenuEntries(false));
+    assert.equal(selectedId(state), 'settings', 'and it lands on the last row there is now');
+    assert.equal(moveSelection(state, 1).id, 'start', 'with the walk round the ends still closing');
 });
 
 test('the menu opens on its first entry, so resuming is one key press away', () => {
@@ -596,6 +644,40 @@ test('a list that was never handed to the mouse is not handed to it by a redraw'
     menu.rebuild(state);
     assert.equal(menu.pointed, false);
     assert.deepEqual(list.children.map(item => Object.keys(item.listeners)), [[], []]);
+});
+
+/**
+ * And a list that lost its last row, which is the shape the start menu takes
+ * while a game mode is running.
+ *
+ * The entries dropping the builder is one thing and the card drawn from them
+ * is another: a rebuild that left the old row in the page would be exactly the
+ * dead row the entry was taken off to avoid, and the entries would still read
+ * as four. So the rows are counted off the list rather than off the menu, with
+ * the cursor on the row that goes - the one case where a stale row and a
+ * cursor pointing past the end would both be in play at once.
+ */
+test('a list that lost its last row draws the rows it has now, with nothing left over', () => {
+    const list = fakeList();
+    const state = createMenuState(START_MENU_ENTRIES);
+    const menu = new MenuList(list, state);
+
+    moveSelection(state, -1);
+    assert.equal(selectedId(state), BUILDER_ENTRY_ID, 'the cursor is on the row that goes');
+
+    setMenuEntries(state, startMenuEntries(false));
+    menu.rebuild(state);
+    menu.render(state);
+
+    assert.deepEqual(list.children.map(item => item.dataset.entry),
+        ['start', 'modes', 'controls', 'settings'],
+        'the card is the four rows and no fifth row drawn dead behind them');
+    assert.ok(!list.children.some(item => item.textContent === BUILDER_LABEL),
+        'nor the label left on a row under another id');
+
+    const selected = list.children.filter(item => item.classes.has('selected'));
+    assert.equal(selected.length, 1, 'with the cursor drawn on a row that is there');
+    assert.equal(selected[0].dataset.entry, 'settings');
 });
 
 // A panel that draws one kind of row differently from another needs to know
