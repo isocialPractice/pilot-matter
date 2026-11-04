@@ -136,3 +136,34 @@ export function createFlightState(start = DEFAULT_CONFIG.start, world = {}) {
         rotation: { x: flight.pitch, y: flight.yaw, z: 0 }
     };
 }
+
+/**
+ * Whether a world just put in force is a new flight for the aircraft over it,
+ * which is the question `reset()` answers to.
+ *
+ * The three readings, in the order they settle it:
+ *
+ * - A world **restored** is the ground that was already there being laid down
+ *   again rather than different ground being chosen, so nothing changed under
+ *   the aircraft and the flight over it is still the flight. A build canvas is
+ *   the case this exists for: it takes the flight's own tiles away and puts the
+ *   same tiles back, so the rebuild it reports is honest while the conclusion
+ *   usually drawn from one is not.
+ * - A world **rebuilt** is a new flight whatever else was happening, because
+ *   the ground the aircraft was over is not there any more.
+ * - A **start** that changed on its own is the next flight's rather than this
+ *   one's, so an aircraft already in the air keeps the flight it is in and
+ *   takes the new start at its next reset. Before launch there is no flight to
+ *   interrupt, so the aircraft is put straight into it.
+ *
+ * Here rather than beside the caller because this is the whole of what went
+ * wrong when a canvas lost a paused flight: the rebuild was right and the
+ * conclusion drawn from it was not, and a conclusion is testable in Node while
+ * the renderer it is drawn in is not.
+ */
+export function startsAfresh({
+    rebuilt = false, startChanged = false, beforeLaunch = false, restored = false
+} = {}) {
+    if (restored) return false;
+    return rebuilt || (startChanged && beforeLaunch);
+}

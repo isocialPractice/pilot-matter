@@ -5,13 +5,13 @@ import { Sky }              from './sky.js';
 import { Weather }          from './weather.js';
 import { CameraController } from './camera.js';
 import { HUD }              from './hud.js';
-import { INITIAL_CAMERA_MODE, flightStart } from './flight-state.js';
+import { INITIAL_CAMERA_MODE, flightStart, startsAfresh } from './flight-state.js';
 import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from './pause.js';
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
     createMenuState, resetSelection, applyMenuKey, applyMenuPointer, isMenuKey, selectedId,
     isMenuAdjustKey, isMenuControlKey, menuAdjustStep, setMenuEntries,
-    MenuList, followPointers, pauseMenuEntries,
+    MenuList, followPointers, startMenuEntries, pauseMenuEntries,
     START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
 import {
@@ -251,10 +251,10 @@ class FlightSimulator {
         this.picker      = createPickerState();
         this.pickerState = createMenuState(pickerEntries(this.picker));
 
-        // Whether the pause menu is currently carrying the builder's entry, so
-        // the card is drawn again when that changes rather than on every frame
+        // Whether the two menus are currently carrying the builder's entry, so
+        // a card is drawn again when that changes rather than on every frame
         // something else did.
-        this.pauseBuilderReady = null;
+        this.builderEntryReady = null;
         // The list opens the way the pilot last left it, which the control
         // panel remembers beside the rest of what it holds: the H key's answer
         // is the same question the panel is already asking.
@@ -497,15 +497,17 @@ class FlightSimulator {
     /**
      * Puts the world and the start now asked for in force.
      *
-     * A world that had to be rebuilt is a new flight whatever else was
-     * happening: the ground the aircraft was over is not there any more. A
-     * start that changed on its own is the next flight's rather than this one's,
-     * so an aircraft already in the air keeps the flight it is in and takes the
-     * new start at the next reset. Before launch there is no flight to
-     * interrupt, so the aircraft is put straight into it and the world behind
-     * the panel shows what was set.
+     * Whether that is a new flight for the aircraft standing on it is
+     * `startsAfresh`, in `js/flight-state.js` with the rest of what a start
+     * means - a pure reading, so what a rebuilt world does to the flight over
+     * it can be tested without a renderer to rebuild one in.
+     *
+     * `restored` is the one thing a caller has to say that this cannot work
+     * out: whether the world going down is the same world being laid again or
+     * a different one being chosen. A rebuild looks identical either way, and
+     * only the caller knows which it asked for.
      */
-    refreshWorld() {
+    refreshWorld({ restored = false } = {}) {
         const rebuilt = this.buildWorld();
         const flight  = this.buildStart();
         const changed = !sameStart(flight, this.start);
@@ -513,7 +515,13 @@ class FlightSimulator {
         this.start = flight;
         this.aircraft.setStart(flight);
 
-        if (rebuilt || (changed && titleShowing(this.titleState))) this.aircraft.reset();
+        if (startsAfresh({
+            rebuilt,
+            startChanged: changed,
+            beforeLaunch: titleShowing(this.titleState),
+            restored
+        })) this.aircraft.reset();
+
         this.syncEngine();
         this.syncObjective();
     }
@@ -1586,7 +1594,12 @@ class FlightSimulator {
      *
      * The flight's own world comes back with it. A canvas is one tile and a
      * flight is an endless grid of them, so the ground has to be laid again
-     * rather than left as the square the builder was working on.
+     * rather than left as the square the builder was working on - and that is
+     * the same ground the pilot was already flying over, so it is restored
+     * rather than changed and the flight paused over it is kept. Before launch
+     * there is nothing to keep, and the waiting aircraft takes the start the
+     * settings panel holds, which is what it does today and is right: a canvas
+     * left from the title screen has no flight behind it.
      */
     leaveBuilder() {
         const canvas = buildModeDrawing(this.builder);
@@ -1596,7 +1609,7 @@ class FlightSimulator {
         if (canvas) {
             this.terrain.setCanvas(false);
             this.releaseCanvasView();
-            this.refreshWorld();
+            this.refreshWorld({ restored: !titleShowing(this.titleState) });
             this.flyOver(this.aircraft.getPosition());
         }
     }
@@ -2192,7 +2205,7 @@ class FlightSimulator {
         this.overlays.objective.classList.toggle('floated', pads);
 
         syncGameModeEntries(this.modesState.entries, this.run);
-        this.syncPauseMenu();
+        this.syncBuilderEntry();
 
         this.startMenu.render(this.startMenuState);
         this.pauseMenu.render(this.pauseMenuState);
@@ -2207,24 +2220,34 @@ class FlightSimulator {
     }
 
     /**
-     * Puts the builder's entry on the pause menu or takes it off, and draws the
-     * card again when that has changed.
+     * Puts the builder's entry on the start menu and the pause menu or takes it
+     * off both, and draws the cards again when that has changed.
      *
      * A row that opened nothing is the one thing a row under the cursor should
      * never do, so the entry comes off while a game mode is running rather than
      * being shown doing nothing - which is the same answer the `L` key has
      * always given, read off the same predicate.
      *
-     * Only a change rebuilds the list. The rows carry their place in the menu,
+     * Both screens, from here, rather than the pause menu alone from here and
+     * the start menu from somewhere else. A mode can be chosen from the title
+     * screen's own panel before anything has flown, and `startRun` makes the
+     * run live from that moment, so the title screen's entry goes dead at
+     * exactly the same instant the pause menu's does.
+     *
+     * Only a change rebuilds the lists. The rows carry their place in the menu,
      * so a menu that has grown or shrunk has to be built again to be walked at
-     * all, and a rebuild on every frame would be the card redrawn under the
+     * all, and a rebuild on every frame would be a card redrawn under the
      * pointer that is working it.
      */
-    syncPauseMenu() {
+    syncBuilderEntry() {
         const ready = this.builderReady();
-        if (ready === this.pauseBuilderReady) return;
+        if (ready === this.builderEntryReady) return;
 
-        this.pauseBuilderReady = ready;
+        this.builderEntryReady = ready;
+
+        setMenuEntries(this.startMenuState, startMenuEntries(ready));
+        this.startMenu.rebuild(this.startMenuState);
+
         setMenuEntries(this.pauseMenuState, pauseMenuEntries(ready));
         this.pauseMenu.rebuild(this.pauseMenuState);
     }

@@ -30,7 +30,7 @@ export const PAUSE_MENU_ENTRIES = [
 ];
 
 /**
- * The pause menu for a flight the builder can or cannot be opened from.
+ * Either menu for a flight the builder can or cannot be opened from.
  *
  * A game mode brings its own ground with it, so there is nothing there for the
  * builder to be editing - which is why the `L` key has always been ignored
@@ -41,11 +41,26 @@ export const PAUSE_MENU_ENTRIES = [
  * `ready` is the answer to the one predicate the key handler reads, handed in
  * rather than worked out again here: the menu and the key cannot disagree about
  * when the builder is reachable if there is only one reading of it.
+ *
+ * Both screens need this and not only the paused one. A mode can be chosen from
+ * the title screen's own panel before anything has flown, and the moment it is,
+ * the builder is as unreachable there as it is over a flight.
  */
+export function startMenuEntries(ready = true) {
+    return ready ? START_MENU_ENTRIES : withoutBuilder(START_MENU_ENTRIES);
+}
+
 export function pauseMenuEntries(ready = true) {
-    return ready
-        ? PAUSE_MENU_ENTRIES
-        : PAUSE_MENU_ENTRIES.filter(entry => entry.id !== BUILDER_ENTRY_ID);
+    return ready ? PAUSE_MENU_ENTRIES : withoutBuilder(PAUSE_MENU_ENTRIES);
+}
+
+/**
+ * One list without its builder entry. The filter is shared rather than written
+ * twice, so the two menus cannot come to drop different rows for the same
+ * reason.
+ */
+function withoutBuilder(entries) {
+    return entries.filter(entry => entry.id !== BUILDER_ENTRY_ID);
 }
 
 // The cursor moves on the same keys the aircraft pitches with, so a hand

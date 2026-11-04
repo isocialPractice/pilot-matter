@@ -3358,9 +3358,40 @@ test('the menu entry and the key both ask whether the builder is ready', () => {
     }
 
     assert.match(mainSource, /const ready = this\.builderReady\(\);/,
-        'and the pause menu reads it once rather than working it out a second way');
+        'and the menus read it once rather than working it out a second way');
     assert.match(mainSource, /setMenuEntries\(this\.pauseMenuState, pauseMenuEntries\(ready\)\)/,
         'building its entries from that same answer');
+});
+
+/**
+ * And both screens are held to it, from the one place.
+ *
+ * A game mode can be chosen from the title screen's own panel before anything
+ * has flown, and the run is live from that moment, so the title screen's entry
+ * goes dead at the same instant the pause menu's does. It is synced beside the
+ * pause menu rather than from a second place of its own, because two readings
+ * of one predicate are two things that can drift apart - which is the whole
+ * reason `builderReady()` exists.
+ */
+test('the title screen drops the builder entry on the same predicate the pause menu does', () => {
+    const body = mainSource.match(/syncBuilderEntry\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.ok(body, 'js/main.js should define syncBuilderEntry()');
+
+    assert.match(body[0], /setMenuEntries\(this\.startMenuState, startMenuEntries\(ready\)\)/,
+        'the start menu should be built from the same answer');
+    assert.match(body[0], /this\.startMenu\.rebuild\(this\.startMenuState\)/,
+        'and its card drawn again, because a row carries its place in the menu');
+    assert.match(body[0], /setMenuEntries\(this\.pauseMenuState, pauseMenuEntries\(ready\)\)/,
+        'beside the pause menu rather than instead of it');
+
+    assert.match(body[0], /if \(ready === this\.builderEntryReady\) return;/,
+        'and only a change should rebuild either card');
+
+    const syncs = mainSource.match(/this\.syncBuilderEntry\(\);/g) ?? [];
+    assert.equal(syncs.length, 1, 'read from the one place the overlays are synced in');
+
+    const built = mainSource.match(/startMenuEntries\(/g) ?? [];
+    assert.equal(built.length, 1, 'and the start menu built from it in one place and no other');
 });
 
 test('both menus open the builder through the one function the key opens it with', () => {
@@ -3414,4 +3445,30 @@ test('opening a canvas draws one tile of it, with no strip and the camera held o
     assert.ok(leaving, 'js/main.js should define leaveBuilder()');
     assert.match(leaving[0], /this\.terrain\.setCanvas\(false\)/, 'and leaving puts the grid back');
     assert.match(leaving[0], /this\.releaseCanvasView\(\)/, 'with the flight camera and its fog');
+});
+
+/**
+ * And the flight under the canvas comes back with its own ground.
+ *
+ * What the flight keeps is held by `startsAfresh` in `test/flight-state.test.js`,
+ * over a stand-in aircraft, because the rule is a pure reading. What cannot be
+ * held there is the wiring: a `refreshWorld` that was never told the world is
+ * being restored would read a rebuild the way the settings panel's rebuild is
+ * read, and put the aircraft back at the start of a flight nothing had ended.
+ * The sequence itself needs a renderer to lay ground in, so this is read off
+ * the source the way every other wiring check in this file is.
+ */
+test('leaving a canvas restores the flight world rather than choosing a new one', () => {
+    assert.match(mainSource, /refreshWorld\(\{ restored = false \} = \{\}\) \{/,
+        'refreshWorld should take whether the world is being laid again or changed');
+    assert.match(mainSource, /if \(startsAfresh\(\{\s*\n\s*rebuilt,\s*\n\s*startChanged: changed,/,
+        'and read what that meant for the aircraft through the one pure rule');
+    assert.match(mainSource, /\n\s*restored\s*\n\s*\}\)\) this\.aircraft\.reset\(\);/,
+        'with the restore among what it reads');
+
+    const leaving = mainSource.match(/leaveBuilder\(\)\s*\{[\s\S]*?\n    \}/);
+    assert.match(leaving[0], /this\.refreshWorld\(\{ restored: !titleShowing\(this\.titleState\) \}\)/,
+        'leaving a canvas should say the flight world is being restored');
+    assert.ok(!/this\.refreshWorld\(\);/.test(leaving[0]),
+        'and never ask for the plain refresh, which reads a restore as a world that changed');
 });

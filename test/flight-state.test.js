@@ -16,7 +16,8 @@ import {
     INITIAL_PITCH,
     INITIAL_YAW,
     createFlightState,
-    flightStart
+    flightStart,
+    startsAfresh
 } from '../js/flight-state.js';
 import {
     DEFAULT_CONFIG, startDefaults, START_TAKEOFF, TAKEOFF_THROTTLE_PERCENT
@@ -283,4 +284,110 @@ test('a flight state built from a takeoff is built where the takeoff is', () => 
     assert.equal(state.position.y, strip.elevation);
     assert.equal(isOnRunway(strip, state.position.x, state.position.z), true);
     assert.equal(state.speed, 0);
+});
+
+// --- Whether a world put in force is a new flight -------------------------
+
+/**
+ * `refreshWorld` in `js/main.js` lays the world, works out the start, and then
+ * reads what that meant for the aircraft standing on it. The renderer cannot be
+ * imported here, so this is the reading driven over a stand-in aircraft: the
+ * steps around it are stubbed and `startsAfresh` is the real one.
+ */
+function refreshWorld(aircraft, asked = {}) {
+    if (startsAfresh(asked)) aircraft.reset();
+    return aircraft;
+}
+
+/**
+ * An aircraft part way through a flight, and what a reset does to one: back to
+ * the configured start, over the middle of the world, pointing the configured
+ * way. The figures are the ones a paused flight was measured at either side of
+ * a build canvas.
+ */
+function flying() {
+    return {
+        position: { x: -85.3, y: 455.8, z: 154.3 },
+        rotation: { x: 0.0211, y: -0.665, z: 0.1043 },
+        speed:    INITIAL_SPEED * 1.4,
+        throttle: 0.82,
+        airborne: true,
+        resets:   0,
+        reset() {
+            this.position = { x: 0, y: INITIAL_ALTITUDE, z: 0 };
+            this.rotation = { x: INITIAL_PITCH, y: INITIAL_YAW, z: 0 };
+            this.speed    = INITIAL_SPEED;
+            this.throttle = INITIAL_THROTTLE;
+            this.airborne = true;
+            this.resets++;
+        }
+    };
+}
+
+test('ground that changed under a flight is a new flight, whatever else was happening', () => {
+    const aircraft = refreshWorld(flying(), { rebuilt: true });
+
+    assert.equal(aircraft.resets, 1, 'the ground it was over is not there any more');
+    assert.deepEqual(aircraft.position, { x: 0, y: INITIAL_ALTITUDE, z: 0 });
+});
+
+/**
+ * The canvas case, and the whole reason this reading is a function.
+ *
+ * A build canvas releases every tile the flight had laid and generates one of
+ * its own, so leaving it rebuilds the terrain twice over: the guard on an
+ * untouched world cannot hold, and the record the canvas wrote is not the
+ * flight's world either. Both of those are honest. What is not is calling the
+ * result a new flight - the ground going back down is the ground the pilot was
+ * already flying over.
+ */
+test('a world restored under a flight keeps the flight that was paused over it', () => {
+    const before   = flying();
+    const aircraft = refreshWorld(flying(), {
+        rebuilt: true, startChanged: true, restored: true
+    });
+
+    assert.equal(aircraft.resets, 0, 'nothing changed under the aircraft, so nothing moves it');
+    assert.deepEqual(aircraft.position, before.position, 'the flight keeps where it had got to');
+    assert.deepEqual(aircraft.rotation, before.rotation, 'and how it was pointing');
+    assert.equal(aircraft.speed, before.speed);
+    assert.equal(aircraft.throttle, before.throttle);
+    assert.equal(aircraft.airborne, before.airborne);
+});
+
+// And the other half of leaving a canvas: from the title screen there is no
+// flight to keep, so the waiting aircraft takes the start the panel holds.
+test('a world rebuilt before launch puts the waiting aircraft at its start', () => {
+    const aircraft = refreshWorld(flying(), { rebuilt: true, beforeLaunch: true });
+
+    assert.equal(aircraft.resets, 1);
+    assert.deepEqual(aircraft.position, { x: 0, y: INITIAL_ALTITUDE, z: 0 });
+});
+
+/**
+ * A start edited while a flight is up is the next flight's rather than this
+ * one's, so the aircraft keeps the flight it is in and takes the new start at
+ * its next reset. Before launch there is no flight to interrupt, so the world
+ * behind the panel shows what was set.
+ */
+test('a start that changed on its own is taken before launch and not in the air', () => {
+    assert.equal(refreshWorld(flying(), { startChanged: true, beforeLaunch: true }).resets, 1);
+    assert.equal(refreshWorld(flying(), { startChanged: true }).resets, 0,
+        'an aircraft already up keeps the flight it is in');
+});
+
+test('a world nothing happened to leaves the aircraft alone', () => {
+    assert.equal(refreshWorld(flying()).resets, 0, 'and asking for nothing at all is nothing done');
+    assert.equal(refreshWorld(flying(), { beforeLaunch: true }).resets, 0,
+        'a world laid again unchanged is not a reason to restart the waiting flight');
+});
+
+// The order the three readings settle in, which is the one thing a caller is
+// relying on when it says the world is being restored.
+test('a restore settles it before either reason to reset is read', () => {
+    assert.equal(startsAfresh({ rebuilt: true, restored: true }), false);
+    assert.equal(startsAfresh({ startChanged: true, beforeLaunch: true, restored: true }), false);
+    assert.equal(startsAfresh({
+        rebuilt: true, startChanged: true, beforeLaunch: true, restored: true
+    }), false, 'every reason there is, and a restore still answers no');
 });

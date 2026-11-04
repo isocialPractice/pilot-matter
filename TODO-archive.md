@@ -3800,3 +3800,44 @@ still be found by name.
     rather than the number. Measured again on the software renderer at the same
     7.5 frames a second: 36.3% of the world's clock before, 100.0% after.
   - From: UI/UX Override - the weather clock on a slow machine
+
+## Archived 11-04-26
+
+- [x] **Weather Guards**: the two assertions that hold the weather layer to
+  building once pass on text that is not the code they name
+  - **Issue**: both are in
+    `test('the weather is built once and drawn down to the condition in force')`
+    in `test/page.test.js`, and each is satisfied by something other than the
+    line it was written for. `/this\.rain\.count\s*=/` at line 1478 matches the
+    `this.rain.count === 0` comparison in `updateRain`, so deleting the
+    `this.rain.count = Math.min(...)` assignment in `setPrecipitation` leaves
+    the suite green - proven by renaming it to `this.rain.tally`, which keeps
+    `test/page.test.js` at 97 pass and 0 fail. `/PRECIPITATION_MOST/` at line
+    1476 matches the import and the two constructor references, so `addRain`
+    sizing itself with a literal `const count = 5200` passes as well, which is
+    the one regression the test's own comment names.
+  - **Goal**: bound each pattern to the statement it is about - an assignment
+    rather than a comparison, and the figure `addRain` actually sizes itself
+    with - and prove each by mutation before accepting it, the way the three
+    assertions beside them in the same file were proven.
+  - From: UI/UX Override - the weather clock on a slow machine
+- [x] **Bulk Three**: the bulk mode is documented as reaching all three
+  footprint ranges and reaches two of them
+  - **Issue**: `const stretch = config.girthRange.on;` at
+    `js/environment/elements.js:467` does not read `config.bulk`, so the mode
+    throws `width` and `length` and leaves `girthRange` alone. The behaviour is
+    right and `test/environment-elements.test.js` pins it, but three places say
+    otherwise: the comment at `js/environment/elements.js:444` ("reads the three
+    gated ranges as on"), `docs/api.md:1338` ("every footprint range at once"),
+    and `docs/terrain.html` ("randomizes all three at once"). A host that reads
+    the API doc and sends `{ bulk: true, girthRange: [0.2, 0.9] }` gets no girth
+    variation at all, and the doc's own example at `docs/api.md:1348` says both
+    halves of it - "The three footprint ranges randomized together" one line
+    above "`girth` is spent".
+  - **Goal**: say two rather than three wherever the count is given, and keep
+    the reason the third is untouched: under the mode `length` holds the long
+    axis, so a girth has nothing left to decide either way. `CHEATSHEET.md` and
+    `docs/cheatsheet.html` carry the same "over all three" phrasing, and
+    `docs/api-reference.html` is generated from `docs/api.md`, so run
+    `npm run docs:api` after editing it.
+  - From: UI/UX Override - the weather clock on a slow machine
