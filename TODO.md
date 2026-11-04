@@ -26,51 +26,6 @@ its context survives being archived.
   to the ground levelled on the tile it is drawn on
   - From: Interactive Build Mode
 
-### UI/UX Override - the builder's way in, and the flight under a canvas
-
-#### Resolve Issues
-
-- [ ] The canvas 1: leaving a canvas puts the paused flight back at its start
-  - **Issue**: a flight paused mid-air, taken into the builder and onto any
-    canvas, comes back to the pause card with the aircraft returned to the
-    start of the flight. Driven in Chromium with the flight paused either side
-    of the session, so nothing but the session could have moved it: the
-    aircraft went from `-85.3, 455.8, 154.3` yaw `-0.665` to `0, 423.8, 0` yaw
-    `0`, a shift of 179 units, and again from `-76.4, 449.0, 112.1` to the same
-    place on a second run. A session that opens the picker and leaves it
-    without starting a canvas is the control and loses nothing at all, so what
-    moves the aircraft is the canvas being put back rather than the builder
-    being opened. Everything else about leaving was verified correct in the
-    same run - nine tiles, the right environment, the fog, the far plane, the
-    chase camera in place on the first frame, and ground under the aircraft on
-    that frame. `leaveBuilder()` calls `refreshWorld()`, which resets the
-    aircraft whenever `buildWorld()` reports a rebuild, and restoring the
-    flight's ground after a canvas always reports one.
-  - **Goal**: Resolve to [canvas-leave-resets-the-flight.prompt.md](.claude/prompts/canvas-leave-resets-the-flight.prompt.md)
-  - From: Interactive Build Mode
-- [ ] The builder in the menus 1: the title screen keeps the builder's entry
-  while a game mode is chosen, where it opens nothing
-  - **Issue**: a game mode can be chosen from the title screen's own `GAME
-    MODES` panel before any flight has begun, and `startRun` makes
-    `isRunning(this.run)` true from that moment. The pause menu answers for
-    this and drops the row; the title screen does not. Observed on the title
-    screen with `RUNWAY LANDING` chosen: the start menu still reads `START
-    FLIGHT, GAME MODES, CONTROL SETTINGS, SETTINGS, INTERACTIVE ENVIRONMENT
-    BUILDER` while `builderReady()` reports false, and both choosing that row
-    and pressing `L` leave `builder.screen` null with no picker drawn. That is
-    the dead row the pause menu's own comment calls the one thing a row under
-    the cursor should never be.
-  - **Goal**: hold the start menu's entry to the same predicate the pause menu
-    is held to. `js/menu.js` already has `pauseMenuEntries(ready)` filtering on
-    `BUILDER_ENTRY_ID`; a matching reading of `START_MENU_ENTRIES` built the
-    same way, rebuilt from `syncPauseMenu`'s one place rather than a second
-    one, is the shape - and `setMenuEntries` already clamps a cursor left past
-    the end, which was verified holding on the pause menu. Leaving the row
-    drawn and giving it something to open is the other answer, but it is a
-    larger decision than this item: a mode brings its own ground, which is the
-    reason the builder is refused in the first place.
-  - From: Interactive Build Mode
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -422,46 +377,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 297 earlier items in `TODO-archive.md`, newest last.
+> 299 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Weather Guards**: the two assertions that hold the weather layer to
-  building once pass on text that is not the code they name
-  - **Issue**: both are in
-    `test('the weather is built once and drawn down to the condition in force')`
-    in `test/page.test.js`, and each is satisfied by something other than the
-    line it was written for. `/this\.rain\.count\s*=/` at line 1478 matches the
-    `this.rain.count === 0` comparison in `updateRain`, so deleting the
-    `this.rain.count = Math.min(...)` assignment in `setPrecipitation` leaves
-    the suite green - proven by renaming it to `this.rain.tally`, which keeps
-    `test/page.test.js` at 97 pass and 0 fail. `/PRECIPITATION_MOST/` at line
-    1476 matches the import and the two constructor references, so `addRain`
-    sizing itself with a literal `const count = 5200` passes as well, which is
-    the one regression the test's own comment names.
-  - **Goal**: bound each pattern to the statement it is about - an assignment
-    rather than a comparison, and the figure `addRain` actually sizes itself
-    with - and prove each by mutation before accepting it, the way the three
-    assertions beside them in the same file were proven.
-  - From: UI/UX Override - the weather clock on a slow machine
-- [x] **Bulk Three**: the bulk mode is documented as reaching all three
-  footprint ranges and reaches two of them
-  - **Issue**: `const stretch = config.girthRange.on;` at
-    `js/environment/elements.js:467` does not read `config.bulk`, so the mode
-    throws `width` and `length` and leaves `girthRange` alone. The behaviour is
-    right and `test/environment-elements.test.js` pins it, but three places say
-    otherwise: the comment at `js/environment/elements.js:444` ("reads the three
-    gated ranges as on"), `docs/api.md:1338` ("every footprint range at once"),
-    and `docs/terrain.html` ("randomizes all three at once"). A host that reads
-    the API doc and sends `{ bulk: true, girthRange: [0.2, 0.9] }` gets no girth
-    variation at all, and the doc's own example at `docs/api.md:1348` says both
-    halves of it - "The three footprint ranges randomized together" one line
-    above "`girth` is spent".
-  - **Goal**: say two rather than three wherever the count is given, and keep
-    the reason the third is untouched: under the mode `length` holds the long
-    axis, so a girth has nothing left to decide either way. `CHEATSHEET.md` and
-    `docs/cheatsheet.html` carry the same "over all three" phrasing, and
-    `docs/api-reference.html` is generated from `docs/api.md`, so run
-    `npm run docs:api` after editing it.
-  - From: UI/UX Override - the weather clock on a slow machine
 - [x] Weather Lift 1
   - **Issue**: the cloud deck mirrors nothing. `createCloudDeck` gives about
     half of the 95 clouds `facing: -1` and `js/weather.js:106` spends it as
@@ -547,4 +464,67 @@ how the simulator got here rather than as a list still to be worked.
 - [x] **Footprints**: a region on a placement, as the five kinds a pointer can
   draw - a disc, a ring, a stroke, a rectangle and an ellipse - in the canvas's
   own frame, with the weight function every later item reads
+  - From: Interactive Build Mode
+- [x] The canvas 1: leaving a canvas puts the paused flight back at its start
+  - **Issue**: a flight paused mid-air, taken into the builder and onto any
+    canvas, comes back to the pause card with the aircraft returned to the
+    start of the flight. Driven in Chromium with the flight paused either side
+    of the session, so nothing but the session could have moved it: the
+    aircraft went from `-85.3, 455.8, 154.3` yaw `-0.665` to `0, 423.8, 0` yaw
+    `0`, a shift of 179 units, and again from `-76.4, 449.0, 112.1` to the same
+    place on a second run. A session that opens the picker and leaves it
+    without starting a canvas is the control and loses nothing at all, so what
+    moves the aircraft is the canvas being put back rather than the builder
+    being opened. Everything else about leaving was verified correct in the
+    same run - nine tiles, the right environment, the fog, the far plane, the
+    chase camera in place on the first frame, and ground under the aircraft on
+    that frame. `leaveBuilder()` calls `refreshWorld()`, which resets the
+    aircraft whenever `buildWorld()` reports a rebuild, and restoring the
+    flight's ground after a canvas always reports one.
+  - **Goal**: Resolve to [canvas-leave-resets-the-flight.prompt.md](.claude/prompts/canvas-leave-resets-the-flight.prompt.md)
+  - **Settled**: resolved the second way the prompt offered - `refreshWorld`
+    takes `{ restored }` now, and `leaveBuilder` passes it for any flight that
+    has begun, with the seven other callers passing nothing and behaving exactly
+    as they did. The conclusion drawn from a rebuild moved out to `startsAfresh`
+    in `js/flight-state.js`, where `test/flight-state.test.js` drives it over a
+    stand-in aircraft: a restored world leaves position, rotation, speed,
+    throttle and `airborne` untouched, and a rebuilt one still restarts the
+    flight. The sequence in `leaveBuilder` itself cannot be reached without a
+    renderer to lay ground in, which the prompt asked be said rather than
+    papered over, so what it passes is read off the source in
+    `test/page.test.js` - proven against three mutations, each of which that
+    assertion rejects. Confirmed on the running page, which is where the claim
+    actually lives: the three sessions the defect was measured in now move the
+    aircraft 0 units, and with the fix taken back out the canvas session shifts
+    it 88.8 units to the start again.
+  - From: Interactive Build Mode
+- [x] The builder in the menus 1: the title screen keeps the builder's entry
+  while a game mode is chosen, where it opens nothing
+  - **Issue**: a game mode can be chosen from the title screen's own `GAME
+    MODES` panel before any flight has begun, and `startRun` makes
+    `isRunning(this.run)` true from that moment. The pause menu answers for
+    this and drops the row; the title screen does not. Observed on the title
+    screen with `RUNWAY LANDING` chosen: the start menu still reads `START
+    FLIGHT, GAME MODES, CONTROL SETTINGS, SETTINGS, INTERACTIVE ENVIRONMENT
+    BUILDER` while `builderReady()` reports false, and both choosing that row
+    and pressing `L` leave `builder.screen` null with no picker drawn. That is
+    the dead row the pause menu's own comment calls the one thing a row under
+    the cursor should never be.
+  - **Goal**: hold the start menu's entry to the same predicate the pause menu
+    is held to. `js/menu.js` already has `pauseMenuEntries(ready)` filtering on
+    `BUILDER_ENTRY_ID`; a matching reading of `START_MENU_ENTRIES` built the
+    same way, rebuilt from `syncPauseMenu`'s one place rather than a second
+    one, is the shape - and `setMenuEntries` already clamps a cursor left past
+    the end, which was verified holding on the pause menu. Leaving the row
+    drawn and giving it something to open is the other answer, but it is a
+    larger decision than this item: a mode brings its own ground, which is the
+    reason the builder is refused in the first place.
+  - **Settled**: built as the goal describes. `startMenuEntries(ready)` reads
+    `START_MENU_ENTRIES` the way `pauseMenuEntries(ready)` has always read the
+    pause menu's, over a filter the two share so they cannot come to drop
+    different rows for one reason, and both are synced from the one place that
+    already held the pause menu to `builderReady()` rather than the title screen
+    getting a second reading of it. Confirmed in Chromium: choosing `RUNWAY
+    LANDING` from the title screen takes the start menu from five rows to four
+    with the builder's gone, and the row comes back with the mode.
   - From: Interactive Build Mode

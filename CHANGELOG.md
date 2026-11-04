@@ -5,6 +5,70 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.35.0] - 2026-11-04
+
+The two things the builder's first release got wrong about the screens either
+side of it: the flight it was opened over, and the row it left on the title
+screen.
+
+### Fixed
+
+- **Leaving a canvas gives the paused flight back.** A flight paused mid-air,
+  taken into the builder and onto any canvas, came back to the pause card with
+  the aircraft at the start of the flight: measured in Chromium at 88 units in
+  one session and 179 in another, position and heading both gone. A session
+  that opened the picker and left it without starting a canvas lost nothing, so
+  it was the canvas being put back that moved the aircraft rather than the
+  builder being opened.
+
+  `refreshWorld` resets the aircraft whenever the world it laid reports a
+  rebuild, and restoring a flight's ground after a canvas always reports one -
+  the canvas had released every tile, and the record it wrote is not the
+  flight's world. Both of those are honest. What was wrong was the conclusion:
+  a rebuild means the ground under the aircraft changed, which is right when
+  the settings panel picks another world and wrong here, where the ground being
+  laid back down is the ground the pilot was already flying over.
+
+  So a caller can now say which it asked for. `refreshWorld({ restored: true })`
+  is a world being laid again rather than chosen, and leaving a canvas says so
+  for any flight that has begun. Before launch there is nothing to keep, so a
+  canvas left from the title screen still opens the waiting aircraft at the
+  start the settings panel holds. The other seven callers pass nothing and
+  behave exactly as they did.
+
+  The reading itself moved out to `startsAfresh` in `js/flight-state.js`,
+  beside the rest of what a start means: a rebuilt world, a start that changed
+  on its own, and a world restored, in the order they settle it. It is the
+  conclusion that was wrong rather than the arithmetic, and a conclusion can be
+  tested in Node while the renderer it is drawn in cannot - so
+  `test/flight-state.test.js` drives it over a stand-in aircraft and holds that
+  a restored world leaves a flight's position, rotation, speed, throttle and
+  `airborne` exactly as they were. The sequence in `leaveBuilder` needs ground
+  to lay, so what it passes is read off the source in `test/page.test.js`, the
+  way every other wiring check there is. Settled on the running page as well:
+  the three sessions the defect was measured in now move the aircraft 0 units,
+  and with the fix taken back out the canvas session shifts it 88.8 units to
+  the start again.
+
+- **The title screen drops the builder's entry when a game mode is chosen.** A
+  mode can be chosen from the title screen's own `GAME MODES` panel before
+  anything has flown, and the run is live from that moment. The pause menu
+  answered for that and dropped its row; the title screen did not, so
+  `INTERACTIVE ENVIRONMENT BUILDER` sat last on the start menu while both
+  choosing it and pressing `L` opened nothing - the dead row that menu's own
+  comment calls the one thing a row under the cursor should never be.
+
+  `startMenuEntries(ready)` now reads `START_MENU_ENTRIES` the way
+  `pauseMenuEntries(ready)` has always read the pause menu's, over a filter the
+  two share so they cannot come to drop different rows for one reason. Both are
+  synced from the one place that already held the pause menu to
+  `builderReady()`, rather than the title screen getting a second reading of a
+  predicate that exists to be read once. A cursor left on the row as it goes is
+  clamped onto the list by `setMenuEntries`, which the pause menu had already
+  proven. Confirmed in Chromium: choosing `RUNWAY LANDING` from the title
+  screen takes the start menu from five rows to four, and the entry comes back
+  with the mode.
+
 ## [1.0.0-alpha.1.34.0] - 2026-11-03
 
 The first five items of the interactive environment builder: the way in, the
