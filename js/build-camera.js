@@ -19,6 +19,7 @@
 
 import { TILE_REACH } from './world-tiles.js';
 import { SELECT_TOOL } from './build-tools.js';
+import { scalar } from './environment/elements.js';
 
 /**
  * How far the view is tilted down from the horizon, in degrees.
@@ -398,4 +399,182 @@ export function isReframeKey(code) {
 export function clearOfGround(position, groundHeight) {
     const floor = (Number(groundHeight) || 0) + CAMERA_CLEARANCE;
     return position.y < floor ? { ...position, y: floor } : position;
+}
+
+// --- The camera written out ----------------------------------------------------
+
+/**
+ * The field of view a canvas opens on, in degrees, which is the flight's own.
+ * It belongs to the renderer's camera rather than to the orbit, so it is kept
+ * beside the state rather than in it.
+ */
+export const DEFAULT_FOV = 70;
+
+/**
+ * How far the field of view may be taken, as a percentage of the default: wide
+ * enough to see round a hill, and short of where the view turns the canvas
+ * inside out at its edges.
+ */
+export const FOV_LOW  = 50;
+export const FOV_HIGH = 150;
+
+/** How high or low the point the view turns about may be taken, in units. */
+export const TARGET_LOW  = -500;
+export const TARGET_HIGH = 3000;
+
+/** How far one press of a `PAN` or `MOVE` row slides the view, as a share of the distance. */
+export const NUDGE_SHARE = 0.1;
+
+/** An angle brought into -180 to 180, so a view turned round twice reads as the way it faces. */
+export function wrapDegrees(degrees) {
+    return ((((Number(degrees) || 0) + 180) % 360) + 360) % 360 - 180;
+}
+
+/**
+ * The camera as the fields Select's panel shows - where the camera stands,
+ * the point it turns about, its two angles, its zoom and its field of view -
+ * each declared with the same helpers as any element's range, so the one panel
+ * draws them and cannot tell them from an element's.
+ *
+ * The bounds are worked out from the canvas the state was made for: the target
+ * stays over it, the camera within a framing's distance of it, the zoom between
+ * the hold and the nearest the view comes. Labels fall out of the names, which
+ * is how `CAMERA X`, `ROTATE Y` and `FIELD OF VIEW` are written.
+ */
+export function cameraFieldRanges(state) {
+    const reach = Math.max(state.reach, 0);
+    const out   = reach + state.furthest;
+    const zoomed = state.nearest > 0 ? Math.max(100, Math.round(state.furthest / state.nearest * 100)) : 100;
+
+    return {
+        cameraX:     scalar(-out, out, 0),
+        cameraY:     scalar(0, Math.max(state.furthest, CAMERA_CLEARANCE) + TARGET_HIGH, 0),
+        cameraZ:     scalar(-out, out, 0),
+        targetX:     scalar(-reach, reach, 0),
+        targetY:     scalar(TARGET_LOW, TARGET_HIGH, 0),
+        targetZ:     scalar(-reach, reach, 0),
+        rotateX:     scalar(MIN_PITCH, MAX_PITCH, CANVAS_PITCH),
+        rotateY:     scalar(-180, 180, 0),
+        zoom:        scalar(100, zoomed, 100),
+        fieldOfView: scalar(FOV_LOW, FOV_HIGH, 100)
+    };
+}
+
+/**
+ * What each of those fields reads for a state and a field of view: the camera's
+ * position as the state stands it, the target, the pitch and the yaw - the yaw
+ * brought round into -180 to 180 - the zoom as a percentage of the hold's
+ * distance, so 100 is the whole canvas and 200 is twice as close, and the field
+ * of view as a percentage of the default.
+ */
+export function readCameraFields(state, fov = DEFAULT_FOV) {
+    const { position } = buildCameraPosition(state);
+    return {
+        cameraX: position.x,
+        cameraY: position.y,
+        cameraZ: position.z,
+        targetX: state.target.x,
+        targetY: state.target.y,
+        targetZ: state.target.z,
+        rotateX: state.pitch,
+        rotateY: wrapDegrees(state.yaw),
+        zoom: state.distance > 0 ? state.furthest / state.distance * 100 : 100,
+        fieldOfView: (Number(fov) || DEFAULT_FOV) / DEFAULT_FOV * 100
+    };
+}
+
+/**
+ * Writes one field of the camera, typed or stepped, and returns the state and
+ * field of view that come of it - every value held to what the view allows, so
+ * a field can be asked for more than it can give and the readout then says
+ * where it landed.
+ *
+ * Writing where the camera stands keeps the point it turns about and works the
+ * orbit out again from the new offset: the distance, the pitch and the yaw that
+ * put the camera there. A position the clamps cannot reach lands as near to it
+ * as they allow.
+ */
+export function writeCameraField(state, fov, name, value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return { state, fov };
+
+    switch (name) {
+        case 'targetX':  return { state: withTarget(state, number, state.target.z), fov };
+        case 'targetZ':  return { state: withTarget(state, state.target.x, number), fov };
+        case 'targetY':  return { state: { ...state, target: { ...state.target, y: clamp(number, TARGET_LOW, TARGET_HIGH) } }, fov };
+        case 'rotateX':  return { state: { ...state, pitch: clamp(number, MIN_PITCH, MAX_PITCH) }, fov };
+        case 'rotateY':  return { state: { ...state, yaw: wrapDegrees(number) }, fov };
+        case 'zoom': {
+            const share = number > 0 ? 100 / number : 1;
+            return { state: { ...state, distance: clamp(state.furthest * share, state.nearest, state.furthest) }, fov };
+        }
+        case 'fieldOfView':
+            return { state, fov: clamp(number, FOV_LOW, FOV_HIGH) / 100 * DEFAULT_FOV };
+        case 'cameraX':
+        case 'cameraY':
+        case 'cameraZ':
+            return { state: standCameraAt(state, name.slice(-1).toLowerCase(), number), fov };
+        default:
+            return { state, fov };
+    }
+}
+
+/** The orbit that stands the camera with one axis moved, about the same target. */
+function standCameraAt(state, axis, value) {
+    const { position, target } = buildCameraPosition(state);
+    const at = { ...position, [axis]: value };
+    const dx = at.x - target.x, dy = at.y - target.y, dz = at.z - target.z;
+    const flat = Math.hypot(dx, dz);
+    const distance = Math.hypot(dx, dy, dz);
+    if (!(distance > 0)) return state;
+
+    return {
+        ...state,
+        distance: clamp(distance, state.nearest, state.furthest),
+        pitch: clamp(Math.atan2(dy, flat) / RADIANS, MIN_PITCH, MAX_PITCH),
+        yaw: flat > 0 ? wrapDegrees(Math.atan2(dx, dz) / RADIANS) : state.yaw
+    };
+}
+
+/**
+ * The rows of Select's panel that slide the view rather than hold a value: a
+ * press either way moves it by a share of what is in frame. `PAN` slides it the
+ * way a drag does, across the screen and up it; `MOVE` walks it across the
+ * ground the way the keys do.
+ */
+export const CAMERA_NUDGES = Object.freeze([
+    Object.freeze({ id: 'panX',        label: 'PAN X' }),
+    Object.freeze({ id: 'panY',        label: 'PAN Y' }),
+    Object.freeze({ id: 'moveForward', label: 'MOVE FORWARD' }),
+    Object.freeze({ id: 'moveRight',   label: 'MOVE RIGHT' })
+]);
+
+/** Slides the view one press of a nudge row, `sign` being -1 or 1. */
+export function nudgeBuildCamera(state, id, sign = 1, { viewHeight = 800, fov = DEFAULT_FOV } = {}) {
+    const way = Math.sign(Number(sign) || 0);
+    if (way === 0) return state;
+
+    // A pan of a tenth of the screen, the way a drag that far would slide it.
+    const pixels = viewHeight * NUDGE_SHARE * way;
+
+    switch (id) {
+        case 'panX':        return panBuildCamera(state, -pixels, 0, { viewHeight, fov });
+        case 'panY':        return panBuildCamera(state, 0, pixels, { viewHeight, fov });
+        case 'moveForward': return walkBuildCamera(state, way, 0);
+        case 'moveRight':   return walkBuildCamera(state, 0, way);
+        default:            return state;
+    }
+}
+
+/**
+ * A tenth of the distance across the ground, the way the view faces. Written
+ * out rather than handed to `moveBuildCamera`, which holds a frame's step short
+ * of what a press is meant to move.
+ */
+function walkBuildCamera(state, forward, right) {
+    const step = state.distance * NUDGE_SHARE;
+    const { ahead, right: across } = groundAxes(state.yaw);
+    return withTarget(state,
+        state.target.x + (ahead.x * forward + across.x * right) * step,
+        state.target.z + (ahead.z * forward + across.z * right) * step);
 }

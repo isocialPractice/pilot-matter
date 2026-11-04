@@ -239,6 +239,10 @@ menu opened the builder; `Backspace` leaves the picker but not a canvas.
 | `Esc` | End a drag being made, or leave the builder |
 | `H` | Collapse the control list, and open it again |
 
+Down the right is the dock: `SELECTION MODE`, the camera written out as
+fields to read and type into, or the edit in hand with `ACCEPT` and `CANCEL`
+under it. Only its fields scroll, and the wheel over it scrolls them.
+
 ## Element editor
 
 The world being flown as the elements it was assembled from. Enter opens an

@@ -18,6 +18,7 @@ import {
     createBuildState, openBuildMode, closeBuildMode, buildModeShowing,
     buildModePicking, buildModeDrawing, buildModeFrom, beginCanvas,
     buildModeTool, chooseBuildTool, requestLeave, leavesBuilder, isCanvasLeaveKey,
+    buildModeEnvironment, draftPending, buildDraft, reviseDraft, acceptDraft, cancelDraft,
     isBuilderOpenKey, BUILDER_ENTRY_ID,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
@@ -30,8 +31,16 @@ import {
     canvasFarPlane, CANVAS_FOG, createBuildCamera, buildCameraPosition,
     orbitBuildCamera, panBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera,
     cameraGesture, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
-    CAMERA_ORBIT
+    writeCameraField, nudgeBuildCamera, CAMERA_ORBIT, DEFAULT_FOV
 } from './build-camera.js';
+import {
+    dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_ACCEPT, DOCK_CANCEL
+} from './build-panel.js';
+import { PanelView } from './panel-view.js';
+import {
+    stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces
+} from './properties-panel.js';
+import { getEnvironment } from './environment/presets.js';
 import { pickGround, canvasPickBounds, pickStep, pointerDevice } from './build-picking.js';
 import {
     createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines, buildHelpLines
@@ -278,6 +287,12 @@ class FlightSimulator {
         this.canvasGround = null;
         this.pointerRay   = new THREE.Raycaster();
 
+        // What the dock last drew, which a press on it is read against, and
+        // the holder an edit in hand is stepped through - its configuration,
+        // and its gradients held as shades of the colours the edit began with.
+        this.dockShown   = null;
+        this.draftHolder = null;
+
         // Whether the two menus are currently carrying the builder's entry, so
         // a card is drawn again when that changes rather than on every frame
         // something else did.
@@ -300,6 +315,11 @@ class FlightSimulator {
         // tablet with a keyboard can now ask for tilt and a phone can ask to be
         // left alone. `syncTilt` is what carries a change of mind to the sensor.
         this.touchOnly  = isTouchOnly();
+
+        // The canvas's control list names keys, and a machine with no keyboard
+        // has none of them, so there it starts collapsed to its hint line rather
+        // than covering the ground a finger is working.
+        if (this.touchOnly) this.buildHelpState.expanded = false;
         this.tilt       = createTiltState(tiltWanted(this.controlSettings, this.touchOnly));
         this.tiltSensor = new TiltSensor(this.tilt);
 
@@ -367,7 +387,8 @@ class FlightSimulator {
             buildHelp:     document.getElementById('build-help'),
             buildHelpList: document.getElementById('build-help-list'),
             buildHelpHint: document.getElementById('build-help-hint'),
-            buildHelpRows: document.getElementById('build-help-rows')
+            buildHelpRows: document.getElementById('build-help-rows'),
+            dock:          document.getElementById('build-dock')
         };
 
         // The pads write the same input state the keys do, which is what lets
@@ -489,6 +510,15 @@ class FlightSimulator {
         this.drawBuildHelp();
         this.overlays.buildHelp.addEventListener('click', () => this.onBuildHelpClick());
         this.setupBuilderPointer();
+
+        // The dock is drawn by the one panel view, and tells this what was done
+        // to it: a row stepped or typed into, the view slid, an edit settled.
+        this.dockView = new PanelView(this.overlays.dock, {
+            onStep:   (entry, step) => this.onDockStep(entry, step),
+            onType:   (entry, figure, field) => this.onDockType(entry, figure, field),
+            onNudge:  (id, sign) => this.onDockNudge(id, sign),
+            onAction: (id) => this.onDockAction(id)
+        });
 
         this.setupKeys();
         this.applySettings();
@@ -853,6 +883,17 @@ class FlightSimulator {
         // keys it works with - the same keys that fly the aircraft - and leaves
         // the rest to be read as they always were.
         window.addEventListener('keydown', (e) => {
+            // A figure being typed into the dock is the field's: none of the
+            // builder's keys - the moves, H, Escape leaving - and none of the
+            // aircraft's reach anything while it has the focus, and the field's
+            // own keys go on doing what a field does. Escape gives the focus
+            // back, which is the innermost thing it can step out of.
+            if (this.editingDockField(e)) {
+                if (e.code === 'Escape') e.target.blur();
+                e.stopPropagation();
+                return;
+            }
+
             // A key held with a modifier is a browser shortcut rather than a
             // menu key, and is left to the browser
             if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -1747,6 +1788,8 @@ class FlightSimulator {
      * and they are there to be seen.
      */
     holdCanvasView() {
+        this.flightFov = this.camera.fov;
+        this.camera.fov = DEFAULT_FOV;
         this.camera.far = canvasFarPlane(this.terrain.size);
         this.camera.updateProjectionMatrix();
         this.sky.setFogDensity(CANVAS_FOG);
@@ -1754,6 +1797,7 @@ class FlightSimulator {
 
     /** Puts both back as the flight had them, which is what leaving restores. */
     releaseCanvasView() {
+        this.camera.fov = this.flightFov ?? DEFAULT_FOV;
         this.camera.far = TILE_REACH;
         this.camera.updateProjectionMatrix();
         this.sky.setFogDensity(currentOption(this.settings, FOG_OPTION));
@@ -1776,6 +1820,9 @@ class FlightSimulator {
         if (!this.buildCamera) this.buildCamera = createBuildCamera(this.terrain.size);
         this.buildCamera = moveBuildCamera(this.buildCamera, moveIntent(this.buildKeys), elapsed);
         this.placeCanvasCamera();
+
+        // Select's panel reads back whatever a gesture just did to the view.
+        this.syncDock();
     }
 
     /** Stands the renderer's camera where the build camera's state says, clear of the ground. */
@@ -1873,6 +1920,137 @@ class FlightSimulator {
         e.preventDefault();
         const point = this.pickCanvasPoint(e.clientX, e.clientY);
         this.buildCamera = zoomBuildCameraToward(this.buildCamera, wheelPixels(e.deltaY, e.deltaMode), point);
+    }
+
+    // --- The dock ----------------------------------------------------------
+
+    /** True while a key is being typed into one of the dock's fields. */
+    editingDockField(e) {
+        return e.target instanceof HTMLInputElement && this.overlays.dock.contains(e.target);
+    }
+
+    /**
+     * Draws the dock for the session as it stands: the edit in hand with its
+     * accept and cancel, or the live tool's panel, or nothing off a canvas.
+     */
+    syncDock(canvas = null) {
+        const showing = canvas ?? buildModeDrawing(this.builder);
+        this.dockShown = showing
+            ? dockContent(this.builder, {
+                camera: this.buildCamera,
+                fov: this.camera.fov,
+                holder: this.currentDraftHolder()
+            })
+            : null;
+        this.dockView.render(this.dockShown);
+    }
+
+    /**
+     * The holder the edit in hand is stepped through, made when the edit is
+     * begun and let go when it is settled - so a gradient's shades are measured
+     * against the colours it had when the edit began, however far it is moved.
+     */
+    currentDraftHolder() {
+        if (!draftPending(this.builder)) {
+            this.draftHolder = null;
+            return null;
+        }
+        if (this.draftHolder?.draft !== this.builder.draft) {
+            this.draftHolder = { draft: this.builder.draft, ...draftHolderFor(buildDraft(this.builder)) };
+        }
+        return this.draftHolder;
+    }
+
+    /** A row of the dock stepped: one press along what its range allows. */
+    onDockStep(entry, step) {
+        const shown = this.dockShown;
+        if (!shown || !stepRow(shown.holder, entry.name, entry.row, step)) return;
+        this.applyDockValue(entry.name);
+    }
+
+    /**
+     * A figure typed into a row of the dock: taken when it is inside what the
+     * range allows, and refused with the bounds otherwise, the field keeping
+     * what was typed so it can be put right.
+     */
+    onDockType(entry, figure, field) {
+        const shown = this.dockShown;
+        if (!shown) return;
+
+        const value = typedRowValue(entry.row, figure);
+        const range = entry.row.range;
+        if (value == null || value < range.low || value > range.high) {
+            field.setCustomValidity(rangeNotice(entry.row));
+            field.reportValidity();
+            return;
+        }
+
+        field.setCustomValidity('');
+        writeRowValue(shown.holder, entry.name, entry.row, Number(value.toFixed(stepPlaces(rangeStep(range)))));
+        field.blur();
+        this.applyDockValue(entry.name);
+    }
+
+    /**
+     * Carries a value the dock's holder now holds to what it stands for: the
+     * camera for Select's panel, the edit in hand - and the ground drawn from
+     * it - for an edit's.
+     */
+    applyDockValue(name) {
+        const shown = this.dockShown;
+
+        if (shown.kind === DOCK_SELECT) {
+            const { state, fov } = writeCameraField(this.buildCamera, this.camera.fov, name, shown.holder.config[name]);
+            this.buildCamera = state;
+            if (fov !== this.camera.fov) {
+                this.camera.fov = fov;
+                this.camera.updateProjectionMatrix();
+            }
+        } else if (shown.kind === DOCK_DRAFT) {
+            reviseDraft(this.builder, { config: shown.holder.config });
+            this.redrawCanvas();
+        }
+
+        this.syncDock();
+    }
+
+    /** A `PAN` or `MOVE` row pressed: the view slid one press's worth. */
+    onDockNudge(id, sign) {
+        if (!this.buildCamera) return;
+        this.buildCamera = nudgeBuildCamera(this.buildCamera, id, sign, {
+            viewHeight: this.renderer.domElement.clientHeight,
+            fov: this.camera.fov
+        });
+        this.syncDock();
+    }
+
+    /**
+     * The edit in hand settled: accepted, which always commits it, or
+     * cancelled, which always drops it - and the ground drawn again from what
+     * is kept.
+     */
+    onDockAction(id) {
+        if (id === DOCK_ACCEPT.id) acceptDraft(this.builder);
+        else if (id === DOCK_CANCEL.id) cancelDraft(this.builder);
+        else return;
+
+        this.draftHolder = null;
+        this.redrawCanvas();
+        this.syncOverlays();
+    }
+
+    /**
+     * Draws the canvas again from the environment's own placements and what
+     * has been built on it, the edit in hand shown where it stands. The same
+     * door a preset goes through: the built world is a description like any
+     * other.
+     */
+    redrawCanvas() {
+        const id = buildModeEnvironment(this.builder);
+        if (!id) return;
+
+        this.terrain.setEnvironment(id, { runway: false, elements: canvasElements(getEnvironment(id), this.builder) });
+        this.canvasGround = this.readCanvasGround();
     }
 
     onBuilderKey(e) {
@@ -2494,6 +2672,7 @@ class FlightSimulator {
         this.overlays.buildHelp.style.display = canvas ? 'block' : 'none';
         this.overlays.buildHelpList.style.display = this.buildHelpState.expanded ? 'block' : 'none';
         this.overlays.buildHelpHint.style.display = this.buildHelpState.expanded ? 'none' : 'block';
+        this.syncDock(canvas);
 
         // The live tool is lit, and said to be pressed, so the palette reads as
         // which tool the canvas is being worked with. The accept tool is a way

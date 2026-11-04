@@ -5,6 +5,82 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.41.0] - 2026-11-04
+
+The panel on the canvas: a dock down the right of the builder, drawn by one
+renderer, showing Select's camera written out or the edit in hand with its
+accept and cancel - its fields scrolling under a pinned heading, and the ground
+moving as a value on it moves.
+
+### Added
+
+- **The dock.** `js/build-panel.js` says what the panel down the right of a
+  canvas shows, and `js/panel-view.js` is the one renderer it is drawn with -
+  rows from the properties panel, the rows that slide the view, and the answers
+  that settle an edit, with a press, a typed figure or an answer reported back.
+  The rows are built when what the dock shows changes shape and only their
+  readings are written on the frames between, so a field being typed into keeps
+  its focus while the camera moves under it. A figure outside what a row allows
+  is refused, the field saying what the bounds are.
+- **Select's panel.** With Select live the dock is headed `SELECTION MODE` and
+  is the camera written out, as the start tour shows it: `CAMERA`, `TARGET` and
+  `ROTATE` on each axis, `ZOOM` as a percentage of the view that frames the whole
+  canvas, `FIELD OF VIEW` as a percentage of the flight's, and `PAN X`, `PAN Y`,
+  `MOVE FORWARD` and `MOVE RIGHT`, which slide the view a tenth at a press. The
+  fields are declared with the same helpers as any element's ranges -
+  `cameraFieldRanges`, `readCameraFields` and `writeCameraField` in
+  `js/build-camera.js` - so the one panel draws them. They read back whatever a
+  gesture just did, and a value typed is the camera moved there, held to what
+  the view allows; writing where the camera stands keeps the point it turns
+  about and works the orbit out again. The field of view belongs to the
+  renderer's camera rather than the orbit, and leaving the builder gives the
+  flight its own back.
+- **The tool controls panel.** With an edit in hand the dock is that edit,
+  headed as its tool's panel in the artwork's words - `BUILD MOUNTAINS`,
+  `BUILD WATER`, `INSERT RUNWAY` - with `ACCEPT` and `CANCEL` pinned under it. A
+  value moved on it revises the edit and draws the canvas again from the
+  environment's own placements and what has been built, the edit shown where it
+  stands, so the ground moves with the panel; `ACCEPT` commits the edit and
+  `CANCEL` drops it. `toolPlacement` in `js/build-tools.js` is the one split from
+  a panel's values to a placement: the values a tool lists in `shapes` go to the
+  footprint it drew, everything else to the element's configuration. No tool
+  begins an edit yet; the first that does arrives with Build Mountains.
+- **A panel that scrolls.** Only the dock's fields scroll, between a heading
+  and answers that stay put, so a long edit's `ACCEPT` is never below the fold.
+  The fields keep the wheel to themselves while it is over them and the canvas
+  has it everywhere else: the canvas's own listener never sees a wheel over the
+  dock, so scrolling the panel never zooms the camera as well. On a narrow
+  screen the dock runs across the foot of the canvas and the control list
+  moves up under the palette to clear it, and on a machine with no keyboard the
+  list starts collapsed, naming as it does keys that machine does not have.
+
+### Changed
+
+- **A key typed into one of the dock's fields is the field's.** It is read
+  ahead of everything else: the moves, `H` and `Esc` leaving do not reach the
+  builder while a field has the focus, nor do any keys reach the aircraft, and
+  `Esc` gives the focus back.
+
+Held in Node by the new `test/build-panel.test.js` - what the dock shows off a
+canvas, with Select live and with an edit in hand, the fields reading back a
+gesture and moving the camera when written, the camera stood where it was asked
+with its target kept, the slides a tenth at a press at any yaw, the split, and
+the artwork's headings - and by `test/page.test.js` for the markup and the
+wiring. Each rejected the defect it names when that was put back: writing
+where the camera stands moving nothing, the zoom read the wrong way up, the
+field of view unbounded, a slide short of a tenth, the camera shown over an
+edit in hand, the canvas drawn without what was built on it, shape values
+sent to the config, a typed key reaching the builder, a value moved on an edit
+leaving the ground as it was, the fields not scrolling, and leaving keeping the
+canvas's field of view. Settled in Chromium in 34 checks across a desktop, a
+short window and a phone - an orbit read back on `ROTATE Y`, `TARGET X` typed
+and taken, `ROTATE X` typed out of range and refused with its bounds, `W` held
+in a field moving nothing, a drawn water level of 600 typed down to 300 and
+stepped to 320 with the ground following each, `CANCEL` putting the ground back,
+`ACCEPT` keeping it, the wheel scrolling the dock's fields in a short window
+while the camera stayed where it was, and the dock across the foot of a phone
+clear of the palette and the list.
+
 ## [1.0.0-alpha.1.40.0] - 2026-11-04
 
 One panel for every range: the element editor's row builder becomes the panel

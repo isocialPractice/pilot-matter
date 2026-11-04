@@ -1065,6 +1065,136 @@
             letter-spacing: 1px;
         }
 
+        /* The dock: the one panel, down the right of a canvas, pointed at the
+           edit in hand or at the live tool. Its heading and its answers are
+           pinned and only the fields between them scroll, so a long panel never
+           pushes the accept and the cancel below the fold. The fields keep the
+           wheel to themselves while it is over them, and the canvas has it
+           everywhere else - the canvas's own listener never sees a wheel over
+           the dock, so a panel scrolled is never the camera zoomed as well. */
+        #build-dock {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            max-height: calc(100vh - 40px);
+            flex-direction: column;
+            color: #f0f2f3;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(0, 255, 0, 0.4);
+            border-radius: 8px;
+            z-index: 120;
+        }
+
+        #build-dock h3 {
+            flex: none;
+            padding: 10px 12px 6px;
+            color: #0f0;
+            font-size: 13px;
+            letter-spacing: 2px;
+        }
+
+        #build-dock-fields {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 0 12px 8px;
+        }
+
+        #build-dock-actions {
+            flex: none;
+            display: none;
+            gap: 6px;
+            padding: 8px 12px 10px;
+            border-top: 1px solid rgba(0, 255, 0, 0.25);
+        }
+
+        .dock-row {
+            display: grid;
+            grid-template-columns: 1fr 24px 84px 24px;
+            align-items: center;
+            gap: 4px;
+            margin: 3px 0;
+        }
+
+        .dock-row.locked {
+            opacity: 0.6;
+        }
+
+        .dock-step,
+        .dock-action {
+            min-height: 24px;
+            color: #f0f2f3;
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid rgba(0, 255, 0, 0.25);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .dock-step:hover:not(:disabled),
+        .dock-action:hover {
+            border-color: #0f0;
+        }
+
+        .dock-value {
+            width: 100%;
+            padding: 2px 4px;
+            color: #f0f2f3;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            text-align: right;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 0, 0.25);
+            border-radius: 3px;
+        }
+
+        span.dock-value {
+            border-color: transparent;
+            background: none;
+        }
+
+        .dock-action {
+            flex: 1;
+            min-height: 36px;
+            font-size: 12px;
+            letter-spacing: 2px;
+        }
+
+        .dock-action[data-action="accept"] {
+            color: #000;
+            background: #0f0;
+            border-color: #0f0;
+        }
+
+        .dock-action[data-action="cancel"] {
+            border-color: rgba(255, 176, 0, 0.6);
+        }
+
+        /* On a narrow screen there is no room down the side of the canvas, so
+           the dock runs across the foot of it, and the control list moves up
+           under the palette to clear it. */
+        @media (max-width: 640px) {
+            #build-dock {
+                top: auto;
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                width: auto;
+                max-height: 40vh;
+            }
+
+            #build-help {
+                bottom: auto;
+                top: 150px;
+            }
+        }
+
         #low-altitude {
             display: none;
             position: fixed;
@@ -1533,6 +1663,12 @@
     </div>
 
     <nav id="build-palette" aria-label="Builder tools"></nav>
+
+    <aside id="build-dock" aria-label="Tool controls">
+        <h3 data-dock="heading"></h3>
+        <div id="build-dock-fields" data-dock="fields"></div>
+        <div id="build-dock-actions" data-dock="actions"></div>
+    </aside>
 
     <div id="build-help">
         <div id="build-help-list">

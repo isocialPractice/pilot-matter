@@ -35,16 +35,20 @@ export const ACCEPT_TOOL = 'accept';
  * on the tool's panel without this file being opened. A tool whose element is
  * not in the registry yet - paint, extrude - names it in the commit that adds
  * it, and the panel's conformance test holds it to the registry from then on.
+ *
+ * `heading` is what the tool's panel is headed, in the artwork's own words -
+ * `SELECTION MODE`, `BUILD MOUNTAINS`, `INSERT RUNWAY` - where the artwork has
+ * drawn one.
  */
 export const BUILD_TOOLS = Object.freeze([
-    { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false },
+    { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false, heading: 'SELECTION MODE' },
     { id: 'lasso',     label: 'LASSO',           hint: 'Draw a region the tools below are clipped to', mindsLasso: false },
-    { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true,  element: 'mountain' },
-    { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true,  element: 'grass' },
-    { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand' },
-    { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water' },
-    { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow' },
-    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway' },
+    { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true,  element: 'mountain', heading: 'BUILD MOUNTAINS' },
+    { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true,  element: 'grass', heading: 'BUILD GRASS' },
+    { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand', heading: 'BUILD SAND' },
+    { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER' },
+    { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW' },
+    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY' },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },
@@ -90,4 +94,34 @@ export function isChoosableTool(id, built = BUILT_TOOLS) {
  */
 export function paletteTools(built = BUILT_TOOLS) {
     return BUILD_TOOLS.filter(tool => built.includes(tool.id));
+}
+
+/** The tool that places an element, or null for an element no tool places yet. */
+export function toolForElement(type) {
+    return BUILD_TOOLS.find(tool => tool.element != null && tool.element === type) ?? null;
+}
+
+/**
+ * The placement a tool makes from what its panel is holding.
+ *
+ * The one place a panel's values become a build argument. The panel collects,
+ * this splits, and the generator the registry already has draws - so a tool
+ * that renders no panel of its own also builds down no path of its own, and an
+ * edit that fails to register fails in one place for every tool.
+ *
+ * A tool lists in `shapes` the values that describe what its pointer drew - a
+ * stamp's width, a brush's tip - and those go to the footprint, laid over what
+ * was drawn. Everything else is the element's configuration.
+ */
+export function toolPlacement(tool, values = {}, drawn = null) {
+    const config = {};
+    const shape  = {};
+
+    for (const [name, value] of Object.entries(values ?? {})) {
+        (tool?.shapes?.includes(name) ? shape : config)[name] = value;
+    }
+
+    const placement = { type: tool?.element, config };
+    if (drawn != null || Object.keys(shape).length > 0) placement.footprint = { ...(drawn ?? {}), ...shape };
+    return placement;
 }

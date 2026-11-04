@@ -11,17 +11,18 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Tool controls panel**: the shared panel docked on the right, pointed at
-  one draft placement, with its accept and its cancel, and the split that sends
-  each value to the config or to the footprint
+- [ ] **Placed mountains**: a mountain dropped at a click, each one placement,
+  each edited alone
   - From: Interactive Build Mode
-- [ ] **Select panel**: the camera written out as the fields the tour shows -
-  camera, target, rotate, zoom, pan, field of view and move - reading back what
-  a gesture just did and writing what is typed into it
+- [ ] **Accept and exit**: the two confirms the artwork names, accepting the
+  pending edit and then saving and leaving, with the first skipped when nothing
+  is pending and the first returning to the editor rather than running on into
+  the second, so committing work never doubles as leaving
   - From: Interactive Build Mode
-- [ ] **A panel that scrolls**: the fields scrolling while the heading and the
-  accept and cancel stay pinned, with the wheel going to the panel under the
-  pointer and to the camera everywhere else
+- [ ] **A tool change asks**: picking another tool with a draft pending asking
+  `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
+  discarding, and `Escape` staying where it was, so leaving a tool never decides
+  what happens to the work on it
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -91,9 +92,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Select panel**: the camera written out as the fields the tour shows -
-  camera, target, rotate, zoom, pan, field of view and move - reading back what
-  a gesture just did and writing what is typed into it
 - [ ] **Select a built element**: the placement under the pointer, found through
   the footprints rather than off the scene because a built element has no mesh
   to hit, with the one on top winning where two overlap, a click told from an
@@ -118,9 +116,6 @@ the order the work unblocks itself in.
 - [ ] **Hide the tool palette**: the palette collapsing to a chevron and coming
   back on a click, so the canvas is clear while a handle is being dragged near
   where it sits
-- [ ] **Tool controls panel**: the shared panel docked on the right, pointed at
-  one draft placement, with its accept and its cancel, and the split that sends
-  each value to the config or to the footprint
 - [ ] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
   groups them into, with the chosen tool's own fields under it and a deselect
   that is there only while something is selected
@@ -213,9 +208,6 @@ the order the work unblocks itself in.
 - [ ] **Deselect from anywhere**: the panel row every tool gets while a
   selection exists, and a right click on the selection itself, both going
   through the same place
-- [ ] **A panel that scrolls**: the fields scrolling while the heading and the
-  accept and cancel stay pinned, with the wheel going to the panel under the
-  pointer and to the camera everywhere else
 - [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
   elements laid before it, any one element or all of them, preset or built, at a
   strength, and with `alt` held putting back what an earlier stroke took
@@ -335,36 +327,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 314 earlier items in `TODO-archive.md`, newest last.
+> 317 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Drags keep the pointer**: every stroke, lasso and handle drag capturing
-  the pointer at the press, so the palette and the camera never see it
-  - Built by **Builder pointer**, which captures every drag at the press, so
-    every stroke, lasso and handle drag after it inherits the capture. Checked
-    off in `1.0.0-alpha.1.37.0` with that item rather than queued: confirmed in
-    Chromium, a drag begun on the canvas and carried over the palette stayed
-    the orbit it began as and pressed nothing.
-  - From: Interactive Build Mode
-- [x] **Footprints wrap**: a region drawn over one edge of the canvas continuing
-  across the opposite one, so the built tile meets itself
-  - **Settled**: `footprintWeight` takes a `wrap`, the canvas size, and weighs a
-    region against the strongest of its nine repeats a width apart;
-    `footprintSampler` is the same answer worked out once per region, for the
-    40,401 vertices a tile asks it at. A region in the middle of the canvas
-    weighs exactly what it did.
-  - From: Interactive Build Mode
-- [x] **Footprinted elements**: an element drawn only where a footprint reaches,
-  by compositing a draft field, so no generator in the registry is changed
-  - **Settled**: `applyFootprintedElement` in the new
-    `js/environment/footprinted.js` draws the element on `cloneField`'s copy and
-    blends it back through the weight, and `buildEnvironment` and the Matter
-    API's `createEnvironment` both draw through it. The element takes from the
-    seeded stream what it always did, a strip the copy cut is recorded, and a
-    drawn body of water leaves the sea's level alone rather than flooding the
-    tile under the line it was drawn at - the plan's first sketch carried the
-    level across, and its own later decision says drawing water never moves
-    the sea, so the decision was followed.
-  - From: Interactive Build Mode
 - [x] **The built tile as a pattern**: a placement landing at the same canvas
   coordinate on every tile, continuous across the seams, with anything levelled
   to the ground levelled on the tile it is drawn on
@@ -442,4 +406,36 @@ how the simulator got here rather than as a list still to be worked.
     rows; it now draws sixteen, so the pin is that those six lead in the
     artwork's order, and which of the other ten Build Mountains shows is
     **Placed mountains**'s to decide.
+  - From: Interactive Build Mode
+- [x] **Tool controls panel**: the shared panel docked on the right, pointed at
+  one draft placement, with its accept and its cancel, and the split that sends
+  each value to the config or to the footprint
+  - **Settled**: `js/build-panel.js` decides what the dock shows and
+    `js/panel-view.js` draws it. With an edit in hand it is that edit's rows,
+    headed as its tool's panel, with `ACCEPT` and `CANCEL`; a value moved on it
+    revises the edit and draws the canvas again from `canvasElements`, so the
+    ground moves with the panel. `toolPlacement` in `js/build-tools.js` is the
+    split, routing a tool's `shapes` to the footprint. Confirmed in Chromium
+    with an edit begun through `build-mode.js`, since no tool begins one yet.
+  - From: Interactive Build Mode
+- [x] **Select panel**: the camera written out as the fields the tour shows -
+  camera, target, rotate, zoom, pan, field of view and move - reading back what
+  a gesture just did and writing what is typed into it
+  - **Settled**: `SELECTION MODE`, ten fields declared with the range helpers
+    and four slide rows, read back every frame and written through
+    `writeCameraField`; writing where the camera stands keeps the target and
+    works the orbit out again. The field of view is the renderer camera's and
+    goes back to the flight's on leaving. `PAN X` and `MOVE RIGHT` both slide
+    across the screen - the tour lists both, and the two differ only in that
+    `PAN` slides by a share of the screen and `MOVE` by a share of the distance.
+  - From: Interactive Build Mode
+- [x] **A panel that scrolls**: the fields scrolling while the heading and the
+  accept and cancel stay pinned, with the wheel going to the panel under the
+  pointer and to the camera everywhere else
+  - **Settled**: only `#build-dock-fields` scrolls, with
+    `overscroll-behavior: contain`, between a heading and answers that do not;
+    the canvas's wheel listener never sees a wheel over the dock. On a narrow
+    screen the dock runs across the foot and the list moves under the palette,
+    collapsed on a machine with no keyboard. Confirmed in a 420-pixel window
+    and on a 390-pixel phone.
   - From: Interactive Build Mode

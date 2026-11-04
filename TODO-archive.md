@@ -4089,3 +4089,31 @@ still be found by name.
     to be retired. That item now says so, so it is the one that brings the
     panel back.
   - From: Interactive Build Mode
+- [x] **Drags keep the pointer**: every stroke, lasso and handle drag capturing
+  the pointer at the press, so the palette and the camera never see it
+  - Built by **Builder pointer**, which captures every drag at the press, so
+    every stroke, lasso and handle drag after it inherits the capture. Checked
+    off in `1.0.0-alpha.1.37.0` with that item rather than queued: confirmed in
+    Chromium, a drag begun on the canvas and carried over the palette stayed
+    the orbit it began as and pressed nothing.
+  - From: Interactive Build Mode
+- [x] **Footprints wrap**: a region drawn over one edge of the canvas continuing
+  across the opposite one, so the built tile meets itself
+  - **Settled**: `footprintWeight` takes a `wrap`, the canvas size, and weighs a
+    region against the strongest of its nine repeats a width apart;
+    `footprintSampler` is the same answer worked out once per region, for the
+    40,401 vertices a tile asks it at. A region in the middle of the canvas
+    weighs exactly what it did.
+  - From: Interactive Build Mode
+- [x] **Footprinted elements**: an element drawn only where a footprint reaches,
+  by compositing a draft field, so no generator in the registry is changed
+  - **Settled**: `applyFootprintedElement` in the new
+    `js/environment/footprinted.js` draws the element on `cloneField`'s copy and
+    blends it back through the weight, and `buildEnvironment` and the Matter
+    API's `createEnvironment` both draw through it. The element takes from the
+    seeded stream what it always did, a strip the copy cut is recorded, and a
+    drawn body of water leaves the sea's level alone rather than flooding the
+    tile under the line it was drawn at - the plan's first sketch carried the
+    level across, and its own later decision says drawing water never moves
+    the sea, so the decision was followed.
+  - From: Interactive Build Mode

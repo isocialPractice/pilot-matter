@@ -3677,3 +3677,75 @@ test('a held row on the element editor is drawn dimmed', () => {
     assert.ok(styled(indexHtml, '#element-editor-menu li.locked', /opacity:\s*0\.6/),
         'index.html should dim a locked row on the element editor');
 });
+
+// --- The dock ----------------------------------------------------------------
+
+/**
+ * The fields scroll and nothing else does: the heading and the answers sit
+ * outside the part that scrolls, so a long panel can never push the accept and
+ * the cancel below the fold.
+ */
+test('the dock scrolls its fields between a pinned heading and pinned answers', () => {
+    const dock = indexHtml.match(/<aside id="build-dock"[^>]*>([\s\S]*?)<\/aside>/);
+    assert.ok(dock, 'index.html should carry the dock');
+    assert.match(dock[1], /^\s*<h3 data-dock="heading"><\/h3>\s*<div id="build-dock-fields" data-dock="fields"><\/div>\s*<div id="build-dock-actions" data-dock="actions"><\/div>\s*$/,
+        'heading, then the fields, then the answers - the answers outside the fields');
+
+    assert.ok(styled(indexHtml, '#build-dock-fields', /overflow-y:\s*auto/), 'the fields scroll');
+    assert.ok(styled(indexHtml, '#build-dock-fields', /overscroll-behavior:\s*contain/),
+        'and keep the wheel to themselves at either end');
+    assert.ok(styled(indexHtml, '#build-dock-fields', /min-height:\s*0/), 'shrinking to the room the dock has');
+    assert.ok(styled(indexHtml, '#build-dock h3', /flex:\s*none/), 'the heading does not');
+    assert.ok(styled(indexHtml, '#build-dock-actions', /flex:\s*none/), 'and neither do the answers');
+    assert.ok(styled(indexHtml, '#build-dock', /max-height:\s*calc\(100vh - 40px\)/), 'inside the window');
+});
+
+test('the dock is drawn by the one panel view and read back every canvas frame', () => {
+    assert.match(mainSource, /this\.dockView = new PanelView\(this\.overlays\.dock, \{/);
+    assert.match(methodBody(mainSource, 'trackCanvasCamera'), /this\.syncDock\(\);/,
+        'so Select\'s panel reads back what a gesture just did');
+    assert.match(methodBody(mainSource, 'syncOverlays'), /this\.syncDock\(canvas\);/,
+        'and comes off with the canvas');
+
+    const sync = methodBody(mainSource, 'syncDock');
+    assert.match(sync, /dockContent\(this\.builder, \{/, 'what it shows is the pure module\'s to say');
+});
+
+/**
+ * A figure typed into the dock is the field's: the builder's keys and the
+ * aircraft's are kept off it, ahead of every other reading of a key.
+ */
+test('a key typed into a dock field reaches nothing but the field', () => {
+    const wired = methodBody(mainSource, 'setupKeys');
+    const guard = wired.indexOf('if (this.editingDockField(e)) {');
+    const first = wired.indexOf('if (e.ctrlKey || e.altKey || e.metaKey) return;');
+    assert.ok(guard >= 0 && guard < first, 'the field is asked about before anything else reads the key');
+    assert.match(wired.slice(guard), /^if \(this\.editingDockField\(e\)\) \{\s*if \(e\.code === 'Escape'\) e\.target\.blur\(\);\s*e\.stopPropagation\(\);\s*return;/);
+});
+
+test('an edit in hand redraws the canvas from what it holds, and is settled from the dock', () => {
+    assert.match(methodBody(mainSource, 'redrawCanvas'),
+        /this\.terrain\.setEnvironment\(id, \{ runway: false, elements: canvasElements\(getEnvironment\(id\), this\.builder\) \}\)/);
+
+    const apply = methodBody(mainSource, 'applyDockValue');
+    assert.match(apply, /reviseDraft\(this\.builder, \{ config: shown\.holder\.config \}\);\s*this\.redrawCanvas\(\);/,
+        'a value moved on an edit is the ground moving under it');
+
+    const settle = methodBody(mainSource, 'onDockAction');
+    assert.match(settle, /if \(id === DOCK_ACCEPT\.id\) acceptDraft\(this\.builder\);/);
+    assert.match(settle, /else if \(id === DOCK_CANCEL\.id\) cancelDraft\(this\.builder\);/);
+    assert.match(settle, /this\.redrawCanvas\(\);/);
+});
+
+test('a canvas\'s field of view is put back as the flight had it', () => {
+    assert.match(methodBody(mainSource, 'holdCanvasView'), /this\.flightFov = this\.camera\.fov;/);
+    assert.match(methodBody(mainSource, 'releaseCanvasView'), /this\.camera\.fov = this\.flightFov \?\? DEFAULT_FOV;/);
+});
+
+test('on a narrow screen the dock runs across the foot and the list moves clear of it', () => {
+    const narrow = indexHtml.match(/@media \(max-width: 640px\) \{\s*#build-dock \{([^}]*)\}\s*#build-help \{([^}]*)\}/);
+    assert.ok(narrow, 'index.html should lay the dock out for a narrow screen');
+    assert.match(narrow[1], /bottom:\s*10px/, 'across the foot');
+    assert.match(narrow[1], /max-height:\s*40vh/, 'leaving most of the canvas to be seen');
+    assert.match(narrow[2], /top:\s*150px/, 'and the list moved up under the palette');
+});
