@@ -28,10 +28,11 @@ import {
 } from './build-picker.js';
 import {
     canvasFarPlane, CANVAS_FOG, createBuildCamera, buildCameraPosition,
-    orbitBuildCamera, panBuildCamera, zoomBuildCamera, moveBuildCamera, reframeBuildCamera,
+    orbitBuildCamera, panBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera,
     cameraGesture, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
     CAMERA_ORBIT
 } from './build-camera.js';
+import { pickGround, canvasPickBounds, pickStep, pointerDevice } from './build-picking.js';
 import {
     createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines, buildHelpLines
 } from './controls-help.js';
@@ -269,6 +270,13 @@ class FlightSimulator {
         this.buildCamera = null;
         this.canvasDrag  = null;
         this.buildKeys   = new Set();
+
+        // What a pick on the canvas reads the ground against - the highest the
+        // ground stands, the square that may be picked, and the march step for
+        // its sampling - worked out once per canvas; and the ray a pick is cast
+        // along, built from the camera through the pointer.
+        this.canvasGround = null;
+        this.pointerRay   = new THREE.Raycaster();
 
         // Whether the two menus are currently carrying the builder's entry, so
         // a card is drawn again when that changes rather than on every frame
@@ -1649,6 +1657,7 @@ class FlightSimulator {
         this.endCanvasDrag();
         this.buildKeys.clear();
         this.buildCamera = null;
+        this.canvasGround = null;
 
         closeBuildMode(this.builder);
 
@@ -1678,9 +1687,53 @@ class FlightSimulator {
         // The view a pointer and the keys move from here, seeded from the hold
         // so the canvas opens on the frame it always has.
         this.buildCamera = createBuildCamera(this.terrain.size);
+        this.canvasGround = this.readCanvasGround();
         this.holdCanvasView();
 
         return true;
+    }
+
+    /**
+     * What a pick reads the canvas's ground against, worked out once per canvas:
+     * the highest the ground stands, so a ray is only walked through the air the
+     * ground could be in; the square of the canvas, which is all a pick may land
+     * on; and a step of half a cell, so no rise in the ground is stepped over.
+     */
+    readCanvasGround() {
+        const field = this.terrain.tileAt(0, 0)?.field;
+        let top = -Infinity;
+        for (const height of field?.height ?? []) if (height > top) top = height;
+
+        return {
+            top: Number.isFinite(top) ? top : Infinity,
+            bounds: canvasPickBounds(this.terrain.size),
+            step: pickStep(field?.step)
+        };
+    }
+
+    /**
+     * The point of the canvas's ground under the pointer, or null where the
+     * pointer is over the sky or over ground off the canvas.
+     *
+     * The ray is cast from the camera as it stands for the state now, not as
+     * the last frame drew it: several wheel notches can land between two
+     * frames, and each has to be aimed from where the one before it left the
+     * view.
+     */
+    pickCanvasPoint(clientX, clientY) {
+        if (!buildModeDrawing(this.builder) || !this.buildCamera || !this.canvasGround) return null;
+
+        this.placeCanvasCamera();
+        const device = pointerDevice(clientX, clientY, this.renderer.domElement.getBoundingClientRect());
+        this.pointerRay.setFromCamera(device, this.camera);
+
+        const { origin, direction } = this.pointerRay.ray;
+        return pickGround(origin, direction, (x, z) => this.terrain.getTerrainHeightAt(x, z), {
+            step: this.canvasGround.step,
+            maxDistance: this.camera.far,
+            top: this.canvasGround.top,
+            bounds: this.canvasGround.bounds
+        });
     }
 
     /**
@@ -1722,13 +1775,18 @@ class FlightSimulator {
     trackCanvasCamera(elapsed = 0) {
         if (!this.buildCamera) this.buildCamera = createBuildCamera(this.terrain.size);
         this.buildCamera = moveBuildCamera(this.buildCamera, moveIntent(this.buildKeys), elapsed);
+        this.placeCanvasCamera();
+    }
 
+    /** Stands the renderer's camera where the build camera's state says, clear of the ground. */
+    placeCanvasCamera() {
         const { position, target } = buildCameraPosition(this.buildCamera);
         const stand = clearOfGround(position, this.terrain.getTerrainHeightAt(position.x, position.z));
 
         this.camera.up.set(0, 1, 0);
         this.camera.position.set(stand.x, stand.y, stand.z);
         this.camera.lookAt(target.x, target.y, target.z);
+        this.camera.updateMatrixWorld();
     }
 
     // --- The pointer on a canvas ------------------------------------------
@@ -1803,12 +1861,18 @@ class FlightSimulator {
         if (surface.hasPointerCapture?.(drag.pointer)) surface.releasePointerCapture(drag.pointer);
     }
 
-    /** The wheel over the canvas zooms the view, and nothing else - not the page. */
+    /**
+     * The wheel over the canvas zooms the view, and nothing else - not the page.
+     * It zooms toward the ground under the pointer, so what is pointed at stays
+     * under the pointer, and toward the middle of the screen where the pointer
+     * is over the sky.
+     */
     onCanvasWheel(e) {
         if (!buildModeDrawing(this.builder)) return;
 
         e.preventDefault();
-        this.buildCamera = zoomBuildCamera(this.buildCamera, wheelPixels(e.deltaY, e.deltaMode));
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        this.buildCamera = zoomBuildCameraToward(this.buildCamera, wheelPixels(e.deltaY, e.deltaMode), point);
     }
 
     onBuilderKey(e) {
@@ -1898,9 +1962,11 @@ class FlightSimulator {
      * Asks to leave the builder, and leaves when the answer is to go.
      *
      * The accept tool, Escape and the picker's BACK all come here, so the three
-     * ways out cannot come to ask different questions. Nothing a session could
-     * keep exists yet, so the answer is always to go; the confirms that ask
-     * first arrive with the accept tool's own item, through this same call.
+     * ways out cannot come to ask different questions. With nothing pending the
+     * answer is to go. With an edit pending it is `ACCEPT EDITS`, and the
+     * builder stays rather than dropping the edit: no tool can begin one yet,
+     * and the confirm that answers it arrives with the accept tool's own item,
+     * read from this same call.
      */
     requestLeaveBuilder() {
         const asked = requestLeave(this.builder);

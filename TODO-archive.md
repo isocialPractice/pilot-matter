@@ -3960,3 +3960,95 @@ still be found by name.
     aircraft 0 units, and with the fix taken back out the canvas session shifts
     it 88.8 units to the start again.
   - From: Interactive Build Mode
+- [x] The builder in the menus 1: the title screen keeps the builder's entry
+  while a game mode is chosen, where it opens nothing
+  - **Issue**: a game mode can be chosen from the title screen's own `GAME
+    MODES` panel before any flight has begun, and `startRun` makes
+    `isRunning(this.run)` true from that moment. The pause menu answers for
+    this and drops the row; the title screen does not. Observed on the title
+    screen with `RUNWAY LANDING` chosen: the start menu still reads `START
+    FLIGHT, GAME MODES, CONTROL SETTINGS, SETTINGS, INTERACTIVE ENVIRONMENT
+    BUILDER` while `builderReady()` reports false, and both choosing that row
+    and pressing `L` leave `builder.screen` null with no picker drawn. That is
+    the dead row the pause menu's own comment calls the one thing a row under
+    the cursor should never be.
+  - **Goal**: hold the start menu's entry to the same predicate the pause menu
+    is held to. `js/menu.js` already has `pauseMenuEntries(ready)` filtering on
+    `BUILDER_ENTRY_ID`; a matching reading of `START_MENU_ENTRIES` built the
+    same way, rebuilt from `syncPauseMenu`'s one place rather than a second
+    one, is the shape - and `setMenuEntries` already clamps a cursor left past
+    the end, which was verified holding on the pause menu. Leaving the row
+    drawn and giving it something to open is the other answer, but it is a
+    larger decision than this item: a mode brings its own ground, which is the
+    reason the builder is refused in the first place.
+  - **Settled**: built as the goal describes. `startMenuEntries(ready)` reads
+    `START_MENU_ENTRIES` the way `pauseMenuEntries(ready)` has always read the
+    pause menu's, over a filter the two share so they cannot come to drop
+    different rows for one reason, and both are synced from the one place that
+    already held the pause menu to `builderReady()` rather than the title screen
+    getting a second reading of it. Confirmed in Chromium: choosing `RUNWAY
+    LANDING` from the title screen takes the start menu from five rows to four
+    with the builder's gone, and the row comes back with the mode.
+  - From: Interactive Build Mode
+- [x] **Back where it came from**: build mode returning to the title screen or
+  to the pause menu, whichever opened it
+  - Built by **Start picker** and **The canvas**, and found so on 11.04.2026
+    rather than queued: `Escape` from a canvas opened on the title screen lands
+    on the title screen with the builder's row under the cursor, and from one
+    opened on the pause menu it lands on the pause card with the flight still
+    paused where it was. Driven in Chromium.
+  - From: Interactive Build Mode
+- [x] The canvas 2: a started canvas answers nothing but two keys it never
+  names, so a pilot cannot find the way back
+  - **Issue**: chosen from either menu, a canvas started from the picker draws
+    the tile and then takes no input a pilot would try. Driven in Chromium from
+    the title screen and from the pause menu with a flight behind it: a click,
+    a left drag, the wheel and a right click leave the camera where the hold
+    put it, at `0, 12451, 8718`, and `P`, `Enter`, the arrows, `H` and `Tab`
+    change nothing. It is not a crash - 66 frames are drawn in the second after
+    `START` - and `Escape` and `Backspace` do leave, to the right menu with the
+    flight kept. But nothing on the canvas names either key: the picker's
+    `ESC TO LEAVE` goes with the picker, the flight's control list comes off
+    with the flight's chrome, and there is nothing to click. A pilot without
+    those two keys in mind has no way back, and a pilot on a touch screen has
+    none at all. No handler is on the renderer's canvas, which is the element
+    under the pointer everywhere on that screen.
+  - **This is the order the work was queued in, not a fault in the item.** The
+    canvas did what it said. Everything that gives it a surface - the camera's
+    gestures, the palette, the accept tool, the control list - was queued
+    behind footprint work that draws nothing a pilot can see.
+  - **Goal**: a canvas that can be left by the mouse, the keys and a finger,
+    and says how. One way out, `requestLeave` in `js/build-mode.js`, which the
+    picker's `BACK`, `Escape` on the canvas and an exit tile all call, and
+    which leaves on the spot while nothing can be kept. The exit tile is the
+    accept tool, at the foot of a palette column that also carries Select, lit:
+    two `<button>` tiles named in text, drawn from `paletteTools` in
+    `js/build-tools.js`, which draws only tools that work. `Backspace` comes off
+    the canvas and stays on the picker. And the builder's own control list,
+    read from `BUILD_HELP_ROWS` in `js/controls-help.js`, expanded when the
+    canvas opens and collapsed by `H` the way the flight's is, listing only
+    what works.
+  - **Done when**: from the title screen and from the pause menu, `START` and
+    then a click on the exit tile lands on the menu that opened the builder,
+    with a paused flight where it was, and so does `Escape`; `Backspace` on the
+    canvas does nothing and still leaves the picker; and the control list is on
+    screen when the canvas opens, naming every key the canvas answers to and no
+    other.
+  - **Where it lives**: the plan's "The base every tool stands on" is the
+    design, under "One way out", "A palette that holds only what works" and
+    "The screen says how". The pointer and the camera are the two items queued
+    beside this, not this item.
+  - **Settled**: built as the goal describes. `requestLeave` in
+    `js/build-mode.js` is the one way out, and `requestLeaveBuilder` in
+    `js/main.js` is the only place a tile, a key or the picker's `BACK` leaves
+    from. `PICKER_CLOSE_KEYS` and `CANVAS_LEAVE_KEYS` replace the one list, read
+    by `leavesBuilder` for the screen showing. The palette is drawn from
+    `paletteTools` in the new `js/build-tools.js` as two buttons, and the
+    canvas's control list from `BUILD_HELP_ROWS`, each row the constant its
+    handler reads - `Esc`, `H` and `F2`. The wiring checks in
+    `test/page.test.js` each rejected the defect they name when it was put
+    back. Confirmed in Chromium from both menus, by the tile and by `Escape`:
+    each lands on the menu that opened the builder, the paused flight moves 0
+    units, `Backspace` leaves the canvas where it is and still leaves the
+    picker, and a tap on the 44-pixel tile leaves on a 390-pixel touch screen.
+  - From: Interactive Build Mode

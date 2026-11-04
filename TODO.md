@@ -11,17 +11,18 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Build mode state**: the twelve tools, the draft, and the rule that an
-  accept always commits while a cancel always discards, as a pure module with
-  its own tests
+- [ ] **One properties panel**: the element editor's row builder lifted into a
+  module of its own and the editor pointed at it, so there is one panel
+  generated from declared ranges rather than one drawn per tool
   - From: Interactive Build Mode
-- [ ] **Re-edit a committed element**: a draft that knows what it stands on, so
-  accepting swaps the placement it replaces and cancelling puts that placement
-  back rather than deleting it
+- [ ] **Panel field kinds**: a toggle, a choice and a gate that disables a row
+  while its toggle is off, named for what `js/config.js` already calls them, so
+  the configurable features still queued are a registry edit rather than a
+  panel edit
   - From: Interactive Build Mode
-- [ ] **Ground picking**: the canvas point under the pointer, raycast against
-  the ground rather than projected onto a plane, so a tilted view still lands on
-  what it is pointing at
+- [ ] **Panel conformance**: a test walking every tool and every range it
+  declares, so a kind with no renderer fails the suite on the commit that
+  declares it rather than drawing an empty row later
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -91,15 +92,9 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Build mode state**: the twelve tools, the draft, and the rule that an
-  accept always commits while a cancel always discards, as a pure module with
-  its own tests
 - [ ] **Select panel**: the camera written out as the fields the tour shows -
   camera, target, rotate, zoom, pan, field of view and move - reading back what
   a gesture just did and writing what is typed into it
-- [ ] **Ground picking**: the canvas point under the pointer, raycast against
-  the ground rather than projected onto a plane, so a tilted view still lands on
-  what it is pointing at
 - [ ] **Select a built element**: the placement under the pointer, found through
   the footprints rather than off the scene because a built element has no mesh
   to hit, with the one on top winning where two overlap, a click told from an
@@ -115,9 +110,6 @@ the order the work unblocks itself in.
   else, clamped to the bounds the panel clamps to, so a drag and a typed number
   are two ways into the same schema, with the centre moving the element on both
   gumballs
-- [ ] **Re-edit a committed element**: a draft that knows what it stands on, so
-  accepting swaps the placement it replaces and cancelling puts that placement
-  back rather than deleting it
 - [ ] **Builder art in the repository**: the marks, panels and thumbnails the
   builder ships copied into `assets/builder/` from an explicit list, renamed on
   the way in, so the site and CI have every file the markup names
@@ -354,100 +346,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 308 earlier items in `TODO-archive.md`, newest last.
+> 311 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The builder in the menus 1: the title screen keeps the builder's entry
-  while a game mode is chosen, where it opens nothing
-  - **Issue**: a game mode can be chosen from the title screen's own `GAME
-    MODES` panel before any flight has begun, and `startRun` makes
-    `isRunning(this.run)` true from that moment. The pause menu answers for
-    this and drops the row; the title screen does not. Observed on the title
-    screen with `RUNWAY LANDING` chosen: the start menu still reads `START
-    FLIGHT, GAME MODES, CONTROL SETTINGS, SETTINGS, INTERACTIVE ENVIRONMENT
-    BUILDER` while `builderReady()` reports false, and both choosing that row
-    and pressing `L` leave `builder.screen` null with no picker drawn. That is
-    the dead row the pause menu's own comment calls the one thing a row under
-    the cursor should never be.
-  - **Goal**: hold the start menu's entry to the same predicate the pause menu
-    is held to. `js/menu.js` already has `pauseMenuEntries(ready)` filtering on
-    `BUILDER_ENTRY_ID`; a matching reading of `START_MENU_ENTRIES` built the
-    same way, rebuilt from `syncPauseMenu`'s one place rather than a second
-    one, is the shape - and `setMenuEntries` already clamps a cursor left past
-    the end, which was verified holding on the pause menu. Leaving the row
-    drawn and giving it something to open is the other answer, but it is a
-    larger decision than this item: a mode brings its own ground, which is the
-    reason the builder is refused in the first place.
-  - **Settled**: built as the goal describes. `startMenuEntries(ready)` reads
-    `START_MENU_ENTRIES` the way `pauseMenuEntries(ready)` has always read the
-    pause menu's, over a filter the two share so they cannot come to drop
-    different rows for one reason, and both are synced from the one place that
-    already held the pause menu to `builderReady()` rather than the title screen
-    getting a second reading of it. Confirmed in Chromium: choosing `RUNWAY
-    LANDING` from the title screen takes the start menu from five rows to four
-    with the builder's gone, and the row comes back with the mode.
-  - From: Interactive Build Mode
-- [x] **Back where it came from**: build mode returning to the title screen or
-  to the pause menu, whichever opened it
-  - Built by **Start picker** and **The canvas**, and found so on 11.04.2026
-    rather than queued: `Escape` from a canvas opened on the title screen lands
-    on the title screen with the builder's row under the cursor, and from one
-    opened on the pause menu it lands on the pause card with the flight still
-    paused where it was. Driven in Chromium.
-  - From: Interactive Build Mode
-- [x] The canvas 2: a started canvas answers nothing but two keys it never
-  names, so a pilot cannot find the way back
-  - **Issue**: chosen from either menu, a canvas started from the picker draws
-    the tile and then takes no input a pilot would try. Driven in Chromium from
-    the title screen and from the pause menu with a flight behind it: a click,
-    a left drag, the wheel and a right click leave the camera where the hold
-    put it, at `0, 12451, 8718`, and `P`, `Enter`, the arrows, `H` and `Tab`
-    change nothing. It is not a crash - 66 frames are drawn in the second after
-    `START` - and `Escape` and `Backspace` do leave, to the right menu with the
-    flight kept. But nothing on the canvas names either key: the picker's
-    `ESC TO LEAVE` goes with the picker, the flight's control list comes off
-    with the flight's chrome, and there is nothing to click. A pilot without
-    those two keys in mind has no way back, and a pilot on a touch screen has
-    none at all. No handler is on the renderer's canvas, which is the element
-    under the pointer everywhere on that screen.
-  - **This is the order the work was queued in, not a fault in the item.** The
-    canvas did what it said. Everything that gives it a surface - the camera's
-    gestures, the palette, the accept tool, the control list - was queued
-    behind footprint work that draws nothing a pilot can see.
-  - **Goal**: a canvas that can be left by the mouse, the keys and a finger,
-    and says how. One way out, `requestLeave` in `js/build-mode.js`, which the
-    picker's `BACK`, `Escape` on the canvas and an exit tile all call, and
-    which leaves on the spot while nothing can be kept. The exit tile is the
-    accept tool, at the foot of a palette column that also carries Select, lit:
-    two `<button>` tiles named in text, drawn from `paletteTools` in
-    `js/build-tools.js`, which draws only tools that work. `Backspace` comes off
-    the canvas and stays on the picker. And the builder's own control list,
-    read from `BUILD_HELP_ROWS` in `js/controls-help.js`, expanded when the
-    canvas opens and collapsed by `H` the way the flight's is, listing only
-    what works.
-  - **Done when**: from the title screen and from the pause menu, `START` and
-    then a click on the exit tile lands on the menu that opened the builder,
-    with a paused flight where it was, and so does `Escape`; `Backspace` on the
-    canvas does nothing and still leaves the picker; and the control list is on
-    screen when the canvas opens, naming every key the canvas answers to and no
-    other.
-  - **Where it lives**: the plan's "The base every tool stands on" is the
-    design, under "One way out", "A palette that holds only what works" and
-    "The screen says how". The pointer and the camera are the two items queued
-    beside this, not this item.
-  - **Settled**: built as the goal describes. `requestLeave` in
-    `js/build-mode.js` is the one way out, and `requestLeaveBuilder` in
-    `js/main.js` is the only place a tile, a key or the picker's `BACK` leaves
-    from. `PICKER_CLOSE_KEYS` and `CANVAS_LEAVE_KEYS` replace the one list, read
-    by `leavesBuilder` for the screen showing. The palette is drawn from
-    `paletteTools` in the new `js/build-tools.js` as two buttons, and the
-    canvas's control list from `BUILD_HELP_ROWS`, each row the constant its
-    handler reads - `Esc`, `H` and `F2`. The wiring checks in
-    `test/page.test.js` each rejected the defect they name when it was put
-    back. Confirmed in Chromium from both menus, by the tile and by `Escape`:
-    each lands on the menu that opened the builder, the paused flight moves 0
-    units, `Backspace` leaves the canvas where it is and still leaves the
-    picker, and a tap on the 44-pixel tile leaves on a 390-pixel touch screen.
-  - From: Interactive Build Mode
 - [x] **Builder pointer**: one router on the renderer's canvas, live only while
   a canvas is open, capturing every drag at the press, keeping the wheel and the
   context menu from the page and a finger from scrolling it, and handing the
@@ -523,4 +423,38 @@ how the simulator got here rather than as a list still to be worked.
     fills each tile's own low ground inside the one footprint.
     `tileElements` needed no change: a footprinted placement goes to every tile
     and a runway still to the home tile alone.
+  - From: Interactive Build Mode
+- [x] **Build mode state**: the twelve tools, the draft, and the rule that an
+  accept always commits while a cancel always discards, as a pure module with
+  its own tests
+  - **Settled**: `js/build-mode.js` holds `placements` and `draft`, with
+    `startDraft`, `reviseDraft`, `acceptDraft`, `cancelDraft` and
+    `builtPlacements`, every placement copied in and out. The twelve carry the
+    tour's minds-the-lasso column in `js/build-tools.js`. With an edit pending,
+    `requestLeave` answers `ACCEPT EDITS` and a tool change waits rather than
+    settling it - the confirm that answers both arrives with **Accept and
+    exit** and **A tool change asks**, which have to land with or before the
+    first tool that begins an edit.
+  - From: Interactive Build Mode
+- [x] **Re-edit a committed element**: a draft that knows what it stands on, so
+  accepting swaps the placement it replaces and cancelling puts that placement
+  back rather than deleting it
+  - **Settled**: `pickUpPlacement` copies a committed placement into the draft
+    with the index it `replaces`, leaving the original in the list throughout;
+    accepting swaps it in place, cancelling leaves the original as it was
+    committed, and while it is being edited `builtPlacements` shows the edit in
+    its place.
+  - From: Interactive Build Mode
+- [x] **Ground picking**: the canvas point under the pointer, raycast against
+  the ground rather than projected onto a plane, so a tilted view still lands on
+  what it is pointing at
+  - **Settled**: `pickGround` in the new `js/build-picking.js` walks the ray
+    against the heights the ground is drawn from and halves down to the
+    crossing, so a pick on a hill's face lands on the face; a ray meeting
+    ground off the canvas is a miss. Read off the heights rather than the mesh,
+    against the plan's suggestion of `THREE.Raycaster`, so it stays pure and
+    tested in Node; the two are the same surface to within a cell. Its first
+    consumer is the wheel, which now zooms toward the ground under the pointer.
+    Confirmed in Chromium: picks project back to the pixel they were taken at,
+    and a zoom leaves the pointed-at ground on the same pixel.
   - From: Interactive Build Mode

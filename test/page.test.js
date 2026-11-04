@@ -3621,7 +3621,9 @@ test('a held key moves the view by the frame, and leaving lets go of it', () => 
     const frame = methodBody(mainSource, 'trackCanvasCamera');
     assert.match(frame, /moveBuildCamera\(this\.buildCamera, moveIntent\(this\.buildKeys\), elapsed\)/,
         'and the frame moves the view on the real clock');
-    assert.match(frame, /clearOfGround\(position, this\.terrain\.getTerrainHeightAt\(position\.x, position\.z\)\)/,
+    assert.match(frame, /this\.placeCanvasCamera\(\);/, 'then stands the camera where the state says');
+    assert.match(methodBody(mainSource, 'placeCanvasCamera'),
+        /clearOfGround\(position, this\.terrain\.getTerrainHeightAt\(position\.x, position\.z\)\)/,
         'with the camera kept above the ground under it');
 
     assert.match(mainSource, /window\.addEventListener\('keyup', \(e\) => this\.buildKeys\.delete\(e\.code\)\);/);
@@ -3635,4 +3637,36 @@ test('a held key moves the view by the frame, and leaving lets go of it', () => 
 test('a canvas opens on a camera seeded from the hold', () => {
     assert.match(methodBody(mainSource, 'startCanvas'),
         /this\.buildCamera = createBuildCamera\(this\.terrain\.size\);/);
+});
+
+// --- Ground picking ----------------------------------------------------------
+
+/**
+ * A pick is cast from the camera as the state now stands rather than as the
+ * last frame drew it - several wheel notches land between frames - and it is
+ * read against the canvas's own ground and square, so a ray that meets ground
+ * off the canvas is a miss rather than a point moved onto its edge.
+ */
+test('a pick is cast from the camera as it stands, against the canvas alone', () => {
+    const pick = methodBody(mainSource, 'pickCanvasPoint');
+    assert.ok(pick, 'js/main.js should define pickCanvasPoint()');
+
+    const placed = pick.indexOf('this.placeCanvasCamera();');
+    const cast   = pick.indexOf('this.pointerRay.setFromCamera(');
+    assert.ok(placed >= 0 && cast > placed, 'the camera is stood where the state says before the ray is cast');
+    assert.match(pick, /if \(!buildModeDrawing\(this\.builder\)/, 'and nothing is picked off a canvas');
+    assert.match(pick, /bounds: this\.canvasGround\.bounds/, 'and only the canvas may be picked');
+    assert.match(pick, /pickGround\(origin, direction, \(x, z\) => this\.terrain\.getTerrainHeightAt\(x, z\)/,
+        'against the ground the canvas is drawn from');
+
+    assert.match(methodBody(mainSource, 'startCanvas'), /this\.canvasGround = this\.readCanvasGround\(\);/,
+        'the ground a pick reads is worked out when the canvas opens');
+    assert.match(methodBody(mainSource, 'placeCanvasCamera'), /this\.camera\.updateMatrixWorld\(\);/,
+        'and a camera stood between frames is one a ray can be cast from');
+});
+
+test('the wheel zooms toward the ground under the pointer', () => {
+    const wheel = methodBody(mainSource, 'onCanvasWheel');
+    assert.match(wheel, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);/);
+    assert.match(wheel, /zoomBuildCameraToward\(this\.buildCamera, wheelPixels\(e\.deltaY, e\.deltaMode\), point\)/);
 });

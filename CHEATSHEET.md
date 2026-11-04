@@ -233,7 +233,7 @@ menu opened the builder; `Backspace` leaves the picker but not a canvas.
 |-------|------|
 | Drag, or one finger | Orbit the view about the middle of the screen |
 | Middle drag, or `Shift` and right drag | Pan, the ground following the pointer |
-| Wheel | Zoom, out no further than the whole canvas |
+| Wheel | Zoom toward the ground under the pointer, out no further than the whole canvas |
 | `W`/`A`/`S`/`D` or the arrows | Move across the ground, the way the view faces |
 | `Home` | Back to the view the canvas opened on |
 | `Esc` | End a drag being made, or leave the builder |

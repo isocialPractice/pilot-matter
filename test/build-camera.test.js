@@ -4,7 +4,7 @@ import {
     canvasCamera, canvasFarPlane,
     CANVAS_PITCH, CANVAS_STANDOFF, CANVAS_FAR, CANVAS_FOG,
     createBuildCamera, buildCameraPosition, orbitBuildCamera, panBuildCamera,
-    zoomBuildCamera, moveBuildCamera, reframeBuildCamera, cameraGesture, wheelPixels,
+    zoomBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera, cameraGesture, wheelPixels,
     moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
     CAMERA_ORBIT, CAMERA_PAN, CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS,
     MIN_PITCH, MAX_PITCH, MAX_MOVE_STEP, CAMERA_CLEARANCE
@@ -272,6 +272,47 @@ test('a key moves by the elapsed time it is handed, and not at all on none', () 
     const capped  = moveBuildCamera(start, { right: 1 }, MAX_MOVE_STEP);
     assert.deepEqual(stalled.target, capped.target,
         'a frame that carries a hidden tab\'s time moves no further than one frame may');
+});
+
+/**
+ * What the pointer is on stays under the pointer: the camera and its target are
+ * scaled about the point together, so the point is seen along the same line
+ * before and after, and the view's own direction does not turn - which puts it
+ * on the same pixel.
+ */
+test('a zoom toward a point keeps the point on the line it was seen along', () => {
+    // Zoomed in first, so a zoom out has somewhere to go: the hold is as far out
+    // as the view goes.
+    const start = zoomBuildCamera(orbitBuildCamera(createBuildCamera(DEFAULT_SIZE), 140, -40), -600);
+    const point = { x: 1800, y: 220, z: -2500 };
+
+    for (const pixels of [-300, -60, 60, 300]) {
+        const zoomed = zoomBuildCameraToward(start, pixels, point);
+        const before = buildCameraPosition(start).position;
+        const after  = buildCameraPosition(zoomed).position;
+
+        const unit = (from, to) => {
+            const d = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+            return { x: (to.x - from.x) / d, y: (to.y - from.y) / d, z: (to.z - from.z) / d };
+        };
+        const was = unit(before, point), is = unit(after, point);
+
+        assert.ok(samePoint(was, is, 1e-9), `a zoom of ${pixels} moved the point off its line`);
+        assert.equal(zoomed.yaw, start.yaw, 'and the view does not turn');
+        assert.equal(zoomed.pitch, start.pitch);
+        assert.notEqual(zoomed.distance, start.distance, 'while it does close in or pull back');
+    }
+});
+
+test('a zoom with nothing under the pointer is the zoom toward the target', () => {
+    const start = createBuildCamera(DEFAULT_SIZE);
+    assert.deepEqual(zoomBuildCameraToward(start, -200, null), zoomBuildCamera(start, -200));
+});
+
+test('a zoom that is already at its limit moves nothing toward the point', () => {
+    const start = createBuildCamera(DEFAULT_SIZE);
+    const held = zoomBuildCameraToward(start, 500, { x: 3000, y: 0, z: 3000 });
+    assert.deepEqual(held.target, start.target, 'out past the hold the view is where it was');
 });
 
 test('Home gives the hold back exactly, from anywhere', () => {

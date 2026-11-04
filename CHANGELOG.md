@@ -5,6 +5,69 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.39.0] - 2026-11-04
+
+The draft a tool will make and the point it will be made at: the builder's
+session can hold an edit and the placements it built, and the pointer can say
+which point of the ground it is over - which the wheel now zooms toward.
+
+### Added
+
+- **The draft and the built world.** `js/build-mode.js` holds what a canvas has
+  built - `placements`, each JSON-shaped data in the canvas's frame - and the
+  edit in hand, `draft`. `startDraft` begins one on bare ground; `reviseDraft`
+  steps a value into its config or replaces its footprint, and the draft
+  survives every step; `acceptDraft` always commits and `cancelDraft` always
+  discards, whatever tool drew it; and `builtPlacements` is what the canvas is
+  drawn from, the edit shown where it stands so what is on screen is what an
+  accept would keep. The session keeps its own copy of everything it is handed
+  and everything it hands back. One edit is in hand at a time.
+- **Re-editing a committed placement.** `pickUpPlacement` takes a copy of one
+  that was committed and records which it `replaces`. Accepting swaps it into
+  that place, so a changed mountain is one mountain and not two; cancelling
+  leaves the original exactly as it was committed, because it never left the
+  list - the case that silently deletes a pilot's mountain if it is wrong.
+- **Ground picking.** `pickGround` in the new `js/build-picking.js` walks the
+  ray from the camera through the pointer against the heights the ground is
+  drawn from, and halves the step that crosses down to the crossing - so a pick
+  aimed at the face of a hill lands on the face rather than on the flat ground
+  behind it where a plane would put it. The walk starts where the ray comes
+  down through the highest ground, and steps half a cell so no rise is stepped
+  over. A ray that meets the ground off the canvas is a miss rather than a point
+  moved onto its edge. It reads the heights rather than the mesh drawn from
+  them - the same surface to within a cell's bend - which keeps it pure and
+  tested in Node. `pickCanvasPoint` in `js/main.js` casts it from the camera as
+  the state now stands rather than as the last frame drew it.
+- **The wheel zooms toward the pointer.** `zoomBuildCameraToward` scales the
+  camera and its target about the ground under the pointer, which keeps that
+  point on the line it was seen along and so on the same pixel; over the sky it
+  zooms toward the middle as before.
+- **Which tools mind the lasso** is declared on each of the twelve, as the
+  tour's own column.
+
+### Changed
+
+- **Leaving with an edit pending asks `ACCEPT EDITS`**, and a tool change waits,
+  rather than either settling the edit by itself. No tool can begin an edit yet;
+  the confirm that answers the question arrives with the accept tool, read from
+  the same `requestLeave`.
+
+Held in Node by `test/build-mode.test.js` - the accept and cancel rule over
+several placements, a draft surviving its steps, both rows of the re-edit
+table, and what a pending edit asks of leaving and of a tool change - by the new
+`test/build-picking.test.js`, which lands a pick on a hill's face rather than on
+the plane behind it and drops one met off the canvas, and by
+`test/build-camera.test.js`, which holds the point a zoom aims at to the line it
+was seen along, in and out. Each rejected the defect it names when that was put
+back: a re-edit accepted beside its original, a pick-up that takes the original
+out of the list, leaving or changing tool past a pending edit, a step that
+replaces the config, a pick moved onto the canvas, a pick cast against a plane,
+a zoom that ignores the point, and a pick cast from the camera the last frame
+drew. Settled in Chromium: picks land on the ground and project back to the
+pixel they were taken at, the sky and the ground past the canvas's edges are
+misses, a pick aimed at a mountain's face lands up on it, and three wheel
+notches each left the ground under the pointer on the same pixel.
+
 ## [1.0.0-alpha.1.38.0] - 2026-11-04
 
 A region drawn on a placement becomes ground: an element is drawn only where

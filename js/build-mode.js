@@ -99,7 +99,17 @@ export function createBuildState() {
         environment: null,
         // The tool the canvas is being worked with, and null until there is a
         // canvas to work.
-        tool: null
+        tool: null,
+        // What has been built on the canvas: placements, each JSON-shaped data
+        // in the canvas's frame, in the order they were committed. Concatenated
+        // onto the environment's own, this is the whole description of the
+        // built world, and it goes to `buildEnvironment` through the same door
+        // a preset does.
+        placements: [],
+        // The edit in hand, and null while nothing is pending: a placement
+        // being drawn or changed, and the index of the committed placement it
+        // replaces, or null for one drawn on bare ground.
+        draft: null
     };
 }
 
@@ -127,23 +137,157 @@ export function closeBuildMode(state) {
     return state;
 }
 
+/** The question asked before leaving with an edit still pending. */
+export const ACCEPT_EDITS = 'accept-edits';
+
 /**
  * Asks to leave the builder. The accept tool, `Escape` and the picker's `BACK`
  * all come here.
  *
  * One function, for the reason there is one way in: three ways out are three
- * things that can drift into asking different questions. Nothing a session
- * could keep exists yet - no tool writes a placement - so it leaves on the
- * spot. The two confirms, whether to accept the pending edit and then whether
- * to save and leave, are asked from here once a session can hold work, so a
- * key that leaves is never a key that drops work without asking.
+ * things that can drift into asking different questions. With an edit pending
+ * it asks `ACCEPT EDITS` first, so a key that leaves is never a key that drops
+ * work without asking; with none it leaves. `SAVE AND EXIT MODE`, the question
+ * asked with nothing pending, arrives with the accept tool's confirms, and is
+ * asked from here too.
  *
- * Returns what to do - `{ leave: true }` - or null for a session that is not
- * open, which has nothing to leave.
+ * Returns what to do - `{ leave: true }` or `{ confirm: ACCEPT_EDITS }` - or
+ * null for a session that is not open, which has nothing to leave.
  */
 export function requestLeave(state) {
     if (!buildModeShowing(state)) return null;
+    if (draftPending(state)) return { confirm: ACCEPT_EDITS };
     return { leave: true };
+}
+
+// --- The draft and the built world --------------------------------------------
+
+/**
+ * A placement taken as the session's own: copied, so nothing the caller does
+ * to the one it handed in afterwards reaches the draft or the committed list.
+ * A placement is JSON-shaped, so a structured clone is the whole of a copy.
+ */
+function own(placement) {
+    return structuredClone(placement);
+}
+
+/** True while an edit is in hand, which is the one predicate every confirm reads. */
+export function draftPending(state) {
+    return state?.draft != null;
+}
+
+/** The placement being drawn or changed, and null while nothing is pending. */
+export function buildDraft(state) {
+    return draftPending(state) ? state.draft.placement : null;
+}
+
+/** What has been committed, as a copy a caller can read without changing it. */
+export function committedPlacements(state) {
+    return (state?.placements ?? []).map(own);
+}
+
+/**
+ * Begins an edit on bare ground: a placement drawn by a tool, which commits as
+ * a new one. Refused off a canvas, while another edit is pending - that one has
+ * to be accepted or cancelled first - and for anything that is not a placement.
+ */
+export function startDraft(state, placement) {
+    if (!buildModeDrawing(state) || draftPending(state) || !isPlacement(placement)) return false;
+
+    state.draft = { placement: own(placement), replaces: null };
+    return true;
+}
+
+/**
+ * Picks a committed placement up again to change it.
+ *
+ * The draft is a copy and the original stays in the committed list, which is
+ * what makes cancelling an edit put the original back rather than delete it:
+ * there was never a moment it was out of the list. `replaces` records which
+ * one the draft stands on, so accepting swaps it rather than adding a second.
+ */
+export function pickUpPlacement(state, index) {
+    if (!buildModeDrawing(state) || draftPending(state)) return false;
+    if (!Number.isInteger(index) || index < 0 || index >= state.placements.length) return false;
+
+    state.draft = { placement: own(state.placements[index]), replaces: index };
+    return true;
+}
+
+/**
+ * Changes the edit in hand: the values the panel steps go into its `config`,
+ * merged over what is there, and a new `footprint` replaces the old one. The
+ * draft survives the change - it is the same edit, standing on the same
+ * placement - which is what lets a value be stepped and stepped again before
+ * anything is committed.
+ */
+export function reviseDraft(state, { config, footprint } = {}) {
+    if (!draftPending(state)) return false;
+
+    const placement = state.draft.placement;
+    if (config != null) placement.config = { ...placement.config, ...own(config) };
+    if (footprint !== undefined) placement.footprint = footprint == null ? undefined : own(footprint);
+    if (placement.footprint === undefined) delete placement.footprint;
+    return true;
+}
+
+/**
+ * Commits the edit in hand, always. A draft on bare ground is added to the
+ * committed list; one standing on a committed placement takes that
+ * placement's place, so a changed mountain is one mountain and not two.
+ *
+ * Returns the placement committed, or null when nothing was pending.
+ */
+export function acceptDraft(state) {
+    if (!draftPending(state)) return null;
+
+    const { placement, replaces } = state.draft;
+    if (replaces != null && replaces >= 0 && replaces < state.placements.length) {
+        state.placements[replaces] = placement;
+    } else {
+        state.placements.push(placement);
+    }
+
+    state.draft = null;
+    return own(placement);
+}
+
+/**
+ * Drops the edit in hand, always. Nothing committed is touched: a draft on bare
+ * ground is gone, and one standing on a committed placement leaves that
+ * placement exactly as it was committed, because it never left the list.
+ *
+ * Returns true when there was something to drop.
+ */
+export function cancelDraft(state) {
+    if (!draftPending(state)) return false;
+    state.draft = null;
+    return true;
+}
+
+/**
+ * The placements the canvas is drawn from right now: everything committed,
+ * with the edit in hand shown where it stands - in place of the placement it
+ * replaces, or after the rest when it is new - so what is on screen is what an
+ * accept would keep.
+ */
+export function builtPlacements(state) {
+    const shown = committedPlacements(state);
+    if (!draftPending(state)) return shown;
+
+    const { placement, replaces } = state.draft;
+    if (replaces != null && replaces >= 0 && replaces < shown.length) shown[replaces] = own(placement);
+    else shown.push(own(placement));
+    return shown;
+}
+
+/** True for something shaped like a placement: a type, and a config if it has one. */
+function isPlacement(placement) {
+    return placement != null
+        && typeof placement === 'object'
+        && typeof placement.type === 'string'
+        && placement.type !== ''
+        && (placement.config == null || typeof placement.config === 'object');
 }
 
 export function buildModeShowing(state) {
@@ -185,6 +329,11 @@ export function beginCanvas(state, environmentId) {
     state.environment = environmentId;
     // Select is the navigation state, so a canvas opens on looking at it.
     state.tool = SELECT_TOOL;
+    // A canvas begun from the picker begins from nothing built. Reopening onto
+    // what an earlier session built is the branch that arrives with the built
+    // world, which skips the picker rather than coming through here.
+    state.placements = [];
+    state.draft = null;
     return true;
 }
 
@@ -200,11 +349,17 @@ export function buildModeTool(state) {
  * which is a way out rather than a mode. Choosing the tool already live is not
  * a change and is answered as one.
  *
+ * Refused too while an edit is pending. Changing tools decides what happens to
+ * the work on the one being left - kept, or dropped - and that is the pilot's
+ * to answer, which `ACCEPT EDITS` asks once a tool change can ask it. Until
+ * then the edit stays exactly where it was rather than being settled either way
+ * by a click on a tile.
+ *
  * Returns true when the live tool changed.
  */
 export function chooseBuildTool(state, id) {
     if (!buildModeDrawing(state) || !isChoosableTool(id)) return false;
-    if (state.tool === id) return false;
+    if (state.tool === id || draftPending(state)) return false;
 
     state.tool = id;
     return true;

@@ -314,6 +314,33 @@ export function zoomBuildCamera(state, pixels = 0) {
     return { ...state, distance: clamp(distance, state.nearest, state.furthest) };
 }
 
+/**
+ * Zooms by a wheel's travel toward a point on the ground - the one under the
+ * pointer - rather than toward the middle of the screen, so what the pilot is
+ * pointing at stays under the pointer while the view closes on it.
+ *
+ * The camera and its target are both scaled about the point by the share the
+ * distance changed by. A scaling about a point keeps every direction from that
+ * point, so the point is seen along the same line before and after and sits on
+ * the same pixel. Given no point - a pointer over the sky, or off the canvas -
+ * it zooms toward the target as the wheel always did. At the edge of the canvas
+ * the target is held over it, which is the one place the point can drift.
+ */
+export function zoomBuildCameraToward(state, pixels = 0, point = null) {
+    const zoomed = zoomBuildCamera(state, pixels);
+    if (point == null || !(state.distance > 0)) return zoomed;
+
+    const share = zoomed.distance / state.distance;
+    const toward = (from, to) => to + (from - to) * share;
+    const target = {
+        x: toward(state.target.x, point.x),
+        y: toward(state.target.y, Number(point.y) || 0),
+        z: toward(state.target.z, point.z)
+    };
+
+    return withTarget({ ...zoomed, target: { ...zoomed.target, y: target.y } }, target.x, target.z);
+}
+
 /** Puts the hold back: the middle of the canvas, square to it, framing the whole of it. */
 export function reframeBuildCamera(state) {
     return { ...state, target: { x: 0, y: 0, z: 0 }, distance: state.furthest, yaw: 0, pitch: CANVAS_PITCH };
