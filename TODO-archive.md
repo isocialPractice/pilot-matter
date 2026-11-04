@@ -3889,3 +3889,33 @@ still be found by name.
     described at length already, rather than restating it in a pure module
     that draws nothing.
   - From: Code Review Override - the comments the cloud mirror left behind
+- [x] **Deck Cost**: the second cloud material is costed at one more draw call,
+  and a sprite is already a draw call of its own
+  - **Issue**: `js/weather.js:109` reads "The cost is one more 256 by 162
+    texture and one more draw call for the deck". The texture is right; the
+    draw call is not a figure the renderer supports. A `THREE.Sprite` in r160
+    is pushed into the render list as an object of its own and drawn with its
+    own call, so a 95-cloud deck is 95 calls whether the sprites share one
+    material or two. What the second material actually adds is material state
+    changes, and because the deck is transparent and therefore depth-sorted,
+    the two materials interleave down the sorted list - so it is many bindings
+    rather than one call. A reader sizing a third texture off this line would
+    budget it wrongly in both directions.
+  - **Goal**: cost it as what it is - one more texture, and the material
+    bindings an interleaved sort costs - or drop the figure rather than carry
+    an unmeasured one. Nothing in the repository reads
+    `renderer.info.render.calls`, so settle it there if a number is wanted:
+    draw a 95-cloud storm and read the count with one material and with two.
+  - From: Code Review Override - the comments the cloud mirror left behind
+- [x] **The builder in the menus**: `INTERACTIVE ENVIRONMENT BUILDER` last on
+  the title screen and on the pause menu, dropped from the pause menu while a
+  game mode is running, and opened through the one function `L` uses too
+  - From: Interactive Build Mode
+- [x] **Blank Canvas**: a sixth environment for the editor to start from, flat
+  ground under grass and nothing else, declared beside `ENVIRONMENTS` rather
+  than in them so it is a thing to build on rather than a thing to fly over
+  - From: Interactive Build Mode
+- [x] **Start picker**: the six cards the editor opens on, read off the
+  environment registry rather than written out, with Highlands the default and
+  a way back out
+  - From: Interactive Build Mode

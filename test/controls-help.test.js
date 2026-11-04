@@ -18,6 +18,7 @@ import {
     buildHelpLines
 } from '../js/controls-help.js';
 import { CANVAS_LEAVE_KEYS, PICKER_CLOSE_KEYS } from '../js/build-mode.js';
+import { CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS } from '../js/build-camera.js';
 import { PHOTO_KEY } from '../js/photo.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 import { CONTROL_REFERENCE_LABEL } from '../js/control-settings.js';
@@ -209,28 +210,51 @@ test('the script writes every row the page marks, and marks every row it writes'
  * promising what the canvas does not do, which is the defect the list was
  * written to end.
  */
-test('every row of the builder list is a key some builder handler reads', () => {
-    const rows = Object.fromEntries(BUILD_HELP_ROWS.map(row => [row.id, row.codes]));
+test('every key row of the builder list is a key some builder handler reads', () => {
+    const rows = Object.fromEntries(BUILD_HELP_ROWS.map(row => [row.id, row]));
 
-    assert.equal(rows.leave, CANVAS_LEAVE_KEYS, 'the way out is read from the keys that leave a canvas');
-    assert.deepEqual(rows.help, [HELP_KEY], 'the list is collapsed by the same key as the flight\'s');
-    assert.deepEqual(rows.photo, [PHOTO_KEY], 'and a picture can be taken of a canvas like any screen');
+    assert.equal(rows.leave.keys[0], CANVAS_LEAVE_KEYS, 'the way out is read from the keys that leave a canvas');
+    assert.deepEqual(rows.help.keys, [[HELP_KEY]], 'the list is collapsed by the same key as the flight\'s');
+    assert.deepEqual(rows.photo.keys, [[PHOTO_KEY]], 'and a picture can be taken of a canvas like any screen');
+    assert.equal(rows.reframe.keys[0], REFRAME_KEYS, 'the hold is put back by the keys that do it');
+    assert.deepEqual(rows.move.keys,
+        [BUILD_MOVE_KEYS.forward, BUILD_MOVE_KEYS.left, BUILD_MOVE_KEYS.back, BUILD_MOVE_KEYS.right],
+        'and the view is moved by the keys the frame reads, in the order they are read out');
 
-    const read = new Set([...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY]);
-    for (const row of BUILD_HELP_ROWS) {
-        for (const code of row.codes) assert.ok(read.has(code), `${code} on the ${row.id} row is read by nothing`);
+    const read = new Set([
+        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS,
+        ...Object.values(BUILD_MOVE_KEYS).flat()
+    ]);
+    for (const row of BUILD_HELP_ROWS.filter(row => row.keys)) {
+        for (const code of row.keys.flat()) assert.ok(read.has(code), `${code} on the ${row.id} row is read by nothing`);
     }
 });
 
+/**
+ * The mouse rows are the gesture table's own entries rather than a description
+ * of them, so a press that stops driving the camera is a row that goes.
+ */
+test('every press on the builder list is one the camera takes', () => {
+    const presses = BUILD_HELP_ROWS.flatMap(row => row.presses ?? []);
+    assert.deepEqual([...presses].sort((a, b) => a.button - b.button), [...CAMERA_GESTURES].sort((a, b) => a.button - b.button),
+        'the list should name every gesture the camera reads, and no other');
+    for (const press of presses) assert.ok(CAMERA_GESTURES.includes(press), 'each one the table\'s own entry');
+});
+
 test('the builder list never offers the key a canvas leaves free', () => {
-    const named = BUILD_HELP_ROWS.flatMap(row => row.codes);
+    const named = BUILD_HELP_ROWS.flatMap(row => row.keys?.flat() ?? []);
     for (const code of PICKER_CLOSE_KEYS.filter(code => !CANVAS_LEAVE_KEYS.includes(code))) {
         assert.ok(!named.includes(code), `${code} leaves the picker but not a canvas`);
     }
 });
 
-test('the builder list reads as keys and then what they do', () => {
+test('the builder list reads as the input and then what it does', () => {
     assert.deepEqual(buildHelpLines().map(line => line.text), [
+        'Drag - Orbit',
+        'Middle Drag or Shift+Right Drag - Pan',
+        'Wheel - Zoom',
+        'W/A/S/D or ↑/←/↓/→ - Move',
+        'Home - Reframe',
         'Esc - Leave the Builder',
         'H - Collapse List',
         'F2 - Photo'

@@ -11,20 +11,6 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Builder pointer**: one router on the renderer's canvas, live only while
-  a canvas is open, capturing every drag at the press, keeping the wheel and the
-  context menu from the page and a finger from scrolling it, and handing the
-  pointer to the live tool
-  - From: Interactive Build Mode
-- [ ] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
-  hold, so a session opens on the frame it always has, with the wheel zooming no
-  further out than the hold, dragging orbiting and panning, the arrows and
-  `WASD` moving the target across the ground, and `Home` putting the hold back
-  - From: Interactive Build Mode
-- [ ] **A way back to the element editor**: the panel that moves an
-  environment's own ranges across the whole world, reachable again now that
-  `L` opens the builder
-  - From: Interactive Build Mode
 - [ ] **Footprints wrap**: a region drawn over one edge of the canvas continuing
   across the opposite one, so the built tile meets itself
   - From: Interactive Build Mode
@@ -103,29 +89,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Builder pointer**: one router on the renderer's canvas, live only while
-  a canvas is open, capturing every drag at the press, keeping the wheel and the
-  context menu from the page and a finger from scrolling it, and handing the
-  pointer to the live tool
-- [ ] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
-  hold, so a session opens on the frame it always has, with the wheel zooming no
-  further out than the hold, dragging orbiting and panning, the arrows and
-  `WASD` moving the target across the ground, and `Home` putting the hold back
-- [ ] **A way back to the element editor**: the panel that moves an
-  environment's own ranges across the whole world, reachable again now that
-  `L` opens the builder
-  - `1.0.0-alpha.1.34.0` moved `L` onto the builder, which was the only way
-    into the element editor. The panel, its state module, its tests and its
-    place in `index.html` are untouched and still do the one thing the builder
-    does not yet offer; nothing reaches them.
-  - The plan's answer is a section of Select's panel under the camera fields,
-    so there is one editor with two scopes rather than two editors - and that
-    waits on **One properties panel** and on **Select panel**. The plan listed
-    it as open rather than taken, because it retires the entry point of a
-    feature that has shipped.
-  - So the decision is whether to wait. Either name a way in that holds until
-    Select carries it, or say the panel stays unreachable until then and let
-    this item close when **Select shows what is selected** does.
 - [ ] **Footprints wrap**: a region drawn over one edge of the canvas continuing
   across the opposite one, so the built tile meets itself
 - [ ] **Footprinted elements**: an element drawn only where a footprint reaches,
@@ -221,6 +184,11 @@ the order the work unblocks itself in.
 - [ ] **Select shows what is selected**: the picked-up placement's own rows on
   Select's panel beneath the camera fields, so a committed batch's density and
   colour can still be changed
+  - **This is the item that brings the element editor back.** `L` moved to the
+    builder in `1.0.0-alpha.1.34.0`, and on 11.04.2026 the user decided to wait
+    for this rather than add an interim way in. So Select's panel also carries
+    the environment's own ranges - the element editor's rows, moved across the
+    whole world - as a section of its own, one editor with two scopes.
 - [ ] **A stroke's band is its ground**: a ground cover drawn with a footprint
   painting all of the ground under it and graded across that ground's own
   relief, worked out on each tile rather than once
@@ -239,11 +207,6 @@ the order the work unblocks itself in.
 - [ ] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
   panel row by ten points or ten steps, in every panel including the element
   editor's
-- [ ] **Drags keep the pointer**: every stroke, lasso and handle drag capturing
-  the pointer at the press, so the palette and the camera never see it
-  - Built by **Builder pointer**, which captures every drag at the press, so
-    every stroke, lasso and handle drag after it inherits the capture. Check
-    this off when that item lands rather than queue it.
 - [ ] **Placed runway**: a strip inserted where it was asked for rather than
   where the site search found room, graded to the ground under it on each tile
   and lifted clear of any water, with width, length and a rotation about its
@@ -396,38 +359,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 301 earlier items in `TODO-archive.md`, newest last.
+> 305 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Deck Cost**: the second cloud material is costed at one more draw call,
-  and a sprite is already a draw call of its own
-  - **Issue**: `js/weather.js:109` reads "The cost is one more 256 by 162
-    texture and one more draw call for the deck". The texture is right; the
-    draw call is not a figure the renderer supports. A `THREE.Sprite` in r160
-    is pushed into the render list as an object of its own and drawn with its
-    own call, so a 95-cloud deck is 95 calls whether the sprites share one
-    material or two. What the second material actually adds is material state
-    changes, and because the deck is transparent and therefore depth-sorted,
-    the two materials interleave down the sorted list - so it is many bindings
-    rather than one call. A reader sizing a third texture off this line would
-    budget it wrongly in both directions.
-  - **Goal**: cost it as what it is - one more texture, and the material
-    bindings an interleaved sort costs - or drop the figure rather than carry
-    an unmeasured one. Nothing in the repository reads
-    `renderer.info.render.calls`, so settle it there if a number is wanted:
-    draw a 95-cloud storm and read the count with one material and with two.
-  - From: Code Review Override - the comments the cloud mirror left behind
-- [x] **The builder in the menus**: `INTERACTIVE ENVIRONMENT BUILDER` last on
-  the title screen and on the pause menu, dropped from the pause menu while a
-  game mode is running, and opened through the one function `L` uses too
-  - From: Interactive Build Mode
-- [x] **Blank Canvas**: a sixth environment for the editor to start from, flat
-  ground under grass and nothing else, declared beside `ENVIRONMENTS` rather
-  than in them so it is a thing to build on rather than a thing to fly over
-  - From: Interactive Build Mode
-- [x] **Start picker**: the six cards the editor opens on, read off the
-  environment registry rather than written out, with Highlands the default and
-  a way back out
-  - From: Interactive Build Mode
 - [x] **The canvas**: one tile drawn rather than nine, at the size the world was
   before the endless grid replaced it, with the camera held over it and nothing
   about the flight's own edges touched
@@ -560,4 +493,49 @@ how the simulator got here rather than as a list still to be worked.
     each lands on the menu that opened the builder, the paused flight moves 0
     units, `Backspace` leaves the canvas where it is and still leaves the
     picker, and a tap on the 44-pixel tile leaves on a 390-pixel touch screen.
+  - From: Interactive Build Mode
+- [x] **Builder pointer**: one router on the renderer's canvas, live only while
+  a canvas is open, capturing every drag at the press, keeping the wheel and the
+  context menu from the page and a finger from scrolling it, and handing the
+  pointer to the live tool
+  - **Settled**: `setupBuilderPointer` in `js/main.js` attaches the listeners to
+    the renderer's canvas once, and every handler returns off a canvas. A press
+    is the camera's when `cameraGesture` in `js/build-camera.js` makes one of it
+    with the live tool, and is captured; the wheel listener is registered
+    `{ passive: false }`; the context menu is kept off only while a canvas is
+    open; and `touch-action: none` is set from `syncOverlays` for a canvas and
+    taken off with it. `Escape` during a drag ends the drag before it can ask to
+    leave. Confirmed in Chromium: a drag carried over the palette stays an
+    orbit, and over a flight the wheel and the right button are the page's.
+  - From: Interactive Build Mode
+- [x] **Build camera**: a target, a distance, a yaw and a pitch seeded from the
+  hold, so a session opens on the frame it always has, with the wheel zooming no
+  further out than the hold, dragging orbiting and panning, the arrows and
+  `WASD` moving the target across the ground, and `Home` putting the hold back
+  - **Settled**: `createBuildCamera` and the gestures over it in
+    `js/build-camera.js`, each returning new state. A session opens on the hold
+    to the unit; zoom stops at the hold and at 2% of the canvas; the pitch at 10
+    and 85 degrees; the target at the canvas's edge. Held keys move by the
+    clock's real delta at half the distance a second, and the camera is kept 40
+    units clear of the ground. `CANVAS_FAR` went from 2 to 2.5, because a target
+    panned to one corner at the hold's distance sees the opposite corner 34958
+    units away, past the 32000 the old multiple gave. The control list gained
+    the five rows, read from the same gesture table and key lists.
+  - From: Interactive Build Mode
+- [x] **A way back to the element editor**: the panel that moves an
+  environment's own ranges across the whole world, reachable again now that
+  `L` opens the builder
+  - **Settled**: decided by the user on 11.04.2026 - wait. The element editor
+    stays unreachable until **Select shows what is selected** carries it as a
+    section of Select's panel, with no interim key or row added that would have
+    to be retired. That item now says so, so it is the one that brings the
+    panel back.
+  - From: Interactive Build Mode
+- [x] **Drags keep the pointer**: every stroke, lasso and handle drag capturing
+  the pointer at the press, so the palette and the camera never see it
+  - Built by **Builder pointer**, which captures every drag at the press, so
+    every stroke, lasso and handle drag after it inherits the capture. Checked
+    off in `1.0.0-alpha.1.37.0` with that item rather than queued: confirmed in
+    Chromium, a drag begun on the canvas and carried over the palette stayed
+    the orbit it began as and pressed nothing.
   - From: Interactive Build Mode

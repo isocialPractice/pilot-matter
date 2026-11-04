@@ -3426,8 +3426,8 @@ test('a canvas stands the flight down rather than being drawn behind it', () => 
         'the frame should know whether a canvas is open');
     assert.match(frame[0], /if \(!canvas\) this\.flyOver\(/,
         'and not lay the grid out around the aircraft while one is');
-    assert.match(frame[0], /if \(canvas\) this\.trackCanvasCamera\(\);\s*\n\s*else this\.camera2\.update\(dt\);/,
-        'and hold the camera over the canvas rather than behind the aircraft');
+    assert.match(frame[0], /if \(canvas\) this\.trackCanvasCamera\(elapsed\);\s*\n\s*else this\.camera2\.update\(dt\);/,
+        'and hold the camera over the canvas rather than behind the aircraft, moved by the real clock');
     assert.match(frame[0], /buildModeShowing\(this\.builder\)/,
         'and freeze the clock for the whole session, picker included');
 });
@@ -3548,4 +3548,91 @@ test('H works the canvas\'s list before the way out reads the key', () => {
     assert.ok(help < leave, 'ahead of the way out');
     assert.match(keyed, /buildModeDrawing\(this\.builder\) && applyHelpKey/,
         'and only on a canvas, where the list is');
+});
+
+// --- The pointer and the camera on a canvas ----------------------------------
+
+/**
+ * The pointer reaches the canvas through one set of listeners on the renderer's
+ * own element. A wheel listener left passive cannot stop the page zooming under
+ * it, so how it is registered is the half of the claim source text can hold.
+ */
+test('the renderer\'s canvas listens for the pointer, with the wheel kept from the page', () => {
+    const wired = methodBody(mainSource, 'setupBuilderPointer');
+    assert.ok(wired, 'js/main.js should define setupBuilderPointer()');
+    assert.match(wired, /const surface = this\.renderer\.domElement;/, 'on the renderer\'s own canvas');
+
+    for (const name of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'lostpointercapture', 'contextmenu']) {
+        assert.ok(wired.includes(`addEventListener('${name}'`), `listening for ${name}`);
+    }
+    assert.match(wired, /addEventListener\('wheel',\s*\(e\) => this\.onCanvasWheel\(e\), \{ passive: false \}\)/,
+        'and for the wheel non-passively, so it can keep the page from zooming');
+    assert.match(wired, /if \(buildModeDrawing\(this\.builder\)\) e\.preventDefault\(\);/,
+        'the right button\'s menu kept off only while a canvas is open');
+
+    const setups = mainSource.match(/this\.setupBuilderPointer\(\);/g) ?? [];
+    assert.equal(setups.length, 1, 'attached once, for as long as the page is open');
+});
+
+/**
+ * The listeners are there for the whole page, so the flight is left alone by
+ * every one of them returning unless a canvas is open - by construction rather
+ * than by each remembering to be careful.
+ */
+test('every pointer handler on the canvas stands down unless a canvas is open', () => {
+    for (const name of ['onCanvasPress', 'onCanvasDrag', 'onCanvasWheel']) {
+        const body = methodBody(mainSource, name);
+        assert.ok(body, `js/main.js should define ${name}()`);
+        assert.match(body, /if \(!buildModeDrawing\(this\.builder\)/, `${name} should return off a canvas`);
+    }
+
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /cameraGesture\(e, buildModeTool\(this\.builder\)\)/,
+        'a press is the camera\'s only when the press and the live tool make a gesture');
+    assert.match(press, /setPointerCapture\(e\.pointerId\)/,
+        'and is captured, so a drag over the palette stays the drag it began as');
+
+    assert.match(methodBody(mainSource, 'onCanvasWheel'), /e\.preventDefault\(\);/,
+        'and the wheel is kept from the page');
+});
+
+test('a finger on a canvas is a gesture and not a scroll, and only on a canvas', () => {
+    assert.match(methodBody(mainSource, 'syncOverlays'),
+        /this\.renderer\.domElement\.style\.touchAction = canvas \? 'none' : '';/);
+});
+
+// Escape steps out of the innermost thing first, so a drag being made ends
+// where it is rather than the builder being left from under it.
+test('Escape ends a drag before it asks to leave', () => {
+    const keyed = methodBody(mainSource, 'onBuilderKey');
+    const ends  = keyed.indexOf('if (this.canvasDrag && isCanvasLeaveKey(e.code))');
+    const leave = keyed.indexOf('leavesBuilder(this.builder');
+
+    assert.ok(ends >= 0, 'the builder should end a drag on the leave key');
+    assert.ok(ends < leave, 'ahead of the way out');
+    assert.match(keyed.slice(ends), /^if \(this\.canvasDrag && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*return;/);
+});
+
+test('a held key moves the view by the frame, and leaving lets go of it', () => {
+    const keyed = methodBody(mainSource, 'onBuilderKey');
+    assert.match(keyed, /if \(isBuildMoveKey\(e\.code\)\) \{\s*e\.preventDefault\(\);\s*this\.buildKeys\.add\(e\.code\);/,
+        'a move key is held rather than acted on');
+
+    const frame = methodBody(mainSource, 'trackCanvasCamera');
+    assert.match(frame, /moveBuildCamera\(this\.buildCamera, moveIntent\(this\.buildKeys\), elapsed\)/,
+        'and the frame moves the view on the real clock');
+    assert.match(frame, /clearOfGround\(position, this\.terrain\.getTerrainHeightAt\(position\.x, position\.z\)\)/,
+        'with the camera kept above the ground under it');
+
+    assert.match(mainSource, /window\.addEventListener\('keyup', \(e\) => this\.buildKeys\.delete\(e\.code\)\);/);
+    assert.match(mainSource, /window\.addEventListener\('blur', \(\) => this\.buildKeys\.clear\(\)\);/);
+
+    const leaving = methodBody(mainSource, 'leaveBuilder');
+    assert.match(leaving, /this\.endCanvasDrag\(\);\s*this\.buildKeys\.clear\(\);/,
+        'and a drag or a held key does not outlive the canvas it was moving');
+});
+
+test('a canvas opens on a camera seeded from the hold', () => {
+    assert.match(methodBody(mainSource, 'startCanvas'),
+        /this\.buildCamera = createBuildCamera\(this\.terrain\.size\);/);
 });

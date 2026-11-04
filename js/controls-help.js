@@ -7,6 +7,9 @@
 
 import { DEFAULT_BINDINGS, keyLabel, UNBOUND_LABEL } from './key-bindings.js';
 import { CANVAS_LEAVE_KEYS } from './build-mode.js';
+import {
+    CAMERA_GESTURES, CAMERA_ORBIT, CAMERA_PAN, BUILD_MOVE_KEYS, REFRAME_KEYS
+} from './build-camera.js';
 import { PHOTO_KEY } from './photo.js';
 
 export const HELP_KEY = 'KeyH';
@@ -78,11 +81,16 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * The builder's control list: what a canvas answers to, and nothing that is
  * planned.
  *
- * Each row carries the codes its handler reads rather than a spelling of them,
- * so the list cannot name a key the canvas does not answer to, and a key moved
- * in the module that reads it is a row that moves with it. A binding the
- * builder gains adds its row here in the same commit, the way a tool adds its
- * tile to the palette.
+ * Each row carries what its handler reads rather than a spelling of it - the
+ * key lists for a key, the gesture table's entries for a press, and the wheel
+ * for the wheel - so the list cannot name an input the canvas does not answer
+ * to, and an input moved in the module that reads it is a row that moves with
+ * it. A binding the builder gains adds its row here in the same commit, the way
+ * a tool adds its tile to the palette.
+ *
+ * A key row's `keys` is a list of controls, each a list of the codes that work
+ * it, read down the alternatives the way the flight's rows are: the move row is
+ * four controls of two keys each, and reads `W/A/S/D or ↑/←/↓/→`.
  *
  * The rows hold codes and are turned into text by `buildHelpLines`, not here:
  * `keyLabel` belongs to a module this one is in an import cycle with, and a
@@ -90,17 +98,46 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * `js/reserved-keys.js` describes.
  */
 export const BUILD_HELP_ROWS = Object.freeze([
-    { id: 'leave', label: 'Leave the Builder', codes: CANVAS_LEAVE_KEYS },
-    { id: 'help',  label: 'Collapse List',     codes: [HELP_KEY] },
-    { id: 'photo', label: 'Photo',             codes: [PHOTO_KEY] }
+    { id: 'orbit',   label: 'Orbit',   presses: CAMERA_GESTURES.filter(entry => entry.gesture === CAMERA_ORBIT) },
+    { id: 'pan',     label: 'Pan',     presses: CAMERA_GESTURES.filter(entry => entry.gesture === CAMERA_PAN) },
+    { id: 'zoom',    label: 'Zoom',    wheel: true },
+    {
+        id: 'move', label: 'Move',
+        keys: [BUILD_MOVE_KEYS.forward, BUILD_MOVE_KEYS.left, BUILD_MOVE_KEYS.back, BUILD_MOVE_KEYS.right]
+    },
+    { id: 'reframe', label: 'Reframe',           keys: [REFRAME_KEYS] },
+    { id: 'leave',   label: 'Leave the Builder', keys: [CANVAS_LEAVE_KEYS] },
+    { id: 'help',    label: 'Collapse List',     keys: [[HELP_KEY]] },
+    { id: 'photo',   label: 'Photo',             keys: [[PHOTO_KEY]] }
 ].map(row => Object.freeze(row)));
+
+/** What a press is called on the list, by the button it is made with. */
+const PRESS_LABELS = ['Drag', 'Middle Drag', 'Right Drag'];
+
+/** The keys of a row, read down the alternatives rather than across the controls. */
+function keysText(controls) {
+    const depth = Math.max(0, ...controls.map(codes => codes.length));
+    const alternatives = [];
+
+    for (let at = 0; at < depth; at++) {
+        const keys = controls.map(codes => codes[at]).filter(Boolean).map(keyLabel);
+        if (keys.length) alternatives.push(keys.join('/'));
+    }
+
+    return alternatives.join(' or ');
+}
+
+/** A row's presses, each named for its button and whether `shift` is held with it. */
+function pressText(presses) {
+    return presses.map(press => `${press.shift ? 'Shift+' : ''}${PRESS_LABELS[press.button]}`).join(' or ');
+}
 
 /** The builder's list, as the lines it is written on screen, in its order. */
 export function buildHelpLines() {
-    return BUILD_HELP_ROWS.map(row => ({
-        id: row.id,
-        text: `${row.codes.map(keyLabel).join('/')} - ${row.label}`
-    }));
+    return BUILD_HELP_ROWS.map(row => {
+        const input = row.keys ? keysText(row.keys) : row.presses ? pressText(row.presses) : 'Wheel';
+        return { id: row.id, text: `${input} - ${row.label}` };
+    });
 }
 
 export function createHelpState(expanded = true) {

@@ -223,6 +223,22 @@ Five more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
 Pipeline order: landforms, ground cover, water, cuts and built things, snow,
 runway last.
 
+## Builder canvas
+
+A canvas carries the tools that work down the left and its own control list in
+the corner. `ACCEPT AND EXIT` and `Esc` are the one way out, back to whichever
+menu opened the builder; `Backspace` leaves the picker but not a canvas.
+
+| Input | Does |
+|-------|------|
+| Drag, or one finger | Orbit the view about the middle of the screen |
+| Middle drag, or `Shift` and right drag | Pan, the ground following the pointer |
+| Wheel | Zoom, out no further than the whole canvas |
+| `W`/`A`/`S`/`D` or the arrows | Move across the ground, the way the view faces |
+| `Home` | Back to the view the canvas opened on |
+| `Esc` | End a drag being made, or leave the builder |
+| `H` | Collapse the control list, and open it again |
+
 ## Element editor
 
 The world being flown as the elements it was assembled from. Enter opens an

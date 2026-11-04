@@ -5,6 +5,74 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.37.0] - 2026-11-04
+
+The pointer and the keys reach a canvas: the view over one can be turned,
+slid, zoomed and moved, and put back where it opened.
+
+### Added
+
+- **The pointer on a canvas.** The renderer's own canvas listens for the
+  pointer, once, for as long as the page is open, and every handler stands down
+  unless a canvas is open - so the flight is left alone by construction, and
+  over a flight the wheel and the right button are the browser's as they always
+  were. A press the camera takes is captured, so a drag carried over the palette
+  or the control list stays the drag it began as and presses nothing. The wheel
+  listener is registered non-passive, so it zooms the view rather than the page;
+  the right button's menu is kept off a canvas, because `shift` and the right
+  button pans; and `touch-action: none` is set for a canvas and taken off with
+  it, so a finger dragged across one is a gesture rather than a scroll. `Esc`
+  during a drag ends the drag rather than the session.
+- **A camera that moves.** The view over a canvas is an orbit about a point on
+  the ground - a target, a distance, a yaw and a pitch, each a plain number -
+  seeded from the framing a canvas has always opened on, so a session that moves
+  nothing opens on exactly that frame. A drag turns it, the ground following the
+  pointer, held off both poles at 10 and 85 degrees. A middle drag pans it, and
+  so does `shift` with the right button, which is the pan a drawing tool will
+  reach the view by and the one a trackpad with no middle button has. The wheel
+  zooms by a share of the distance, out no further than the whole canvas and in
+  no nearer than 2% of it. `W`/`A`/`S`/`D` and the arrows move across the ground
+  the way the view faces, by the clock's real delta - the simulation's step is 0
+  for as long as the builder is open - at half the distance a second, and
+  `Home` puts the opening view back. The target stays over the canvas and the
+  camera stays 40 units clear of the ground under it. All of it is
+  `js/build-camera.js`, pure and returning new state, with the renderer's side a
+  few lines in `js/main.js`.
+- **The canvas's control list names all of it**: `Drag - Orbit`,
+  `Middle Drag or Shift+Right Drag - Pan`, `Wheel - Zoom`,
+  `W/A/S/D or ↑/←/↓/→ - Move` and `Home - Reframe` above the three it had. The
+  mouse rows are the gesture table's own entries and the key rows the lists the
+  frame reads, so the list cannot name an input the canvas does not answer to.
+  The cheat sheet carries the same as a **Builder canvas** table.
+
+### Changed
+
+- **A canvas's far plane reaches further.** `CANVAS_FAR` is 2.5 rather than 2.
+  The camera can now be taken to a target at a corner of the canvas at the
+  framing's distance, and from there the opposite corner is 34958 units away on
+  the default canvas - past the 32000 the old multiple drew to. The new one
+  covers the framing's distance and the diagonal from wherever the camera can
+  go.
+- **The element editor waits for Select's panel.** `L` moved to the builder in
+  `1.0.0-alpha.1.34.0`, which left the element editor with no way in. It stays
+  unreachable until Select's panel carries the environment's own ranges as a
+  section of its own, rather than gaining an interim key or row that would have
+  to be retired; the roadmap item that builds that panel now says so.
+
+Held in Node by `test/build-camera.test.js`, which drives every gesture over
+the state - the opening frame against the framing to the unit, each clamp, a key
+move at every yaw and its elapsed time, and the far plane against every corner
+from every place the camera can be taken, which fails at the old multiple - and
+by `test/controls-help.test.js` for the list. The wiring is read off
+`js/main.js` in `test/page.test.js`, and each new assertion there rejected the
+defect it names when that was put back: a passive wheel listener, a press
+handled off a canvas, `touch-action` left on for a flight, `Esc` leaving from
+under a drag, held keys moved on the stopped clock, the right button's menu
+taken from a flight, and held keys outliving the canvas. Settled in Chromium
+with real input: each gesture moves the view as described and nothing else,
+the page neither scrolls nor zooms, a held `W` moves the target and stops with
+the key, and the camera taken low and close over a hill stays above it.
+
 ## [1.0.0-alpha.1.36.0] - 2026-11-04
 
 A started canvas says how to leave it, and can be left by a pointer and a

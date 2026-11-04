@@ -17,7 +17,7 @@ import {
 import {
     createBuildState, openBuildMode, closeBuildMode, buildModeShowing,
     buildModePicking, buildModeDrawing, buildModeFrom, beginCanvas,
-    buildModeTool, chooseBuildTool, requestLeave, leavesBuilder,
+    buildModeTool, chooseBuildTool, requestLeave, leavesBuilder, isCanvasLeaveKey,
     isBuilderOpenKey, BUILDER_ENTRY_ID,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
@@ -26,7 +26,12 @@ import {
     createPickerState, pickerEntries, choosePickerEntry,
     CARD_ENTRY, PICKER_STARTED, PICKER_LEFT
 } from './build-picker.js';
-import { canvasCamera, canvasFarPlane, CANVAS_FOG } from './build-camera.js';
+import {
+    canvasFarPlane, CANVAS_FOG, createBuildCamera, buildCameraPosition,
+    orbitBuildCamera, panBuildCamera, zoomBuildCamera, moveBuildCamera, reframeBuildCamera,
+    cameraGesture, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
+    CAMERA_ORBIT
+} from './build-camera.js';
 import {
     createHelpState, applyHelpKey, expandHelp, toggleHelp, helpRowLines, buildHelpLines
 } from './controls-help.js';
@@ -257,6 +262,14 @@ class FlightSimulator {
         // canvas is a screen with nothing else on it to say what it answers to.
         this.buildHelpState = createHelpState(true);
 
+        // The camera over a canvas, as the orbit a pointer and the keys move;
+        // the drag being made on the canvas, if one is; and the move keys held
+        // down, which the frame reads rather than the key event, so a held key
+        // moves the view smoothly rather than at the rate keys repeat.
+        this.buildCamera = null;
+        this.canvasDrag  = null;
+        this.buildKeys   = new Set();
+
         // Whether the two menus are currently carrying the builder's entry, so
         // a card is drawn again when that changes rather than on every frame
         // something else did.
@@ -467,6 +480,7 @@ class FlightSimulator {
         this.drawPalette();
         this.drawBuildHelp();
         this.overlays.buildHelp.addEventListener('click', () => this.onBuildHelpClick());
+        this.setupBuilderPointer();
 
         this.setupKeys();
         this.applySettings();
@@ -850,6 +864,13 @@ class FlightSimulator {
         }, true);
 
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
+
+        // A move key held on a canvas is let go of on its release, wherever the
+        // release lands, and every one is let go of when the window loses the
+        // keys - a release made behind another window never arrives, and the
+        // view would slide on after it.
+        window.addEventListener('keyup', (e) => this.buildKeys.delete(e.code));
+        window.addEventListener('blur', () => this.buildKeys.clear());
     }
 
     onStartKey(e) {
@@ -1624,6 +1645,11 @@ class FlightSimulator {
     leaveBuilder() {
         const canvas = buildModeDrawing(this.builder);
 
+        // A drag or a held key does not outlive the canvas it was moving.
+        this.endCanvasDrag();
+        this.buildKeys.clear();
+        this.buildCamera = null;
+
         closeBuildMode(this.builder);
 
         if (canvas) {
@@ -1649,6 +1675,9 @@ class FlightSimulator {
         this.bounds = this.terrain.getBounds();
         this.hud.setBounds(this.bounds);
 
+        // The view a pointer and the keys move from here, seeded from the hold
+        // so the canvas opens on the frame it always has.
+        this.buildCamera = createBuildCamera(this.terrain.size);
         this.holdCanvasView();
 
         return true;
@@ -1683,13 +1712,103 @@ class FlightSimulator {
      * Written every frame rather than once, because the flight camera is what
      * would otherwise have placed it: `js/camera.js` chases an aircraft, and a
      * canvas has no aircraft to chase.
+     *
+     * The keys held down move the view here rather than in the key handler, by
+     * the clock's own `elapsed` - the simulation's step is 0 for as long as the
+     * builder is open - so a held key moves it smoothly and at one speed
+     * whatever rate the keyboard repeats at. And the camera is kept clear of the
+     * ground under it, so a view taken low over a hill is not one from inside it.
      */
-    trackCanvasCamera() {
-        const { position, target } = canvasCamera(this.terrain.size);
+    trackCanvasCamera(elapsed = 0) {
+        if (!this.buildCamera) this.buildCamera = createBuildCamera(this.terrain.size);
+        this.buildCamera = moveBuildCamera(this.buildCamera, moveIntent(this.buildKeys), elapsed);
+
+        const { position, target } = buildCameraPosition(this.buildCamera);
+        const stand = clearOfGround(position, this.terrain.getTerrainHeightAt(position.x, position.z));
 
         this.camera.up.set(0, 1, 0);
-        this.camera.position.set(position.x, position.y, position.z);
+        this.camera.position.set(stand.x, stand.y, stand.z);
         this.camera.lookAt(target.x, target.y, target.z);
+    }
+
+    // --- The pointer on a canvas ------------------------------------------
+
+    /**
+     * Listens for the pointer on the renderer's canvas, once, for as long as
+     * the page is open.
+     *
+     * Every handler returns at once unless a canvas is open, so the flight is
+     * untouched by construction rather than by each handler remembering to be
+     * careful. A press the camera takes is captured, so a drag that wanders
+     * over the palette or the control list stays the drag it began as; the
+     * wheel is kept from zooming the page; and the right button's menu is kept
+     * off the canvas, because shift and the right button pans.
+     */
+    setupBuilderPointer() {
+        const surface = this.renderer.domElement;
+
+        surface.addEventListener('pointerdown',        (e) => this.onCanvasPress(e));
+        surface.addEventListener('pointermove',        (e) => this.onCanvasDrag(e));
+        surface.addEventListener('pointerup',          (e) => this.onCanvasRelease(e));
+        surface.addEventListener('pointercancel',      (e) => this.onCanvasRelease(e));
+        surface.addEventListener('lostpointercapture', (e) => this.onCanvasRelease(e));
+        surface.addEventListener('wheel',              (e) => this.onCanvasWheel(e), { passive: false });
+        surface.addEventListener('contextmenu', (e) => {
+            if (buildModeDrawing(this.builder)) e.preventDefault();
+        });
+    }
+
+    /** A press on the canvas: the camera takes it if the press and the live tool make a gesture. */
+    onCanvasPress(e) {
+        if (!buildModeDrawing(this.builder) || this.canvasDrag) return;
+
+        const gesture = cameraGesture(e, buildModeTool(this.builder));
+        if (!gesture) return;
+
+        e.preventDefault();
+        this.renderer.domElement.setPointerCapture(e.pointerId);
+        this.canvasDrag = { pointer: e.pointerId, gesture, x: e.clientX, y: e.clientY };
+    }
+
+    /** The pointer moving under a drag: the camera turns or slides by how far it went. */
+    onCanvasDrag(e) {
+        const drag = this.canvasDrag;
+        if (!buildModeDrawing(this.builder) || !drag || e.pointerId !== drag.pointer) return;
+
+        const dx = e.clientX - drag.x;
+        const dy = e.clientY - drag.y;
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+
+        this.buildCamera = drag.gesture === CAMERA_ORBIT
+            ? orbitBuildCamera(this.buildCamera, dx, dy)
+            : panBuildCamera(this.buildCamera, dx, dy, {
+                viewHeight: this.renderer.domElement.clientHeight,
+                fov: this.camera.fov
+            });
+    }
+
+    /** The press let go of, cancelled, or its capture lost: the drag ends where it is. */
+    onCanvasRelease(e) {
+        if (this.canvasDrag && e.pointerId === this.canvasDrag.pointer) this.endCanvasDrag();
+    }
+
+    /** Ends the drag being made, if one is, and gives the pointer back. */
+    endCanvasDrag() {
+        const drag = this.canvasDrag;
+        if (!drag) return;
+
+        this.canvasDrag = null;
+        const surface = this.renderer.domElement;
+        if (surface.hasPointerCapture?.(drag.pointer)) surface.releasePointerCapture(drag.pointer);
+    }
+
+    /** The wheel over the canvas zooms the view, and nothing else - not the page. */
+    onCanvasWheel(e) {
+        if (!buildModeDrawing(this.builder)) return;
+
+        e.preventDefault();
+        this.buildCamera = zoomBuildCamera(this.buildCamera, wheelPixels(e.deltaY, e.deltaMode));
     }
 
     onBuilderKey(e) {
@@ -1699,6 +1818,31 @@ class FlightSimulator {
         if (buildModeDrawing(this.builder) && applyHelpKey(this.buildHelpState, e.code, true, e.repeat)) {
             this.syncOverlays();
             return;
+        }
+
+        if (buildModeDrawing(this.builder)) {
+            // Escape steps out of the innermost thing first: a drag being made
+            // ends where it is, and only a press with nothing in progress asks
+            // to leave.
+            if (this.canvasDrag && isCanvasLeaveKey(e.code)) {
+                this.endCanvasDrag();
+                return;
+            }
+
+            // A move key is held rather than acted on, so the frame moves the
+            // view for as long as it is down; the arrows would scroll a page
+            // given the chance.
+            if (isBuildMoveKey(e.code)) {
+                e.preventDefault();
+                this.buildKeys.add(e.code);
+                return;
+            }
+
+            if (isReframeKey(e.code)) {
+                e.preventDefault();
+                this.buildCamera = reframeBuildCamera(this.buildCamera);
+                return;
+            }
         }
 
         // The picker is the builder's first screen rather than a gate in front
@@ -2277,6 +2421,10 @@ class FlightSimulator {
         this.overlays.editor.style.display    = editor ? 'block' : 'none';
         this.overlays.picker.style.display    = picker ? 'block' : 'none';
         this.overlays.palette.style.display   = canvas ? 'grid' : 'none';
+        // A finger dragged across a canvas is a gesture, not a page being
+        // scrolled, so the browser is told before a finger arrives rather than
+        // after it has already taken the drag.
+        this.renderer.domElement.style.touchAction = canvas ? 'none' : '';
         this.overlays.buildHelp.style.display = canvas ? 'block' : 'none';
         this.overlays.buildHelpList.style.display = this.buildHelpState.expanded ? 'block' : 'none';
         this.overlays.buildHelpHint.style.display = this.buildHelpState.expanded ? 'none' : 'block';
@@ -2465,7 +2613,7 @@ class FlightSimulator {
         this.trackRescue();
         this.advanceRun(dt);
 
-        if (canvas) this.trackCanvasCamera();
+        if (canvas) this.trackCanvasCamera(elapsed);
         else this.camera2.update(dt);
 
         // The day moves on and the water moves with it: what the surface has to
