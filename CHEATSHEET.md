@@ -227,21 +227,30 @@ runway last.
 
 A canvas carries the tools that work down the left and its own control list in
 the corner. `ACCEPT AND EXIT` and `Esc` are the one way out, back to whichever
-menu opened the builder; `Backspace` leaves the picker but not a canvas.
+menu opened the builder, and both ask first; `Backspace` leaves the picker but
+not a canvas.
 
 | Input | Does |
 |-------|------|
-| Drag, or one finger | Orbit the view about the middle of the screen |
-| Middle drag, or `Shift` and right drag | Pan, the ground following the pointer |
+| Drag, or one finger, in Select | Orbit the view about the middle of the screen |
+| Middle drag in Select, or `Shift` and right drag | Pan, the ground following the pointer |
 | Wheel | Zoom toward the ground under the pointer, out no further than the whole canvas |
 | `W`/`A`/`S`/`D` or the arrows | Move across the ground, the way the view faces |
 | `Home` | Back to the view the canvas opened on |
-| `Esc` | End a drag being made, or leave the builder |
+| Click, or a finger, in Mountain | Drop a mountain there, or put the one in hand down there instead |
+| `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
+| `Enter` | Answer the question asked, on the button under the cursor |
 | `H` | Collapse the control list, and open it again |
 
 Down the right is the dock: `SELECTION MODE`, the camera written out as
 fields to read and type into, or the edit in hand with `ACCEPT` and `CANCEL`
 under it. Only its fields scroll, and the wheel over it scrolls them.
+
+The two questions open on `YES`; the arrows cross to `NO`, and `Esc` or a press
+off the panel calls the question off. `YES` on `ACCEPT EDITS` keeps the edit and
+stays, so keeping work never doubles as leaving; `YES` on `SAVE AND EXIT MODE`
+keeps what was built as the world flown and leaves. Choosing another tool with
+an edit in hand asks `ACCEPT EDITS` first.
 
 ## Element editor
 

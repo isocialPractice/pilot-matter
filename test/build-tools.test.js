@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     BUILD_TOOLS, BUILD_TOOL_IDS, BUILT_TOOLS, SELECT_TOOL, ACCEPT_TOOL,
-    isBuildTool, isBuiltTool, isChoosableTool, paletteTools
+    isBuildTool, isBuiltTool, isChoosableTool, paletteTools,
+    buildTool, dropsAtClick, derivedValues, droppedPlacement, toolPlacement
 } from '../js/build-tools.js';
+import { getElement } from '../js/environment/elements.js';
 
 // The twelve, in the order the tour walks them and the palette stacks them.
 test('the twelve tools are the tour\'s, in its order', () => {
@@ -29,8 +31,41 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is Select and the way out, and nothing else', () => {
-    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, ACCEPT_TOOL]);
+test('today the palette is Select, Mountain and the way out, and nothing else', () => {
+    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'mountain', ACCEPT_TOOL]);
+    assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');
+});
+
+// --- Mountain drops at a click --------------------------------------------------
+
+test('Mountain is the one tool that drops at a click, and its click settles the count', () => {
+    assert.deepEqual(BUILD_TOOLS.filter(tool => dropsAtClick(tool.id)).map(tool => tool.id), ['mountain']);
+    assert.deepEqual(derivedValues(buildTool('mountain')), { count: 1 });
+    assert.ok(Object.isFrozen(buildTool('mountain').derived), 'the declaration cannot be rewritten');
+    assert.deepEqual(derivedValues(buildTool(SELECT_TOOL)), {}, 'a tool with no gesture of its own settles nothing');
+    assert.ok('count' in getElement('mountain').ranges, 'and what it settles is a range the element declares');
+    assert.equal(buildTool('hammer'), null);
+});
+
+test('a dropped mountain is the panel\'s values, then the click\'s, then the point', () => {
+    const mountain = buildTool('mountain');
+    assert.deepEqual(droppedPlacement(mountain, { count: 12, height: [400, 600] }, { x: -301.6, y: 55, z: 7.5 }), {
+        type: 'mountain',
+        config: { count: 1, height: [400, 600], at: [-302, 8] }
+    }, 'a count carried in from a panel is overruled by the click, which drops one');
+    assert.deepEqual(droppedPlacement(mountain, null, { x: 0.2, z: -0.4 }).config.at, [0, 0]);
+    assert.ok(Object.is(droppedPlacement(mountain, {}, { x: -0.4, z: 0 }).config.at[0], 0), 'and never -0');
+});
+
+test('nothing is dropped off the ground, or by a tool that does not drop', () => {
+    const mountain = buildTool('mountain');
+    for (const point of [null, {}, { x: 1 }, { x: NaN, z: 1 }, { x: 1, z: -Infinity }]) {
+        assert.equal(droppedPlacement(mountain, {}, point), null, JSON.stringify(point));
+    }
+    assert.equal(droppedPlacement(buildTool(SELECT_TOOL), {}, { x: 0, z: 0 }), null);
+    assert.equal(droppedPlacement(null, {}, { x: 0, z: 0 }), null);
+    assert.deepEqual(toolPlacement(mountain, { at: [1, 2] }).config, { at: [1, 2] },
+        'the point goes to the configuration, not to a footprint');
 });
 
 /**

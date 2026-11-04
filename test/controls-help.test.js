@@ -20,6 +20,8 @@ import {
 import { CANVAS_LEAVE_KEYS, PICKER_CLOSE_KEYS } from '../js/build-mode.js';
 import { CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS } from '../js/build-camera.js';
 import { PHOTO_KEY } from '../js/photo.js';
+import { MENU_SELECT_KEYS } from '../js/menu.js';
+import { dropsAtClick } from '../js/build-tools.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 import { CONTROL_REFERENCE_LABEL } from '../js/control-settings.js';
 import {
@@ -214,6 +216,9 @@ test('every key row of the builder list is a key some builder handler reads', ()
     const rows = Object.fromEntries(BUILD_HELP_ROWS.map(row => [row.id, row]));
 
     assert.equal(rows.leave.keys[0], CANVAS_LEAVE_KEYS, 'the way out is read from the keys that leave a canvas');
+    assert.deepEqual(rows.answer.keys, [[MENU_SELECT_KEYS[0]]], 'a question is answered by the key a menu chooses with');
+    assert.equal(rows.drop.click, 'mountain', 'and the click is the tool that drops at one');
+    assert.equal(dropsAtClick(rows.drop.click), true);
     assert.deepEqual(rows.help.keys, [[HELP_KEY]], 'the list is collapsed by the same key as the flight\'s');
     assert.deepEqual(rows.photo.keys, [[PHOTO_KEY]], 'and a picture can be taken of a canvas like any screen');
     assert.equal(rows.reframe.keys[0], REFRAME_KEYS, 'the hold is put back by the keys that do it');
@@ -222,7 +227,7 @@ test('every key row of the builder list is a key some builder handler reads', ()
         'and the view is moved by the keys the frame reads, in the order they are read out');
 
     const read = new Set([
-        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS,
+        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS, ...MENU_SELECT_KEYS,
         ...Object.values(BUILD_MOVE_KEYS).flat()
     ]);
     for (const row of BUILD_HELP_ROWS.filter(row => row.keys)) {
@@ -250,12 +255,14 @@ test('the builder list never offers the key a canvas leaves free', () => {
 
 test('the builder list reads as the input and then what it does', () => {
     assert.deepEqual(buildHelpLines().map(line => line.text), [
-        'Drag - Orbit',
-        'Middle Drag or Shift+Right Drag - Pan',
+        'Drag (Select) - Orbit',
+        'Middle Drag (Select) or Shift+Right Drag - Pan',
         'Wheel - Zoom',
         'W/A/S/D or ↑/←/↓/→ - Move',
         'Home - Reframe',
-        'Esc - Leave the Builder',
+        'Click (Mountain) - Drop a Mountain',
+        'Esc - Accept Edits or Save and Exit',
+        'Enter - Answer a Question',
         'H - Collapse List',
         'F2 - Photo'
     ]);

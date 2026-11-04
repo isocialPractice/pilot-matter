@@ -359,13 +359,45 @@ export function blend({ light, dark }, t) {
  * preset asked for where it asked for something and the declared default where
  * it did not. Everything is clamped into the range it was declared with, so a
  * preset cannot configure an element outside what it says it supports.
+ *
+ * A configuration may also carry `at`, the point an element was dropped on,
+ * which is kept beside the ranges rather than among them - see `resolvePoint`.
  */
 export function resolveConfig(element, overrides = {}) {
+    const given  = overrides ?? {};
     const config = {};
     for (const [name, range] of Object.entries(element.ranges)) {
-        config[name] = resolveRange(range, overrides[name]);
+        config[name] = resolveRange(range, given[name]);
     }
+
+    const at = resolvePoint(given.at);
+    if (at) config.at = at;
     return config;
+}
+
+/**
+ * The point an element was dropped on, as `[x, z]` in the square's own frame -
+ * measured from its middle, so the same point lands in the same place on every
+ * tile of a world - or null for anything that is not a pair of finite numbers.
+ *
+ * Not a range. A click sets it rather than a panel, so it has no row to be
+ * drawn as and no bounds to be clamped into; it is carried through beside the
+ * ranges, and only a generator that reads it is moved by it. No preset carries
+ * one, so every preset is the ground it always was.
+ */
+export function resolvePoint(given) {
+    return Array.isArray(given) && given.length === 2 && given.every(Number.isFinite)
+        ? [given[0], given[1]]
+        : null;
+}
+
+/**
+ * An offset taken to the nearest repeat of a square `size` wide, so a distance
+ * measured with it is measured to the closest of a pattern's copies. A size of
+ * 0 leaves the offset as it is.
+ */
+export function wrapOffset(offset, size = 0) {
+    return size > 0 ? offset - size * Math.round(offset / size) : offset;
 }
 
 function resolveRange(range, given) {
@@ -523,8 +555,14 @@ const mountain = {
     },
 
     generate(field, config, random) {
-        const total  = config.count > 0 ? Math.round(config.count) : mountainCount(field.size);
+        // A mountain dropped at a point is one peak standing on it: the click
+        // said where and how many, so the count is not read. Measured to the
+        // nearest repeat of the square, so a peak dropped near an edge carries
+        // on across the seam into the next tile rather than stopping at it.
+        const at     = config.at ?? null;
+        const total  = at ? 1 : config.count > 0 ? Math.round(config.count) : mountainCount(field.size);
         const half   = field.size / 2 - field.size * 0.10;
+        const wrap   = at ? field.size : 0;
         const peaks  = [];
 
         // The bulk mode read once rather than per peak, and as the two answers
@@ -551,8 +589,14 @@ const mountain = {
             // two of the three questions below rather than adding a question
             // of its own, so a world laid in the mode has its peaks in the same
             // places as the same world laid out of it.
-            const x = field.originX + (random() * 2 - 1) * half;
-            const z = field.originZ + (random() * 2 - 1) * half;
+            //
+            // A peak dropped at a point spends the two draws its place would
+            // have taken and stands where it was dropped, so it takes from the
+            // stream exactly what a peak laid out of it does.
+            const drawnX = field.originX + (random() * 2 - 1) * half;
+            const drawnZ = field.originZ + (random() * 2 - 1) * half;
+            const x = at ? field.originX + at[0] : drawnX;
+            const z = at ? field.originZ + at[1] : drawnZ;
 
             // The footprint, as the two axes of the ellipse the bump is drawn
             // on. Held as a radius and a stretch rather than as the pair,
@@ -587,7 +631,7 @@ const mountain = {
             let added = 0;
             for (const m of peaks) {
                 added += mountainBump(
-                    ellipticalDistance(x - m.x, z - m.z, m.angle, m.stretch),
+                    ellipticalDistance(wrapOffset(x - m.x, wrap), wrapOffset(z - m.z, wrap), m.angle, m.stretch),
                     m.radius,
                     m.peak
                 );

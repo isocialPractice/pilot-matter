@@ -281,24 +281,28 @@
 
 <h2 id="builder-canvas-cheat">Builder canvas</h2>
 
-<p>A canvas carries the tools that work down the left and its own control list in the corner. <code>ACCEPT AND EXIT</code> and <kbd>Esc</kbd> are the one way out, back to whichever menu opened the builder; <kbd>Backspace</kbd> leaves the picker but not a canvas.</p>
+<p>A canvas carries the tools that work down the left and its own control list in the corner. <code>ACCEPT AND EXIT</code> and <kbd>Esc</kbd> are the one way out, back to whichever menu opened the builder, and both ask first; <kbd>Backspace</kbd> leaves the picker but not a canvas.</p>
 
 <div class="table-wrap">
 <table>
     <thead><tr><th>Input</th><th>Does</th></tr></thead>
     <tbody>
-        <tr><td>Drag, or one finger</td><td>Orbit the view about the middle of the screen</td></tr>
-        <tr><td>Middle drag, or <kbd>Shift</kbd> and right drag</td><td>Pan, the ground following the pointer</td></tr>
+        <tr><td>Drag, or one finger, in Select</td><td>Orbit the view about the middle of the screen</td></tr>
+        <tr><td>Middle drag in Select, or <kbd>Shift</kbd> and right drag</td><td>Pan, the ground following the pointer</td></tr>
         <tr><td>Wheel</td><td>Zoom toward the ground under the pointer, out no further than the whole canvas</td></tr>
         <tr><td><kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd> or the arrows</td><td>Move across the ground, the way the view faces</td></tr>
         <tr><td><kbd>Home</kbd></td><td>Back to the view the canvas opened on</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>End a drag being made, or leave the builder</td></tr>
+        <tr><td>Click, or a finger, in Mountain</td><td>Drop a mountain there, or put the one in hand down there instead</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>End a drag being made, or ask <code>ACCEPT EDITS</code> with an edit in hand and <code>SAVE AND EXIT MODE</code> without</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>Answer the question asked, on the button under the cursor</td></tr>
         <tr><td><kbd>H</kbd></td><td>Collapse the control list, and open it again</td></tr>
     </tbody>
 </table>
 </div>
 
 <p>Down the right is the dock: <code>SELECTION MODE</code>, the camera written out as fields to read and type into, or the edit in hand with <code>ACCEPT</code> and <code>CANCEL</code> under it. Only its fields scroll, and the wheel over it scrolls them.</p>
+
+<p>The two questions open on <code>YES</code>; the arrows cross to <code>NO</code>, and <kbd>Esc</kbd> or a press off the panel calls the question off. <code>YES</code> on <code>ACCEPT EDITS</code> keeps the edit and stays, so keeping work never doubles as leaving; <code>YES</code> on <code>SAVE AND EXIT MODE</code> keeps what was built as the world flown and leaves. Choosing another tool with an edit in hand asks <code>ACCEPT EDITS</code> first.</p>
 
 <h2 id="element-editor-cheat">Element editor</h2>
 

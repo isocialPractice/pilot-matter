@@ -1301,6 +1301,28 @@ is drawn on each square's own ground, so anything it works out from the ground
 is worked out where it lands. A placement without a footprint is drawn exactly
 as it always was.
 
+A placement may carry a `seed`, any finite number, and then draws from a random
+stream of its own rather than the world's. A world's placements otherwise share
+one stream in the order they are applied, which is what makes a description the
+same world every time - and also means a placement added among them moves every
+draw after it. Seeded, it takes nothing the others were going to draw, so they
+stay where they were, and it draws the same values on every tile.
+
+A mountain's configuration may carry `at`, `[x, z]` in the same square's frame
+as a footprint, and is then one peak standing on that point whatever its
+`count` says - a mountain dropped somewhere rather than scattered. A peak near
+an edge carries on across it into the next square. `at` is a point rather than
+a range: it has no bounds and no row on a panel, and no preset uses it.
+
+```js
+{
+    type: 'mountain',
+    // One peak 600 tall, east and north of the middle.
+    config: { at: [2500, -1800], height: [600, 600] },
+    seed: 20260101
+}
+```
+
 Every range an element declares says which of six kinds it is, which is what a
 host reading `ELEMENTS` has to branch on and what a value handed to
 `resolveConfig` is read as:

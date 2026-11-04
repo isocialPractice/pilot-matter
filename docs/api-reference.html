@@ -1131,6 +1131,17 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
 
 <p>The kinds are <code>disc</code> (<code>x</code>, <code>z</code>, <code>radius</code>), <code>ring</code> (<code>points</code>, a closed outline of <code>[x, z]</code> pairs), <code>stroke</code> (<code>points</code> with a <code>stamp</code> of <code>width</code>, <code>depth</code> and <code>corner</code> swept along them), <code>rect</code> (<code>x</code>, <code>z</code>, <code>width</code>, <code>depth</code>, <code>angle</code>, <code>corner</code>) and <code>ellipse</code> (<code>x</code>, <code>z</code>, <code>radiusX</code>, <code>radiusZ</code>, <code>angle</code>), each with an optional <code>feather</code>: the width in world units of the band the element fades out across at the edge, two cells of the sampling where none is given. The coordinates are the square's own, measured from its middle, so the same footprint lands in the same place on every tile of a tiled world, and one drawn over an edge of the square carries on across the opposite edge - which is what lets a built square repeat as a world without a cut at its seams. The element is drawn on each square's own ground, so anything it works out from the ground is worked out where it lands. A placement without a footprint is drawn exactly as it always was.</p>
 
+<p>A placement may carry a <code>seed</code>, any finite number, and then draws from a random stream of its own rather than the world's. A world's placements otherwise share one stream in the order they are applied, which is what makes a description the same world every time - and also means a placement added among them moves every draw after it. Seeded, it takes nothing the others were going to draw, so they stay where they were, and it draws the same values on every tile.</p>
+
+<p>A mountain's configuration may carry <code>at</code>, <code>[x, z]</code> in the same square's frame as a footprint, and is then one peak standing on that point whatever its <code>count</code> says - a mountain dropped somewhere rather than scattered. A peak near an edge carries on across it into the next square. <code>at</code> is a point rather than a range: it has no bounds and no row on a panel, and no preset uses it.</p>
+
+<pre><code>{
+    type: 'mountain',
+    // One peak 600 tall, east and north of the middle.
+    config: { at: [2500, -1800], height: [600, 600] },
+    seed: 20260101
+}</code></pre>
+
 <p>Every range an element declares says which of six kinds it is, which is what a host reading <code>ELEMENTS</code> has to branch on and what a value handed to <code>resolveConfig</code> is read as:</p>
 
 <div class="table-wrap">

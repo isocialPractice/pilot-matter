@@ -4,7 +4,7 @@
  *
  * The palette draws only tools that work. A tile that does nothing is a row
  * that does nothing with a picture on it, and the pause menu already drops the
- * builder's own entry rather than show one of those. So the palette starts as
+ * builder's own entry rather than show one of those. So the palette started as
  * Select and the accept tool, and each tool joins `BUILT_TOOLS` in the commit
  * that makes it work, taking the place in the column the twelve give it.
  *
@@ -39,11 +39,17 @@ export const ACCEPT_TOOL = 'accept';
  * `heading` is what the tool's panel is headed, in the artwork's own words -
  * `SELECTION MODE`, `BUILD MOUNTAINS`, `INSERT RUNWAY` - where the artwork has
  * drawn one.
+ *
+ * `drops` marks a tool that places at a click rather than by dragging: the
+ * point clicked is the placement's `at`. `derived` holds the values the tool's
+ * own gesture settles, which its panel leaves off rather than showing and
+ * ignoring - a mountain dropped at a click is one mountain, so its count is
+ * the click's and not the pilot's to set to twelve and wonder why they got one.
  */
 export const BUILD_TOOLS = Object.freeze([
     { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false, heading: 'SELECTION MODE' },
     { id: 'lasso',     label: 'LASSO',           hint: 'Draw a region the tools below are clipped to', mindsLasso: false },
-    { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true,  element: 'mountain', heading: 'BUILD MOUNTAINS' },
+    { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true,  element: 'mountain', heading: 'BUILD MOUNTAINS', drops: true, derived: Object.freeze({ count: 1 }) },
     { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true,  element: 'grass', heading: 'BUILD GRASS' },
     { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand', heading: 'BUILD SAND' },
     { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER' },
@@ -66,7 +72,7 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * The tools that work today. A tool is added here in the commit that makes it
  * work, and not before, so the palette never offers one that does nothing.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'mountain', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {
@@ -101,6 +107,24 @@ export function toolForElement(type) {
     return BUILD_TOOLS.find(tool => tool.element != null && tool.element === type) ?? null;
 }
 
+/** One of the twelve by its id, or null. */
+export function buildTool(id) {
+    return BUILD_TOOLS.find(tool => tool.id === id) ?? null;
+}
+
+/** True for a tool that places what it builds at a click on the ground. */
+export function dropsAtClick(id) {
+    return buildTool(id)?.drops === true;
+}
+
+/**
+ * The values a tool's gesture settles for it, which its panel does not show.
+ * Empty for a tool whose panel shows every range its element declares.
+ */
+export function derivedValues(tool) {
+    return { ...(tool?.derived ?? {}) };
+}
+
 /**
  * The placement a tool makes from what its panel is holding.
  *
@@ -124,4 +148,23 @@ export function toolPlacement(tool, values = {}, drawn = null) {
     const placement = { type: tool?.element, config };
     if (drawn != null || Object.keys(shape).length > 0) placement.footprint = { ...(drawn ?? {}), ...shape };
     return placement;
+}
+
+/**
+ * The placement a tool that drops at a click makes there: its panel's values,
+ * then the values its gesture settles, then the point itself as `at` - in the
+ * canvas's frame, rounded to a whole unit, so the same click is the same
+ * placement written down.
+ *
+ * Null for a point that is not on the ground, which is a click over the sky or
+ * off the canvas, and for a tool that does not drop.
+ */
+export function droppedPlacement(tool, values = {}, point = null) {
+    if (tool?.drops !== true || !Number.isFinite(point?.x) || !Number.isFinite(point?.z)) return null;
+    return toolPlacement(tool, {
+        ...(values ?? {}),
+        ...derivedValues(tool),
+        // `|| 0` so a click a hair west of the middle is written 0, not -0.
+        at: [Math.round(point.x) || 0, Math.round(point.z) || 0]
+    });
 }

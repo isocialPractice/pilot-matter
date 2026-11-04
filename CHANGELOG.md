@@ -5,6 +5,105 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.42.0] - 2026-11-04
+
+The first tool that builds: Mountain drops a mountain where the ground is
+clicked, one placement each and edited alone - and the two questions that
+settle work in hand, asked by the accept tool, by `Esc` and by a change of
+tool, so nothing built is ever kept or dropped without being asked about.
+
+### Added
+
+- **Placed mountains.** `MOUNTAIN` joins the palette between Select and the way
+  out. With it live, a click or a tap on the ground drops a mountain there, in
+  hand: one peak standing on the point clicked, with its controls headed
+  `BUILD MOUNTAINS`. A click with one already in hand puts that one down there
+  instead, so it can be placed again before it is kept rather than a second
+  appearing. Its panel is the mountain's own ranges in the order the element
+  declares them - the artwork's `HEIGHT`, `RADIUS` and `GIRTH` first, the ways
+  of stretching a peak added since below them - less `COUNT`, which the click
+  settles at one. The next mountain starts from the panel as the last one left
+  it, kept or cancelled, rather than from the element's defaults.
+- **A point to drop on.** A mountain's configuration may carry `at`, `[x, z]`
+  in the square's own frame, and is then one peak on that point whatever its
+  count says. It is measured to the nearest repeat of the square, so a peak
+  dropped by an edge carries on across the seam into the next tile, and it
+  spends the same draws a peak laid out of the stream does. `at` is not a
+  range - `resolveConfig` carries it beside them - and no preset carries one.
+- **A stream of its own.** A placement may carry a `seed`, and then draws from
+  a random stream of its own rather than the world's; every mountain the
+  builder drops is seeded. A built placement is applied among a preset's by
+  type - a built mountain beside the preset's own, before its water and its
+  forest - and on the shared stream every draw after it moves: one mountain
+  dropped that way moved ground far from it on four of the five presets, up to
+  35,479 of 40,401 vertices on one. Seeded, nothing beyond its own slopes
+  moves, and it is the same mountain on every tile of the world.
+- **Accept and exit.** Neither the accept tool nor `Esc` leaves a canvas in one
+  press; each asks the one question that applies. With an edit in hand it is
+  `ACCEPT EDITS`, and both answers stay on the canvas - `YES` keeps the edit,
+  `NO` drops it - so keeping a batch of work never doubles as leaving. With
+  nothing in hand it is `SAVE AND EXIT MODE`: `YES` keeps what was built and
+  leaves, `NO` leaves the world as it was. Each is a small panel over the
+  canvas in the artwork's colours that opens on `YES` with the focus: the arrows
+  cross between the buttons, `Enter` answers, and `Esc` or a press anywhere off
+  the panel calls the question off with nothing settled. The accept tile is
+  named for the question it will ask, `Accept edits` or `Save and exit`, which
+  is also what `Esc` will ask.
+- **A tool change asks.** Choosing another tool with an edit in hand asks
+  `ACCEPT EDITS` before the tool or its panel changes: `YES` keeps the edit and
+  changes, `NO` drops it and changes, and calling it off leaves both where they
+  were. While a question is open nothing else moves - no tile, no click on the
+  ground, no key behind it.
+- **What `YES` keeps.** The canvas's environment becomes the one flown, chosen
+  in the settings as though it had been picked there, with what was built laid
+  over it in the list of placements the element editor hands to the ground.
+  A canvas opened on that environment again opens with it already committed,
+  so saving again keeps it as well as what was added. Another environment
+  chosen in the settings drops it, being ground it was never built on; turning
+  the strip on or off keeps it.
+
+### Changed
+
+- **Leaving from the pause menu with the world changed starts the flight
+  again.** With nothing changed it still resumes where the pause left it. With
+  a mountain kept, the ground under a parked aircraft may not be the ground it
+  was parked on, so the flight starts again from its start, the way a world
+  chosen in the settings does, until a resumed flight can be put back on top of
+  the new ground.
+- **The canvas's control list** names the click, `Click (Mountain) - Drop a
+  Mountain`, says what `Esc` asks, `Accept Edits or Save and Exit`, and how a
+  question is answered, `Enter - Answer a Question`. The two presses only Select
+  answers now say so - `Drag (Select) - Orbit` - since with Mountain live a drag
+  does nothing.
+
+Held in Node by `test/build-mode.test.js` - both questions and every answer to
+them from the way out and from a tool change, a question open holding every
+other change still, the click that drops and the click that moves, the seeds,
+and the panel carried to the next mountain - by the new
+`test/placed-mountain.test.js` - one peak on its point, its count ignored, the
+draws it spends, the seam it crosses, the stream of its own, every preset left
+as it was beyond its slopes, the panel's rows and what is kept - and by
+`test/build-tools.test.js`, `test/controls-help.test.js` and
+`test/page.test.js` for the tool, the list and the wiring. Each rejected the
+defect it names when that was put back, twenty-five in all: among them a
+dropped mountain drawn where the stream puts it, a peak stopping at the seam,
+a seeded placement sharing the world's stream, `Esc` leaving with nothing in
+hand, `YES` on `ACCEPT EDITS` running on into leaving, a confirm called off
+settling the edit, a tool change settling it without asking, a second click
+dropping a second mountain, a tile clicked under a question turning its way
+back to the editor into a tool change, a value stepped putting a moved mountain
+back, and a kept world resuming the flight in moved ground. Settled in Chromium
+in 38 checks across a desktop, the pause menu and a phone: a click raising the
+ground under it, `HEIGHT MIN` and `MAX` typed to 1200 standing it 1198 above
+the ground, a second click moving it and the ground where it stood going back,
+`Esc` then `Enter` keeping it and staying, `W` under a question moving its
+cursor rather than the view, `Enter` on the focused accept tile asking once and
+not running on, `NO` on a tool change dropping the mountain and changing the
+tool, `YES` on `SAVE AND EXIT MODE` drawing the flight's world with both
+mountains and the next canvas opening with them, the flight kept when nothing
+changed and started again when a mountain was kept, and a finger dropping,
+keeping and leaving on a phone.
+
 ## [1.0.0-alpha.1.41.0] - 2026-11-04
 
 The panel on the canvas: a dock down the right of the builder, drawn by one

@@ -11,18 +11,24 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Placed mountains**: a mountain dropped at a click, each one placement,
-  each edited alone
+- [ ] **Back to the built world**: the builder reopening straight onto what was
+  built rather than on the picker, with every earlier batch still a placement
+  that can be picked up and changed
+  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
+    environment a session kept opens with what it kept already committed -
+    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
+    second save keeps the first one's work. What is left is reopening straight
+    onto it rather than through the picker.
   - From: Interactive Build Mode
-- [ ] **Accept and exit**: the two confirms the artwork names, accepting the
-  pending edit and then saving and leaving, with the first skipped when nothing
-  is pending and the first returning to the editor rather than running on into
-  the second, so committing work never doubles as leaving
+- [ ] **Select a built element**: the placement under the pointer, found through
+  the footprints rather than off the scene because a built element has no mesh
+  to hit, with the one on top winning where two overlap, a click told from an
+  orbit by how far it travelled, and a click on bare ground dropping the pick
+  but never the lasso
   - From: Interactive Build Mode
-- [ ] **A tool change asks**: picking another tool with a draft pending asking
-  `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
-  discarding, and `Escape` staying where it was, so leaving a tool never decides
-  what happens to the work on it
+- [ ] **Selection highlight**: the hovered placement outlined lightly and the
+  chosen one firmly, on the overlay the lasso already draws on, so hovering and
+  picking rebuild no ground
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -139,8 +145,6 @@ the order the work unblocks itself in.
 - [ ] **Shift at the press, shift in the drag**: the key that adds a shape to a
   selection when it is held at the press, and keeps the shape square or round
   when it is pressed after the drag has begun
-- [ ] **Placed mountains**: a mountain dropped at a click, each one placement,
-  each edited alone
 - [ ] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
   the four, laying it by dragging a rounded-rectangle stamp swept whole along
   the stroke, whose width, depth and corner are on the panel in pixels and
@@ -152,6 +156,11 @@ the order the work unblocks itself in.
 - [ ] **Back to the built world**: the builder reopening straight onto what was
   built rather than on the picker, with every earlier batch still a placement
   that can be picked up and changed
+  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
+    environment a session kept opens with what it kept already committed -
+    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
+    second save keeps the first one's work. What is left is reopening straight
+    onto it rather than through the picker.
 - [ ] **Select shows what is selected**: the picked-up placement's own rows on
   Select's panel beneath the camera fields, so a committed batch's density and
   colour can still be changed
@@ -240,14 +249,11 @@ the order the work unblocks itself in.
   taken off the panel rather than shown and ignored, and given the value the
   footprint implies - the count going away while a selection is live, a ground
   cover's band going away when it is drawn, and drawn water's level with it
-- [ ] **Accept and exit**: the two confirms the artwork names, accepting the
-  pending edit and then saving and leaving, with the first skipped when nothing
-  is pending and the first returning to the editor rather than running on into
-  the second, so committing work never doubles as leaving
-- [ ] **A tool change asks**: picking another tool with a draft pending asking
-  `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
-  discarding, and `Escape` staying where it was, so leaving a tool never decides
-  what happens to the work on it
+  - **The mountain's count already goes.** A mountain dropped at a click is one
+    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
+    is a `derived` value on the tool, left off the panel by `panelRanges` for
+    any placement carrying `at`. What is left is the cover band and drawn
+    water's level, which a footprint rather than a click settles.
 - [ ] **Builder settings**: a settings screen for the builder's own
   preferences, declared and stored the way the game's two settings screens are,
   with a reset to defaults, and read by nothing that generates ground, so a
@@ -268,6 +274,10 @@ the order the work unblocks itself in.
 - [ ] **Re-seat the aircraft**: a flight resumed over ground that changed under
   it put back on top of that ground before the first frame is scored, so a
   mountain built where it was parked is not a crash on resume
+  - **Until then a changed world starts the flight again.** Since
+    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
+    passes `changed` to `leaveBuilder`, and the flight goes back to its start
+    rather than resuming in moved ground. This item is what lets it resume.
 - [ ] **Build mode controls help**: the builder's control list, grown by each
   item as it added a binding, carried into the docs and the cheat sheet beside
   the flight's and held to the code there the way the flight's is
@@ -327,40 +337,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 317 earlier items in `TODO-archive.md`, newest last.
+> 320 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **The built tile as a pattern**: a placement landing at the same canvas
-  coordinate on every tile, continuous across the seams, with anything levelled
-  to the ground levelled on the tile it is drawn on
-  - **Settled**: a footprint is weighed with the tile's own origin taken off
-    each vertex and the canvas size as its wrap, so the same placement covers
-    the same vertices on tiles four apart and the ground at a seam is the same
-    from both tiles. The element is drawn on each tile's own ground, so a level
-    fills each tile's own low ground inside the one footprint.
-    `tileElements` needed no change: a footprinted placement goes to every tile
-    and a runway still to the home tile alone.
-  - From: Interactive Build Mode
-- [x] **Build mode state**: the twelve tools, the draft, and the rule that an
-  accept always commits while a cancel always discards, as a pure module with
-  its own tests
-  - **Settled**: `js/build-mode.js` holds `placements` and `draft`, with
-    `startDraft`, `reviseDraft`, `acceptDraft`, `cancelDraft` and
-    `builtPlacements`, every placement copied in and out. The twelve carry the
-    tour's minds-the-lasso column in `js/build-tools.js`. With an edit pending,
-    `requestLeave` answers `ACCEPT EDITS` and a tool change waits rather than
-    settling it - the confirm that answers both arrives with **Accept and
-    exit** and **A tool change asks**, which have to land with or before the
-    first tool that begins an edit.
-  - From: Interactive Build Mode
-- [x] **Re-edit a committed element**: a draft that knows what it stands on, so
-  accepting swaps the placement it replaces and cancelling puts that placement
-  back rather than deleting it
-  - **Settled**: `pickUpPlacement` copies a committed placement into the draft
-    with the index it `replaces`, leaving the original in the list throughout;
-    accepting swaps it in place, cancelling leaves the original as it was
-    committed, and while it is being edited `builtPlacements` shows the edit in
-    its place.
-  - From: Interactive Build Mode
 - [x] **Ground picking**: the canvas point under the pointer, raycast against
   the ground rather than projected onto a plane, so a tilted view still lands on
   what it is pointing at
@@ -438,4 +416,39 @@ how the simulator got here rather than as a list still to be worked.
     screen the dock runs across the foot and the list moves under the palette,
     collapsed on a machine with no keyboard. Confirmed in a 420-pixel window
     and on a 390-pixel phone.
+  - From: Interactive Build Mode
+- [x] **Placed mountains**: a mountain dropped at a click, each one placement,
+  each edited alone
+  - **Settled**: `MOUNTAIN` is built; a click is `dropDraft` in
+    `js/build-mode.js`, making `droppedPlacement` from `js/build-tools.js` - the
+    panel's values, the tool's `derived` count of one, and the point as `at` -
+    and a click with one in hand moves it rather than adding another. The
+    generator honours `at` as one peak measured to the nearest repeat of the
+    square, spending the draws it always did. Each drop carries a `seed` and
+    `applyFootprintedElement` gives a seeded placement a stream of its own:
+    without it one mountain moved ground far from it on four presets of five.
+    The panel is every range the mountain declares, less the count the click
+    settles - the artwork's six lead in its order, the ranges added since
+    follow - and the next mountain starts from where the panel was left.
+  - From: Interactive Build Mode
+- [x] **Accept and exit**: the two confirms the artwork names, accepting the
+  pending edit and then saving and leaving, with the first skipped when nothing
+  is pending and the first returning to the editor rather than running on into
+  the second, so committing work never doubles as leaving
+  - **Settled**: `requestLeave` asks `ACCEPT EDITS` or `SAVE AND EXIT MODE` and
+    `answerConfirm` settles it; one panel, `#build-confirm`, opens on `YES` with
+    the focus, and `Esc` or a press off it calls it off. `YES` keeps the
+    canvas's environment as the one flown with what was built laid over it in
+    the element editor's placements, and the next canvas on it opens with that
+    committed. From the pause menu with the world changed the flight starts
+    again, until `Re-seat the aircraft`. Confirmed in Chromium, including
+    `Enter` on the focused tile asking once and not running on.
+  - From: Interactive Build Mode
+- [x] **A tool change asks**: picking another tool with a draft pending asking
+  `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
+  discarding, and `Escape` staying where it was, so leaving a tool never decides
+  what happens to the work on it
+  - **Settled**: `chooseBuildTool` opens `ACCEPT EDITS` with the tool held in
+    the question, and `answerConfirm` changes it once answered. While a question
+    is open no tile, click or key behind it changes anything.
   - From: Interactive Build Mode

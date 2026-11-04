@@ -3437,11 +3437,14 @@ test('opening a canvas draws one tile of it, with no strip and the camera held o
     assert.ok(body, 'js/main.js should define startCanvas()');
 
     assert.match(body[0], /this\.terrain\.setCanvas\(true\)/, 'one tile rather than nine');
-    assert.match(body[0], /setEnvironment\(environmentId, \{ runway: false \}\)/,
-        'on the canvas the picker chose, with nothing prepared to arrive on');
+    assert.match(body[0],
+        /setEnvironment\(environmentId, \{\s*runway: false,\s*elements: canvasElements\(getEnvironment\(environmentId\), this\.builder\)\s*\}\)/,
+        'on the canvas the picker chose, with nothing prepared to arrive on and drawn from what is on it');
+    assert.match(body[0], /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\)\)/,
+        'which opens with what an earlier session kept on it already committed');
     assert.match(body[0], /this\.holdCanvasView\(\)/, 'and the camera held over it');
 
-    const leaving = mainSource.match(/leaveBuilder\(\)\s*\{[\s\S]*?\n    \}/);
+    const leaving = mainSource.match(/leaveBuilder\(changed = false\)\s*\{[\s\S]*?\n    \}/);
     assert.ok(leaving, 'js/main.js should define leaveBuilder()');
     assert.match(leaving[0], /this\.terrain\.setCanvas\(false\)/, 'and leaving puts the grid back');
     assert.match(leaving[0], /this\.releaseCanvasView\(\)/, 'with the flight camera and its fog');
@@ -3466,9 +3469,9 @@ test('leaving a canvas restores the flight world rather than choosing a new one'
     assert.match(mainSource, /\n\s*restored\s*\n\s*\}\)\) this\.aircraft\.reset\(\);/,
         'with the restore among what it reads');
 
-    const leaving = mainSource.match(/leaveBuilder\(\)\s*\{[\s\S]*?\n    \}/);
-    assert.match(leaving[0], /this\.refreshWorld\(\{ restored: !titleShowing\(this\.titleState\) \}\)/,
-        'leaving a canvas should say the flight world is being restored');
+    const leaving = mainSource.match(/leaveBuilder\(changed = false\)\s*\{[\s\S]*?\n    \}/);
+    assert.match(leaving[0], /this\.refreshWorld\(\{ restored: !titleShowing\(this\.titleState\) && !changed \}\)/,
+        'leaving a canvas should say the flight world is being restored - unless a kept world changed it');
     assert.ok(!/this\.refreshWorld\(\);/.test(leaving[0]),
         'and never ask for the plain refresh, which reads a restore as a world that changed');
 });
@@ -3587,8 +3590,10 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     }
 
     const press = methodBody(mainSource, 'onCanvasPress');
-    assert.match(press, /cameraGesture\(e, buildModeTool\(this\.builder\)\)/,
+    assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
+    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*return;\s*\}/,
+        'and a plain press of the main button is a tool\'s that drops at a click');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
 
@@ -3748,4 +3753,85 @@ test('on a narrow screen the dock runs across the foot and the list moves clear 
     assert.match(narrow[1], /bottom:\s*10px/, 'across the foot');
     assert.match(narrow[1], /max-height:\s*40vh/, 'leaving most of the canvas to be seen');
     assert.match(narrow[2], /top:\s*150px/, 'and the list moved up under the palette');
+});
+
+// --- The two confirms, and a mountain dropped at a click -----------------------------
+
+test('the page carries one confirm panel, a dialog with a heading and a menu of two buttons', () => {
+    assert.match(indexHtml,
+        /<div id="build-confirm">\s*<div id="build-confirm-panel" role="alertdialog" aria-modal="true" aria-labelledby="build-confirm-heading" tabindex="-1">\s*<h3 id="build-confirm-heading"><\/h3>\s*<ul id="build-confirm-menu"><\/ul>\s*<\/div>\s*<\/div>/,
+        'the heading and the buttons are written by the script, from the session');
+
+    const layer = indexHtml.match(/#build-confirm \{([^}]*)\}/);
+    assert.ok(layer, 'index.html should style the layer the panel stands on');
+    assert.match(layer[1], /inset:\s*0/, 'across the whole screen, so the palette, the dock and the canvas wait');
+    assert.match(indexHtml, /#build-confirm-menu li\[data-entry="yes"\] \{[^}]*background:\s*#90c090/, 'a green YES');
+    assert.match(indexHtml, /#build-confirm-menu li\[data-entry="no"\] \{[^}]*background:\s*#8b7355/, 'and a tan NO');
+});
+
+test('the confirm is drawn over a canvas only while it is asking, headed for its question', () => {
+    const sync = methodBody(mainSource, 'syncOverlays');
+    assert.match(sync, /const asking = canvas \? buildConfirm\(this\.builder\) : null;/);
+    assert.match(sync, /this\.overlays\.confirm\.style\.display = asking \? 'flex' : 'none';/);
+    assert.match(sync, /this\.overlays\.confirmHeading\.textContent = asking \? CONFIRM_HEADINGS\[asking\] : '';/);
+    assert.match(sync, /this\.confirmMenu\.render\(this\.confirmState\);/);
+});
+
+test('the accept tile is named for the question it will ask, and Escape asks the same one', () => {
+    const sync = methodBody(mainSource, 'syncOverlays');
+    assert.match(sync, /const name = acceptToolName\(this\.builder\);\s*tile\.title = `\$\{name\} \(Esc\)`;\s*tile\.setAttribute\('aria-label', name\);/);
+});
+
+test('an open confirm takes every key before anything on the canvas reads one', () => {
+    const keys = methodBody(mainSource, 'onBuilderKey');
+    const confirm = keys.indexOf('confirmOpen(this.builder)');
+    assert.ok(confirm >= 0, 'onBuilderKey should ask whether a confirm is open');
+    for (const later of ['applyHelpKey', 'isBuildMoveKey', 'isReframeKey', 'leavesBuilder']) {
+        assert.ok(keys.indexOf(later) > confirm, `${later} is read only once no confirm is asking`);
+    }
+    assert.match(keys, /if \(buildModeDrawing\(this\.builder\) && confirmOpen\(this\.builder\)\) \{\s*this\.onConfirmKey\(e\);\s*return;\s*\}/);
+
+    const answer = methodBody(mainSource, 'onConfirmKey');
+    assert.match(answer, /if \(isCanvasLeaveKey\(e\.code\)\) \{\s*e\.preventDefault\(\);\s*this\.answerBuildConfirm\(CONFIRM_STAY\);/,
+        'Escape calls the question off');
+    assert.match(answer, /const chosen = applyMenuKey\(this\.confirmState, e\.code, true, e\.repeat\);\s*if \(chosen\) this\.answerBuildConfirm\(chosen\);/,
+        'and Enter answers the button under the cursor');
+});
+
+test('a confirm opens on YES with the focus, and a press off it calls it off', () => {
+    const opened = methodBody(mainSource, 'confirmOpened');
+    assert.match(opened, /resetSelection\(this\.confirmState\);/);
+    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view behind it');
+    assert.match(opened, /this\.overlays\.confirmPanel\.focus\(\{ preventScroll: true \}\);/,
+        'so Enter answers it rather than pressing the tile last clicked');
+
+    assert.match(mainSource,
+        /this\.overlays\.confirm\.addEventListener\('click', \(e\) => \{\s*if \(e\.target === this\.overlays\.confirm\) this\.answerBuildConfirm\(CONFIRM_STAY\);/);
+    assert.match(methodBody(mainSource, 'requestLeaveBuilder'), /else if \(asked\?\.confirm\) this\.confirmOpened\(\);/);
+    assert.match(methodBody(mainSource, 'onPaletteClick'),
+        /else if \(!chooseBuildTool\(this\.builder, id\) && confirmOpen\(this\.builder\)\) this\.confirmOpened\(\);/,
+        'and a tool change that asks opens it the same way');
+});
+
+test('an answer leaves, keeping the built world on YES, or settles the edit and redraws', () => {
+    const answer = methodBody(mainSource, 'answerBuildConfirm');
+    assert.match(answer, /const answered = answerConfirm\(this\.builder, answer\);/);
+    assert.match(answer,
+        /if \(answered\.leave\) \{\s*const changed = answered\.keep && this\.saveBuiltWorld\(answered\.environment, answered\.placements\);\s*this\.leaveBuilder\(changed\);/);
+    assert.match(answer, /else if \(answered\.settled\) \{\s*this\.draftHolder = null;\s*this\.redrawCanvas\(\);/);
+
+    const save = methodBody(mainSource, 'saveBuiltWorld');
+    assert.match(save, /chooseSetting\(this\.settings, environment\);/, 'the canvas\'s environment becomes the one flown');
+    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements\);/,
+        'with what was built held where an edited world already lives');
+    assert.match(save, /return this\.flightWorldKey\(\) !== before;/, 'and says whether the flight\'s world changed');
+});
+
+test('a click with a tool that drops picks the ground and drops there', () => {
+    const drop = methodBody(mainSource, 'dropAt');
+    assert.match(drop, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);\s*if \(!point \|\| !dropDraft\(this\.builder, point\)\) return;/);
+    assert.match(drop, /this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);/, 'and the ground is drawn with it');
+    assert.match(methodBody(mainSource, 'syncOverlays'),
+        /this\.renderer\.domElement\.style\.cursor = canvas && dropsAtClick\(live\) \? 'crosshair' : '';/,
+        'over ground marked as somewhere to click');
 });

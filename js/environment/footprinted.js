@@ -55,9 +55,13 @@ import { footprintSampler } from './footprints.js';
  *   and colour come across; giving it a surface of its own is the per-vertex
  *   water line, which arrives with drawn water.
  *
+ * A placement carrying a `seed` draws from a stream of its own rather than from
+ * `random` - see `placementRandom`.
+ *
  * Returns whatever the element's generator counted, as `applyElement` does.
  */
 export function applyFootprintedElement(field, placement, random = createRandom()) {
+    random = placementRandom(placement, random);
     if (placement?.footprint == null) return applyElement(field, placement, random);
 
     const weigh = footprintSampler(placement.footprint, field.size);
@@ -80,4 +84,27 @@ export function applyFootprintedElement(field, placement, random = createRandom(
     field.runways.push(...draft.runways.slice(strips));
 
     return result;
+}
+
+/**
+ * The stream a placement draws from: its own, seeded from its `seed`, when it
+ * carries one, and the world's shared `random` when it does not.
+ *
+ * A preset's placements share one stream, in the order they are applied, which
+ * is what makes a described world the same world every time. A placement built
+ * on top of one is applied among them by type - a built mountain beside the
+ * preset's mountains, before its water and its forest - and taking from the
+ * shared stream there would move every draw after it: dropping one mountain
+ * would put the preset's forest, town and river somewhere else. Drawing from a
+ * stream of its own, it takes nothing the preset's elements were going to
+ * draw, so they stay where they were; and it draws the same values on every
+ * tile of a world and every time it is drawn, so a built mountain is the same
+ * mountain wherever the pattern repeats it.
+ *
+ * A seed is any finite number. Anything else is no seed, and the placement
+ * shares the world's stream as every placement did before seeds existed.
+ */
+export function placementRandom(placement, random = createRandom()) {
+    const seed = placement?.seed;
+    return Number.isFinite(seed) ? createRandom(seed) : random;
 }

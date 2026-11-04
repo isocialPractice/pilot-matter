@@ -4117,3 +4117,35 @@ still be found by name.
     level across, and its own later decision says drawing water never moves
     the sea, so the decision was followed.
   - From: Interactive Build Mode
+- [x] **The built tile as a pattern**: a placement landing at the same canvas
+  coordinate on every tile, continuous across the seams, with anything levelled
+  to the ground levelled on the tile it is drawn on
+  - **Settled**: a footprint is weighed with the tile's own origin taken off
+    each vertex and the canvas size as its wrap, so the same placement covers
+    the same vertices on tiles four apart and the ground at a seam is the same
+    from both tiles. The element is drawn on each tile's own ground, so a level
+    fills each tile's own low ground inside the one footprint.
+    `tileElements` needed no change: a footprinted placement goes to every tile
+    and a runway still to the home tile alone.
+  - From: Interactive Build Mode
+- [x] **Build mode state**: the twelve tools, the draft, and the rule that an
+  accept always commits while a cancel always discards, as a pure module with
+  its own tests
+  - **Settled**: `js/build-mode.js` holds `placements` and `draft`, with
+    `startDraft`, `reviseDraft`, `acceptDraft`, `cancelDraft` and
+    `builtPlacements`, every placement copied in and out. The twelve carry the
+    tour's minds-the-lasso column in `js/build-tools.js`. With an edit pending,
+    `requestLeave` answers `ACCEPT EDITS` and a tool change waits rather than
+    settling it - the confirm that answers both arrives with **Accept and
+    exit** and **A tool change asks**, which have to land with or before the
+    first tool that begins an edit.
+  - From: Interactive Build Mode
+- [x] **Re-edit a committed element**: a draft that knows what it stands on, so
+  accepting swaps the placement it replaces and cancelling puts that placement
+  back rather than deleting it
+  - **Settled**: `pickUpPlacement` copies a committed placement into the draft
+    with the index it `replaces`, leaving the original in the list throughout;
+    accepting swaps it in place, cancelling leaves the original as it was
+    committed, and while it is being edited `builtPlacements` shows the edit in
+    its place.
+  - From: Interactive Build Mode

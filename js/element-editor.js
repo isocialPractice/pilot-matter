@@ -131,6 +131,12 @@ export function createEditorState(environmentId, runway = false) {
         environmentId: null,
         runway: null,
         elements: [],
+        // What the builder built on this world and was told to keep, as the
+        // placements it committed - drawn after the world's own elements and
+        // held apart from them, because a built mountain dropped at a click is
+        // a placement with a point and a seed of its own rather than a row of
+        // ranges the panel steps.
+        built: [],
         // The element types the generated world had to hold off the strip, as
         // the strip itself reported them. Filled in by the caller after the
         // ground is built, because only the built ground knows.
@@ -156,6 +162,11 @@ export function createEditorState(environmentId, runway = false) {
  * never had that mountain. So a different world empties the panel and fills it
  * again from the preset, and the same world leaves the pilot's edits alone.
  *
+ * What the builder kept goes with the environment rather than with the strip:
+ * another environment drops it, being ground it was never built on, while
+ * turning the strip on or off keeps it - the strip is laid after it, and a
+ * start state changed in the settings is no reason to lose a built mountain.
+ *
  * Returns true when the panel was rebuilt.
  */
 export function setEditorWorld(state, environmentId, runway = false) {
@@ -164,6 +175,7 @@ export function setEditorWorld(state, environmentId, runway = false) {
 
     if (state.environmentId === wanted && state.runway === strip) return false;
 
+    if (state.environmentId !== wanted) state.built = [];
     state.environmentId = wanted;
     state.runway = strip;
     state.elements = editorElements(getEnvironment(wanted), strip);
@@ -173,6 +185,38 @@ export function setEditorWorld(state, environmentId, runway = false) {
     syncEditorEntries(state);
 
     return true;
+}
+
+/**
+ * Keeps what the builder built: the world goes back to the environment the
+ * canvas was opened on, as that environment describes it - which is the ground
+ * the canvas was drawn on - with the placements the session committed laid
+ * over it. What was kept before is replaced, because the canvas opened with it
+ * already committed and so what it hands back is the whole of the built world.
+ *
+ * `runway` is whether the start wants a strip, which is the flight's to say
+ * rather than the canvas's: the canvas is drawn without one, and the flight
+ * searches for one after everything built is down.
+ */
+export function keepBuiltWorld(state, environmentId, runway = false, placements = []) {
+    const wanted = getEnvironment(environmentId).id;
+
+    state.environmentId = wanted;
+    state.runway = runway === true;
+    state.elements = editorElements(getEnvironment(wanted), state.runway);
+    state.built = (Array.isArray(placements) ? placements : []).map(placement => structuredClone(placement));
+    state.typing = null;
+    syncEditorEntries(state);
+    return state;
+}
+
+/**
+ * What the builder kept on a world, as a copy, and nothing for any other world
+ * - which is what a canvas opened on that world starts with already committed.
+ */
+export function keptPlacements(state, environmentId) {
+    if (state.environmentId == null || state.environmentId !== getEnvironment(environmentId).id) return [];
+    return (state.built ?? []).map(placement => structuredClone(placement));
 }
 
 /** True when the world had to hold an element off the strip it cut. */
@@ -437,10 +481,13 @@ export function chooseEditorEntry(state, id, step = 1) {
  * live object would find the world it recorded changing underneath it.
  */
 export function editorPlacements(state) {
-    return state.elements.map(element => ({
-        type: element.type,
-        config: structuredCloneConfig(element.config)
-    }));
+    return [
+        ...state.elements.map(element => ({
+            type: element.type,
+            config: structuredCloneConfig(element.config)
+        })),
+        ...(state.built ?? []).map(placement => structuredClone(placement))
+    ];
 }
 
 // --- Typing a number into a row --------------------------------------------

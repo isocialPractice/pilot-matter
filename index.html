@@ -986,11 +986,11 @@
         }
 
         /* The builder's palette: the tools down the left of a canvas, as a
-           column of tiles two wide. It holds only the tools that work, so it
-           starts as two - Select, lit as the live tool, and the accept tool
-           across the foot of the column, which is the way out a pointer and a
-           finger can find. A tile is tall enough for a fingertip, and named in
-           text until the marks the builder ships are in the repository. */
+           column of tiles two wide. It holds only the tools that work - Select,
+           Mountain, and the accept tool across the foot of the column, which is
+           the way out a pointer and a finger can find - with the live tool lit.
+           A tile is tall enough for a fingertip, and named in text until the
+           marks the builder ships are in the repository. */
         #build-palette {
             display: none;
             position: fixed;
@@ -1174,6 +1174,83 @@
 
         .dock-action[data-action="cancel"] {
             border-color: rgba(255, 176, 0, 0.6);
+        }
+
+        /* The builder's two confirms, ACCEPT EDITS and SAVE AND EXIT MODE: a
+           small panel over the canvas rather than a screen of its own, drawn in
+           the artwork's colours - the navy body, the green tab it is headed in,
+           a green YES and a tan NO. The text on the green is navy rather than
+           the artwork's white, which reads at barely two to one on it. The
+           layer behind the panel takes every press, so the palette, the dock
+           and the canvas wait on the answer, and a press anywhere off the panel
+           calls the question off. */
+        #build-confirm {
+            display: none;
+            position: fixed;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.25);
+            z-index: 350;
+        }
+
+        #build-confirm-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 322px;
+            max-width: calc(100vw - 40px);
+            padding: 0 20px 22px;
+            font-family: 'Courier New', monospace;
+            background: #061d43;
+            border-radius: 13px;
+            outline: none;
+        }
+
+        #build-confirm-heading {
+            margin: 0 0 20px;
+            padding: 7px 28px 6px;
+            color: #061d43;
+            font-size: 15px;
+            letter-spacing: 2px;
+            background: #90c090;
+            border-radius: 0 0 6px 6px;
+        }
+
+        #build-confirm-menu {
+            display: flex;
+            gap: 28px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        #build-confirm-menu li {
+            width: 91px;
+            min-height: 33px;
+            padding: 7px 0;
+            font-size: 15px;
+            letter-spacing: 2px;
+            text-align: center;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        #build-confirm-menu li[data-entry="yes"] {
+            color: #061d43;
+            background: #90c090;
+        }
+
+        #build-confirm-menu li[data-entry="no"] {
+            color: #fff;
+            background: #8b7355;
+        }
+
+        /* The cursor, which the keys and the pointer both move: Enter answers
+           the button it is on, and it opens on YES. */
+        #build-confirm-menu li.selected {
+            border-color: #fff;
         }
 
         /* On a narrow screen there is no room down the side of the canvas, so
@@ -1676,6 +1753,13 @@
             <div id="build-help-rows"></div>
         </div>
         <div id="build-help-hint">H - CONTROL REFERENCE</div>
+    </div>
+
+    <div id="build-confirm">
+        <div id="build-confirm-panel" role="alertdialog" aria-modal="true" aria-labelledby="build-confirm-heading" tabindex="-1">
+            <h3 id="build-confirm-heading"></h3>
+            <ul id="build-confirm-menu"></ul>
+        </div>
     </div>
 
     <div id="low-altitude">LOW ALTITUDE<small>PULL UP</small></div>

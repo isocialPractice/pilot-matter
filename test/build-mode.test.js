@@ -6,7 +6,10 @@ import {
     beginCanvas, isBuilderOpenKey, isPickerCloseKey, isCanvasLeaveKey, leavesBuilder,
     requestLeave, buildModeTool, chooseBuildTool,
     draftPending, buildDraft, committedPlacements, startDraft, pickUpPlacement,
-    reviseDraft, acceptDraft, cancelDraft, builtPlacements, ACCEPT_EDITS,
+    reviseDraft, acceptDraft, cancelDraft, builtPlacements, ACCEPT_EDITS, SAVE_AND_EXIT,
+    confirmOpen, buildConfirm, answerConfirm, acceptToolName, dropDraft, placementSeed,
+    toolStartValues, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_YES, CONFIRM_NO, CONFIRM_STAY,
+    ACCEPTED, CANCELLED,
     BUILDER_LABEL, BUILDER_ENTRY_ID, BUILDER_OPEN_KEYS, PICKER_CLOSE_KEYS, CANVAS_LEAVE_KEYS,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE, BUILD_PICKER, BUILD_CANVAS
 } from '../js/build-mode.js';
@@ -214,19 +217,24 @@ test('which keys leave depends on the screen the session is on', () => {
 });
 
 /**
- * Nothing a session could keep exists yet, so asking to leave is leaving - from
- * the picker and from a canvas alike. The confirms are asked from this same
- * call once a tool can write something worth keeping.
+ * The picker is a panel with nothing built on it, so asking to leave it is
+ * leaving. A canvas always asks: with nothing in hand the question is
+ * `SAVE AND EXIT MODE`, whether or not anything was built - the select
+ * walkthrough states that branch - so a key that leaves a canvas is never a
+ * key that leaves in one press.
  */
-test('asking to leave an open session leaves, from either screen', () => {
+test('asking to leave the picker leaves, and asking to leave a canvas asks', () => {
     const picking = createBuildState();
     openBuildMode(picking, BUILD_FROM_PAUSE);
     assert.deepEqual(requestLeave(picking), { leave: true });
+    assert.equal(confirmOpen(picking), false, 'the picker asks nothing');
 
     const drawing = createBuildState();
     openBuildMode(drawing, BUILD_FROM_TITLE);
     beginCanvas(drawing, 'blank-canvas');
-    assert.deepEqual(requestLeave(drawing), { leave: true });
+    assert.deepEqual(requestLeave(drawing), { confirm: SAVE_AND_EXIT },
+        'a canvas with nothing built still asks whether to save');
+    assert.equal(buildConfirm(drawing), SAVE_AND_EXIT);
 
     assert.equal(buildModeShowing(drawing), true,
         'asking is not leaving - the caller leaves on the answer');
@@ -473,21 +481,26 @@ test('leaving with an edit pending asks ACCEPT EDITS rather than dropping it', (
     assert.deepEqual(requestLeave(state), { confirm: ACCEPT_EDITS });
     assert.equal(draftPending(state), true, 'asking is not answering: the edit is still in hand');
 
+    answerConfirm(state, CONFIRM_STAY);
     acceptDraft(state);
-    assert.deepEqual(requestLeave(state), { leave: true }, 'and with nothing pending it leaves');
+    assert.deepEqual(requestLeave(state), { confirm: SAVE_AND_EXIT },
+        'and with nothing pending it asks whether to save and leave');
 });
 
-test('a tool change waits while an edit is pending, leaving the edit where it was', () => {
+test('a tool change asks while an edit is pending, leaving the edit and the tool where they were', () => {
     const state = onCanvas();
     startDraft(state, PEAK);
     state.tool = 'mountain';
 
     assert.equal(chooseBuildTool(state, SELECT_TOOL), false);
-    assert.equal(buildModeTool(state), 'mountain', 'the tool has not changed');
+    assert.equal(buildConfirm(state), ACCEPT_EDITS, 'the change asks ACCEPT EDITS');
+    assert.equal(buildModeTool(state), 'mountain', 'the tool has not changed - nor its panel');
     assert.deepEqual(buildDraft(state), PEAK, 'and the edit is neither kept nor dropped by the click');
 
+    answerConfirm(state, CONFIRM_STAY);
     cancelDraft(state);
     assert.equal(chooseBuildTool(state, SELECT_TOOL), true, 'once it is settled, the tool changes');
+    assert.equal(confirmOpen(state), false, 'asking nothing');
 });
 
 test('a canvas begun from the picker begins from nothing built', () => {
@@ -516,4 +529,285 @@ test('which tools mind the lasso is the tour\'s own column', () => {
         assert.equal(mindsLasso(tool.id), TOUR_MINDS_LASSO[tool.id]);
     }
     assert.equal(mindsLasso('hammer'), false, 'and a name that is no tool minds nothing');
+});
+
+// --- The two confirms ---------------------------------------------------------------
+
+/** A canvas with Mountain live and a mountain dropped at the middle of it. */
+function withMountainDropped() {
+    const state = onCanvas();
+    chooseBuildTool(state, 'mountain');
+    dropDraft(state, { x: 0, y: 40, z: 0 });
+    return state;
+}
+
+test('a confirm is headed in the artwork\'s words and opens on YES', () => {
+    assert.deepEqual(CONFIRM_HEADINGS, { [ACCEPT_EDITS]: 'ACCEPT EDITS', [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE' });
+    assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.id), [CONFIRM_YES, CONFIRM_NO],
+        'YES first, so Enter on a confirm just opened keeps the work');
+    assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.label), ['YES', 'NO']);
+});
+
+test('YES on ACCEPT EDITS from the way out commits the edit and stays, so accepting is never leaving', () => {
+    const state = withMountainDropped();
+    requestLeave(state);
+
+    const answered = answerConfirm(state, CONFIRM_YES);
+    assert.deepEqual(answered, { settled: ACCEPTED, tool: 'mountain' });
+    assert.equal(buildModeDrawing(state), true, 'still on the canvas');
+    assert.equal(confirmOpen(state), false);
+    assert.equal(committedPlacements(state).length, 1, 'the mountain is kept');
+    assert.equal(buildModeTool(state), 'mountain', 'and the tool is the one it was');
+
+    assert.deepEqual(requestLeave(state), { confirm: SAVE_AND_EXIT },
+        'only the next ask, with nothing in hand, reaches SAVE AND EXIT MODE');
+});
+
+test('NO on ACCEPT EDITS from the way out drops the edit and stays', () => {
+    const state = withMountainDropped();
+    requestLeave(state);
+
+    assert.deepEqual(answerConfirm(state, CONFIRM_NO), { settled: CANCELLED, tool: 'mountain' });
+    assert.equal(buildModeDrawing(state), true);
+    assert.equal(draftPending(state), false);
+    assert.deepEqual(committedPlacements(state), [], 'nothing was there before, so nothing is');
+});
+
+test('a confirm called off settles nothing, and anything but YES or NO calls it off', () => {
+    for (const answer of [CONFIRM_STAY, 'maybe', undefined, null, 'YES']) {
+        const state = withMountainDropped();
+        const draft = buildDraft(state);
+        chooseBuildTool(state, SELECT_TOOL);
+
+        assert.deepEqual(answerConfirm(state, answer), { stay: true }, `${answer} calls it off`);
+        assert.equal(confirmOpen(state), false);
+        assert.deepEqual(buildDraft(state), draft, 'the edit is still in hand');
+        assert.equal(buildModeTool(state), 'mountain', 'and the tool is still the one it was');
+    }
+});
+
+test('YES on a tool change commits and changes, and NO drops and changes', () => {
+    const kept = withMountainDropped();
+    chooseBuildTool(kept, SELECT_TOOL);
+    assert.deepEqual(answerConfirm(kept, CONFIRM_YES), { settled: ACCEPTED, tool: SELECT_TOOL });
+    assert.equal(buildModeTool(kept), SELECT_TOOL);
+    assert.equal(committedPlacements(kept).length, 1);
+
+    const dropped = withMountainDropped();
+    chooseBuildTool(dropped, SELECT_TOOL);
+    assert.deepEqual(answerConfirm(dropped, CONFIRM_NO), { settled: CANCELLED, tool: SELECT_TOOL },
+        'the click on the tile already said where the pilot is going');
+    assert.equal(buildModeTool(dropped), SELECT_TOOL);
+    assert.deepEqual(committedPlacements(dropped), []);
+});
+
+test('SAVE AND EXIT MODE leaves either way, YES keeping what was built and NO not', () => {
+    const state = withMountainDropped();
+    acceptDraft(state);
+    requestLeave(state);
+
+    const yes = answerConfirm(state, CONFIRM_YES);
+    assert.equal(yes.leave, true);
+    assert.equal(yes.keep, true);
+    assert.equal(yes.environment, 'blank-canvas');
+    assert.deepEqual(yes.placements, committedPlacements(state));
+    yes.placements[0].config.count = 99;
+    assert.equal(committedPlacements(state)[0].config.count, 1, 'what is handed back to keep is a copy');
+
+    requestLeave(state);
+    const no = answerConfirm(state, CONFIRM_NO);
+    assert.equal(no.leave, true);
+    assert.equal(no.keep, false);
+});
+
+test('nothing is answered when nothing was asked', () => {
+    assert.equal(answerConfirm(onCanvas(), CONFIRM_YES), null);
+    assert.equal(answerConfirm(createBuildState(), CONFIRM_YES), null);
+    assert.equal(answerConfirm(null, CONFIRM_YES), null);
+});
+
+test('a confirm open holds every other change still', () => {
+    const state = withMountainDropped();
+    requestLeave(state);
+    const draft = buildDraft(state);
+
+    assert.equal(requestLeave(state), null, 'Escape again asks nothing new');
+    assert.equal(buildConfirm(state), ACCEPT_EDITS, 'and leaves the question that was asked');
+    assert.equal(chooseBuildTool(state, SELECT_TOOL), false);
+    assert.equal(dropDraft(state, { x: 500, z: 500 }), false);
+    assert.deepEqual(buildDraft(state), draft, 'nothing moved the edit');
+    assert.equal(buildModeTool(state), 'mountain');
+
+    answerConfirm(state, CONFIRM_YES);
+    assert.equal(buildModeTool(state), 'mountain',
+        'a tile clicked under the confirm did not turn its way back to the editor into a tool change');
+
+    requestLeave(state);
+    assert.equal(buildConfirm(state), SAVE_AND_EXIT);
+    assert.equal(chooseBuildTool(state, SELECT_TOOL), false, 'with nothing in hand, a tile still waits on the answer');
+    assert.equal(buildModeTool(state), 'mountain');
+    assert.equal(startDraft(state, PEAK), false, 'nor begins one');
+    assert.equal(pickUpPlacement(state, 0), false, 'nor picks one up');
+});
+
+test('a confirm does not outlive the session it was asked in', () => {
+    const state = withMountainDropped();
+    requestLeave(state);
+    closeBuildMode(state);
+    assert.equal(confirmOpen(state), false);
+
+    openBuildMode(state, BUILD_FROM_TITLE);
+    assert.equal(confirmOpen(state), false);
+});
+
+test('the accept tool is named for the question it will ask', () => {
+    const state = onCanvas();
+    assert.equal(acceptToolName(state), 'Save and exit');
+
+    chooseBuildTool(state, 'mountain');
+    dropDraft(state, { x: 0, z: 0 });
+    assert.equal(acceptToolName(state), 'Accept edits');
+
+    acceptDraft(state);
+    assert.equal(acceptToolName(state), 'Save and exit',
+        'a batch kept earlier does nothing to the name while nothing newer is in hand');
+});
+
+// --- A click that drops ---------------------------------------------------------------
+
+test('a click with Mountain begins a mountain there, one peak, with a seed of its own', () => {
+    const state = onCanvas();
+    chooseBuildTool(state, 'mountain');
+
+    assert.equal(dropDraft(state, { x: 1234.4, y: 80, z: -0.3 }), true);
+    const draft = buildDraft(state);
+    assert.equal(draft.type, 'mountain');
+    assert.deepEqual(draft.config, { count: 1, at: [1234, 0] },
+        'the click rounded to a whole unit - and -0 written 0 - with the count the click settles');
+    assert.ok(Object.is(draft.config.at[1], 0));
+    assert.equal(draft.seed, placementSeed(0));
+    assert.equal(state.draft.tool, 'mountain', 'and the tool that began it is remembered');
+    assert.equal(state.draft.replaces, null, 'on bare ground');
+});
+
+test('a click drops nothing for a tool that does not drop, or off the ground', () => {
+    const selecting = onCanvas();
+    assert.equal(dropDraft(selecting, { x: 0, z: 0 }), false, 'Select does not drop');
+
+    const state = onCanvas();
+    chooseBuildTool(state, 'mountain');
+    for (const point of [null, undefined, {}, { x: NaN, z: 0 }, { x: 0 }, { x: Infinity, z: 0 }]) {
+        assert.equal(dropDraft(state, point), false, `${JSON.stringify(point)} is not on the ground`);
+    }
+    assert.equal(draftPending(state), false);
+
+    const picking = createBuildState();
+    openBuildMode(picking, BUILD_FROM_TITLE);
+    assert.equal(dropDraft(picking, { x: 0, z: 0 }), false, 'nor off a canvas');
+});
+
+test('a click with the mountain in hand puts it down there instead of adding another', () => {
+    const state = withMountainDropped();
+    reviseDraft(state, { config: { height: [900, 900] } });
+    const seed = buildDraft(state).seed;
+
+    assert.equal(dropDraft(state, { x: -2500, z: 3100 }), true);
+    const draft = buildDraft(state);
+    assert.deepEqual(draft.config.at, [-2500, 3100], 'it moved');
+    assert.deepEqual(draft.config.height, [900, 900], 'with what the panel set on it');
+    assert.equal(draft.seed, seed, 'and the same seed, so it is the same mountain moved');
+    assert.deepEqual(committedPlacements(state), [], 'nothing was kept by the second click');
+    assert.equal(builtPlacements(state).length, 1, 'and there is still one mountain');
+});
+
+test('a click does not move an edit the tool did not begin', () => {
+    const state = withTwo();
+    pickUpPlacement(state, 0);
+    state.tool = 'mountain';
+    const draft = buildDraft(state);
+
+    assert.equal(dropDraft(state, { x: 10, z: 10 }), false);
+    assert.deepEqual(buildDraft(state), draft);
+});
+
+test('each mountain dropped draws from a stream of its own', () => {
+    const state = withMountainDropped();
+    acceptDraft(state);
+    dropDraft(state, { x: 100, z: 100 });
+    cancelDraft(state);
+    dropDraft(state, { x: 200, z: 200 });
+
+    assert.equal(committedPlacements(state)[0].seed, placementSeed(0));
+    assert.equal(buildDraft(state).seed, placementSeed(2), 'a dropped edit cancelled still used its seed');
+});
+
+test('a placement seed is a 32-bit count mixed so neighbours are unrelated', () => {
+    const seeds = Array.from({ length: 1000 }, (_, n) => placementSeed(n));
+    assert.equal(new Set(seeds).size, seeds.length, 'every one distinct');
+    for (const seed of seeds) assert.ok(Number.isInteger(seed) && seed >= 0 && seed < 2 ** 32);
+    assert.equal(placementSeed(7), placementSeed(7), 'and the same count is the same seed');
+    assert.ok(seeds.slice(0, 8).every(seed => seed > 2 ** 16),
+        'none of the first few is the small number that would start a stream near zero');
+});
+
+// --- The panel carried to the next draft --------------------------------------------
+
+test('the next mountain starts from where the panel was left, and not from where the last one stood', () => {
+    const state = withMountainDropped();
+    reviseDraft(state, { config: { height: [700, 900], girth: 0.4 } });
+    acceptDraft(state);
+
+    assert.deepEqual(toolStartValues(state, 'mountain'), { count: 1, height: [700, 900], girth: 0.4 });
+
+    dropDraft(state, { x: 3000, z: -3000 });
+    assert.deepEqual(buildDraft(state).config, { count: 1, height: [700, 900], girth: 0.4, at: [3000, -3000] });
+});
+
+test('a mountain cancelled leaves its panel for the next one too', () => {
+    const state = withMountainDropped();
+    reviseDraft(state, { config: { radius: [2000, 2400] } });
+    cancelDraft(state);
+
+    dropDraft(state, { x: 50, z: 50 });
+    assert.deepEqual(buildDraft(state).config.radius, [2000, 2400]);
+});
+
+test('an edit picked up again is not a tool\'s panel to carry', () => {
+    const state = withTwo();
+    pickUpPlacement(state, 0);
+    reviseDraft(state, { config: { height: [1, 1] } });
+    acceptDraft(state);
+    assert.deepEqual(toolStartValues(state, 'mountain'), {});
+});
+
+test('what a tool starts from is a copy, and a new canvas starts from the defaults', () => {
+    const state = withMountainDropped();
+    reviseDraft(state, { config: { height: [700, 900] } });
+    acceptDraft(state);
+
+    toolStartValues(state, 'mountain').height[0] = 1;
+    assert.deepEqual(toolStartValues(state, 'mountain').height, [700, 900]);
+
+    closeBuildMode(state);
+    openBuildMode(state, BUILD_FROM_TITLE);
+    beginCanvas(state, 'blank-canvas');
+    assert.deepEqual(toolStartValues(state, 'mountain'), {});
+});
+
+// --- A canvas opened on what was kept ---------------------------------------------
+
+test('a canvas opens with what was kept on it already committed, as copies', () => {
+    const kept = [{ ...PEAK, seed: placementSeed(0) }, MEADOW];
+    const state = createBuildState();
+    openBuildMode(state, BUILD_FROM_TITLE);
+    beginCanvas(state, 'blank-canvas', [...kept, null, { config: {} }, 'mountain']);
+
+    assert.deepEqual(committedPlacements(state), kept, 'anything that is not a placement is left out');
+    committedPlacements(state)[0].config.count = 99;
+    assert.equal(committedPlacements(state)[0].config.count, 1);
+
+    chooseBuildTool(state, 'mountain');
+    dropDraft(state, { x: 0, z: 0 });
+    assert.equal(buildDraft(state).seed, placementSeed(2),
+        'seeds count on from what it opened with');
 });

@@ -16,7 +16,7 @@
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements
 } from './build-mode.js';
-import { BUILD_TOOLS, SELECT_TOOL, toolForElement } from './build-tools.js';
+import { BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues } from './build-tools.js';
 import { cameraFieldRanges, readCameraFields, CAMERA_NUDGES } from './build-camera.js';
 import { panelRows, label } from './properties-panel.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
@@ -39,6 +39,10 @@ export const SELECT_HEADING = BUILD_TOOLS.find(tool => tool.id === SELECT_TOOL).
  * drawn at against the colours they were when the edit began - so a gradient
  * end is stepped along its own hue, the way the element editor steps one.
  *
+ * The point a placement was dropped on is the click's rather than the panel's,
+ * so the holder leaves it out, and a value stepped never puts the placement
+ * back where it was first dropped after a click has moved it.
+ *
  * Null for a placement of an element the registry does not hold.
  */
 export function draftHolderFor(placement) {
@@ -48,6 +52,7 @@ export function draftHolderFor(placement) {
     const config  = resolveConfig(element, placement.config);
     const shades  = {};
     const base    = {};
+    delete config.at;
 
     for (const [name, range] of Object.entries(element.ranges)) {
         if (range.kind !== 'gradient') continue;
@@ -56,6 +61,31 @@ export function draftHolderFor(placement) {
     }
 
     return { config, shades, base };
+}
+
+/**
+ * The ranges a placement's panel shows: every range its element declares, in
+ * the order it declares them, less the ones the click settled when the
+ * placement was dropped at one - a dropped mountain is one mountain, so its
+ * count is the click's and the panel leaves it off rather than offering a
+ * figure that would be ignored. A placement that was not dropped shows every
+ * range, count and all.
+ *
+ * The mountain declares sixteen rows and the artwork draws six. The six are
+ * the first six it declares, so they lead the panel in the artwork's order,
+ * and the ranges added since - a girth drawn from a pair, the footprint said
+ * outright, the mode that randomizes it - follow them down the scroll: one
+ * dropped peak is still one peak those shape. The count is the one of the six
+ * the click takes.
+ */
+export function panelRanges(placement) {
+    if (!isElementId(placement?.type)) return {};
+
+    const ranges = { ...getElement(placement.type).ranges };
+    if (placement.config?.at == null) return ranges;
+
+    for (const name of Object.keys(derivedValues(toolForElement(placement.type)))) delete ranges[name];
+    return ranges;
 }
 
 /**
@@ -77,7 +107,7 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
         const held  = holder ?? draftHolderFor(draft);
         if (held == null) return null;
 
-        const ranges = getElement(draft.type).ranges;
+        const ranges = panelRanges(draft);
         return {
             kind: DOCK_DRAFT,
             heading: toolForElement(draft.type)?.heading ?? `BUILD ${label(draft.type)}`,

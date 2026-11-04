@@ -10,7 +10,7 @@ import { createPauseState, applyPauseKey, resumeFlight, simulationDelta } from '
 import { createTitleState, startFlight, titleShowing, preFlightDelta }    from './title-screen.js';
 import {
     createMenuState, resetSelection, applyMenuKey, applyMenuPointer, isMenuKey, selectedId,
-    isMenuAdjustKey, isMenuControlKey, menuAdjustStep, setMenuEntries,
+    isMenuAdjustKey, isMenuControlKey, menuAdjustStep, setMenuEntries, moveSelection,
     MenuList, followPointers, startMenuEntries, pauseMenuEntries,
     START_MENU_ENTRIES, PAUSE_MENU_ENTRIES
 } from './menu.js';
@@ -19,10 +19,11 @@ import {
     buildModePicking, buildModeDrawing, buildModeFrom, beginCanvas,
     buildModeTool, chooseBuildTool, requestLeave, leavesBuilder, isCanvasLeaveKey,
     buildModeEnvironment, draftPending, buildDraft, reviseDraft, acceptDraft, cancelDraft,
-    isBuilderOpenKey, BUILDER_ENTRY_ID,
+    dropDraft, confirmOpen, buildConfirm, answerConfirm, acceptToolName,
+    isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
-import { paletteTools, ACCEPT_TOOL } from './build-tools.js';
+import { paletteTools, dropsAtClick, ACCEPT_TOOL } from './build-tools.js';
 import {
     createPickerState, pickerEntries, choosePickerEntry,
     CARD_ENTRY, PICKER_STARTED, PICKER_LEFT
@@ -99,7 +100,7 @@ import {
     createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
     typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
-    setEditorClearance, isEditorCloseKey, EDITOR_BACK_ID
+    setEditorClearance, isEditorCloseKey, keepBuiltWorld, keptPlacements, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
@@ -268,6 +269,10 @@ class FlightSimulator {
         this.picker      = createPickerState();
         this.pickerState = createMenuState(pickerEntries(this.picker));
 
+        // The confirm a canvas asks before an edit is settled or the builder is
+        // left, as a menu of its two buttons.
+        this.confirmState = createMenuState(CONFIRM_ENTRIES);
+
         // The builder's own control list, open when a canvas first opens - a
         // canvas is a screen with nothing else on it to say what it answers to.
         this.buildHelpState = createHelpState(true);
@@ -388,7 +393,11 @@ class FlightSimulator {
             buildHelpList: document.getElementById('build-help-list'),
             buildHelpHint: document.getElementById('build-help-hint'),
             buildHelpRows: document.getElementById('build-help-rows'),
-            dock:          document.getElementById('build-dock')
+            dock:          document.getElementById('build-dock'),
+            // The two confirms a canvas asks, drawn in one panel over it.
+            confirm:        document.getElementById('build-confirm'),
+            confirmPanel:   document.getElementById('build-confirm-panel'),
+            confirmHeading: document.getElementById('build-confirm-heading')
         };
 
         // The pads write the same input state the keys do, which is what lets
@@ -518,6 +527,15 @@ class FlightSimulator {
             onType:   (entry, figure, field) => this.onDockType(entry, figure, field),
             onNudge:  (id, sign) => this.onDockNudge(id, sign),
             onAction: (id) => this.onDockAction(id)
+        });
+
+        // The confirm is worked with the mouse as every menu here is, and a
+        // press on the layer behind it - anywhere but the panel - calls the
+        // question off, the way Escape does.
+        this.confirmMenu = new MenuList(document.getElementById('build-confirm-menu'), this.confirmState);
+        this.confirmMenu.followPointer((index, choose) => this.onConfirmPointer(index, choose));
+        this.overlays.confirm.addEventListener('click', (e) => {
+            if (e.target === this.overlays.confirm) this.answerBuildConfirm(CONFIRM_STAY);
         });
 
         this.setupKeys();
@@ -1690,8 +1708,15 @@ class FlightSimulator {
      * there is nothing to keep, and the waiting aircraft takes the start the
      * settings panel holds, which is what it does today and is right: a canvas
      * left from the title screen has no flight behind it.
+     *
+     * `changed` says the world a flight is drawn from is not the one it was -
+     * a built world kept - and then the flight paused over it starts again
+     * from its start rather than resuming in ground that moved under it. A
+     * world changed under an aircraft is a new flight, as a world chosen in
+     * the settings panel is; carrying the flight over, lifted clear of what was
+     * built, is `Re-seat the aircraft`'s.
      */
-    leaveBuilder() {
+    leaveBuilder(changed = false) {
         const canvas = buildModeDrawing(this.builder);
 
         // A drag or a held key does not outlive the canvas it was moving.
@@ -1705,9 +1730,37 @@ class FlightSimulator {
         if (canvas) {
             this.terrain.setCanvas(false);
             this.releaseCanvasView();
-            this.refreshWorld({ restored: !titleShowing(this.titleState) });
+            this.refreshWorld({ restored: !titleShowing(this.titleState) && !changed });
             this.flyOver(this.aircraft.getPosition());
         }
+    }
+
+    /**
+     * Keeps what was built: the canvas's environment becomes the one flown,
+     * and what the session committed is laid over it, held by the element
+     * editor - which is where an edited world already lives, and what a free
+     * flight is drawn from.
+     *
+     * Returns true when the world a flight is drawn from is now a different
+     * one, which a canvas kept exactly as the flight already had it is not.
+     */
+    saveBuiltWorld(environment, placements) {
+        const before = this.flightWorldKey();
+
+        chooseSetting(this.settings, environment);
+        keepBuiltWorld(this.editor, environment, runwayWanted(startSettings(this.settings)), placements);
+        this.redrawEditor();
+
+        return this.flightWorldKey() !== before;
+    }
+
+    /** The world a free flight is drawn from, written down so two can be compared. */
+    flightWorldKey() {
+        return JSON.stringify({
+            environment: currentEnvironment(this.settings),
+            runway: runwayWanted(startSettings(this.settings)),
+            elements: editorPlacements(this.editor)
+        });
     }
 
     /**
@@ -1715,13 +1768,18 @@ class FlightSimulator {
      *
      * The world is drawn as the one tile that canvas is, with no strip in it -
      * a runway is a place rather than ground that repeats, and one is placed
-     * here rather than searched for - and the camera is held over it.
+     * here rather than searched for - and the camera is held over it. What an
+     * earlier session built on this environment and kept is on it already,
+     * committed, so saving again keeps that as well as what is added.
      */
     startCanvas(environmentId) {
-        if (!beginCanvas(this.builder, environmentId)) return false;
+        if (!beginCanvas(this.builder, environmentId, keptPlacements(this.editor, environmentId))) return false;
 
         this.terrain.setCanvas(true);
-        this.terrain.setEnvironment(environmentId, { runway: false });
+        this.terrain.setEnvironment(environmentId, {
+            runway: false,
+            elements: canvasElements(getEnvironment(environmentId), this.builder)
+        });
         this.bounds = this.terrain.getBounds();
         this.hud.setBounds(this.bounds);
 
@@ -1863,16 +1921,39 @@ class FlightSimulator {
         });
     }
 
-    /** A press on the canvas: the camera takes it if the press and the live tool make a gesture. */
+    /**
+     * A press on the canvas: the camera takes it if the press and the live tool
+     * make a gesture, and a tool that drops at a click takes a plain press of
+     * the main button - a mouse's left, or a finger.
+     */
     onCanvasPress(e) {
         if (!buildModeDrawing(this.builder) || this.canvasDrag) return;
 
-        const gesture = cameraGesture(e, buildModeTool(this.builder));
-        if (!gesture) return;
+        const tool    = buildModeTool(this.builder);
+        const gesture = cameraGesture(e, tool);
+        if (!gesture) {
+            if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
+            return;
+        }
 
         e.preventDefault();
         this.renderer.domElement.setPointerCapture(e.pointerId);
         this.canvasDrag = { pointer: e.pointerId, gesture, x: e.clientX, y: e.clientY };
+    }
+
+    /**
+     * A click with a tool that drops: the edit begun where the ground under
+     * the pointer is, or the one in hand put down there instead, and the
+     * ground drawn again with it. A click over the sky or off the canvas lands
+     * on nothing and does nothing.
+     */
+    dropAt(e) {
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        if (!point || !dropDraft(this.builder, point)) return;
+
+        e.preventDefault();
+        this.redrawCanvas();
+        this.syncOverlays();
     }
 
     /** The pointer moving under a drag: the camera turns or slides by how far it went. */
@@ -2054,6 +2135,14 @@ class FlightSimulator {
     }
 
     onBuilderKey(e) {
+        // A confirm open on the canvas takes every key: it is the one thing
+        // the pilot has been asked, and nothing behind it moves until it is
+        // answered or called off.
+        if (buildModeDrawing(this.builder) && confirmOpen(this.builder)) {
+            this.onConfirmKey(e);
+            return;
+        }
+
         // H opens and collapses the canvas's control list the way it does the
         // flight's, so the key that says how to work a screen is the same key
         // on both.
@@ -2140,15 +2229,86 @@ class FlightSimulator {
      * Asks to leave the builder, and leaves when the answer is to go.
      *
      * The accept tool, Escape and the picker's BACK all come here, so the three
-     * ways out cannot come to ask different questions. With nothing pending the
-     * answer is to go. With an edit pending it is `ACCEPT EDITS`, and the
-     * builder stays rather than dropping the edit: no tool can begin one yet,
-     * and the confirm that answers it arrives with the accept tool's own item,
-     * read from this same call.
+     * ways out cannot come to ask different questions. Off the picker the
+     * answer is to go. On a canvas it is a question - `ACCEPT EDITS` with an
+     * edit in hand, `SAVE AND EXIT MODE` with none - and the confirm that asks
+     * it opens.
      */
     requestLeaveBuilder() {
         const asked = requestLeave(this.builder);
         if (asked?.leave) this.leaveBuilder();
+        else if (asked?.confirm) this.confirmOpened();
+    }
+
+    /**
+     * A confirm has just opened: it opens on `YES`, takes the focus so `Enter`
+     * answers it rather than pressing whatever tile was last clicked, and stops
+     * a drag or a held key from moving the view behind it.
+     */
+    confirmOpened() {
+        resetSelection(this.confirmState);
+        this.endCanvasDrag();
+        this.buildKeys.clear();
+        this.syncOverlays();
+        this.overlays.confirmPanel.focus({ preventScroll: true });
+    }
+
+    /**
+     * A key while a confirm is open. The arrows and their letters move between
+     * the two buttons whichever way they point, since the buttons stand side by
+     * side; `Enter` answers the one under the cursor; `Escape` calls the
+     * question off. Each is kept from the page, so `Enter` never also presses a
+     * tile that had the focus.
+     */
+    onConfirmKey(e) {
+        if (isCanvasLeaveKey(e.code)) {
+            e.preventDefault();
+            this.answerBuildConfirm(CONFIRM_STAY);
+            return;
+        }
+
+        if (isMenuAdjustKey(e.code)) {
+            e.preventDefault();
+            if (!e.repeat) moveSelection(this.confirmState, menuAdjustStep(e.code));
+            this.syncOverlays();
+            return;
+        }
+
+        if (!isMenuKey(e.code)) return;
+        e.preventDefault();
+
+        const chosen = applyMenuKey(this.confirmState, e.code, true, e.repeat);
+        if (chosen) this.answerBuildConfirm(chosen);
+        else this.syncOverlays();
+    }
+
+    /** The confirm under the mouse: the cursor follows the pointer, and a click answers. */
+    onConfirmPointer(index, choose) {
+        const chosen = applyMenuPointer(this.confirmState, index, choose);
+        if (chosen) this.answerBuildConfirm(chosen);
+        else this.syncOverlays();
+    }
+
+    /**
+     * Answers the confirm that is open, and does what the answer says: leaves,
+     * keeping what was built or not, or settles the edit in hand and draws the
+     * ground again from what is kept - or, called off, does nothing at all.
+     */
+    answerBuildConfirm(answer) {
+        const answered = answerConfirm(this.builder, answer);
+        if (!answered) return;
+
+        this.overlays.confirmPanel.blur();
+
+        if (answered.leave) {
+            const changed = answered.keep && this.saveBuiltWorld(answered.environment, answered.placements);
+            this.leaveBuilder(changed);
+        } else if (answered.settled) {
+            this.draftHolder = null;
+            this.redrawCanvas();
+        }
+
+        this.syncOverlays();
     }
 
     /**
@@ -2186,7 +2346,7 @@ class FlightSimulator {
         if (!buildModeDrawing(this.builder)) return;
 
         if (id === ACCEPT_TOOL) this.requestLeaveBuilder();
-        else chooseBuildTool(this.builder, id);
+        else if (!chooseBuildTool(this.builder, id) && confirmOpen(this.builder)) this.confirmOpened();
 
         this.syncOverlays();
     }
@@ -2676,12 +2836,29 @@ class FlightSimulator {
 
         // The live tool is lit, and said to be pressed, so the palette reads as
         // which tool the canvas is being worked with. The accept tool is a way
-        // out rather than a mode, so it is a plain button and never a toggle.
+        // out rather than a mode, so it is a plain button and never a toggle -
+        // named for the question it will ask if it is pressed now, which is
+        // the question Escape asks too.
         const live = buildModeTool(this.builder);
         for (const tile of this.overlays.palette.children) {
-            if (tile.dataset.tool === ACCEPT_TOOL) continue;
+            if (tile.dataset.tool === ACCEPT_TOOL) {
+                const name = acceptToolName(this.builder);
+                tile.title = `${name} (Esc)`;
+                tile.setAttribute('aria-label', name);
+                continue;
+            }
             tile.setAttribute('aria-pressed', String(tile.dataset.tool === live));
         }
+
+        // A tool that drops at a click marks the ground as somewhere to click.
+        this.renderer.domElement.style.cursor = canvas && dropsAtClick(live) ? 'crosshair' : '';
+
+        // The confirm, over the canvas while one is asking.
+        const asking = canvas ? buildConfirm(this.builder) : null;
+        this.overlays.confirm.style.display = asking ? 'flex' : 'none';
+        this.overlays.confirm.dataset.ask = asking ?? '';
+        this.overlays.confirmHeading.textContent = asking ? CONFIRM_HEADINGS[asking] : '';
+        this.confirmMenu.render(this.confirmState);
         this.overlays.gameModes.style.display = modes ? 'block' : 'none';
         this.overlays.paused.style.display    = paused && !panel ? 'block' : 'none';
         this.overlays.hud.style.display       = chrome ? 'block' : 'none';

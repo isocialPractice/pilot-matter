@@ -11,6 +11,8 @@ import {
     CAMERA_GESTURES, CAMERA_ORBIT, CAMERA_PAN, BUILD_MOVE_KEYS, REFRAME_KEYS
 } from './build-camera.js';
 import { PHOTO_KEY } from './photo.js';
+import { MENU_SELECT_KEYS } from './menu.js';
+import { BUILD_TOOLS, isBuiltTool } from './build-tools.js';
 
 export const HELP_KEY = 'KeyH';
 
@@ -92,6 +94,11 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * it, read down the alternatives the way the flight's rows are: the move row is
  * four controls of two keys each, and reads `W/A/S/D or ↑/←/↓/→`.
  *
+ * A row's `click` is the tool whose own click on the ground the row is, listed
+ * while that tool is built. An input one tool answers to and the rest do not
+ * is named with that tool, so a drag that orbits in Select and does nothing
+ * with Mountain live says so on the line rather than leaving it to be found.
+ *
  * The rows hold codes and are turned into text by `buildHelpLines`, not here:
  * `keyLabel` belongs to a module this one is in an import cycle with, and a
  * label worked out at load would read it before it exists - the trap
@@ -106,7 +113,9 @@ export const BUILD_HELP_ROWS = Object.freeze([
         keys: [BUILD_MOVE_KEYS.forward, BUILD_MOVE_KEYS.left, BUILD_MOVE_KEYS.back, BUILD_MOVE_KEYS.right]
     },
     { id: 'reframe', label: 'Reframe',           keys: [REFRAME_KEYS] },
-    { id: 'leave',   label: 'Leave the Builder', keys: [CANVAS_LEAVE_KEYS] },
+    ...(isBuiltTool('mountain') ? [{ id: 'drop', label: 'Drop a Mountain', click: 'mountain' }] : []),
+    { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
+    { id: 'answer',  label: 'Answer a Question',             keys: [MENU_SELECT_KEYS.slice(0, 1)] },
     { id: 'help',    label: 'Collapse List',     keys: [[HELP_KEY]] },
     { id: 'photo',   label: 'Photo',             keys: [[PHOTO_KEY]] }
 ].map(row => Object.freeze(row)));
@@ -127,15 +136,32 @@ function keysText(controls) {
     return alternatives.join(' or ');
 }
 
-/** A row's presses, each named for its button and whether `shift` is held with it. */
+/** A row's presses, each named for its button, whether `shift` is held with it, and the tool it is for. */
 function pressText(presses) {
-    return presses.map(press => `${press.shift ? 'Shift+' : ''}${PRESS_LABELS[press.button]}`).join(' or ');
+    return presses
+        .map(press => `${press.shift ? 'Shift+' : ''}${PRESS_LABELS[press.button]}${forTools(press.tools)}`)
+        .join(' or ');
+}
+
+/** The tools an input is answered by, as the line names them, or nothing for every tool. */
+function forTools(tools) {
+    if (!tools?.length) return '';
+    return ` (${tools.map(toolName).join('/')})`;
+}
+
+/** A tool as the control list names it: its tile's label, in the list's case. */
+function toolName(id) {
+    const label = BUILD_TOOLS.find(tool => tool.id === id)?.label ?? id;
+    return label.charAt(0) + label.slice(1).toLowerCase();
 }
 
 /** The builder's list, as the lines it is written on screen, in its order. */
 export function buildHelpLines() {
     return BUILD_HELP_ROWS.map(row => {
-        const input = row.keys ? keysText(row.keys) : row.presses ? pressText(row.presses) : 'Wheel';
+        const input = row.keys ? keysText(row.keys)
+            : row.presses ? pressText(row.presses)
+            : row.click ? `Click${forTools([row.click])}`
+            : 'Wheel';
         return { id: row.id, text: `${input} - ${row.label}` };
     });
 }
