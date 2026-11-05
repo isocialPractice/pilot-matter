@@ -5,6 +5,80 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.50.0] - 2026-11-05
+
+Insert Runway: a strip placed where it is asked for, the runway templates as
+cards, the strip a runway start opens on, and a coarse step on every panel.
+
+### Added
+
+- **Coarse steps.** `Shift` with a press on a spinner moves a row ten points
+  where it reads as a percentage - added, so 100%, 110%, 120% - and ten of its
+  own steps anywhere else; `Shift` with an arrow in the element editor does the
+  same.
+- **Placed runway.** A `runway` whose configuration carries `at` is laid there
+  rather than where the site search finds room: along its heading, at its
+  length and width, levelled to the ground under its own footprint on each tile
+  and lifted clear of any water under it, the sea's or a drawn body's. The
+  search's `band` and `separation` are not read - a strip put on a ridge is a
+  strip on a ridge - and it moves nothing else in the world. A `centreline`
+  toggle, off by default so every preset's strip is unchanged, paints dashes
+  down the middle of a strip.
+- **Runway templates.** `BASIC RUNWAY` and `COMMERCIAL`, longer and wider with
+  its centreline, are groups of placements the registry already draws, placed
+  as one `group` placement with their members copied in, so a template
+  improved later leaves a built world as it was. A group is expanded when the
+  ground is built - each member turned and moved into place, its strip given
+  the group's length and width and kept wholly on the canvas - and picked with
+  Select as one. `BASIC AIRPORT` and `COMMERCIAL AIRPORT` are declared, laid out
+  from paint aprons and extruded buildings, and join the cards when those
+  elements arrive.
+- **Insert Runway.** `RUNWAY` joins the palette, its panel headed `INSERT
+  RUNWAY` with the templates as cards. A card arms it, and the template's
+  outline follows the pointer over the ground; a click places it lined up with
+  the view to the nearest ten degrees. `HEADING`, `LENGTH` and `WIDTH` sit
+  under the cards, and the gumball's centre moves it, its arc turns it and its
+  squares size its strip. A click with it in hand puts it down there instead,
+  and another card turns it into that template where it stands.
+- **The strip a flight starts on.** A runway start opens on the last strip the
+  pilot placed rather than the one the search found, through `flightStrip`,
+  now published beside the other strip readers; a strip records `placed`.
+- **The control list** carries `Click (Runway) - Place the Chosen Runway`.
+
+### Changed
+
+- The builder's control list stops short of the palette and scrolls rather
+  than covering it: with nine tools the palette reached the list on an
+  800-pixel screen, and the way out at its foot went under it.
+
+Held in Node by the new `test/templates.test.js` - the coarse step on a
+percentage and on anything else, through the dock and the element editor, the
+four templates and the two offered, a placed group copied and written down,
+the arrival heading, a group expanded, turned and held on the canvas, a group's
+bounds, a placed strip where it was asked for on every tile, levelled to its
+ground, on a ridge, out of the water and with and without its centreline, a
+world built with a template and the strip a flight starts on, Insert Runway
+armed, placing, moving and swapping, its panel, a placed runway picked again,
+picked by its strips, and its gumball - with `test/page.test.js`,
+`test/build-tools.test.js` and `test/controls-help.test.js`. Each rejected the
+defect it names when that was put back, forty-four in all: among them a coarse
+step of ten steps on a percentage or of five on anything else, shift never
+passed, a placed strip searched for, laid at its lowest ground or in the water,
+not recorded as placed, every strip carrying an unbroken centreline, a runway
+start on the first placed strip or the searched one, a template turned the
+wrong way, sharing its members, arriving at the ten below the view or crossing
+the seam, a group built unexpanded or picked nowhere, its gumball turning in
+radians or stretching past its bounds, a card changing the template in hand in
+place, Insert Runway with no panel, and the list running up over the palette.
+Settled in Chromium in 16 checks across a desktop and a phone: Insert Runway on
+the palette, the list clear of the way out, shift on a percentage and on a
+brush row, the two cards, no card placing nothing, the outline under the
+pointer, a click placing a group lined up with the view, its rows, its strip
+level, `HEADING` turning it and a coarse `LENGTH` lengthening it, `COMMERCIAL`
+turning it into a centrelined strip where it stood, a click moving it, Select
+picking it again by its card's name, a runway start opening on it, and a
+finger placing one.
+
 ## [1.0.0-alpha.1.49.0] - 2026-11-05
 
 Water and snow drawn where a stroke goes: the water line kept a vertex at a

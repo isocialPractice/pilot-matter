@@ -56,6 +56,10 @@ export const ACCEPT_TOOL = 'accept';
  * element's 1, which every preset draws with, and the tool's own figure is
  * the walkthroughs': clumps of grass and sand at a half, and water and snow
  * whole, so a line of either is not drawn with gaps.
+ *
+ * `inserts` marks Insert Runway: a tool that places a template, chosen on its
+ * panel as a card, at a click - a whole strip or airport rather than one
+ * element - see `js/templates.js`.
  */
 export const BUILD_TOOLS = Object.freeze([
     { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false, heading: 'SELECTION MODE' },
@@ -65,7 +69,7 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand', heading: 'BUILD SAND', cover: true, starts: Object.freeze({ density: 0.5 }) },
     { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER', cover: true, starts: Object.freeze({ density: 1 }) },
     { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW', cover: true, starts: Object.freeze({ density: 1 }) },
-    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY' },
+    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY', inserts: true },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },
@@ -112,9 +116,11 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * Grass, sand, water and snow are the cover tool, each drawn where its stroke
  * went: a cover's band, drawn water's line and drawn snow's line are all
  * worked out from the ground under the stroke rather than held at a height a
- * stroke would usually miss.
+ * stroke would usually miss. Insert Runway places the templates whose every
+ * element the registry draws - the two runways today, and the airports once
+ * paint and extrude are in it.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {
@@ -189,6 +195,11 @@ export const COVER_STAMP = Object.freeze({ buildHeight: 'depth', buildWidth: 'wi
  * slope are not the pilot's here.
  */
 export const COVER_ELEMENT_ROWS = Object.freeze(['density', 'color']);
+
+/** True for Insert Runway, which places a template chosen on its panel. */
+export function insertsTemplate(id) {
+    return buildTool(id)?.inserts === true;
+}
 
 /** True for the cover tool, pointed at whichever ground cover it lays. */
 export function isCoverTool(id) {

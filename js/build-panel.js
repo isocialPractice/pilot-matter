@@ -22,11 +22,12 @@
 
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
-    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, coverValues
+    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, coverValues, buildRunwayTemplate
 } from './build-mode.js';
+import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } from './templates.js';
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import {
-    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, COVER_BRUSH
+    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, COVER_BRUSH, insertsTemplate
 } from './build-tools.js';
 
 /** The palette's lasso tile, whose panel is its own ten tools rather than an element's ranges. */
@@ -48,6 +49,9 @@ export const DOCK_LASSO = 'lasso';
 
 /** What the dock shows with the cover tool live: its brush and its element's rows, and the batch's accept and cancel while one is in hand. */
 export const DOCK_COVER = 'cover';
+
+/** What the dock shows with Insert Runway live: its templates as cards, and the one in hand's rows. */
+export const DOCK_RUNWAY = 'runway';
 
 /** The answer that drops the selection, there only while something is selected. */
 export const DOCK_DESELECT = Object.freeze({ id: 'deselect', label: 'DESELECT' });
@@ -80,6 +84,12 @@ export const SELECT_HEADING = BUILD_TOOLS.find(tool => tool.id === SELECT_TOOL).
  * Null for a placement of an element the registry does not hold.
  */
 export function draftHolderFor(placement) {
+    // A placed template's own rows - its heading and its strip's length and
+    // width - which have no gradient to hold as shades.
+    if (isGroup(placement)) {
+        const { heading, length, width } = groupConfig(placement);
+        return { config: { heading, length, width }, shades: {}, base: {} };
+    }
     if (!isElementId(placement?.type)) return null;
 
     const element = getElement(placement.type);
@@ -113,6 +123,7 @@ export function draftHolderFor(placement) {
  * the click takes.
  */
 export function panelRanges(placement) {
+    if (isGroup(placement)) return { ...GROUP_RANGES };
     if (!isElementId(placement?.type)) return {};
 
     const element = getElement(placement.type);
@@ -191,6 +202,7 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
     const picked = pickedIndex(state) != null;
 
     if (isCoverTool(buildModeTool(state))) return coverContent(state, holder, context);
+    if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
 
     if (draftPending(state) && !(select && picked)) {
         const draft = buildDraft(state);
@@ -232,7 +244,7 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
         const pick  = holder ?? draftHolderFor(draft);
         if (pick != null) {
             content.sections.push(dockSection(
-                PICK_SECTION, DOCK_DRAFT, `SELECTED ${label(draft.type)}`, panelRanges(draft), pick, context
+                PICK_SECTION, DOCK_DRAFT, `SELECTED ${placementName(draft)}`, panelRanges(draft), pick, context
             ));
             content.actions = [DOCK_ACCEPT, DOCK_CANCEL];
         }
@@ -303,6 +315,40 @@ function coverContent(state, holder, context) {
         actions: draftPending(state) ? [DOCK_ACCEPT, DOCK_CANCEL] : [],
         sections: []
     };
+}
+
+/**
+ * Insert Runway's panel: the templates as cards, the one chosen lit, and once
+ * one is placed and in hand, its rows beneath them - `HEADING`, `LENGTH` and
+ * `WIDTH` - with the accept and cancel that settle it. The cards are a choice,
+ * of what is placed; the rows are the placement's own, edited as any draft's.
+ */
+function runwayContent(state, holder, context) {
+    const chosen = buildRunwayTemplate(state);
+    const draft  = draftPending(state) ? buildDraft(state) : null;
+    const held   = draft ? holder ?? draftHolderFor(draft) : { config: {} };
+    const ranges = draft ? panelRanges(draft) : {};
+    return {
+        kind: DOCK_RUNWAY,
+        heading: buildTool(buildModeTool(state)).heading,
+        shapes: [{
+            row: 'templates',
+            tools: offeredTemplates().map(template => ({
+                id: template.id, label: template.label, name: label(template.id), art: null, live: template.id === chosen
+            }))
+        }],
+        ranges,
+        holder: held,
+        rows: panelRows(ranges, held, context),
+        nudges: [],
+        actions: draft ? [DOCK_ACCEPT, DOCK_CANCEL] : [],
+        sections: []
+    };
+}
+
+/** What a placement is called on the dock: a placed template by its card's name, and an element by its own. */
+function placementName(placement) {
+    return isGroup(placement) ? runwayTemplate(placement.template)?.label ?? 'RUNWAY' : label(placement.type);
 }
 
 /** One section of the dock: a heading, the holder its rows write, and the rows - none while it is folded. */

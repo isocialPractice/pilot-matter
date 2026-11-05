@@ -1139,6 +1139,11 @@
             position: fixed;
             bottom: 20px;
             left: 20px;
+            /* Never up over the palette above it: the page sets where the
+               palette ends, and past that the list scrolls rather than covering
+               a tool - the way out at the foot of the column among them. */
+            max-height: calc(100vh - var(--build-palette-bottom, 0px) - 34px);
+            overflow-y: auto;
             color: #fff;
             font-family: 'Courier New', monospace;
             font-size: 12px;
@@ -1364,6 +1369,17 @@
 
         .dock-shape[aria-pressed="true"] {
             box-shadow: 0 0 0 3px #90c090;
+        }
+
+        /* A card: a tile with no icon, its name alone - Insert Runway's
+           templates, until the art's own cards are out of its work in
+           progress. */
+        .dock-shape.dock-card {
+            max-width: 130px;
+            min-height: 44px;
+            justify-content: center;
+            font-size: 10px;
+            letter-spacing: 1px;
         }
 
         /* The builder's two confirms, ACCEPT EDITS and SAVE AND EXIT MODE: a

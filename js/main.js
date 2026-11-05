@@ -23,12 +23,14 @@ import {
     selectPlacement, pickedIndex, pickablePlacements,
     setSelection, deselect, buildLassoTool, chooseLassoTool, lassoValues, setLassoValues,
     drawIntoSelection, selectionLive, coverValues, setCoverValues, layStroke,
+    buildRunwayTemplate, chooseRunwayTemplate, insertTemplate,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
 import {
-    paletteTools, dropsAtClick, toolMark, toolName, isCoverTool, coverStamp, ACCEPT_TOOL, SELECT_TOOL
+    paletteTools, dropsAtClick, toolMark, toolName, isCoverTool, coverStamp, insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
+import { placeTemplate, groupStrips, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
 import {
     createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK
 } from './build-palette.js';
@@ -50,11 +52,11 @@ import {
     canvasFarPlane, CANVAS_FOG, createBuildCamera, buildCameraPosition,
     orbitBuildCamera, panBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera,
     cameraGesture, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
-    writeCameraField, nudgeBuildCamera, unitsPerPixel, CAMERA_ORBIT, DEFAULT_FOV
+    writeCameraField, nudgeBuildCamera, unitsPerPixel, viewBearing, CAMERA_ORBIT, DEFAULT_FOV
 } from './build-camera.js';
 import {
     dockContent, draftHolderFor, coverHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
-    DOCK_COVER, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT
+    DOCK_COVER, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT
 } from './build-panel.js';
 import {
     lassoTool, lassoFootprint, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -62,7 +64,7 @@ import {
 import { flattenPath } from './environment/footprints.js';
 import { PanelView } from './panel-view.js';
 import {
-    stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces
+    stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces, coarseStep
 } from './properties-panel.js';
 import { getEnvironment } from './environment/presets.js';
 import { pickGround, canvasPickBounds, pickStep, pointerDevice } from './build-picking.js';
@@ -641,7 +643,7 @@ class FlightSimulator {
         // The dock is drawn by the one panel view, and tells this what was done
         // to it: a row stepped or typed into, the view slid, an edit settled.
         this.dockView = new PanelView(this.overlays.dock, {
-            onStep:   (entry, step) => this.onDockStep(entry, step),
+            onStep:   (entry, step, coarse) => this.onDockStep(entry, step, coarse),
             onType:   (entry, figure, field) => this.onDockType(entry, figure, field),
             onNudge:  (id, sign) => this.onDockNudge(id, sign),
             onAction: (id) => this.onDockAction(id),
@@ -1708,10 +1710,11 @@ class FlightSimulator {
         }
 
         // A range is stepped where an element is opened, so the roll keys move
-        // a number along its own bounds rather than the cursor down the panel.
+        // a number along its own bounds rather than the cursor down the panel;
+        // with `shift`, ten points or ten steps at a time, as the dock's rows.
         if (isMenuAdjustKey(e.code)) {
             e.preventDefault();
-            const moved = adjustEditorRange(this.editor, selectedId(this.editorState), menuAdjustStep(e.code));
+            const moved = adjustEditorRange(this.editor, selectedId(this.editorState), menuAdjustStep(e.code), { coarse: e.shiftKey });
             if (moved) this.applyEditor();
             this.syncOverlays();
             return;
@@ -2090,7 +2093,7 @@ class FlightSimulator {
         if (this.gumballDrag != null) return 'grabbing';
         if (this.gumballHover != null) return 'grab';
         const tool = buildModeTool(this.builder);
-        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isCoverTool(tool)) return 'crosshair';
+        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isCoverTool(tool) || insertsTemplate(tool)) return 'crosshair';
         return this.hovered != null ? 'pointer' : '';
     }
 
@@ -2156,6 +2159,15 @@ class FlightSimulator {
         if (brush && pointer && pointer.type !== 'touch' && !confirmOpen(this.builder)
             && this.gumballHover == null && this.gumballDrag == null) {
             strokePaths(ctx, [stampOutline(pointer.x, pointer.y, brush.buildWidth, brush.buildHeight, brush.cornerRadius)], DRAWING_OUTLINE);
+        }
+
+        // The template Insert Runway carries, outlined on the ground where a
+        // click would put it - the field is written once, on the click.
+        if (insertsTemplate(buildModeTool(this.builder)) && !confirmOpen(this.builder)
+            && this.gumballHover == null && this.gumballDrag == null) {
+            for (const loop of this.insertPreview() ?? []) {
+                strokePaths(ctx, this.screenRegion(loop, true, width, height), DRAWING_OUTLINE);
+            }
         }
 
         const picked  = pickedIndex(this.builder);
@@ -2309,6 +2321,7 @@ class FlightSimulator {
             if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
             else if (e.button === 0 && tool === LASSO_PALETTE_TOOL) this.lassoPress(e);
             else if (e.button === 0 && isCoverTool(tool)) this.coverPress(e);
+            else if (e.button === 0 && insertsTemplate(tool)) this.insertAt(e);
             return;
         }
 
@@ -2336,6 +2349,42 @@ class FlightSimulator {
         e.preventDefault();
         this.redrawCanvas();
         this.syncOverlays();
+    }
+
+    /**
+     * A click with Insert Runway armed: the chosen template placed where the
+     * ground under the pointer is, lined up with the view to the nearest ten
+     * degrees - or the one in hand put down there instead - and the ground
+     * drawn again with it. A click over the sky, or with no card chosen,
+     * places nothing.
+     */
+    insertAt(e) {
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        if (!point || !insertTemplate(this.builder, point, arrivalHeading(viewBearing(this.buildCamera)), { size: this.terrain.size })) return;
+
+        e.preventDefault();
+        this.redrawCanvas();
+        this.syncOverlays();
+    }
+
+    /**
+     * The template Insert Runway is armed with, as it would land under a
+     * pointer that can hover - lined up with the view, held on the canvas - as
+     * the outlines of its strips, on the canvas's frame. Null with no card
+     * chosen, or over the sky.
+     */
+    insertPreview() {
+        const id = buildRunwayTemplate(this.builder);
+        const pointer = this.canvasPointer;
+        if (id == null || pointer == null || pointer.type === 'touch') return null;
+
+        const ground = this.pickCanvasPoint(pointer.x, pointer.y);
+        if (ground == null) return null;
+
+        const size = this.terrain.size;
+        const placed = placeTemplate(id, [ground.x, ground.z], arrivalHeading(viewBearing(this.buildCamera)));
+        placed.config.at = keepStripOnCanvas(placed.config.at, groupReach(placed), size);
+        return groupStrips(placed, size).map(strip => footprintLoop(strip));
     }
 
     /**
@@ -2852,9 +2901,9 @@ class FlightSimulator {
     }
 
     /** A row of the dock stepped: one press along what its range allows. */
-    onDockStep(entry, step) {
+    onDockStep(entry, step, coarse = false) {
         const holder = this.dockHolder(entry);
-        if (!holder || !stepRow(holder, entry.name, entry.row, step)) return;
+        if (!holder || !stepRow(holder, entry.name, entry.row, coarse ? coarseStep(entry.row, step) : step)) return;
         this.applyDockValue(entry);
     }
 
@@ -2866,8 +2915,18 @@ class FlightSimulator {
         return shown.sections?.find(section => section.id === entry.section)?.holder ?? null;
     }
 
-    /** One of the lasso's tools pressed on its panel: the next shape is drawn with it. */
+    /**
+     * One of a mode's own tiles pressed on its panel: a template's card arms
+     * Insert Runway with it - and turns the one in hand into it - and a lasso
+     * tool is what the next shape is drawn with.
+     */
     onDockShape(id) {
+        if (this.dockShown?.kind === DOCK_RUNWAY) {
+            if (!chooseRunwayTemplate(this.builder, id)) return;
+            if (draftPending(this.builder)) this.redrawCanvas();
+            this.syncOverlays();
+            return;
+        }
         if (!chooseLassoTool(this.builder, id)) return;
         this.cancelLasso();
         this.syncDock();
@@ -2951,7 +3010,7 @@ class FlightSimulator {
                 this.camera.fov = fov;
                 this.camera.updateProjectionMatrix();
             }
-        } else if (kind === DOCK_DRAFT) {
+        } else if (kind === DOCK_DRAFT || kind === DOCK_RUNWAY) {
             reviseDraft(this.builder, { config: holder.config });
             this.redrawCanvas();
             // A picked placement changed, or changed back, turns the accept
@@ -3773,6 +3832,15 @@ class FlightSimulator {
                 continue;
             }
             tile.setAttribute('aria-pressed', String(tile.dataset.tool === live));
+        }
+
+        // Where the palette ends, folded or not, for the control list under it
+        // to stop short of - so the list scrolls rather than covering a tool,
+        // the way out at the foot of the column among them, however tall the
+        // palette grows as tools join it.
+        if (canvas) {
+            const bottom = this.overlays.palette.getBoundingClientRect().bottom;
+            document.documentElement.style.setProperty('--build-palette-bottom', `${Math.ceil(bottom)}px`);
         }
 
         // A tool that drops at a click marks the ground as somewhere to click,

@@ -69,7 +69,7 @@ export class PanelView {
     /**
      * `root` holds three parts, found by `data-dock`: the heading, the fields
      * that scroll, and the answers. `handlers` are told what was done:
-     * `onStep(entry, step)`, `onType(entry, figure, field)`,
+     * `onStep(entry, step, coarse)`, `onType(entry, figure, field)`,
      * `onNudge(id, sign)`, `onAction(id)`, `onFold(id)` for a section's
      * heading pressed, and `onShape(id)` for one of a mode's own tools.
      */
@@ -111,8 +111,9 @@ export class PanelView {
         this.answers.replaceChildren();
         this.drawn.clear();
 
-        // A mode with tools of its own - the lasso - draws them first, a row
-        // of tiles to each row the artwork groups them into.
+        // A mode with tools of its own - the lasso, or Insert Runway's
+        // templates - draws them first, a row of tiles to each row the artwork
+        // groups them into. A tile with no art to it is a card: its name alone.
         for (const row of content.shapes ?? []) {
             const line = document.createElement('div');
             line.className = 'dock-shapes';
@@ -124,13 +125,18 @@ export class PanelView {
                 tile.dataset.shape = tool.id;
                 tile.title = tool.name;
                 tile.setAttribute('aria-label', tool.name);
-                const mark = document.createElement('img');
-                mark.src = tool.art;
-                mark.alt = '';
-                mark.draggable = false;
+                if (tool.art) {
+                    const mark = document.createElement('img');
+                    mark.src = tool.art;
+                    mark.alt = '';
+                    mark.draggable = false;
+                    tile.append(mark);
+                } else {
+                    tile.classList.add('dock-card');
+                }
                 const name = document.createElement('span');
                 name.textContent = tool.label;
-                tile.append(mark, name);
+                tile.append(name);
                 line.append(tile);
             }
             this.fields.append(line);
@@ -267,8 +273,9 @@ export class PanelView {
             return;
         }
 
+        // `shift` with the press is a coarse step - ten points, or ten steps.
         const entry = this.entryFor(line?.dataset.row);
-        if (entry?.live) this.handlers.onStep?.(entry, step);
+        if (entry?.live) this.handlers.onStep?.(entry, step, event.shiftKey === true);
     }
 
     onChange(event) {

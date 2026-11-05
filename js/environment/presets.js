@@ -18,6 +18,7 @@ import {
     DEFAULT_SIZE, DEFAULT_SEGMENTS
 } from './elements.js';
 import { applyFootprintedElement } from './footprinted.js';
+import { expandGroups } from '../templates.js';
 
 /**
  * The world the simulator has always generated, and the one a fresh install
@@ -350,7 +351,12 @@ export function buildEnvironment(environment = getEnvironment(), options = {}) {
     const random = createRandom(seed ?? environment.seed);
 
     applyBase(field, { ...environment.base, ...base });
-    for (const placement of orderPlacements(elements ?? environmentElements(environment, runway))) {
+
+    // A placed template is the placements it stands for, each applied in the
+    // pipeline's order with everything else: its strip last with the other
+    // runways, its buildings where extrusions go.
+    const placements = expandGroups(elements ?? environmentElements(environment, runway), field.size);
+    for (const placement of orderPlacements(placements)) {
         applyFootprintedElement(field, placement, random);
     }
 

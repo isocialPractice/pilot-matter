@@ -706,6 +706,15 @@ algorithm rather than placed as an asset, cut into whichever ground the site
 search found flattest, and levelled with an apron that eases back into the
 country around it. A world is built without one unless one is asked for.
 
+A strip can be placed instead of searched for: a `runway` whose configuration
+carries `at`, `[x, z]` in the square's own frame as a footprint's, is laid
+there, along the low end of its `heading` span and at the low ends of its
+`length` and `width`, levelled to the ground under it on each square and
+lifted clear of any water there - the sea's or a drawn body's. `band` and
+`separation` are the search's rules and are not read; it takes nothing from
+the world's seeded stream. Any strip with `centreline: true` carries a dashed
+line down its middle.
+
 ```javascript
 import { createEnvironment, createPilot, flightStart, startDefaults, START_TAKEOFF } from 'pilot-matter';
 
@@ -728,6 +737,7 @@ A strip is a plain description, and everything that reads one is published:
 | `alongX`, `alongZ` | The same bearing as a unit vector |
 | `length`, `width` | The paved rectangle |
 | `elevation` | The height it was levelled to |
+| `placed` | True for a strip placed at its `at` rather than searched for |
 
 | Export | Is |
 |--------|-----|
@@ -737,6 +747,7 @@ A strip is a plain description, and everything that reads one is published:
 | `isOnRunway(runway, x, z, margin)` | Whether a place is over the pavement |
 | `runwayThresholds(runway)` | Both ends, each with the bearing a takeoff from it runs on |
 | `nearestRunway(runways, x, z)` | The strip nearest a place, or null |
+| `flightStrip(runways)` | The strip a takeoff opens on: the last one placed, or the first - the one searched for - where none was |
 
 A strip changes what an arrival on the ground means rather than how hard one is
 allowed to be. Off a runway the rule is the one it has always been: too fast a
@@ -1361,6 +1372,25 @@ one stream in the order they are applied, which is what makes a description the
 same world every time - and also means a placement added among them moves every
 draw after it. Seeded, it takes nothing the others were going to draw, so they
 stay where they were, and it draws the same values on every tile.
+
+A placement of type `group` is a runway template placed whole: `config` holds
+where it stands, `at`, which way it runs, `heading`, and how long and wide its
+strip is, and `members` holds the placements it stands for, laid out in its own
+frame - world units from its middle, a heading of 0 running north. The members
+are copied in when it is placed rather than looked up by the template's name,
+so a template changed later leaves a world built with it as it was. When the
+world is built the group is expanded: each member turned through its heading
+and moved to where it stands, its strip given its length and width, and kept
+wholly on the square, so no copy of it crosses an edge.
+
+```js
+{
+    type: 'group',
+    template: 'basic-runway',
+    config: { at: [2000, -1500], heading: 120, length: 2400, width: 240 },
+    members: [{ type: 'runway', role: 'strip', config: { at: [0, 0], heading: [0, 0] } }]
+}
+```
 
 A mountain's configuration may carry `at`, `[x, z]` in the same square's frame
 as a footprint, and is then one peak standing on that point whatever its

@@ -267,6 +267,25 @@ function writePair(pair, at, value) {
     pair[at] = at === 0 ? Math.min(value, pair[1]) : Math.max(value, pair[0]);
 }
 
+/** How many ordinary steps a coarse step is, for any row not read as a percentage. */
+export const COARSE_STEPS = 10;
+
+/** How many points a coarse step moves a row read as a percentage. */
+export const COARSE_POINTS = 10;
+
+/**
+ * The step `shift` makes of a press: ten points on a row read as a percentage,
+ * added rather than compounded - 100%, 110%, 120%, not 121% - and ten of a
+ * row's own steps on any other. The same for a click on a spinner and an arrow
+ * key, so the mouse and the keyboard step alike, and for every panel the rows
+ * are drawn in.
+ */
+export function coarseStep(row, step) {
+    const sign = Math.sign(Number(step) || 0);
+    if (row?.shade) return sign * (COARSE_POINTS / 100) / rangeStep(SHADE_RANGE);
+    return sign * COARSE_STEPS * Math.max(Math.abs(Number(step) || 0), 1);
+}
+
 /**
  * Steps a row along what its range allows: a number by the range's step, held
  * to its bounds, and a choice along its list a value at a time, stopping at

@@ -1237,6 +1237,11 @@ const RUNWAY_CROWDING_PENALTY = 12;
 const RUNWAY_SHOULDER  = 0.78;
 const RUNWAY_THRESHOLD = 0.9;
 
+// The centreline a strip carries when asked: its half-width as a share of the
+// strip's, and the length of each dash and each gap between them.
+const RUNWAY_CENTRELINE = 0.04;
+const RUNWAY_DASH       = 300;
+
 // How far a strip is lifted clear of a water line it would otherwise be cut
 // under, in world units. Small on purpose: enough that the surface is not drawn
 // over the paving, and little enough that the apron eases into the shore rather
@@ -1310,10 +1315,15 @@ const runway = {
         // never asks for a second strip is laid exactly as it always was.
         separation: scalar(0, 12000, 0),
         color: gradient([0.32, 0.32, 0.34], [0.11, 0.11, 0.13]),
-        mark:  gradient([0.95, 0.95, 0.92], [0.70, 0.72, 0.70])
+        mark:  gradient([0.95, 0.95, 0.92], [0.70, 0.72, 0.70]),
+        // A dashed line down the middle of the strip, which a commercial strip
+        // carries. Off by default, so every preset's strip is the one it was.
+        centreline: toggle(false)
     },
 
     generate(field, config, random) {
+        if (config.at) return placeStrip(field, config);
+
         const length = pick(random, config.length);
         const width  = pick(random, config.width);
         const site   = chooseRunwaySite(field, config, length, width, random);
@@ -1331,7 +1341,54 @@ const runway = {
     }
 };
 
+/**
+ * A strip placed where it was asked for rather than where the site search
+ * found room: centred on `at`, in the square's own frame like a dropped
+ * mountain's, and laid along the bearing its `heading` names - the low end of
+ * the span, which a placed strip writes as the one number it is. Its length and
+ * width are the low ends of theirs the same way.
+ *
+ * Its height is measured under its own footprint on the tile it lands on, as
+ * the search measures a site, because the built tile is a pattern and every
+ * copy of the strip sits on different ground; it is lifted clear of any water
+ * under it, the sea's or a drawn body's. `band` and `separation` are the
+ * search's rules and are not consulted: a pilot who puts a strip on a ridge
+ * gets a strip on a ridge. It takes nothing from the seeded stream, so placing
+ * one moves nothing else in the world.
+ *
+ * Recorded `placed`, which is what puts a flight that starts on a runway on it
+ * rather than on the strip the search found - see `getRunway` in
+ * `js/terrain.js`.
+ */
+function placeStrip(field, config) {
+    const [x, z] = config.at;
+    const length = config.length[0];
+    const width  = config.width[0];
+    const heading = config.heading[0];
+    const site = { x: field.originX + x, z: field.originZ + z, heading, ...runwayDirection(heading) };
+
+    const elevation = measureRunwayGround(field, site, length, width).mean;
+    const index = field.runways.length;
+    const strip = {
+        ...site, ...clearRunwayGround(field, elevation, { ...site, length, width }),
+        length, width, index, placed: true
+    };
+    gradeRunway(field, strip, config);
+    field.runways.push(strip);
+    return strip;
+}
+
 // --- Reading a strip ------------------------------------------------------
+
+/**
+ * The strip a flight that starts on a runway opens on, of a world's strips:
+ * the last one the pilot placed, when there is one - the order a pilot builds
+ * a runway and then resets the flight to fly it - and otherwise the first,
+ * which is the strip the site search found. Null for a world with none.
+ */
+export function flightStrip(strips = []) {
+    return strips.findLast(strip => strip?.placed === true) ?? strips[0] ?? null;
+}
 
 /**
  * The unit vector a strip runs along, from the bearing it was laid on. North is
@@ -2204,9 +2261,18 @@ function gradeRunway(field, runway, config) {
         const painted = reachCross / halfWidth >= RUNWAY_SHOULDER
                      || reachAlong / halfLength >= RUNWAY_THRESHOLD;
 
-        paint(field, i, painted
-            ? blend(config.mark, reachCross / halfWidth)
-            : blend(config.color, 1 - reachCross / halfWidth));
+        // The centreline: dashes down the middle, short of the threshold
+        // bars, at least a vertex wide however fine the strip is drawn.
+        const centre = config.centreline === true
+            && reachCross <= Math.max(field.step * 0.6, halfWidth * RUNWAY_CENTRELINE)
+            && reachAlong / halfLength < RUNWAY_THRESHOLD - 0.05
+            && Math.floor((along + halfLength) / RUNWAY_DASH) % 2 === 0;
+
+        paint(field, i, centre
+            ? blend(config.mark, 0)
+            : painted
+                ? blend(config.mark, reachCross / halfWidth)
+                : blend(config.color, 1 - reachCross / halfWidth));
     }
 }
 

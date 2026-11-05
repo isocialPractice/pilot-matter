@@ -24,7 +24,7 @@ import {
 import { getEnvironment, environmentElements } from './environment/presets.js';
 import {
     rangeStep, stepPlaces, label, rowValue, rangeEntryText,
-    writeRowValue, stepRow, isTypedRow, typedRowValue, rangeNotice, panelRows
+    writeRowValue, stepRow, isTypedRow, typedRowValue, rangeNotice, panelRows, coarseStep
 } from './properties-panel.js';
 import {
     typedCharacter, startsTypedValue, readTypedKey, typedValueLabel
@@ -489,7 +489,7 @@ export function editorElement(state, id) {
  * Returns the id of the element that changed, so the caller knows the ground
  * has to be drawn again, and null when nothing moved.
  */
-export function adjustEditorRange(state, id, step) {
+export function adjustEditorRange(state, id, step, { coarse = false } = {}) {
     if (!step) return null;
 
     const entry = editorEntry(state, id);
@@ -498,7 +498,7 @@ export function adjustEditorRange(state, id, step) {
     const element = editorElement(state, entry.element);
     if (!element) return null;
 
-    if (!stepRow(element, entry.name, entry.row, step)) return null;
+    if (!stepRow(element, entry.name, entry.row, coarse ? coarseStep(entry.row, step) : step)) return null;
 
     syncEditorEntries(state);
     return element.id;

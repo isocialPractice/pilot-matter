@@ -4443,3 +4443,80 @@ still be found by name.
     stands. Confirmed in Chromium on the canvas and in the flight it was kept
     for.
   - From: Interactive Build Mode
+- [x] **Parametric shapes**: a regular figure held as its centre, radius, sides
+  and star ratio, so changing the number of sides reshapes what was drawn
+  instead of asking for it again
+  - **Settled**: a `polygon` footprint is its centre, `radius`, `sides`,
+    `angle` and an `inner` ratio that makes it a star, read by
+    `polygonPoints` in `js/environment/footprints.js`, so Triangle, Star and
+    Polygon Select are on the panel - each standing on the press, reaching to
+    the pointer and turned the way it went. A tool's `fields` name what each
+    of its rows writes on the figure, and `setLassoValues` puts a changed row
+    onto the selection the same tool drew through `reshapeFootprint`: an
+    octagon from a hexagon where it stood, and Round Rect.'s `CORNER` the same
+    way. A selection another tool drew, or a combined one, is left alone.
+  - From: Interactive Build Mode
+- [x] **Curved selections**: a boundary of curve segments, flattened once per
+  pass rather than once per vertex, with the control points kept so the curve
+  stays editable
+  - **Settled**: a `path` footprint is its control points and whether it is
+    `closed`; `flattenPath` runs a Catmull-Rom curve through them, twelve
+    pieces a stretch, once per footprint and kept in a `WeakMap`, so the
+    points stay the record. Curved Polygon runs round the loop and Curved
+    Polyline from the first point to the last and straight back, both through
+    the click-per-vertex gesture, drawn on the ground as they will come out
+    while the points are placed. All ten tools are on the panel.
+  - From: Interactive Build Mode
+- [x] **Drawing against a selection**: a shape added to it with `shift`, cut out
+  of it with `alt`, or drawn inside it with neither, read once at the press, so
+  every tool that minds the lasso shares one rule for combining with it
+  - **Settled**: a `combine` footprint - `op`, `a`, `b` - weighs `union` as
+    the larger of its parts, `intersect` as their product and `subtract` as
+    `a * (1 - b)`, each part keeping its own feather and either one nestable.
+    `lassoOp` reads the key once at the press - `alt` cuts, `shift` adds, and
+    neither draws inside a live selection or adds to none - and a shape of
+    clicks keeps what its first click said. `drawIntoSelection` in
+    `js/build-mode.js` combines the shape with the selection and drops the
+    selection when no ground is left. A combined selection is outlined by
+    `regionEdges`, the contour of its weight chained into runs and kept until
+    it changes, and a mountain dropped in it is clipped by the whole
+    combination. `AltLeft` and `AltRight` are swallowed on a canvas.
+  - From: Interactive Build Mode
+- [x] **Shift at the press, shift in the drag**: the key that adds a shape to a
+  selection when it is held at the press, and keeps the shape square or round
+  when it is pressed after the drag has begun
+  - **Settled**: `squareInDrag` keeps the two apart. A drag remembers whether
+    `shift` was down at its press; `shift` pressed once that has been let go,
+    or only after the drag began, squares the box or rounds the ellipse -
+    grown from the press toward the pointer by the longer side - and it is
+    drawn so while it is drawn. Held from the press it adds and squares
+    nothing. The control list says both, as `Shift+Drag (Lasso)` and `Drag
+    (Lasso), then Shift`.
+  - From: Interactive Build Mode
+- [x] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
+  the four, laying it by dragging a rounded-rectangle stamp swept whole along
+  the stroke, whose width, depth and corner are on the panel in pixels and
+  stored in world units once the stroke is laid
+  - **The Flat gumball is waiting for it.** Since `1.0.0-alpha.1.44.0`
+    `handleBinding` in `js/gumball.js` binds the squares to a footprint's extent
+    - `radius`, `radiusX`/`radiusZ`, `width`/`depth` - and the blue arc to its
+    angle, held in Node, but no placement on a canvas has a footprint yet, so
+    none of them has been seen dragged. A stroke's footprint has no extent the
+    squares know; giving it one is this item's.
+  - **Settled**: `js/build-tools.js` declares the cover tool once for each of
+    the four covers - `cover`, and `starts` at a half for grass and sand and
+    whole for water and snow - with `COVER_BRUSH`, its stamp in screen pixels,
+    as the panel's `BUILD HEIGHT`, `BUILD WIDTH` and `CORNER RADIUS`, the first
+    written to the stamp's `depth`. Grass and Sand are on the palette; water
+    and snow wait for their elements to be drawn where a stroke goes. The panel
+    is on the dock from the moment the tool is chosen. A drag is sampled every
+    six pixels, each sample stood on the ground as it is taken, and laid by
+    `layStroke` with `coverStamp` at the scale `unitsPerPixel` gives where it
+    was pressed. The strokes before an accept are one batch: a union set down
+    in a `placed` frame, which the Flat gumball moves, turns and stretches.
+    The panel's density and colours change the whole batch, the brush only
+    the strokes still to come. Laying it found the `stroke` kind short inside:
+    measured as boxes end to end, a drag sampled every few pixels with a
+    stamp shallower than its feather was part covered down its middle. It is
+    measured from the way the drag went now.
+  - From: Interactive Build Mode

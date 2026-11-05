@@ -11,26 +11,35 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
-  panel row by ten points or ten steps, in every panel including the element
-  editor's
+- [ ] **Free paint**: an element that writes colour and no height, so an
+  accepted stroke is ground rather than a decal standing over it
+  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
+    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
+    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
+    the strip's grey, given their members once both are in the registry.
   - From: Interactive Build Mode
-- [ ] **Placed runway**: a strip inserted where it was asked for rather than
-  where the site search found room, graded to the ground under it on each tile
-  and lifted clear of any water, with width, length and a rotation about its
-  own centre
+- [ ] **Paint panel**: the colour swatches, the custom picker, the eye dropper
+  and the hex field, with the brush as a tip and an edge rather than a list of
+  named presets
   - From: Interactive Build Mode
-- [ ] **Runway templates**: basic and commercial runways and airports as groups
-  of placements the registry already has, copied into the placement when it is
-  inserted so a template improved later leaves built worlds as they were
+- [ ] **Brush sizing**: a brush measured in screen pixels while painting and
+  stored in world units once the stroke is laid, so a stroke does not change
+  size when the camera moves
+  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
+    `coverStamp` turns a brush in pixels into a stamp in world units at the
+    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
+    goes the same way.
   - From: Interactive Build Mode
-- [ ] **Insert a template**: a card chosen on the panel, its outline carried
-  over the ground and written only on the click, arriving lined up with the
-  view to the nearest ten degrees, then turned and sized on the panel or by the
-  gumball
+- [ ] **Strokes land as they are drawn**: each pointer sample projected to the
+  ground as it is taken, so the stroke on screen while painting is the stroke
+  that gets committed
+  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
+    `js/main.js` stands each sample on the ground as it is taken, every six
+    pixels, and the trail on the overlay is drawn through them.
   - From: Interactive Build Mode
-- [ ] **The strip a flight starts on**: a placed strip outranking a searched
-  one, so a flight reset onto a runway opens on the strip the pilot built
+- [ ] **Paint blending**: a stroke that takes the brush's hue and keeps the
+  ground's own lightness, so a painted hillside is still lit from the same side
+  rather than going flat
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -100,24 +109,12 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
-  panel row by ten points or ten steps, in every panel including the element
-  editor's
-- [ ] **Placed runway**: a strip inserted where it was asked for rather than
-  where the site search found room, graded to the ground under it on each tile
-  and lifted clear of any water, with width, length and a rotation about its
-  own centre
-- [ ] **Runway templates**: basic and commercial runways and airports as groups
-  of placements the registry already has, copied into the placement when it is
-  inserted so a template improved later leaves built worlds as they were
-- [ ] **Insert a template**: a card chosen on the panel, its outline carried
-  over the ground and written only on the click, arriving lined up with the
-  view to the nearest ten degrees, then turned and sized on the panel or by the
-  gumball
-- [ ] **The strip a flight starts on**: a placed strip outranking a searched
-  one, so a flight reset onto a runway opens on the strip the pilot built
 - [ ] **Free paint**: an element that writes colour and no height, so an
   accepted stroke is ground rather than a decal standing over it
+  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
+    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
+    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
+    the strip's grey, given their members once both are in the registry.
 - [ ] **Paint panel**: the colour swatches, the custom picker, the eye dropper
   and the hex field, with the brush as a tip and an edge rather than a list of
   named presets
@@ -169,6 +166,10 @@ the order the work unblocks itself in.
 - [ ] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
   by the gumball or by a number, previewing on the overlay and writing the field
   once on release
+  - **The airport templates wait on it too.** Their buildings are extrusions
+    over rects at fixed distances from the strip's edge and ends - see
+    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
+    widens.
 - [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
   height as a single region, with two that overlap reading as one solid
   - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
@@ -292,85 +293,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 343 earlier items in `TODO-archive.md`, newest last.
+> 348 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Parametric shapes**: a regular figure held as its centre, radius, sides
-  and star ratio, so changing the number of sides reshapes what was drawn
-  instead of asking for it again
-  - **Settled**: a `polygon` footprint is its centre, `radius`, `sides`,
-    `angle` and an `inner` ratio that makes it a star, read by
-    `polygonPoints` in `js/environment/footprints.js`, so Triangle, Star and
-    Polygon Select are on the panel - each standing on the press, reaching to
-    the pointer and turned the way it went. A tool's `fields` name what each
-    of its rows writes on the figure, and `setLassoValues` puts a changed row
-    onto the selection the same tool drew through `reshapeFootprint`: an
-    octagon from a hexagon where it stood, and Round Rect.'s `CORNER` the same
-    way. A selection another tool drew, or a combined one, is left alone.
-  - From: Interactive Build Mode
-- [x] **Curved selections**: a boundary of curve segments, flattened once per
-  pass rather than once per vertex, with the control points kept so the curve
-  stays editable
-  - **Settled**: a `path` footprint is its control points and whether it is
-    `closed`; `flattenPath` runs a Catmull-Rom curve through them, twelve
-    pieces a stretch, once per footprint and kept in a `WeakMap`, so the
-    points stay the record. Curved Polygon runs round the loop and Curved
-    Polyline from the first point to the last and straight back, both through
-    the click-per-vertex gesture, drawn on the ground as they will come out
-    while the points are placed. All ten tools are on the panel.
-  - From: Interactive Build Mode
-- [x] **Drawing against a selection**: a shape added to it with `shift`, cut out
-  of it with `alt`, or drawn inside it with neither, read once at the press, so
-  every tool that minds the lasso shares one rule for combining with it
-  - **Settled**: a `combine` footprint - `op`, `a`, `b` - weighs `union` as
-    the larger of its parts, `intersect` as their product and `subtract` as
-    `a * (1 - b)`, each part keeping its own feather and either one nestable.
-    `lassoOp` reads the key once at the press - `alt` cuts, `shift` adds, and
-    neither draws inside a live selection or adds to none - and a shape of
-    clicks keeps what its first click said. `drawIntoSelection` in
-    `js/build-mode.js` combines the shape with the selection and drops the
-    selection when no ground is left. A combined selection is outlined by
-    `regionEdges`, the contour of its weight chained into runs and kept until
-    it changes, and a mountain dropped in it is clipped by the whole
-    combination. `AltLeft` and `AltRight` are swallowed on a canvas.
-  - From: Interactive Build Mode
-- [x] **Shift at the press, shift in the drag**: the key that adds a shape to a
-  selection when it is held at the press, and keeps the shape square or round
-  when it is pressed after the drag has begun
-  - **Settled**: `squareInDrag` keeps the two apart. A drag remembers whether
-    `shift` was down at its press; `shift` pressed once that has been let go,
-    or only after the drag began, squares the box or rounds the ellipse -
-    grown from the press toward the pointer by the longer side - and it is
-    drawn so while it is drawn. Held from the press it adds and squares
-    nothing. The control list says both, as `Shift+Drag (Lasso)` and `Drag
-    (Lasso), then Shift`.
-  - From: Interactive Build Mode
-- [x] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
-  the four, laying it by dragging a rounded-rectangle stamp swept whole along
-  the stroke, whose width, depth and corner are on the panel in pixels and
-  stored in world units once the stroke is laid
-  - **The Flat gumball is waiting for it.** Since `1.0.0-alpha.1.44.0`
-    `handleBinding` in `js/gumball.js` binds the squares to a footprint's extent
-    - `radius`, `radiusX`/`radiusZ`, `width`/`depth` - and the blue arc to its
-    angle, held in Node, but no placement on a canvas has a footprint yet, so
-    none of them has been seen dragged. A stroke's footprint has no extent the
-    squares know; giving it one is this item's.
-  - **Settled**: `js/build-tools.js` declares the cover tool once for each of
-    the four covers - `cover`, and `starts` at a half for grass and sand and
-    whole for water and snow - with `COVER_BRUSH`, its stamp in screen pixels,
-    as the panel's `BUILD HEIGHT`, `BUILD WIDTH` and `CORNER RADIUS`, the first
-    written to the stamp's `depth`. Grass and Sand are on the palette; water
-    and snow wait for their elements to be drawn where a stroke goes. The panel
-    is on the dock from the moment the tool is chosen. A drag is sampled every
-    six pixels, each sample stood on the ground as it is taken, and laid by
-    `layStroke` with `coverStamp` at the scale `unitsPerPixel` gives where it
-    was pressed. The strokes before an accept are one batch: a union set down
-    in a `placed` frame, which the Flat gumball moves, turns and stretches.
-    The panel's density and colours change the whole batch, the brush only
-    the strokes still to come. Laying it found the `stroke` kind short inside:
-    measured as boxes end to end, a drag sampled every few pixels with a
-    stamp shallower than its feather was part covered down its middle. It is
-    measured from the way the drag went now.
-  - From: Interactive Build Mode
 - [x] **Cover density**: how much of a stroke grass, sand, water or snow covers,
   through noise that stays put when a tile is drawn again, defaulting to full
   cover so every preset renders as it does today, with water and snow starting
@@ -447,4 +371,63 @@ how the simulator got here rather than as a list still to be worked.
     times its coverage, so it is thin and blue-grey at the edge and white down
     the middle on any ground; `slope` still leaves steep faces bare. Snow
     joins the palette.
+  - From: Interactive Build Mode
+- [x] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
+  panel row by ten points or ten steps, in every panel including the element
+  editor's
+  - **Settled**: `coarseStep` in `js/properties-panel.js` makes a press with
+    `shift` ten points on a row read as a percentage - added, so 100%, 110%,
+    120% - and ten of a row's own steps on any other. The dock's spinner hands
+    `shift` through `onStep`, and the element editor's arrow keys through
+    `adjustEditorRange`'s `coarse`. The game's own settings screens are not the
+    shared panel and keep their steps.
+  - From: Interactive Build Mode
+- [x] **Placed runway**: a strip inserted where it was asked for rather than
+  where the site search found room, graded to the ground under it on each tile
+  and lifted clear of any water, with width, length and a rotation about its
+  own centre
+  - **Settled**: a `runway` whose configuration carries `at` is laid by
+    `placeStrip` rather than searched for: at that canvas point on each tile,
+    along the low end of its heading span, its elevation measured under its own
+    footprint with the search's own `measureRunwayGround`, lifted clear of any
+    water by `clearRunwayGround`, `band` and `separation` unread, nothing taken
+    from the seeded stream, and recorded `placed: true`. A `centreline` toggle,
+    off by default so every preset's strip is unchanged, paints dashes down the
+    middle. A placed strip is kept wholly on the canvas: one across a seam
+    would be graded half on one tile's ground and half on the next's.
+  - From: Interactive Build Mode
+- [x] **Runway templates**: basic and commercial runways and airports as groups
+  of placements the registry already has, copied into the placement when it is
+  inserted so a template improved later leaves built worlds as they were
+  - **Settled**: `js/templates.js` declares the four in the panel's order.
+    `BASIC RUNWAY` and `COMMERCIAL` - longer, wider, and carrying its
+    centreline - are offered; the two airports are laid out from a `paint`
+    apron and `extrude` buildings, neither of which the registry draws yet, so
+    they are declared waiting on both and get their members with Free paint and
+    Extrude. A template is placed as one `group` placement with its members
+    copied in; `buildEnvironment` expands a group - each member turned through
+    its heading, moved into place, its strip sized and held on the canvas -
+    and Select picks a group by its strips, apron and all.
+  - From: Interactive Build Mode
+- [x] **Insert a template**: a card chosen on the panel, its outline carried
+  over the ground and written only on the click, arriving lined up with the
+  view to the nearest ten degrees, then turned and sized on the panel or by the
+  gumball
+  - **Settled**: Insert Runway joins the palette, its panel the templates as
+    cards - named tiles, the art's own cards still being in its
+    work-in-progress folder. A card arms it, and the template's outline
+    follows a pointer that can hover; a click places it lined up with the view
+    to the nearest ten degrees, `arrivalHeading(viewBearing(...))`, with
+    `HEADING`, `LENGTH` and `WIDTH` under the cards, and the Flat gumball's
+    centre, arc and squares moving, turning and sizing it. A click with it in
+    hand moves it, and another card turns it into that template where it
+    stands. With nine tiles the palette reached the control list on an
+    800-pixel screen, so the list now stops short of the palette and scrolls.
+  - From: Interactive Build Mode
+- [x] **The strip a flight starts on**: a placed strip outranking a searched
+  one, so a flight reset onto a runway opens on the strip the pilot built
+  - **Settled**: `flightStrip` in `js/environment/elements.js` - the last
+    placed strip, the first otherwise - is what `getRunway()` returns, so a
+    runway start opens on the strip the pilot built. It is published in the
+    API beside the other strip readers.
   - From: Interactive Build Mode

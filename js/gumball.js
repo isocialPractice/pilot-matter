@@ -31,6 +31,7 @@
 import { bearingToDirection } from './units.js';
 import { getElement, isElementId, wrapOffset } from './environment/elements.js';
 import { rangeStep, stepPlaces } from './properties-panel.js';
+import { GROUP_TYPE, GROUP_RANGES, isGroup, groupReach, keepStripOnCanvas } from './templates.js';
 
 /** The gumball an element is drawn with: one that stands to a height, or one that lies flat. */
 export const GUMBALL_HEIGHTS = 'heights';
@@ -104,6 +105,8 @@ export function gumballHandle(id) {
 
 /** The gumball an element is drawn with: Heights for one that declares a height span, Flat otherwise. */
 export function gumballKind(type) {
+    // A placed runway lies flat, as every strip does.
+    if (type === GROUP_TYPE) return GUMBALL_FLAT;
     if (!isElementId(type)) return null;
     return getElement(type).ranges.height?.kind === 'span' ? GUMBALL_HEIGHTS : GUMBALL_FLAT;
 }
@@ -129,6 +132,9 @@ const EXTENTS = Object.freeze({
 
 /** The footprint kinds that carry an angle, which the blue arc turns. */
 const TURNED = Object.freeze(['ellipse', 'rect', 'placed']);
+
+/** What a placed runway's squares size: its strip's width across, and its length along. */
+const GROUP_EXTENTS = Object.freeze({ red: 'width', green: 'length' });
 
 /**
  * The least a frame may be stretched to along an axis: a twentieth, past which
@@ -185,10 +191,16 @@ export function handleBinding(handleOrId, placement) {
         case 'stand':
             return spanOf(placement.type, 'height') ? { from: 'config', name: 'height', mode: 'scale' } : null;
         case 'extent': {
+            // A placed runway is sized by its strip: across it, and along it.
+            if (isGroup(placement)) {
+                const strip = GROUP_EXTENTS[handle.axis];
+                return strip ? { from: 'config', name: strip, mode: 'scale' } : null;
+            }
             const name = EXTENTS[footprint?.kind]?.[handle.axis];
             return name && Number.isFinite(footprint[name]) ? { from: 'footprint', name, mode: 'scale' } : null;
         }
         case 'turn':
+            if (handle.axis === 'blue' && isGroup(placement)) return { from: 'config', name: 'heading', mode: 'turn' };
             return handle.axis === 'blue' && TURNED.includes(footprint?.kind)
                 ? { from: 'footprint', name: 'angle', mode: 'turn' }
                 : null;
@@ -305,7 +317,9 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
         const centre = gumballCentre(placement);
         const x = keepOnCanvas(centre.x + dx, size);
         const z = keepOnCanvas(centre.z + dz, size);
-        if (binding.from === 'point') changes.config.at = [Math.round(x) || 0, Math.round(z) || 0];
+        // A placed runway is held wholly on the canvas, where its strip is.
+        const [px, pz] = isGroup(placement) ? keepStripOnCanvas([x, z], groupReach(placement), size) : [x, z];
+        if (binding.from === 'point') changes.config.at = [Math.round(px) || 0, Math.round(pz) || 0];
         else changes.footprint = { ...placement.footprint, x, z };
         return changes;
     }
@@ -321,7 +335,12 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
         const factor = Math.exp(along / SCALE_PIXELS);
         const scaled = drag.uniform ? scaleHandles(placement) : [binding];
         for (const each of scaled) {
-            if (each.from === 'config') {
+            if (each.from === 'config' && isGroup(placement)) {
+                const range = GROUP_RANGES[each.name];
+                const held = Number(placement.config?.[each.name]);
+                const value = Math.min(Math.max((Number.isFinite(held) ? held : range.default) * factor, range.low), range.high);
+                changes.config[each.name] = stepped(range, value);
+            } else if (each.from === 'config') {
                 const range = spanOf(placement.type, each.name);
                 changes.config[each.name] = scaleSpan(currentSpan(placement, each.name, range), factor, range);
             } else {
@@ -330,6 +349,14 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
             }
         }
         if (changes.footprint == null) delete changes.footprint;
+        return changes;
+    }
+
+    if (binding.mode === 'turn' && binding.from === 'config') {
+        // A heading turns the way a box's angle does, in whole degrees round
+        // the card.
+        const heading = (Number(placement.config?.heading) || 0) + (Number(drag.turn) || 0) * 180 / Math.PI;
+        changes.config.heading = ((Math.round(heading) % 360) + 360) % 360;
         return changes;
     }
 

@@ -249,6 +249,8 @@ back.
 | Drag in Lasso, then `Shift` | Keep a box square or an ellipse round |
 | Click in Lasso, with Polyline or a curved tool | Place a point; click the first one again, or double click, to close the shape |
 | Drag, or a finger, in Grass, Sand, Water or Snow | Lay a stroke of it with the stamp on the panel, which follows the pointer |
+| Click, or a finger, in Runway | Place the chosen runway, lined up with the view; with one in hand, put it down there instead |
+| `Shift` and a press on a spinner | A coarse step: ten points on a percentage, ten steps on anything else |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
@@ -309,6 +311,21 @@ stays off faces too steep to hold it. The batch carries the gumball: the
 centre moves it, the squares stretch it and the arc turns it. With a selection
 live the batch is clipped to it, and a stroke that reaches none of it lays
 nothing. The next batch starts where the panel was left.
+
+Insert Runway's panel is its templates as cards: `BASIC RUNWAY`, and
+`COMMERCIAL`, longer and wider with a dashed centreline. Choosing a card arms
+the tool, and the template's outline follows the pointer over the ground; a
+click places it lined up with the view to the nearest ten degrees, its strip
+levelled to the ground it lands on. `HEADING`, `LENGTH` and `WIDTH` turn and
+size it, as the gumball's arc and squares do, and its centre moves it; a click
+with it in hand puts it down there instead, and another card turns it into that
+template where it stands. A strip is kept wholly on the canvas. The two
+airports join the cards once their aprons and buildings can be drawn. A flight
+that starts on a runway starts on the last one placed.
+
+`Shift` with a press on a spinner is a coarse step - ten points on a row read
+as a percentage, 100% to 110% to 120%, and ten steps on any other row - and
+`Shift` with an arrow in the element editor is the same.
 
 What is in hand carries the gumball, in the art's colours: red east, green
 north, blue up. The white centre moves it over the ground, the red and green

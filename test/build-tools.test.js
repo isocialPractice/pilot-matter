@@ -31,12 +31,13 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is Select, Lasso, Mountain, the four covers and the way out, and nothing else', () => {
-    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', ACCEPT_TOOL]);
+test('today the palette is Select, Lasso, Mountain, the four covers, Insert Runway and the way out, and nothing else', () => {
+    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', ACCEPT_TOOL]);
     assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');
     assert.equal(isChoosableTool('lasso'), true, 'and so is the lasso, which draws the selection');
     assert.equal(isChoosableTool('water'), true, 'and the cover tool, pointed at any of its four');
-    assert.equal(isChoosableTool('runway'), false, 'but not yet the runway, which places nothing');
+    assert.equal(isChoosableTool('runway'), true, 'and Insert Runway, which places a template');
+    assert.equal(isChoosableTool('extrude'), false, 'but not yet Extrude, which draws nothing');
 });
 
 // --- Mountain drops at a click --------------------------------------------------

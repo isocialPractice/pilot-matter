@@ -22,8 +22,11 @@
 
 import {
     SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isCoverTool, COVER_BRUSH,
-    COVER_ELEMENT_ROWS, toolPlacement
+    COVER_ELEMENT_ROWS, toolPlacement, insertsTemplate
 } from './build-tools.js';
+import {
+    templateBuilt, placeTemplate, groupConfig, groupReach, keepStripOnCanvas
+} from './templates.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
 import {
     footprintWeight, isFootprint, combineFootprints, placeFootprint, addToPlaced
@@ -155,7 +158,10 @@ export function createBuildState() {
         // Which of the lasso's ten tools is chosen, and where its fields were
         // left.
         lassoTool: DEFAULT_LASSO_TOOL,
-        lassoValues: {}
+        lassoValues: {},
+        // The template Insert Runway is armed with, or null until a card is
+        // chosen: the pointer carries nothing and a click places nothing.
+        runwayTemplate: null
     };
 }
 
@@ -561,6 +567,66 @@ function rememberToolValues(state) {
     state.toolValues = { ...state.toolValues, [tool]: values };
 }
 
+// --- Insert Runway -------------------------------------------------------------
+
+/** The template Insert Runway is armed with, or null before a card is chosen. */
+export function buildRunwayTemplate(state) {
+    return templateBuilt(state?.runwayTemplate) ? state.runwayTemplate : null;
+}
+
+/**
+ * A card chosen on Insert Runway's panel: the tool armed with its template.
+ * With the tool's own template in hand, the one in hand becomes the new one
+ * where it stands and the way it faces - a card is what is placed, so the card
+ * pressed is what is there - at the new template's own size.
+ *
+ * Refused off a canvas, with a confirm open, for Insert Runway not live, and
+ * for a template the panel does not offer. Returns true when the card is now
+ * chosen.
+ */
+export function chooseRunwayTemplate(state, id) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsTemplate(state.tool) || !templateBuilt(id)) return false;
+
+    state.runwayTemplate = id;
+    const draft = state.draft;
+    if (draftPending(state) && draft.tool === state.tool && draft.replaces == null) {
+        // A new draft rather than the old one changed, so what the panel
+        // steps it through is made again from the template now in hand.
+        const { at, heading } = groupConfig(draft.placement);
+        state.draft = { ...draft, placement: placeTemplate(id, at, heading) };
+    }
+    return true;
+}
+
+/**
+ * A click on the ground with Insert Runway armed: the template placed there,
+ * facing `heading` to the nearest ten degrees - the way the view looks, which
+ * the caller hands in - or, with the one it placed still in hand, that one put
+ * down there instead, facing the way it was turned. Held wholly on a canvas
+ * `size` wide, where its strip is drawn.
+ *
+ * Refused off a canvas, with a confirm open, for Insert Runway not live or not
+ * armed, for a point that is not on the ground, and with an edit in hand this
+ * tool did not begin. Returns true when a template was placed or moved.
+ */
+export function insertTemplate(state, point, heading = 0, { size = 0 } = {}) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsTemplate(state.tool)) return false;
+    const id = buildRunwayTemplate(state);
+    if (id == null || !Number.isFinite(point?.x) || !Number.isFinite(point?.z)) return false;
+
+    if (draftPending(state)) {
+        const draft = state.draft;
+        if (draft.tool !== state.tool || draft.replaces != null) return false;
+        const at = keepStripOnCanvas([point.x, point.z], groupReach(draft.placement), size);
+        draft.placement.config = { ...draft.placement.config, at: at.map(value => Math.round(value) || 0) };
+        return true;
+    }
+
+    const placement = placeTemplate(id, [point.x, point.z], heading);
+    placement.config.at = keepStripOnCanvas(placement.config.at, groupReach(placement), size).map(value => Math.round(value) || 0);
+    return startDraft(state, placement, state.tool);
+}
+
 // --- The cover tool -------------------------------------------------------------
 
 /**
@@ -833,6 +899,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.selectionTool = null;
     state.lassoTool = DEFAULT_LASSO_TOOL;
     state.lassoValues = {};
+    state.runwayTemplate = null;
     return true;
 }
 

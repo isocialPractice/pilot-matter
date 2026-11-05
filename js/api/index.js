@@ -162,5 +162,5 @@ export {
 // takeoff rolls from, for a host placing an aircraft on one of its own.
 export {
     runwayDirection, runwayPoint, runwayOffsets,
-    isOnRunway, runwayThresholds, nearestRunway
+    isOnRunway, runwayThresholds, nearestRunway, flightStrip
 } from '../environment/elements.js';

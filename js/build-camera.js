@@ -20,6 +20,7 @@
 import { TILE_REACH } from './world-tiles.js';
 import { SELECT_TOOL } from './build-tools.js';
 import { scalar } from './environment/elements.js';
+import { directionToBearing } from './units.js';
 
 /**
  * How far the view is tilted down from the horizon, in degrees.
@@ -240,6 +241,15 @@ export function buildCameraPosition(state) {
  * `right` across it, both level. At a yaw of 0 the camera stands back along z,
  * so ahead is toward -z and right is +x.
  */
+/**
+ * The bearing the view looks along over the ground, in degrees round the
+ * compass card: what a template placed from it arrives lined up with.
+ */
+export function viewBearing(state) {
+    const { ahead } = groundAxes(Number(state?.yaw) || 0);
+    return directionToBearing(ahead.x, ahead.z);
+}
+
 function groundAxes(yaw) {
     const turn = yaw * RADIANS;
     return {

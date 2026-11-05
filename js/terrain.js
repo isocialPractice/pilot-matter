@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
     DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight, waterSurface, tileSeed,
-    matchEdges, matchWater, seamBand
+    matchEdges, matchWater, seamBand, flightStrip
 } from './environment/elements.js';
 import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
 import { animateWater } from './water.js';
@@ -352,9 +352,14 @@ export class Terrain {
         return this.tiles.get(tileKey({ x: 0, z: 0 }))?.field.runways ?? [];
     }
 
-    /** The one strip a world carries, or null for a world generated without one. */
+    /**
+     * The strip a flight that starts on a runway opens on, or null for a world
+     * generated without one: the last strip the pilot placed, when there is
+     * one - the order a pilot builds a runway and then resets the flight to fly
+     * it - and the strip the site search found otherwise.
+     */
     getRunway() {
-        return this.getRunways()[0] ?? null;
+        return flightStrip(this.getRunways());
     }
 
     /**

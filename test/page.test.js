@@ -3602,8 +3602,8 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && isCoverTool\(tool\)\) this\.coverPress\(e\);\s*return;\s*\}/,
-        'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, or the cover tool\'s');
+    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && isCoverTool\(tool\)\) this\.coverPress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*return;\s*\}/,
+        'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, the cover tool\'s or Insert Runway\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
 
@@ -3745,7 +3745,7 @@ test('an edit in hand redraws the canvas from what it holds, and is settled from
         /this\.terrain\.setEnvironment\(id, \{ runway: false, elements: canvasElements\(getEnvironment\(id\), this\.builder\) \}\)/);
 
     const apply = methodBody(mainSource, 'applyDockValue');
-    assert.match(apply, /else if \(kind === DOCK_DRAFT\) \{\s*reviseDraft\(this\.builder, \{ config: holder\.config \}\);\s*this\.redrawCanvas\(\);/,
+    assert.match(apply, /else if \(kind === DOCK_DRAFT \|\| kind === DOCK_RUNWAY\) \{\s*reviseDraft\(this\.builder, \{ config: holder\.config \}\);\s*this\.redrawCanvas\(\);/,
         'a value moved on an edit is the ground moving under it');
 
     const settle = methodBody(mainSource, 'onDockAction');
@@ -3850,7 +3850,7 @@ test('a click with a tool that drops picks the ground and drops there', () => {
         /this\.renderer\.domElement\.style\.cursor = canvas \? this\.canvasCursor\(\) : '';/,
         'over ground marked as somewhere to click');
     assert.match(methodBody(mainSource, 'canvasCursor'),
-        /const tool = buildModeTool\(this\.builder\);\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isCoverTool\(tool\)\) return 'crosshair';/,
+        /const tool = buildModeTool\(this\.builder\);\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isCoverTool\(tool\) \|\| insertsTemplate\(tool\)\) return 'crosshair';/,
         'which is a crosshair for a tool that drops, and for the lasso and the cover tool, which draw on it');
 });
 
@@ -4245,7 +4245,7 @@ test('a press with the lasso draws, never orbits, and the cursor says so', () =>
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /else if \(e\.button === 0 && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);/,
         'shift and alt included, which are how a shape meets the selection');
-    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isCoverTool\(tool\)\) return 'crosshair';/);
+    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isCoverTool\(tool\) \|\| insertsTemplate\(tool\)\) return 'crosshair';/);
 });
 
 test('the lasso\'s tiles and its deselect are drawn as the artwork draws them', () => {
@@ -4363,4 +4363,38 @@ test('a stroke is drawn as it goes, as wide as the brush, and the stamp follows 
     assert.match(draw, /pointer\.type !== 'touch' && !confirmOpen\(this\.builder\)\s*&& this\.gumballHover == null && this\.gumballDrag == null/,
         'not for a finger, under a question, or over a handle');
     assert.match(draw, /stampOutline\(pointer\.x, pointer\.y, brush\.buildWidth, brush\.buildHeight, brush\.cornerRadius\)/);
+});
+
+// --- Insert Runway -----------------------------------------------------------------
+
+test('a click with Insert Runway places the chosen template lined up with the view, and the ground is drawn with it', () => {
+    const insert = methodBody(mainSource, 'insertAt');
+    assert.match(insert, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);/);
+    assert.match(insert, /insertTemplate\(this\.builder, point, arrivalHeading\(viewBearing\(this\.buildCamera\)\), \{ size: this\.terrain\.size \}\)/);
+    assert.match(insert, /this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);/);
+});
+
+test('the template armed is outlined where a click would put it, for a pointer that can hover, and writes nothing', () => {
+    const preview = methodBody(mainSource, 'insertPreview');
+    assert.match(preview, /if \(id == null \|\| pointer == null \|\| pointer\.type === 'touch'\) return null;/);
+    assert.match(preview, /placed\.config\.at = keepStripOnCanvas\(placed\.config\.at, groupReach\(placed\), size\);/, 'held on the canvas as a click would hold it');
+    assert.match(preview, /return groupStrips\(placed, size\)\.map\(strip => footprintLoop\(strip\)\);/);
+    assert.doesNotMatch(preview, /redrawCanvas|insertTemplate|startDraft/);
+    const draw = methodBody(mainSource, 'drawBuildOverlay');
+    assert.match(draw, /if \(insertsTemplate\(buildModeTool\(this\.builder\)\) && !confirmOpen\(this\.builder\)\s*&& this\.gumballHover == null && this\.gumballDrag == null\) \{\s*for \(const loop of this\.insertPreview\(\) \?\? \[\]\) \{/);
+});
+
+test('a card pressed on Insert Runway\'s panel arms it, and turns the template in hand into it', () => {
+    const shape = methodBody(mainSource, 'onDockShape');
+    assert.match(shape, /if \(this\.dockShown\?\.kind === DOCK_RUNWAY\) \{\s*if \(!chooseRunwayTemplate\(this\.builder, id\)\) return;\s*if \(draftPending\(this\.builder\)\) this\.redrawCanvas\(\);/);
+    assert.ok(shape.indexOf('DOCK_RUNWAY') < shape.indexOf('chooseLassoTool'), 'before the lasso\'s tools are asked');
+});
+
+test('the control list stops short of the palette and scrolls, however tall the palette grows', () => {
+    assert.match(methodBody(mainSource, 'syncOverlays'),
+        /const bottom = this\.overlays\.palette\.getBoundingClientRect\(\)\.bottom;\s*document\.documentElement\.style\.setProperty\('--build-palette-bottom', `\$\{Math\.ceil\(bottom\)\}px`\);/);
+    // The desktop rule: the first one written for the list, ahead of any screen's own.
+    const css = indexHtml.slice(indexHtml.indexOf('#build-help {'), indexHtml.indexOf('}', indexHtml.indexOf('#build-help {')));
+    assert.match(css, /max-height: calc\(100vh - var\(--build-palette-bottom, 0px\) - 34px\);/);
+    assert.match(css, /overflow-y: auto;/);
 });
