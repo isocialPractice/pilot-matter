@@ -270,6 +270,43 @@ back.
 | `H` | Collapse the control list, and open it again |
 | `O`, or the gear on the palette's band | The builder's own settings, over the canvas; the tool waits under them |
 
+### The control list
+
+What a canvas's own list reads, in its corner, line by line - the tool a line
+is for in brackets.
+
+| Input | Action |
+|-------|--------|
+| Drag (Select) | Orbit |
+| Middle Drag (Select) or Shift+Right Drag | Pan |
+| Wheel | Zoom |
+| W/A/S/D or ↑/←/↓/→ | Move |
+| Home | Reframe |
+| Click (Select) | Pick a Built Element |
+| Drag (Lasso) | Draw a Selection, or Within One |
+| Shift+Drag (Lasso) | Add to the Selection |
+| Alt+Drag (Lasso) | Cut From the Selection |
+| Drag (Lasso), then Shift | Keep It Square or Round |
+| Click (Lasso) | Place a Point, Double Click to Close |
+| Click (Mountain) | Drop a Mountain |
+| Drag (Grass/Sand/Water/Snow) | Lay a Stroke |
+| Click (Runway) | Place the Chosen Runway |
+| Drag (Free paint) | Paint a Stroke |
+| Click (Free paint) | Take a Colour With the Eye Dropper |
+| Drag (Erase) | Erase Through a Stroke |
+| Alt+Drag (Erase) | Put Back What Was Erased |
+| Drag (Extrude) | Draw a Shape to Lift, or Within the Selection |
+| Shift+Drag (Extrude) | Add a Shape to the Region |
+| Alt+Drag (Extrude) | Cut a Shape From the Region |
+| Click (Extrude) | Choose the Top or the Wall to Colour |
+| Right Click | Offer Deselect, on the Selection |
+| Drag a Handle | Move or Shape What Is in Hand |
+| Esc | Accept Edits or Save and Exit |
+| Enter | Answer a Question |
+| O | Builder Settings |
+| H | Collapse List |
+| F2 | Photo |
+
 Down the right is the dock: `SELECTION MODE`, the camera written out as
 fields to read and type into, or the edit in hand with `ACCEPT` and `CANCEL`
 under it. Only its fields scroll, and the wheel over it scrolls them. In
@@ -435,8 +472,10 @@ ground whatever was set here while they were built.
 The four under `AUTO ACCEPT` are when a draft is kept without being asked
 about. `WHEN DRAWING AGAIN`: the next press that draws - a stroke begun, a
 mountain dropped, a runway placed, a shape begun over a lifted extrusion -
-keeps the draft in hand and starts a new one; nothing is kept when a stroke is
-let go of, so the stroke just drawn can still be changed or cancelled.
+keeps the draft in hand and starts a new one, joined to the stroke kept just
+before it when nothing about it changed, so a batch is still one placement;
+nothing is kept when a stroke is let go of, so the stroke just drawn can still
+be changed or cancelled.
 `WHEN LEAVING`: the way out keeps it and asks only `SAVE AND EXIT MODE`.
 `WHEN CHANGING TOOL`: another tool keeps it rather than asking `ACCEPT EDITS`.
 With `ALL` on the three read on and do not step; off, they are what they were.

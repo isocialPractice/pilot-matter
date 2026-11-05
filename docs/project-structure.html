@@ -102,7 +102,7 @@
 │   ├── config.js       # Pure simulator start state, and the fields it is set through
 │   ├── flight-state.js # Pure configured start in the units the model flies in, and whether a world put in force is a new flight
 │   ├── units.js        # Pure conversions between world units and readings
-│   ├── crash.js        # Pure ground rules: impact, landing, and the crash countdown
+│   ├── crash.js        # Pure ground rules: impact, landing, the crash countdown, and the height an aircraft is put back at over ground that changed under it
 │   ├── game-modes.js   # Pure modes, stages, run state, course, the gate test, the fuel budget, the rescue marker, and the stage clock
 │   ├── pattern.js      # Pure traffic circuit laid off a strip, and the mark each leg is held to
 │   ├── corridor.js     # Pure canyon corridor, and whether a step crossed a cut inside the walls and under the lid
@@ -128,7 +128,7 @@
 │   ├── builder-settings.js # Pure builder settings screen: auto accept's moments with ALL over them, the camera speed, the reset, where it was opened from, and their storage - read by the editor, never by generation
 │   ├── element-editor.js # Pure element editor state: the placed elements and their ranges, what the builder kept laid over them, and the world a free flight is drawn on
 │   ├── properties-panel.js # Pure properties panel: the one row builder every panel of declared ranges is drawn from, its kinds and its gates, a colour's swatches, picker and hex figure, the rows read as a percentage, and the coarse step `shift` makes of a press
-│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, a template Insert Runway places or moves at a click, a stroke laid into its batch - an erase stroke the other way cut out of it - and the stroke tools' panel values, Free Paint's DEFAULT and the eye dropper it and an extrusion's surfaces share, an extrusion's stages, the surface a click chose and the BACK that drops what was changed there, the camera held from inside a tool, the tool suspended under the builder's settings, auto accept's moments - the next press that draws, the way out and another tool, the popup a right click on the selection opens, the placement picked with Select, the selection the lasso drew and the tool that drew it, a shape drawn into it, and what has been committed
+│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, a template Insert Runway places or moves at a click, a stroke laid into its batch - an erase stroke the other way cut out of it - and the stroke tools' panel values, Free Paint's DEFAULT and the eye dropper it and an extrusion's surfaces share, an extrusion's stages, the surface a click chose and the BACK that drops what was changed there, the camera held from inside a tool, the tool suspended under the builder's settings, auto accept's moments - the next press that draws, the way out and another tool - and a stroke it keeps joined to the one kept before it, the popup a right click on the selection opens, the placement picked with Select, the selection the lasso drew and the tool that drew it, a shape drawn into it, and what has been committed
 │   ├── shapes.js       # Pure shape vocabulary: every shape a pointer draws on the ground, the kind of region and the gesture each is, and what a drag or a click per vertex comes to, written once for the lasso and Extrude to offer
 │   ├── lasso.js        # Pure lasso: the ten shapes it offers in the art's rows, and when a shape closes; how a shape meets the selection by the key held at its press, a figure reshaped by its fields, and shift in a drag squaring it
 │   ├── extrude.js      # Pure Extrude: the seven shapes it offers in the art's rows, cut from its panel's art, and the stages an extrusion goes through - drawing, extruding, surfaces - with the one button they share, its two surfaces and which one a point is, and the rows a surface clicked narrows the panel to
@@ -146,7 +146,7 @@
 │   ├── typed-value.js  # Pure keypad both number-holding panels read a typed figure through
 │   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
 │   ├── audio.js        # Pure engine and wind mix, and the graph it is played through
-│   ├── controls-help.js# Pure collapse toggle for the on-screen control lists, the flight's and a canvas's, and the rows they are written from
+│   ├── controls-help.js# Pure collapse toggle for the on-screen control lists, the flight's and a canvas's, the rows they are written from, and a canvas's lines as the input and action the docs carry
 │   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── photo.js        # Pure photo mode state and filename, and the download
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math

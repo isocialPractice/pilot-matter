@@ -1,15 +1,16 @@
 /**
  * Auto accept, and the builder's settings over a canvas - a pending draft kept
  * without being asked about at the next press that draws, at the way out and
- * at another tool, never on a release, with `all` over the three; and the
- * screen opened over a canvas suspending the live tool the way a held pan
- * does, so opening it never keeps or drops a stroke.
+ * at another tool, never on a release, with `all` over the three; a stroke
+ * kept that way joined to the one kept before it when nothing about it
+ * changed; and the screen opened over a canvas suspending the live tool the
+ * way a held pan does, so opening it never keeps or drops a stroke.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     createBuildState, openBuildMode, beginCanvas, chooseBuildTool, buildModeTool, buildDraft, draftPending, editPending,
-    layStroke, setStrokeValues, strokeValues, acceptDraft, cancelDraft, committedPlacements, dropDraft, insertTemplate,
+    layStroke, setStrokeValues, strokeValues, acceptDraft, reviseDraft, cancelDraft, committedPlacements, dropDraft, insertTemplate,
     chooseRunwayTemplate, drawExtrudeShape, pressExtrudeStage, extrudeStage, toggleEyeDropper, selectPlacement,
     requestLeave, buildConfirm, confirmOpen, answerConfirm, acceptToolName, setSelection,
     setAutoAccept, autoAccepts, drawAgain, holdCamera, releaseCamera, cameraHeld,
@@ -18,6 +19,8 @@ import {
 } from '../js/build-mode.js';
 import { EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_SURFACES } from '../js/extrude.js';
 import { DEFAULT_SIZE } from '../js/environment/elements.js';
+import { footprintWeight } from '../js/environment/footprints.js';
+import { buildEnvironment, getEnvironment } from '../js/environment/presets.js';
 
 const SIZE = DEFAULT_SIZE;
 const STAMP = { width: 1200, depth: 1200, corner: 600 };
@@ -254,4 +257,131 @@ test('the settings suspend nothing off a canvas, under a question or under a hel
     beginCanvas(Object.assign(state, { screen: 'picker' }), 'highlands');
     assert.equal(state.settingsOver, null);
     assert.equal(editPending(state), false);
+});
+
+// --- Auto accept merges -------------------------------------------------------------------
+
+const FIRST = [[-2000, 0], [-500, 200]];
+const SECOND = [[800, -300], [2200, 0]];
+const covers = (placement, [x, z]) => footprintWeight(placement.footprint, x, z, SIZE) > 0.99;
+
+test('two strokes kept in a row with nothing changed between are one placement, its footprint both', () => {
+    const state = onCanvas('water', { draw: true });
+    layStroke(state, FIRST, STAMP);
+    drawAgain(state);
+    layStroke(state, SECOND, STAMP);
+    drawAgain(state);
+    const kept = committedPlacements(state);
+    assert.equal(kept.length, 1, 'one placement, as a batch accepted by hand would be');
+    assert.equal(draftPending(state), false, 'and nothing left in hand, the stroke joined being kept');
+    assert.ok(covers(kept[0], [-1200, 100]) && covers(kept[0], [1500, -150]), 'covering both strokes');
+    assert.equal(state.kept, 0, 'and still the one the next is joined to');
+
+    // The same ground a batch of the two accepted by hand draws.
+    const hand = onCanvas('water');
+    layStroke(hand, FIRST, STAMP);
+    layStroke(hand, SECOND, STAMP);
+    acceptDraft(hand);
+    const env = getEnvironment('highlands');
+    const ground = placements => buildEnvironment(env, { segments: 60, elements: placements });
+    const a = ground(kept), b = ground(committedPlacements(hand));
+    assert.ok(a.height.every((h, i) => Math.abs(h - b.height[i]) < 1e-6), 'the same heights');
+    assert.ok(a.color.every((c, i) => Math.abs(c - b.color[i]) < 1e-6), 'and colours');
+});
+
+test('a stroke whose configuration changed starts a placement of its own, as the walkthrough\'s does', () => {
+    const state = onCanvas('water', { all: true });
+    layStroke(state, FIRST, STAMP);
+    drawAgain(state);
+    layStroke(state, SECOND, STAMP);
+    setStrokeValues(state, { color: { ...strokeValues(state).color, dark: [0.1, 0.2, 0.6] } });
+    drawAgain(state);
+    assert.equal(committedPlacements(state).length, 2);
+    assert.deepEqual(committedPlacements(state)[1].config.color.dark, [0.1, 0.2, 0.6], 'the second keeps what it was changed to');
+    assert.notDeepEqual(committedPlacements(state)[0].config.color.dark, [0.1, 0.2, 0.6]);
+
+    // And the next stroke, as the second was, joins the second.
+    layStroke(state, [[0, 2000], [500, 2500]], STAMP);
+    drawAgain(state);
+    assert.equal(committedPlacements(state).length, 2);
+    assert.ok(covers(committedPlacements(state)[1], [250, 2250]));
+});
+
+test('anything committed between ends the run, and only a stroke tool\'s batches are joined', () => {
+    // An ACCEPT by hand between.
+    const hand = onCanvas('grass', { draw: true });
+    layStroke(hand, FIRST, STAMP);
+    drawAgain(hand);
+    layStroke(hand, SECOND, STAMP);
+    acceptDraft(hand);
+    assert.equal(hand.kept, null, 'a batch accepted by hand is closed');
+    layStroke(hand, [[0, 2000], [500, 2500]], STAMP);
+    drawAgain(hand);
+    assert.equal(committedPlacements(hand).length, 3);
+
+    // Another tool, kept on the way: the same element would join, another never does.
+    const tools = onCanvas('grass', { all: true });
+    layStroke(tools, FIRST, STAMP);
+    drawAgain(tools);
+    layStroke(tools, SECOND, STAMP);
+    chooseBuildTool(tools, 'sand');
+    assert.equal(committedPlacements(tools).length, 1, 'kept by the tool change, joined to the grass before it');
+    layStroke(tools, [[0, 2000], [500, 2500]], STAMP);
+    drawAgain(tools);
+    assert.deepEqual(committedPlacements(tools).map(placement => placement.type), ['grass', 'sand']);
+
+    // A different clip is a different placement.
+    const clipped = onCanvas('paint', { draw: true });
+    const brush = { width: 300, depth: 300, corner: 150 };
+    layStroke(clipped, FIRST, brush);
+    drawAgain(clipped);
+    setSelection(clipped, { kind: 'rect', x: 1500, z: 0, width: 3000, depth: 3000, angle: 0, corner: 0, feather: 0 });
+    layStroke(clipped, SECOND, brush);
+    drawAgain(clipped);
+    assert.equal(committedPlacements(clipped).length, 2, 'one clipped to a selection, one not');
+
+    // Mountains are each where they stand.
+    const mountains = onCanvas('mountain', { draw: true });
+    dropDraft(mountains, { x: 0, z: 0 });
+    drawAgain(mountains);
+    dropDraft(mountains, { x: 3000, z: 0 });
+    drawAgain(mountains);
+    assert.equal(committedPlacements(mountains).length, 2);
+    assert.equal(mountains.kept, null);
+});
+
+test('two extrusions kept in a row stay two, each levelled to its own ground', () => {
+    const state = onCanvas('extrude', { draw: true });
+    for (const x of [-3000, 3000]) {
+        drawExtrudeShape(state, { ...BOX, x }, 'union', { size: SIZE });
+        pressExtrudeStage(state, { size: SIZE });
+        drawAgain(state);
+    }
+    assert.equal(committedPlacements(state).length, 2);
+});
+
+test('the way out keeps the stroke joined to the one kept before it, and a picked placement ends the run', () => {
+    const state = onCanvas('snow', { all: true });
+    layStroke(state, FIRST, STAMP);
+    drawAgain(state);
+    layStroke(state, SECOND, STAMP);
+    requestLeave(state);
+    assert.equal(committedPlacements(state).length, 1, 'joined on the way out');
+    answerConfirm(state, CONFIRM_STAY);
+
+    // Picked again with Select, changed, and kept by a tool change: a pick
+    // starts no run, so the next stroke is a placement of its own.
+    chooseBuildTool(state, 'select');
+    selectPlacement(state, 0);
+    reviseDraft(state, { config: { density: 0.5 } });
+    assert.equal(chooseBuildTool(state, 'snow'), true, 'kept without a question');
+    assert.equal(state.kept, null, 'a pick kept starts no run');
+    assert.equal(committedPlacements(state).length, 1);
+    stroke(state, 4000);
+    drawAgain(state);
+    assert.equal(committedPlacements(state).length, 2, 'so the stroke after it is not joined to it');
+
+    // And a canvas begun again starts with nothing to join.
+    beginCanvas(Object.assign(state, { screen: 'picker' }), 'highlands');
+    assert.equal(state.kept, null);
 });

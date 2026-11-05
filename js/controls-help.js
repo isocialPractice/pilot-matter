@@ -187,7 +187,12 @@ function forTools(tools) {
     return ` (${tools.map(toolName).join('/')})`;
 }
 
-/** The builder's list, as the lines it is written on screen, in its order. */
+/**
+ * The builder's list, as the lines it is written on screen, in its order: each
+ * line's `input` and `action`, and the two as the `text` the list reads -
+ * which is what the docs and the cheat sheets carry, cell by cell, and are
+ * held to.
+ */
 export function buildHelpLines() {
     return BUILD_HELP_ROWS.map(row => {
         const input = row.keys ? keysText(row.keys)
@@ -197,7 +202,7 @@ export function buildHelpLines() {
             : row.handle ? 'Drag a Handle'
             : row.rightClick ? 'Right Click'
             : 'Wheel';
-        return { id: row.id, text: `${input} - ${row.label}` };
+        return { id: row.id, input, action: row.label, text: `${input} - ${row.label}` };
     });
 }
 

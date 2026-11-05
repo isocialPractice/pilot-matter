@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     GROUND_CLEARANCE,
+    RESEAT_HEADROOM,
+    reseatHeight,
     CRASH_IMPACT_SPEED,
     RUNWAY_IMPACT_SPEED,
     CRASH_DURATION,
@@ -351,4 +353,38 @@ test('the aircraft ends a run off the strip through the path every crash takes',
         'and record the crash the way an arrival that broke the aircraft is recorded');
     assert.ok(/stopOnTheGround\(\)\s*\{/.test(aircraftSource),
         'both ways a flight ends on the ground should come through one place');
+});
+
+// --- Ground that changed under a flight ------------------------------------------
+
+test('an aircraft in the air over ground that rose under it is lifted to the height it had over the old ground', () => {
+    // Flying 200 over ground at 100, a 900-high mountain built under it.
+    assert.equal(reseatHeight({ y: 300, ground: 900, was: 100 }), 1100, 'as high over the mountain as it was over the valley');
+    // Flying low - 10 over the old ground - it is given the headroom at least.
+    assert.equal(reseatHeight({ y: 110, ground: 900, was: 100 }), 900 + GROUND_CLEARANCE + RESEAT_HEADROOM);
+    // Inside the new ground with no old ground known, the headroom over the new.
+    assert.equal(reseatHeight({ y: 50, ground: 400 }), 400 + GROUND_CLEARANCE + RESEAT_HEADROOM);
+    assert.ok(RESEAT_HEADROOM > 0, 'room enough that the first frame is flown rather than arrived');
+});
+
+test('an aircraft in the air the new ground still clears with headroom is left where it is', () => {
+    assert.equal(reseatHeight({ y: 1000, ground: 900, was: 100 }), 1000, 'already clear');
+    assert.equal(reseatHeight({ y: 600, ground: 0, was: 400 }), 600, 'ground that fell away is not followed down');
+    const floor = 500 + GROUND_CLEARANCE + RESEAT_HEADROOM;
+    assert.equal(reseatHeight({ y: floor, ground: 500, was: 0 }), floor, 'exactly at the headroom');
+    assert.ok(reseatHeight({ y: floor - 1, ground: 500, was: 400 }) >= floor, 'and a hair under it lifted');
+});
+
+test('an aircraft on the ground stays on the ground, the new ground', () => {
+    assert.equal(reseatHeight({ y: 105, ground: 300, was: 100, airborne: false }), 300 + GROUND_CLEARANCE, 'lifted onto ground that rose');
+    assert.equal(reseatHeight({ y: 105, ground: 40, was: 100, airborne: false }), 40 + GROUND_CLEARANCE, 'and set down on ground that fell');
+    assert.equal(reseatHeight({ y: 105, ground: 100, was: 100, airborne: false }), 105, 'and left alone on ground that did not move');
+    assert.equal(reseatHeight({ y: 105, ground: 300, airborne: false, clearance: 8 }), 308, 'at its own clearance');
+});
+
+test('a height or a ground that is not a number moves nothing', () => {
+    assert.equal(reseatHeight({ y: 120, ground: Number.NaN }), 120);
+    assert.equal(reseatHeight({ y: 120, ground: undefined }), 120);
+    assert.ok(Number.isNaN(reseatHeight({ y: Number.NaN, ground: 50 })));
+    assert.equal(reseatHeight({ y: 10, ground: 400, was: Number.NaN }), 400 + GROUND_CLEARANCE + RESEAT_HEADROOM, 'an old ground not known is no height over it');
 });

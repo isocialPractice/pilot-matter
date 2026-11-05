@@ -16,7 +16,7 @@ import {
     GROUND_CLEARANCE, CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED,
     CRASHED, LANDED, createCrashState, clearCrash, updateCrash, controlsLocked,
     touchdownOutcome, recordTouchdown, releaseGround, groundOutcome, headingOffsetTo,
-    ranOffRunway
+    ranOffRunway, reseatHeight
 } from './crash.js';
 import { isOnRunway, nearestRunway } from './environment/elements.js';
 import { wrapPosition } from './world-edge.js';
@@ -664,6 +664,25 @@ export class Aircraft {
     }
 
     getPosition()  { return this.position.clone(); }
+
+    /**
+     * Puts the aircraft back over ground that changed under it while the
+     * flight was held, before the first frame over it is flown and scored -
+     * see `reseatHeight` in js/crash.js. `ground` is the height of the new
+     * ground under it; the ground it was flying over is the last it was told
+     * of. Returns true when it moved.
+     */
+    reseat(ground) {
+        const y = reseatHeight({
+            y: this.position.y, ground, was: this.terrainHeight, airborne: this.airborne, clearance: this.clearance
+        });
+        if (Number.isFinite(ground)) this.terrainHeight = ground;
+        if (y === this.position.y) return false;
+
+        this.position.y = y;
+        this.group.position.copy(this.position);
+        return true;
+    }
     getRotation()  { return this.rotation.clone(); }
     getQuaternion(){ return new THREE.Quaternion().setFromEuler(this.rotation); }
     getSpeed()     { return this.speed; }

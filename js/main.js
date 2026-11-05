@@ -2044,9 +2044,26 @@ class FlightSimulator {
         if (canvas) {
             this.terrain.setCanvas(false);
             this.releaseCanvasView();
-            this.refreshWorld({ restored: !titleShowing(this.titleState) && !changed });
+            // A flight paused before the builder opened is the flight it goes
+            // back to, kept whatever was built: a world kept that changed the
+            // ground is laid under it, and it is put back over that ground
+            // before the first frame is scored, rather than started again.
+            const resumed = !titleShowing(this.titleState);
+            this.refreshWorld({ restored: resumed });
             this.flyOver(this.aircraft.getPosition());
+            if (resumed && changed) this.reseatAircraft();
         }
+    }
+
+    /**
+     * The aircraft put back over the ground under it as it is now, which a
+     * world kept from the builder may have raised or lowered - so a mountain
+     * built where it was parked is not a crash on resume. See `reseatHeight`
+     * in js/crash.js.
+     */
+    reseatAircraft() {
+        const at = this.aircraft.getPosition();
+        return this.aircraft.reseat(this.terrain.getTerrainHeightAt(at.x, at.z));
     }
 
     /**
@@ -4583,7 +4600,13 @@ class FlightSimulator {
         // held at is the attitude this frame is flown in.
         this.trackTilt(frozen);
 
-        this.aircraft.update(dt, groundH);
+        // Nor is the aircraft measured against a canvas. The ground there is
+        // one tile being built, not the ground under the flight, and a frozen
+        // frame still meets the ground: a block built where the aircraft was
+        // paused would set it down on top of the block and lose the height it
+        // was flying at, which is what it is put back at when the flight
+        // resumes over the world kept.
+        if (!canvas) this.aircraft.update(dt, groundH);
 
         // The world has no end to it: the ground is laid on ahead of the
         // aircraft as it flies, out past everything the camera can see, so the

@@ -301,3 +301,50 @@ test('the page leaves the builder list for the script to write', () => {
     assert.ok(/for \(const line of buildHelpLines\(\)\)/.test(mainSource),
         'js/main.js should write the rows from the builder\'s list');
 });
+
+// --- The builder's list in the docs -------------------------------------------------
+
+/**
+ * The builder's list carried into the docs and both cheat sheets, and held to
+ * the code there: each table is the list exactly - every line, in its order,
+ * its input and its action in their own cells - so a binding added to the
+ * canvas fails the documents until each names it, and one taken off fails
+ * them until each lets it go.
+ */
+const decoded = text => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+
+function tableRows(source, id) {
+    const start = source.indexOf(`<table id="${id}">`);
+    if (start < 0) return null;
+    const table = source.slice(start, source.indexOf('</table>', start));
+    return [...table.matchAll(/<tr><td>([^<]*)<\/td><td>([^<]*)<\/td><\/tr>/g)].map(([, input, action]) => [decoded(input), decoded(action)]);
+}
+
+function markdownRows(source, heading) {
+    const lines = source.split('\n');
+    const at = lines.findIndex(line => line.trim() === heading);
+    if (at < 0) return null;
+    const header = lines.findIndex((line, i) => i > at && line.startsWith('| Input | Action |'));
+    const rows = [];
+    for (let i = header + 2; i < lines.length && lines[i].startsWith('|'); i++) {
+        const cells = lines[i].split('|').slice(1, -1).map(cell => cell.trim());
+        rows.push(cells);
+    }
+    return rows;
+}
+
+test('each line of the builder list is its input and its action', () => {
+    for (const line of buildHelpLines()) {
+        assert.ok(line.input && line.action, `${line.id} has both halves`);
+        assert.equal(line.text, `${line.input} - ${line.action}`);
+    }
+});
+
+test('the docs and both cheat sheets carry the builder list line by line, and nothing it does not say', () => {
+    const expected = buildHelpLines().map(line => [line.input, line.action]);
+    assert.ok(expected.length > 20);
+    for (const page of ['docs/controls/index.html', 'docs/cheatsheet.html']) {
+        assert.deepEqual(tableRows(read(page), 'builder-control-list'), expected, `${page} carries the list as the canvas shows it`);
+    }
+    assert.deepEqual(markdownRows(read('CHEATSHEET.md'), '### The control list'), expected, 'and so does CHEATSHEET.md');
+});

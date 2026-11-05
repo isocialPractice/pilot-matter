@@ -188,7 +188,11 @@ export function createBuildState() {
         // handed in from the builder's settings - which this module never
         // reads itself, so a session works without them. `all` is over the
         // other three.
-        autoAccept: noAutoAccept()
+        autoAccept: noAutoAccept(),
+        // The committed placement auto accept kept last, while nothing else
+        // has been committed since, which the next draft it keeps can be
+        // joined to. Null once anything else is committed.
+        kept: null
     };
 }
 
@@ -301,7 +305,7 @@ export function requestLeave(state) {
     // With auto accept on for leaving, the edit in hand is kept without the
     // first question, and the way out goes straight to the second. It never
     // skips that one: leaving is the confirm that keeps a pilot's work.
-    if (editPending(state) && autoAccepts(state, 'exit')) acceptDraft(state);
+    if (editPending(state) && autoAccepts(state, 'exit')) autoKeep(state);
 
     const ask = editPending(state) ? ACCEPT_EDITS : SAVE_AND_EXIT;
     state.confirm = { ask, then: null };
@@ -897,6 +901,9 @@ export function acceptDraft(state) {
     if (!draftPending(state)) return null;
 
     rememberToolValues(state);
+    // Anything committed this way ends the run auto accept was keeping, so
+    // nothing kept after it is joined to what came before it.
+    state.kept = null;
 
     const { placement, replaces } = state.draft;
     if (replaces != null && replaces >= 0 && replaces < state.placements.length) {
@@ -1036,6 +1043,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.extrudeValues = {};
     state.camera = null;
     state.settingsOver = null;
+    state.kept = null;
     return true;
 }
 
@@ -1077,7 +1085,7 @@ export function chooseBuildTool(state, id) {
             state.confirm = { ask: ACCEPT_EDITS, then: { tool: id } };
             return false;
         }
-        acceptDraft(state);
+        autoKeep(state);
     }
 
     state.draft = null;
@@ -1229,8 +1237,59 @@ export function drawAgain(state) {
         || (isExtrudeTool(tool) && state.draft.stage === EXTRUDE_EXTRUDING);
     if (!draws) return false;
 
-    acceptDraft(state);
+    autoKeep(state);
     return true;
+}
+
+/**
+ * A draft auto accept keeps - at the next press that draws, the way out or
+ * another tool - joined to the placement it kept just before when nothing
+ * about it changed, and committed as a placement of its own otherwise.
+ *
+ * Accepting by hand, a batch of strokes is one placement; kept stroke by
+ * stroke, it would be one placement a stroke, each a copy of the field on
+ * every tile it is drawn on. So a stroke tool's draft is joined to the
+ * placement auto accept kept last - the same element, the same configuration
+ * once resolved and the same clip, with nothing committed between - its
+ * footprint added to that one's as a union, which is the ground a batch
+ * accepted by hand would have drawn while the configuration held still. A
+ * placement starts only where the pilot changed something, which is where
+ * Select needs to tell two apart. A stroke tool's alone: a mountain, a runway
+ * or an extrusion is one thing where it stands, and an extrusion is levelled
+ * to the mean of the ground it covers, which a union would change.
+ *
+ * Returns the placement the draft was kept as, or null with none in hand.
+ */
+function autoKeep(state) {
+    const draft = state.draft;
+    if (draft == null) return null;
+
+    const last = state.placements.length - 1;
+    if (state.kept === last && last >= 0 && joinsKept(draft, state.placements[last])) {
+        rememberToolValues(state);
+        const into = state.placements[last];
+        into.footprint = addToPlaced(into.footprint, own(draft.placement.footprint));
+        state.draft = null;
+        return own(into);
+    }
+
+    // A pick changed and kept carries no tool, so it starts no run.
+    const kept = acceptDraft(state);
+    state.kept = isStrokeTool(draft.tool) ? state.placements.length - 1 : null;
+    return kept;
+}
+
+/**
+ * True when a draft can be joined to the placement auto accept kept: one of
+ * the same element, configuration and clip. Only a stroke tool's batch is
+ * ever kept as one to join, and an element is drawn by one tool, so a draft
+ * of the same element is that tool's too - with a footprint, as a stroke
+ * tool's always has.
+ */
+function joinsKept(draft, placement) {
+    const made = draft.placement;
+    return samePlacement({ ...made, footprint: null }, { ...placement, footprint: null })
+        && JSON.stringify(made.clip ?? null) === JSON.stringify(placement.clip ?? null);
 }
 
 // --- The selection, and the lasso that draws it -----------------------------------

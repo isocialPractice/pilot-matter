@@ -3477,8 +3477,10 @@ test('leaving a canvas restores the flight world rather than choosing a new one'
         'with the restore among what it reads');
 
     const leaving = mainSource.match(/leaveBuilder\(changed = false\)\s*\{[\s\S]*?\n    \}/);
-    assert.match(leaving[0], /this\.refreshWorld\(\{ restored: !titleShowing\(this\.titleState\) && !changed \}\)/,
-        'leaving a canvas should say the flight world is being restored - unless a kept world changed it');
+    assert.match(leaving[0], /const resumed = !titleShowing\(this\.titleState\);\s*this\.refreshWorld\(\{ restored: resumed \}\);/,
+        'leaving a canvas should say the flight paused before it is being resumed - a kept world that changed the ground included');
+    assert.match(leaving[0], /this\.flyOver\(this\.aircraft\.getPosition\(\)\);\s*if \(resumed && changed\) this\.reseatAircraft\(\);/,
+        'and put the aircraft back over the new ground once it is laid under it, before a frame is flown');
     assert.ok(!/this\.refreshWorld\(\);/.test(leaving[0]),
         'and never ask for the plain refresh, which reads a restore as a world that changed');
 });
@@ -4757,4 +4759,26 @@ test('a draft kept by auto accept lets the panel\'s holders go and draws the gro
     const leave = methodBody(mainSource, 'requestLeaveBuilder');
     assert.match(leave, /const pending = editPending\(this\.builder\);\s*const asked = requestLeave\(this\.builder\);\s*if \(pending && !draftPending\(this\.builder\)\) this\.draftKept\(\);/,
         'and a way out that kept it before asking whether to save');
+});
+
+test('a flight resumed over ground that changed is put back over it, read where every frame reads it', () => {
+    assert.match(methodBody(mainSource, 'reseatAircraft'),
+        /const at = this\.aircraft\.getPosition\(\);\s*return this\.aircraft\.reseat\(this\.terrain\.getTerrainHeightAt\(at\.x, at\.z\)\);/);
+    assert.match(mainSource, /const groundH\s*= this\.terrain\.getTerrainHeightAt\(aircraftPos\.x, aircraftPos\.z\);/,
+        'the same ground the frame flies over');
+    const aircraft = readFileSync(fileURLToPath(new URL('../js/aircraft.js', import.meta.url)), 'utf8');
+    const reseat = methodBody(aircraft, 'reseat');
+    assert.match(reseat, /y: this\.position\.y, ground, was: this\.terrainHeight, airborne: this\.airborne, clearance: this\.clearance/,
+        'measured against the ground it was last flying over, whether it is in the air, and its own clearance');
+    assert.match(reseat, /if \(Number\.isFinite\(ground\)\) this\.terrainHeight = ground;/, 'and told of the new ground');
+    assert.match(reseat, /this\.position\.y = y;\s*this\.group\.position\.copy\(this\.position\);/, 'and drawn where it now is');
+});
+
+test('while a canvas is open the aircraft is neither flown nor measured against the canvas\'s ground', () => {
+    const frame = methodBody(mainSource, 'animate');
+    assert.match(frame, /const canvas = buildModeDrawing\(this\.builder\);/);
+    assert.match(frame, /if \(!canvas\) this\.aircraft\.update\(dt, groundH\);/,
+        'a frozen frame still meets the ground, and the canvas\'s is not the ground under the flight');
+    assert.doesNotMatch(frame.replace('if (!canvas) this.aircraft.update(dt, groundH);', ''), /this\.aircraft\.update\(/,
+        'and nothing else flies it there');
 });

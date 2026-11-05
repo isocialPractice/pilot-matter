@@ -323,6 +323,45 @@
 </table>
 </div>
 
+<h3 id="builder-control-list-cheat">The control list</h3>
+<p>What a canvas's own list reads, in its corner, line by line - the tool a line is for in brackets.</p>
+<div class="table-wrap">
+<table id="builder-control-list">
+    <thead><tr><th>Input</th><th>Action</th></tr></thead>
+    <tbody>
+        <tr><td>Drag (Select)</td><td>Orbit</td></tr>
+        <tr><td>Middle Drag (Select) or Shift+Right Drag</td><td>Pan</td></tr>
+        <tr><td>Wheel</td><td>Zoom</td></tr>
+        <tr><td>W/A/S/D or ↑/←/↓/→</td><td>Move</td></tr>
+        <tr><td>Home</td><td>Reframe</td></tr>
+        <tr><td>Click (Select)</td><td>Pick a Built Element</td></tr>
+        <tr><td>Drag (Lasso)</td><td>Draw a Selection, or Within One</td></tr>
+        <tr><td>Shift+Drag (Lasso)</td><td>Add to the Selection</td></tr>
+        <tr><td>Alt+Drag (Lasso)</td><td>Cut From the Selection</td></tr>
+        <tr><td>Drag (Lasso), then Shift</td><td>Keep It Square or Round</td></tr>
+        <tr><td>Click (Lasso)</td><td>Place a Point, Double Click to Close</td></tr>
+        <tr><td>Click (Mountain)</td><td>Drop a Mountain</td></tr>
+        <tr><td>Drag (Grass/Sand/Water/Snow)</td><td>Lay a Stroke</td></tr>
+        <tr><td>Click (Runway)</td><td>Place the Chosen Runway</td></tr>
+        <tr><td>Drag (Free paint)</td><td>Paint a Stroke</td></tr>
+        <tr><td>Click (Free paint)</td><td>Take a Colour With the Eye Dropper</td></tr>
+        <tr><td>Drag (Erase)</td><td>Erase Through a Stroke</td></tr>
+        <tr><td>Alt+Drag (Erase)</td><td>Put Back What Was Erased</td></tr>
+        <tr><td>Drag (Extrude)</td><td>Draw a Shape to Lift, or Within the Selection</td></tr>
+        <tr><td>Shift+Drag (Extrude)</td><td>Add a Shape to the Region</td></tr>
+        <tr><td>Alt+Drag (Extrude)</td><td>Cut a Shape From the Region</td></tr>
+        <tr><td>Click (Extrude)</td><td>Choose the Top or the Wall to Colour</td></tr>
+        <tr><td>Right Click</td><td>Offer Deselect, on the Selection</td></tr>
+        <tr><td>Drag a Handle</td><td>Move or Shape What Is in Hand</td></tr>
+        <tr><td>Esc</td><td>Accept Edits or Save and Exit</td></tr>
+        <tr><td>Enter</td><td>Answer a Question</td></tr>
+        <tr><td>O</td><td>Builder Settings</td></tr>
+        <tr><td>H</td><td>Collapse List</td></tr>
+        <tr><td>F2</td><td>Photo</td></tr>
+    </tbody>
+</table>
+</div>
+
 <p>Down the right is the dock: <code>SELECTION MODE</code>, the camera written out as fields to read and type into, or the edit in hand with <code>ACCEPT</code> and <code>CANCEL</code> under it. Only its fields scroll, and the wheel over it scrolls them. In Select the camera stays on top: beneath it is the placement picked, under <code>SELECTED</code> and its name, or with nothing picked each of the world's own elements under <code>WORLD:</code>, folded until its heading is pressed. A value changed there changes every one of that element across the world, and <code>YES</code> on leaving keeps it.</p>
 
 <p>The two questions open on <code>YES</code>; the arrows cross to <code>NO</code>, and <kbd>Esc</kbd> or a press off the panel calls the question off. <code>YES</code> on <code>ACCEPT EDITS</code> keeps the edit and stays, so keeping work never doubles as leaving; <code>YES</code> on <code>SAVE AND EXIT MODE</code> keeps what was built as the world flown and leaves. Choosing another tool with an edit in hand asks <code>ACCEPT EDITS</code> first.</p>
@@ -358,7 +397,7 @@
     </tbody>
 </table>
 </div>
-<p>The four under <code>AUTO ACCEPT</code> are when a draft is kept without being asked about. <code>WHEN DRAWING AGAIN</code>: the next press that draws - a stroke begun, a mountain dropped, a runway placed, a shape begun over a lifted extrusion - keeps the draft in hand and starts a new one; nothing is kept when a stroke is let go of, so the stroke just drawn can still be changed or cancelled. <code>WHEN LEAVING</code>: the way out keeps it and asks only <code>SAVE AND EXIT MODE</code>. <code>WHEN CHANGING TOOL</code>: another tool keeps it rather than asking <code>ACCEPT EDITS</code>. With <code>ALL</code> on the three read on and do not step; off, they are what they were. A pan never keeps anything. <code>CAMERA SPEED</code> scales the orbit, the pan and the wheel's zoom together.</p>
+<p>The four under <code>AUTO ACCEPT</code> are when a draft is kept without being asked about. <code>WHEN DRAWING AGAIN</code>: the next press that draws - a stroke begun, a mountain dropped, a runway placed, a shape begun over a lifted extrusion - keeps the draft in hand and starts a new one, joined to the stroke kept just before it when nothing about it changed, so a batch is still one placement; nothing is kept when a stroke is let go of, so the stroke just drawn can still be changed or cancelled. <code>WHEN LEAVING</code>: the way out keeps it and asks only <code>SAVE AND EXIT MODE</code>. <code>WHEN CHANGING TOOL</code>: another tool keeps it rather than asking <code>ACCEPT EDITS</code>. With <code>ALL</code> on the three read on and do not step; off, they are what they were. A pan never keeps anything. <code>CAMERA SPEED</code> scales the orbit, the pan and the wheel's zoom together.</p>
 <p>Opened over a canvas the screen is modal and the live tool waits under it: nothing is kept or dropped, the draft is the draft when it closes, and a setting changed there applies from the next press.</p>
 
 <h2 id="element-editor-cheat">Element editor</h2>

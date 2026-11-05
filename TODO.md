@@ -11,35 +11,6 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Auto accept merges**: a draft the setting commits joined to the
-  placement before it when nothing about it changed, so auto accept adds a
-  placement only where the pilot changed something
-  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
-    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
-    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
-    already compares two placements' resolved configs. What is left is the
-    join: the same element and config as the placement committed just before,
-    with nothing between, its footprint added to that one's as a union.
-  - From: Interactive Build Mode
-- [ ] **Re-seat the aircraft**: a flight resumed over ground that changed under
-  it put back on top of that ground before the first frame is scored, so a
-  mountain built where it was parked is not a crash on resume
-  - **Until then a changed world starts the flight again.** Since
-    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
-    passes `changed` to `leaveBuilder`, and the flight goes back to its start
-    rather than resuming in moved ground. This item is what lets it resume.
-  - From: Interactive Build Mode
-- [ ] **Build mode controls help**: the builder's control list, grown by each
-  item as it added a binding, carried into the docs and the cheat sheet beside
-  the flight's and held to the code there the way the flight's is
-  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
-    `js/controls-help.js` names every tool's bindings and `O - Builder
-    Settings`, each held by `test/controls-help.test.js` to a key a builder
-    handler reads; the cheat sheet's builder table was written by hand
-    beside it. What is left is the docs page and the cheat sheet read from
-    the list and held to it.
-  - From: Interactive Build Mode
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -107,32 +78,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Auto accept merges**: a draft the setting commits joined to the
-  placement before it when nothing about it changed, so auto accept adds a
-  placement only where the pilot changed something
-  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
-    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
-    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
-    already compares two placements' resolved configs. What is left is the
-    join: the same element and config as the placement committed just before,
-    with nothing between, its footprint added to that one's as a union.
-- [ ] **Re-seat the aircraft**: a flight resumed over ground that changed under
-  it put back on top of that ground before the first frame is scored, so a
-  mountain built where it was parked is not a crash on resume
-  - **Until then a changed world starts the flight again.** Since
-    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
-    passes `changed` to `leaveBuilder`, and the flight goes back to its start
-    rather than resuming in moved ground. This item is what lets it resume.
-- [ ] **Build mode controls help**: the builder's control list, grown by each
-  item as it added a binding, carried into the docs and the cheat sheet beside
-  the flight's and held to the code there the way the flight's is
-  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
-    `js/controls-help.js` names every tool's bindings and `O - Builder
-    Settings`, each held by `test/controls-help.test.js` to a key a builder
-    handler reads; the cheat sheet's builder table was written by hand
-    beside it. What is left is the docs page and the cheat sheet read from
-    the list and held to it.
-
 ## Documentation & Polish
 
 Keep the docs accurate and improve first-run experience. Completing items
@@ -188,56 +133,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 369 earlier items in `TODO-archive.md`, newest last.
+> 372 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Sum of shapes**: several shapes drawn before the extrude lifted to one
-  height as a single region, with two that overlap reading as one solid
-  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
-    with `union` weighs as the larger of its parts, so two shapes that overlap
-    already read as one region; this item lifts one to a single height.
-  - **Settled**: shapes drawn before `EXTRUDE` are one placement's footprint,
-    joined in a `placed` frame by the op their press read - `lassoOp`, the
-    lasso's own rule: added with nothing selected or with `shift`, cut out
-    with `alt`, and drawn within a selection with neither. `addToPlaced` takes
-    `intersect` for that. A shape that leaves the region covering no ground
-    is refused. One `height` lifts the region whole, and two shapes that
-    overlap read as one block.
-  - From: Interactive Build Mode
-- [x] **Extrude a selection**: a live selection taken as the region to lift, so
-  the button is ready on arrival, and drawn in red while Extrude is the tool so
-  it reads as the thing that will be lifted rather than as a clip
-  - **Settled**: with a selection live and nothing drawn, `extrudeRegion` is
-    the selection, so `EXTRUDE` is ready on arrival and lifts it as it stands
-    - as a region, carrying no clip. The overlay draws the selection solid
-    red while Extrude is the tool, and once shapes are drawn into it the
-    region they come to is filled red under a red dashed edge, the selection
-    no longer drawn beside it.
-  - From: Interactive Build Mode
-- [x] **Extrusion surfaces**: a top and a wall colour, with a click on either
-  pointing the panel at that declared value and outlining it on the overlay,
-  and the surface panel's apply keeping a change where its back drops it
-  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
-    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
-    field; `topColor` and `wallColor` declared with it are drawn the same way.
-  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
-    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
-    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
-    `js/extrude.js`. What is left is the click on a surface pointing the
-    panel at one, its red outline, and `BACK` dropping a change.
-  - **Settled**: a heightfield has no faces, so the two surfaces are the two
-    kinds of vertex the element paints - the top where the footprint's weight
-    is whole, the wall short of it - and `surfaceAt` in `js/extrude.js` reads
-    a click as one or the other off the footprint's weight under the pointer,
-    as the element does. `chooseExtrudeSurface` points the panel at that
-    surface's colour and `BLEND`; nothing in the ground is selected.
-    `surfaceEdges` in `js/build-overlay.js` outlines it in red, the top round
-    its rim and the wall at its foot and its head, traced a hair under whole
-    so the rim falls between the sampled corners. `BACK` beside `APPLY` comes
-    back with the surfaces as `pressExtrudeStage` remembered them on the way
-    in, and `ACCEPT` and `CANCEL` wait while the surfaces are open. Each
-    surface's colour row offers the eye dropper and it fills that row:
-    `state.dropper` names the row, where Free Paint's is `true`.
-  - From: Interactive Build Mode
 - [x] **Extrusions settle into the ground**: each surface taking the ground's
   own lightness, and the wall's colour fading to the ground's across the band
   its height already eases over
@@ -365,4 +262,59 @@ how the simulator got here rather than as a list still to be worked.
     `chooseBuildTool` keeps it and changes the tool. Each stroke is now a
     placement of its own; joining the ones nothing changed between is the
     next item's.
+  - From: Interactive Build Mode
+- [x] **Auto accept merges**: a draft the setting commits joined to the
+  placement before it when nothing about it changed, so auto accept adds a
+  placement only where the pilot changed something
+  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
+    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
+    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
+    already compares two placements' resolved configs. What is left is the
+    join: the same element and config as the placement committed just before,
+    with nothing between, its footprint added to that one's as a union.
+  - **Settled**: a draft auto accept keeps goes through `autoKeep` in
+    `js/build-mode.js`, which joins a stroke tool's batch to the placement
+    auto accept kept just before it - `state.kept`, cleared by any other
+    commit - when the element, its resolved configuration and its clip
+    match, its footprint added to that one's with `addToPlaced`. The world
+    is then exactly what a batch accepted by hand draws, which a test
+    builds both ways and compares. Only a stroke tool's are joined: a
+    mountain or a runway is one thing where it stands, and an extrusion is
+    levelled to the mean of the ground it covers, which a union would
+    change. A pick kept by a tool change starts no run.
+  - From: Interactive Build Mode
+- [x] **Re-seat the aircraft**: a flight resumed over ground that changed under
+  it put back on top of that ground before the first frame is scored, so a
+  mountain built where it was parked is not a crash on resume
+  - **Until then a changed world starts the flight again.** Since
+    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
+    passes `changed` to `leaveBuilder`, and the flight goes back to its start
+    rather than resuming in moved ground. This item is what lets it resume.
+  - **Settled**: leaving the builder over a paused flight keeps that flight
+    whatever was kept, and `reseatAircraft` puts it back over the new ground
+    through `reseatHeight` in `js/crash.js`: on the ground at its clearance
+    if it was on the ground; in the air left where it is while the new ground
+    clears it by `RESEAT_HEADROOM`, and otherwise lifted to the height it had
+    over the old ground, never less than that headroom. Found on the way:
+    the frame loop went on updating the aircraft against the canvas's ground
+    while a canvas was open, which set it down on a block built under it and
+    lost the height it was flying at - the aircraft is now not flown or
+    measured while a canvas is open.
+  - From: Interactive Build Mode
+- [x] **Build mode controls help**: the builder's control list, grown by each
+  item as it added a binding, carried into the docs and the cheat sheet beside
+  the flight's and held to the code there the way the flight's is
+  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
+    `js/controls-help.js` names every tool's bindings and `O - Builder
+    Settings`, each held by `test/controls-help.test.js` to a key a builder
+    handler reads; the cheat sheet's builder table was written by hand
+    beside it. What is left is the docs page and the cheat sheet read from
+    the list and held to it.
+  - **Settled**: `buildHelpLines` hands each line's `input` and `action`
+    beside its text, and the controls page, `docs/cheatsheet.html` and
+    `CHEATSHEET.md` carry the list as a table, `builder-control-list` on the
+    two pages and `### The control list` in the markdown, held by
+    `test/controls-help.test.js` to the list exactly - every line in its
+    order, nothing more - so a binding added, renamed or taken off fails
+    each document until it follows.
   - From: Interactive Build Mode

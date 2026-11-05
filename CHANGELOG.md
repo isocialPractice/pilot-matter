@@ -5,6 +5,70 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.56.0] - 2026-11-05
+
+The interactive build mode finished: strokes auto accept keeps joined where
+nothing changed between them, a paused flight put back over ground built under
+it, and the builder's control list carried into the docs.
+
+### Added
+
+- **Auto accept merges.** A stroke auto accept keeps is joined to the one it
+  kept just before - the same element, configuration and clip, with nothing
+  committed between - its region added to that one's, so the strokes a batch
+  accepted by hand would have been are still one placement and a new one
+  starts only where the pilot changed something. A mountain, a runway and an
+  extrusion are never joined.
+- **Re-seat the aircraft.** A world kept from the pause menu goes back to the
+  paused flight rather than starting it again: the aircraft is put back over
+  the new ground before a frame is flown - on it if it was on the ground, and
+  in the air left where it was while the new ground clears it with room to
+  spare, otherwise lifted to the height it had over the old ground - so a
+  mountain built where it was parked is not a crash on resume.
+- **The builder's control list in the docs.** The controls page and both cheat
+  sheets carry the canvas's list line by line, input and action, held to the
+  list the canvas draws.
+
+### Fixed
+
+- While a canvas was open the aircraft went on being updated against the
+  canvas's ground, so something built where it was paused set it down on top
+  of it. It is not flown or measured while a canvas is open.
+
+Held in Node by `test/auto-accept.test.js` - two strokes kept in a row one
+placement covering both and drawing the ground a batch accepted by hand draws,
+a changed stroke kept apart and the next joined to it, a batch accepted by
+hand closed, a tool change joining the same element and never another, a
+different clip, mountains and extrusions kept apart, the way out joining, and
+a pick kept by a tool change starting no run - `test/crash.test.js` - the
+aircraft lifted to its height over the old ground, given the headroom at
+least, left where the new ground still clears it, kept on the ground it is on,
+and nothing moved by a height or a ground that is not a number - and
+`test/controls-help.test.js`, which holds the controls page and both cheat
+sheets to the list line by line, with `test/page.test.js`. Each rejected the
+defect it names when that was put back, 31 in all: among them a kept
+stroke never joined or joined to whatever came before, a batch accepted by
+hand left open, anything kept starting a run, any tool's draft joined, a
+stroke with another configuration or clip joined, a joined stroke not added
+or left in hand, the way out, a tool change or drawing again never joining, a
+canvas begun mid-run, an aircraft never lifted or treated as flying on the
+ground, no headroom, the height over the old ground forgotten, a ground that is
+not a number moving it, the old ground measured as the new, the aircraft not
+told of the new ground, a changed world starting the flight again, the
+aircraft left inside the hill or flown over a canvas, the re-seat reading the
+sea's level, a line's halves swapped, a binding renamed or added on the canvas
+and not in the docs, and a line left off, out of order or stale in each
+document. One more changed nothing:
+another tool's draft joined, because only a stroke tool's batch is ever kept as
+one to join and each element is drawn by one tool - so that check was taken
+out.
+Settled in Chromium in 7 checks: two water strokes kept in a row one placement
+and one stepped down kept apart; a flight paused, a 1200-high block built
+under the aircraft and kept, and the flight back where it was rather than
+started again, lifted to the height it had over the old ground and flying on
+over the block when resumed; and the controls page and the cheat sheet page
+showing the list as the canvas does.
+
 ## [1.0.0-alpha.1.55.0] - 2026-11-05
 
 The builder's own settings - a third settings screen, reached from the builder

@@ -4894,3 +4894,51 @@ still be found by name.
     each a lot kept at its distance from the paving as the strip widens, the
     whole held on the canvas by its farthest lot and picked by any of it.
   - From: Interactive Build Mode
+- [x] **Sum of shapes**: several shapes drawn before the extrude lifted to one
+  height as a single region, with two that overlap reading as one solid
+  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
+    with `union` weighs as the larger of its parts, so two shapes that overlap
+    already read as one region; this item lifts one to a single height.
+  - **Settled**: shapes drawn before `EXTRUDE` are one placement's footprint,
+    joined in a `placed` frame by the op their press read - `lassoOp`, the
+    lasso's own rule: added with nothing selected or with `shift`, cut out
+    with `alt`, and drawn within a selection with neither. `addToPlaced` takes
+    `intersect` for that. A shape that leaves the region covering no ground
+    is refused. One `height` lifts the region whole, and two shapes that
+    overlap read as one block.
+  - From: Interactive Build Mode
+- [x] **Extrude a selection**: a live selection taken as the region to lift, so
+  the button is ready on arrival, and drawn in red while Extrude is the tool so
+  it reads as the thing that will be lifted rather than as a clip
+  - **Settled**: with a selection live and nothing drawn, `extrudeRegion` is
+    the selection, so `EXTRUDE` is ready on arrival and lifts it as it stands
+    - as a region, carrying no clip. The overlay draws the selection solid
+    red while Extrude is the tool, and once shapes are drawn into it the
+    region they come to is filled red under a red dashed edge, the selection
+    no longer drawn beside it.
+  - From: Interactive Build Mode
+- [x] **Extrusion surfaces**: a top and a wall colour, with a click on either
+  pointing the panel at that declared value and outlining it on the overlay,
+  and the surface panel's apply keeping a change where its back drops it
+  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
+    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
+    field; `topColor` and `wallColor` declared with it are drawn the same way.
+  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
+    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
+    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
+    `js/extrude.js`. What is left is the click on a surface pointing the
+    panel at one, its red outline, and `BACK` dropping a change.
+  - **Settled**: a heightfield has no faces, so the two surfaces are the two
+    kinds of vertex the element paints - the top where the footprint's weight
+    is whole, the wall short of it - and `surfaceAt` in `js/extrude.js` reads
+    a click as one or the other off the footprint's weight under the pointer,
+    as the element does. `chooseExtrudeSurface` points the panel at that
+    surface's colour and `BLEND`; nothing in the ground is selected.
+    `surfaceEdges` in `js/build-overlay.js` outlines it in red, the top round
+    its rim and the wall at its foot and its head, traced a hair under whole
+    so the rim falls between the sampled corners. `BACK` beside `APPLY` comes
+    back with the surfaces as `pressExtrudeStage` remembered them on the way
+    in, and `ACCEPT` and `CANCEL` wait while the surfaces are open. Each
+    surface's colour row offers the eye dropper and it fills that row:
+    `state.dropper` names the row, where Free Paint's is `true`.
+  - From: Interactive Build Mode

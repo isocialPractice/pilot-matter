@@ -238,6 +238,43 @@ export function releaseGround(state) {
     return true;
 }
 
+// --- Ground that changed under a flight ------------------------------------------
+
+/**
+ * The room an aircraft in the air is left with over ground that has risen
+ * under it, past the clearance, in world units: enough that the first frame
+ * flown over it is a frame in the air rather than an arrival on it.
+ */
+export const RESEAT_HEADROOM = 20;
+
+/**
+ * The height an aircraft is put back at over ground that changed under it
+ * while the flight was held - a world built from the pause menu and kept,
+ * regenerated beneath an aircraft paused over it. A mountain built where it was
+ * parked would otherwise put it inside a hill, and the first frame flown would
+ * be an arrival judged against the hill's top.
+ *
+ * On the ground - held at a takeoff, rolled out, parked - it stays on the
+ * ground: the new ground, at the clearance it keeps over any. In the air it is
+ * left where it is while that still clears the new ground with
+ * `RESEAT_HEADROOM` to spare, and otherwise lifted to the height it had over
+ * the old ground `was`, but never to less than that headroom - so a pilot
+ * flying low over a valley that is now a hill resumes as low over the hill.
+ * Nothing it does not know is moved: a height or a ground that is not a
+ * number leaves the height as it was.
+ */
+export function reseatHeight({
+    y, ground, was = ground, airborne = true, clearance = GROUND_CLEARANCE, headroom = RESEAT_HEADROOM
+} = {}) {
+    if (!Number.isFinite(y) || !Number.isFinite(ground)) return y;
+    if (!airborne) return ground + clearance;
+
+    const floor = ground + clearance + headroom;
+    if (y >= floor) return y;
+    const above = Number.isFinite(was) ? y - was : 0;
+    return ground + Math.max(above, clearance + headroom);
+}
+
 /** What the flight is currently doing about the ground, for anything showing it. */
 export function groundOutcome(state) {
     return state?.outcome ?? FLYING;

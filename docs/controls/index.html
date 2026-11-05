@@ -121,6 +121,49 @@
 
 <p>Every key in that table above <kbd>C</kbd> can be moved, and so can <kbd>R</kbd>: the <a href="../controls/control-settings.html">control settings panel</a> has a row per control and per instruction, each taking the next key pressed as its own. The rest of the table is the game's own - <kbd>C</kbd>, <kbd>P</kbd>, <kbd>O</kbd>, <kbd>L</kbd>, <kbd>M</kbd>, <kbd>H</kbd>, <kbd>Tab</kbd> and <kbd>F2</kbd> - and a row waiting for a key refuses them and says what the key already does, because one press that both rolled the aircraft and paused it would be a control nobody could fly. A menu reads the keys that walk it before the flight behind it does, whatever the map says, so the panel stays reachable from any map at all, and one row in it puts every key back where it started. The list in the corner of the screen is written from the map, so it names the keys as they stand rather than as they shipped.</p>
 
+<h2 id="the-builders-control-list">The builder's control list</h2>
+
+<p>A canvas in the <a href="../terrain.html#the-environment-builder">interactive environment builder</a> carries a control list of its own in the same corner as the flight's, open when a canvas opens and collapsed to its hint line by <kbd>H</kbd> or a click. It lists what a canvas answers to and nothing else - each tool's lines joined it in the change that made the tool work - with the tool a line is for in brackets, and a line naming no tool answered by every one. It reads:</p>
+
+<div class="table-wrap">
+<table id="builder-control-list">
+    <thead><tr><th>Input</th><th>Action</th></tr></thead>
+    <tbody>
+        <tr><td>Drag (Select)</td><td>Orbit</td></tr>
+        <tr><td>Middle Drag (Select) or Shift+Right Drag</td><td>Pan</td></tr>
+        <tr><td>Wheel</td><td>Zoom</td></tr>
+        <tr><td>W/A/S/D or ↑/←/↓/→</td><td>Move</td></tr>
+        <tr><td>Home</td><td>Reframe</td></tr>
+        <tr><td>Click (Select)</td><td>Pick a Built Element</td></tr>
+        <tr><td>Drag (Lasso)</td><td>Draw a Selection, or Within One</td></tr>
+        <tr><td>Shift+Drag (Lasso)</td><td>Add to the Selection</td></tr>
+        <tr><td>Alt+Drag (Lasso)</td><td>Cut From the Selection</td></tr>
+        <tr><td>Drag (Lasso), then Shift</td><td>Keep It Square or Round</td></tr>
+        <tr><td>Click (Lasso)</td><td>Place a Point, Double Click to Close</td></tr>
+        <tr><td>Click (Mountain)</td><td>Drop a Mountain</td></tr>
+        <tr><td>Drag (Grass/Sand/Water/Snow)</td><td>Lay a Stroke</td></tr>
+        <tr><td>Click (Runway)</td><td>Place the Chosen Runway</td></tr>
+        <tr><td>Drag (Free paint)</td><td>Paint a Stroke</td></tr>
+        <tr><td>Click (Free paint)</td><td>Take a Colour With the Eye Dropper</td></tr>
+        <tr><td>Drag (Erase)</td><td>Erase Through a Stroke</td></tr>
+        <tr><td>Alt+Drag (Erase)</td><td>Put Back What Was Erased</td></tr>
+        <tr><td>Drag (Extrude)</td><td>Draw a Shape to Lift, or Within the Selection</td></tr>
+        <tr><td>Shift+Drag (Extrude)</td><td>Add a Shape to the Region</td></tr>
+        <tr><td>Alt+Drag (Extrude)</td><td>Cut a Shape From the Region</td></tr>
+        <tr><td>Click (Extrude)</td><td>Choose the Top or the Wall to Colour</td></tr>
+        <tr><td>Right Click</td><td>Offer Deselect, on the Selection</td></tr>
+        <tr><td>Drag a Handle</td><td>Move or Shape What Is in Hand</td></tr>
+        <tr><td>Esc</td><td>Accept Edits or Save and Exit</td></tr>
+        <tr><td>Enter</td><td>Answer a Question</td></tr>
+        <tr><td>O</td><td>Builder Settings</td></tr>
+        <tr><td>H</td><td>Collapse List</td></tr>
+        <tr><td>F2</td><td>Photo</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The list is written from the bindings the canvas reads, so a key named on it is a key the canvas answers to, and this table is held to it line by line.</p>
+
 <h2 id="working-a-menu">Working a menu</h2>
 
 <p>In any menu, <kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> move between entries and <kbd>Enter</kbd> or <kbd>Space</kbd> chooses one. On the start screen and in the pause menu the mouse works as well: moving the pointer onto an entry puts the cursor there, and clicking one chooses it. In the settings panel, the <a href="../controls/control-settings.html">control settings panel</a> and the element editor, <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> step the value under the cursor through its settings, and a click on a row holding a value steps it the way the click reads - left of the middle steps it back, right of it steps it on. <kbd>Esc</kbd> backs out of the panel.</p>
