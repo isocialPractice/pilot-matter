@@ -11,6 +11,23 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
+- [ ] **Colours the fog can reach**: a patch of built ground seen saturated
+  through fog that hides everything around it, measured in Chromium before
+  anything is changed, fixed where the colour is made, with the ground's colour
+  attribute held to 0 to 1 as a backstop and every vertex of every preset and
+  of the measured build tested to lie in it
+  - From: Post Interactive Build
+- [ ] **Turn with the right button**: a right drag orbiting the view in every
+  tool and in Select, as the camera override from inside a tool, with `shift`
+  and a right drag still panning, a right click that did not travel still
+  opening `DESELECT` - decided on the button's release rather than on
+  `contextmenu` - and a second button ignored while a drag is in hand
+  - From: Post Interactive Build
+- [ ] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
+  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
+  changed, never the default, and fitting the card on a phone
+  - From: Post Interactive Build
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -77,6 +94,105 @@ linked as a goal because a completed item takes its goal file with it when it
 is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
+
+## Post Interactive Build
+
+Polish for the interactive build mode, and the three things it was missing: a
+plane and a start point of the world's own, a city, and a way to save a built
+world to a file and load it, with models of the pilot's own. Completing items
+in this section applies a minor version update.
+
+The plan these items were broken out of is
+`.claude/prompts/post-interactive-build-plan.prompt.md`, named here rather
+than linked as a goal because a completed item takes its goal file with it
+when it is archived - and `.claude/` is untracked, so that copy is the only
+one.
+
+- [ ] **Colours the fog can reach**: a patch of built ground seen saturated
+  through fog that hides everything around it, measured in Chromium before
+  anything is changed, fixed where the colour is made, with the ground's colour
+  attribute held to 0 to 1 as a backstop and every vertex of every preset and
+  of the measured build tested to lie in it
+- [ ] **Turn with the right button**: a right drag orbiting the view in every
+  tool and in Select, as the camera override from inside a tool, with `shift`
+  and a right drag still panning, a right click that did not travel still
+  opening `DESELECT` - decided on the button's release rather than on
+  `contextmenu` - and a second button ignored while a drag is in hand
+- [ ] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
+  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
+  changed, never the default, and fitting the card on a phone
+- [ ] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
+  percentage moved a tenth at a press wherever it is stepped, still written and
+  typed to the hundredth through a precision of its own
+- [ ] **The dock's own spin buttons**: the browser's spinner, which moves a
+  field by 1, replaced by the panel's own up and down inside the field, with
+  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
+  and `Page Down` always coarse, and the wheel over a field moving nothing
+- [ ] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
+  with no figure to type, a number row the label and its field with the column
+  of figures kept in line, and a switch's or choice's reading drawn as a box a
+  click steps
+- [ ] **Mode types**: what an insert, load or save section does declared on it
+  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
+  config<flight:start-point>`, `Load data<file>` - written and read back by one
+  pair of functions and dispatched on, with Insert Runway marked and unchanged
+- [ ] **The palette redrawn**: the seven rows of `panel-updated.svg` with
+  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
+  a text button in the art's colours, the new marks copied by the sync list,
+  each tile shown once its tool works, the gear kept, and both screens measured
+- [ ] **The environment file**: a built world written as one JSON file with a
+  committed schema - format, version, name, base, rows, placements, and later
+  the start, the plane and the assets - read back by a function that never
+  throws and refuses a bad file whole with its first problem named
+- [ ] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
+  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
+  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
+  first, and each action's outcome written under its answer
+- [ ] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
+  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
+  the pause menu, a loaded world becoming a chosen entry of the list that is
+  kept across a reload, and both rows gone while a game mode runs
+- [ ] **Start point**: one point and heading per environment, placed by a
+  click with Insert Plane live, turned by its arrow, written out as typed rows,
+  saved with the world, and flown from - over it at its height above the ground
+  when flying, on the runway nearest it for a takeoff - with the settings rows
+  it overrides locked
+- [ ] **Pre-built planes**: five original planes drawn from primitives as the
+  trainer is, each with the flight figures the aircraft already takes, each
+  leaving the ground within BASIC RUNWAY, swapped between flights by
+  `setPlane`, the trainer the default
+- [ ] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
+  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
+  the world and flown on it
+- [ ] **Objects on the ground**: a placement drawn as a mesh standing on the
+  ground rather than as ground, repeated on every tile on that tile's own
+  ground, fogged like the ground, solid to the aircraft - any touch on one a
+  crash, roofs included, while an extrusion's top is still landed on as
+  ground - picked by Select and taken whole by Erase
+- [ ] **Prefabs**: a building as a recipe of primitives in its own frame,
+  copied into the placement as a template's members are, merged and instanced
+  per prefab
+- [ ] **City buildings**: five skylines, three factories, nine residential,
+  five commercial and five infrastructure buildings, original and generic, in
+  the catalogue a test holds to the counts asked
+- [ ] **Parks**: seven parks of trees, paths, water and fields, drawn as
+  objects with no roof
+- [ ] **Roads that snap**: six road pieces laid over the ground, each with
+  connectors at its open ends, snapping end to end to an open connector within
+  30 metres while previewed, and placed free with `shift`
+- [ ] **Insert City**: the tool and its mark, a folding section per category
+  of named cards, a chosen card previewed under the pointer and placed by a
+  click, and turned by the gumball
+- [ ] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
+  never sent anywhere, then a step that sets its scale, up and facing and says
+  which insert menus it fits, from its bounds, with the reason where it does
+  not
+- [ ] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
+  listed with what each is used as and removable, and carried inside an
+  environment file that uses them so it opens on another computer
+- [ ] **Inserting loaded assets**: a loaded plane flown as a card of Insert
+  Plane, a loaded building placed as an object in its Insert City section, and
+  a loaded runway placed over a real strip of its size
 
 ## Documentation & Polish
 
