@@ -20,9 +20,14 @@
  * opens on without pulling in a renderer to do it.
  */
 
-import { SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso } from './build-tools.js';
+import {
+    SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isCoverTool, COVER_BRUSH,
+    COVER_ELEMENT_ROWS, toolPlacement
+} from './build-tools.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
-import { footprintWeight } from './environment/footprints.js';
+import {
+    footprintWeight, isFootprint, combineFootprints, placeFootprint, addToPlaced
+} from './environment/footprints.js';
 import {
     DEFAULT_LASSO_TOOL, lassoTool, lassoToolBuilt, isSelection, combineSelection, coversGround, reshapeFootprint
 } from './lasso.js';
@@ -548,9 +553,110 @@ function rememberToolValues(state) {
     const { placement, tool } = state.draft;
     if (tool == null) return;
 
-    const values = own(placement.config ?? {});
+    // Laid over what the panel held rather than in place of it, so a tool's
+    // own rows - the cover tool's brush, which no placement carries - are
+    // kept with the element's.
+    const values = { ...(state.toolValues?.[tool] ?? {}), ...own(placement.config ?? {}) };
     delete values.at;
     state.toolValues = { ...state.toolValues, [tool]: values };
+}
+
+// --- The cover tool -------------------------------------------------------------
+
+/**
+ * What the cover tool's panel holds for the cover it is pointed at: the
+ * element's ranges and the brush's, each as the pilot last left it on this
+ * canvas, or as the tool starts it - the element's defaults, the tool's own
+ * `starts` over them, and the brush's defaults - where they have not touched
+ * it. A batch in hand was begun from these and is written with them by
+ * `setCoverValues`, so they are its values too.
+ *
+ * Null for a tool that is not the cover tool.
+ */
+export function coverValues(state, id = state?.tool) {
+    const tool = buildTool(id);
+    if (!isCoverTool(id) || !isElementId(tool.element)) return null;
+
+    const defaults = resolveConfig(getElement(tool.element), {});
+    const values = {
+        ...Object.fromEntries(COVER_ELEMENT_ROWS.map(name => [name, defaults[name]])),
+        ...(tool.starts ?? {}),
+        ...Object.fromEntries(Object.entries(COVER_BRUSH).map(([name, range]) => [name, range.default])),
+        ...own(state?.toolValues?.[id] ?? {})
+    };
+    return values;
+}
+
+/**
+ * The cover tool's panel written: every value kept for the tool's next batch,
+ * and the element's into the batch in hand as well - one configuration for
+ * the whole batch, so a density raised after three strokes were laid raises it
+ * on all three. The brush is not the batch's: it is how the next stroke is
+ * drawn, and a stroke laid keeps the size it was laid at.
+ *
+ * Refused off a canvas, with a confirm open, and for a live tool that is not
+ * the cover tool. Returns true when the batch in hand changed, which is when
+ * the ground has to be drawn again.
+ */
+export function setCoverValues(state, values = {}) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !isCoverTool(state.tool)) return false;
+
+    const id = state.tool;
+    state.toolValues = { ...state.toolValues, [id]: { ...(state.toolValues?.[id] ?? {}), ...own(values) } };
+
+    const draft = state.draft;
+    if (!draftPending(state) || draft.tool !== id || draft.replaces != null) return false;
+    draft.placement.config = { ...draft.placement.config, ...toolPlacement(buildTool(id), own(values)).config };
+    return true;
+}
+
+/**
+ * A stroke of the cover tool let go of: `points`, the ground it was dragged
+ * over in the canvas's frame, swept with `stamp`, in world units.
+ *
+ * The first stroke begins the tool's batch - its placement from the panel, set
+ * down in a frame of its own so the gumball can move, turn and stretch the
+ * batch whole - and each stroke after it joins the batch, so the sum of the
+ * strokes is the draft and an accept keeps them as one placement.
+ *
+ * With a selection live the batch is clipped to it, as a dropped mountain is:
+ * it carries the selection as it stood when the batch began, and a stroke that
+ * reaches none of the selected ground is refused, since all of it would be cut
+ * away.
+ *
+ * Refused off a canvas, with a confirm open, for a live tool that is not the
+ * cover tool, for a stroke that covers nothing, and with an edit in hand that
+ * this tool did not begin. Returns true when the stroke was laid.
+ */
+export function layStroke(state, points = [], stamp = {}, { size = 0 } = {}) {
+    if (!buildModeDrawing(state) || confirmOpen(state)) return false;
+
+    const tool = buildTool(state.tool);
+    if (!isCoverTool(tool?.id)) return false;
+
+    const stroke = {
+        kind: 'stroke',
+        // `|| 0` so a point a hair west of the middle is written 0, not -0.
+        points: (points ?? []).map(([x, z]) => [Math.round(x) || 0, Math.round(z) || 0]),
+        stamp: { width: stamp.width, depth: stamp.depth, corner: stamp.corner }
+    };
+    if (!isFootprint(stroke)) return false;
+
+    const pending = draftPending(state);
+    if (pending && (state.draft.tool !== tool.id || state.draft.replaces != null)) return false;
+
+    const clip = pending ? state.draft.placement.clip ?? null : mindsLasso(tool.id) ? state.selection : null;
+    if (clip != null && !coversGround(combineFootprints('intersect', stroke, clip), size)) return false;
+
+    if (pending) {
+        const placement = state.draft.placement;
+        placement.footprint = addToPlaced(placement.footprint, stroke);
+        return true;
+    }
+
+    const placement = toolPlacement(tool, coverValues(state, tool.id), placeFootprint(stroke));
+    if (clip != null) placement.clip = own(clip);
+    return startDraft(state, placement, tool.id);
 }
 
 /**

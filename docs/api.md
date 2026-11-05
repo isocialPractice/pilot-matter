@@ -1289,7 +1289,9 @@ footprint reaches rather than across the whole square:
 
 The kinds are `disc` (`x`, `z`, `radius`), `ring` (`points`, a closed outline of
 `[x, z]` pairs), `stroke` (`points` with a `stamp` of `width`, `depth` and
-`corner` swept along them), `rect` (`x`, `z`, `width`, `depth`, `angle`,
+`corner` swept along them: as wide as the stamp all along the way, joined round
+at every bend, and the stamp itself at each end, reaching half its `depth`
+past the first and last points), `rect` (`x`, `z`, `width`, `depth`, `angle`,
 `corner`), `ellipse` (`x`, `z`, `radiusX`, `radiusZ`, `angle`), `polygon` (`x`,
 `z`, `radius`, `sides`, `angle`, and an `inner` between 0 and 1 that pulls every
 other corner in to that share of the radius, making a star) and `path`
@@ -1299,7 +1301,12 @@ optional `feather`: the width in world units of the band the element fades out
 across at the edge, two cells of the sampling where none is given. A `combine`
 (`op`, `a`, `b`) makes one region of two: `union` covers either, `intersect`
 only both and `subtract` the first without the second, each part keeping its
-own feather, and either part may itself be a `combine`. The
+own feather, and either part may itself be a `combine`. A `placed` footprint
+(`of`, `x`, `z`, `angle`, `scaleX`, `scaleZ`) sets another down somewhere: `of`
+is drawn about the middle of its own frame, and the frame puts that middle at
+`x`, `z`, turned by `angle` and stretched along its own two axes, so a region
+with no one middle - several strokes unioned - can be moved, turned and
+stretched whole. The
 coordinates are the square's own, measured from its middle, so the same
 footprint lands in the same place on every tile of a tiled world, and one drawn
 over an edge of the square carries on across the opposite edge - which is what
@@ -1307,6 +1314,25 @@ lets a built square repeat as a world without a cut at its seams. The element
 is drawn on each square's own ground, so anything it works out from the ground
 is worked out where it lands. A placement without a footprint is drawn exactly
 as it always was.
+
+A ground cover drawn with a footprint of its own - `grass` or `sand` - is not
+held to its `band`. The band is worked out on each square from the ground the
+footprint covers there, its lowest point to its highest, so the cover lies on
+all of that ground and its colour runs from the light end on the low ground to
+the dark end on the high. Every ground cover - `grass`, `sand`, `water` and
+`snow` - also takes a `density` between 0 and 1: how much of the ground it
+reaches it covers, in clumps that stay where they are each time the ground is
+drawn, from none at 0 to all of it at 1, which is the default and how every
+preset is drawn:
+
+```js
+{
+    type: 'grass',
+    // Half the ground under the stroke, in clumps; the band is the stroke's.
+    config: { density: 0.5 },
+    footprint: { kind: 'stroke', points: [[-1000, 0], [1000, 200]], stamp: { width: 600, depth: 400, corner: 50 } }
+}
+```
 
 A placement may carry a `seed`, any finite number, and then draws from a random
 stream of its own rather than the world's. A world's placements otherwise share

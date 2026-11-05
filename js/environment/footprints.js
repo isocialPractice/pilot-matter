@@ -64,6 +64,97 @@ function combineWeights(op, a, b) {
 }
 
 /**
+ * A region set down somewhere: `{ kind: 'placed', of, x, z, angle, scaleX,
+ * scaleZ }`. `of` is drawn about the middle of its own frame, and the frame
+ * puts that middle at `x`, `z`, turned by `angle` and stretched along its own
+ * two axes by `scaleX` and `scaleZ`.
+ *
+ * Not a kind a pointer draws, but what lets a region that has no one middle -
+ * the strokes of a batch of grass, unioned - be moved, turned and stretched
+ * whole, by the same three numbers a box is: the Flat gumball's centre, arc
+ * and squares each write one of them. Its feather is its region's, stretched
+ * with it.
+ */
+export const PLACED_KIND = 'placed';
+
+/**
+ * A region moved by `dx`, `dz` without being drawn again: the middle of a
+ * figure, every point of an outline or a stroke, and both parts of a
+ * combination, moved alike. A footprint of no kind this module reads comes
+ * back as it was.
+ */
+export function moveFootprint(footprint, dx = 0, dz = 0) {
+    if (footprint == null || typeof footprint !== 'object') return footprint;
+
+    switch (footprint.kind) {
+        case 'disc': case 'rect': case 'ellipse': case 'polygon': case PLACED_KIND:
+            return { ...footprint, x: (Number(footprint.x) || 0) + dx, z: (Number(footprint.z) || 0) + dz };
+        case 'ring': case 'stroke': case 'path':
+            return {
+                ...footprint,
+                points: Array.isArray(footprint.points)
+                    ? footprint.points.map(point => (Array.isArray(point) ? [point[0] + dx, point[1] + dz] : point))
+                    : footprint.points
+            };
+        case COMBINE_KIND:
+            return { ...footprint, a: moveFootprint(footprint.a, dx, dz), b: moveFootprint(footprint.b, dx, dz) };
+        default:
+            return { ...footprint };
+    }
+}
+
+/**
+ * A region in a frame of its own, standing where it stood: the frame's middle
+ * at the middle of the square the region reaches, to the whole unit, turned by
+ * nothing and stretched by nothing. Null for a region this module cannot read.
+ */
+export function placeFootprint(footprint) {
+    const square = footprintBounds(footprint);
+    if (square == null) return null;
+
+    // `|| 0` so a middle a hair west of the origin is written 0, not -0.
+    const x = Math.round((square.minX + square.maxX) / 2) || 0;
+    const z = Math.round((square.minZ + square.maxZ) / 2) || 0;
+    return { kind: PLACED_KIND, of: moveFootprint(footprint, -x, -z), x, z, angle: 0, scaleX: 1, scaleZ: 1 };
+}
+
+/**
+ * A region added to one set down in a frame, and the two set down again in a
+ * frame of their own round both - which is how each stroke of a batch joins
+ * the strokes before it.
+ *
+ * A frame nothing has moved, turned or stretched is taken off first, so a
+ * batch drawn stroke after stroke is one frame round one union rather than a
+ * frame for every stroke; one the gumball has changed is kept whole inside the
+ * new one, so what it did to the strokes already laid is not undone by the
+ * next.
+ */
+export function addToPlaced(placed, footprint) {
+    if (placed == null) return placeFootprint(footprint);
+    if (!isFootprint(footprint)) return placed;
+
+    const plain = placed.kind === PLACED_KIND
+        && (Number(placed.angle) || 0) === 0 && placed.scaleX === 1 && placed.scaleZ === 1;
+    const held = plain ? moveFootprint(placed.of, placed.x, placed.z) : placed;
+    return placeFootprint(combineFootprints('union', held, footprint));
+}
+
+/** A frame's three numbers, read the way the region is weighed, or null for a frame that sets nothing down. */
+function frameOf(placed) {
+    const x = Number(placed?.x), z = Number(placed?.z);
+    const scaleX = placed?.scaleX ?? 1, scaleZ = placed?.scaleZ ?? 1;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    if (!(Number.isFinite(scaleX) && scaleX > 0) || !(Number.isFinite(scaleZ) && scaleZ > 0)) return null;
+    return { x, z, angle: Number(placed.angle) || 0, scaleX, scaleZ };
+}
+
+/** A point of the canvas as its frame's region sees it: moved back, turned back, and unstretched. */
+function intoFrame(frame, x, z) {
+    const [u, v] = unrotate(x - frame.x, z - frame.z, frame.angle);
+    return [u / frame.scaleX, v / frame.scaleZ];
+}
+
+/**
  * How wide the band a region's weight falls across is, in world units, when
  * nothing says otherwise.
  *
@@ -101,6 +192,12 @@ export function footprintWeight(footprint, x, z, wrap = 0) {
     if (footprint?.kind === COMBINE_KIND) {
         if (!isFootprint(footprint)) return 0;
         return combineWeights(footprint.op, footprintWeight(footprint.a, x, z), footprintWeight(footprint.b, x, z));
+    }
+
+    if (footprint?.kind === PLACED_KIND) {
+        if (!isFootprint(footprint)) return 0;
+        const [u, v] = intoFrame(frameOf(footprint), x, z);
+        return footprintWeight(footprint.of, u, v);
     }
 
     const inside = insideDistance(footprint, x, z);
@@ -147,9 +244,30 @@ export function footprintSampler(footprint, wrap = 0) {
         return (x, z) => combineWeights(footprint.op, a(x, z), b(x, z));
     }
 
-    const edge   = feather(footprint);
     const across = Number(wrap) > 0 ? Number(wrap) : 0;
     const shifts = across > 0 ? REPEATS.map(([i, j]) => [i * across, j * across]) : [[0, 0]];
+
+    // A region set down in a frame is repeated as the frame is, and weighed in
+    // its own frame on its own: the wrap is the canvas's, which the frame's
+    // region knows nothing of.
+    if (footprint.kind === PLACED_KIND) {
+        const frame = frameOf(footprint);
+        const inner = footprintSampler(footprint.of);
+        return function weighPlaced(x, z) {
+            let best = 0;
+            for (const [shiftX, shiftZ] of shifts) {
+                const px = x - shiftX;
+                const pz = z - shiftZ;
+                if (px < square.minX || px > square.maxX || pz < square.minZ || pz > square.maxZ) continue;
+                const weight = inner(...intoFrame(frame, px, pz));
+                if (weight >= 1) return 1;
+                if (weight > best) best = weight;
+            }
+            return best;
+        };
+    }
+
+    const edge   = feather(footprint);
 
     return function weigh(x, z) {
         let best = 0;
@@ -353,6 +471,24 @@ function ringDistance({ points }, x, z) {
  *
  * A stroke of one point is a single stamp, which is the press that never
  * travelled.
+ *
+ * Measured from the way the drag went rather than from shapes laid along it:
+ *
+ * - **Along the way** a point is half the stamp's width inside, less how far
+ *   it is from the nearest point of the way - which is the swathe's two sides,
+ *   with every bend joined round.
+ * - **At either end** the stamp itself stands, turned along the stretch it
+ *   ends, reaching half its depth past the sample with its corners rounded:
+ *   a point past the end is measured against the stamp, and one short of it
+ *   against whichever is nearer, the side or the end.
+ *
+ * One distance, not the largest of several shapes', because the largest of
+ * several is short wherever two of them meet: a pointer is sampled every few
+ * pixels, and stretches laid end to end as boxes put a point on the way always
+ * near the end of two of them - never more than half the stamp's depth inside
+ * either, however far it is from the swathe's edge. A stamp shallower than the
+ * feather is wide comes, that way, to a stroke part covered all the way along
+ * its middle.
  */
 function strokeDistance({ points, stamp }, x, z) {
     const path = usablePoints(points);
@@ -363,42 +499,75 @@ function strokeDistance({ points, stamp }, x, z) {
     if (!(width > 0) || !(depth > 0)) return null;
 
     const corner = Math.max(Number(stamp?.corner) || 0, 0);
+    const half   = width / 2;
 
-    if (path.length === 1) {
-        const [only] = path;
-        return roundedBoxDistance(x - only[0], z - only[1], 0, width / 2, depth / 2, corner);
-    }
-
-    // The sweep is the union of the segments, and a union of signed distances is
-    // the largest of them: a point inside any one stamp is inside the stroke.
-    let best = -Infinity;
+    // The nearest point of the way, and which stretch it is on. A sample that
+    // landed on the one before it adds no stretch.
+    let nearest = Infinity, on = -1;
     for (let i = 1; i < path.length; i++) {
-        const from = path[i - 1], to = path[i];
-        const dx = to[0] - from[0], dz = to[1] - from[1];
-        const length = Math.hypot(dx, dz);
-
-        // A sample that landed on the one before it adds no length, so it is
-        // the stamp on its own rather than a segment with no direction.
-        //
-        // Negated because `unrotate` turns a point by the angle rather than
-        // turning the box, so the angle that lays the stamp's long side along
-        // the segment is the one that brings the segment back onto z. Without
-        // the sign the stamp is turned by twice the segment's angle, which is
-        // right for a drag along either axis and perpendicular at 45 degrees.
-        const angle = length > 0 ? -Math.atan2(dx, dz) : 0;
-        const midX  = (from[0] + to[0]) / 2;
-        const midZ  = (from[1] + to[1]) / 2;
-
-        // The stamp's own depth is carried along the segment, which is what
-        // makes the sweep reach past each end by half a stamp rather than
-        // stopping at the sample.
-        const reach = roundedBoxDistance(
-            x - midX, z - midZ, angle, width / 2, length / 2 + depth / 2, corner
-        );
-        if (reach > best) best = reach;
+        const away = segmentDistance(x, z, path[i - 1], path[i]);
+        if (away < nearest && segmentLength(path[i - 1], path[i]) > 0) { nearest = away; on = i; }
     }
 
-    return best;
+    // A way with no stretch at all is the one stamp it was pressed as.
+    if (on < 0) {
+        const [only] = path;
+        return roundedBoxDistance(x - only[0], z - only[1], 0, half, depth / 2, corner);
+    }
+
+    let inside = half - nearest;
+    const first = firstStretch(path), last = lastStretch(path);
+
+    for (const [end, from, to] of [[on === first, path[first], path[first - 1]], [on === last, path[last - 1], path[last]]]) {
+        if (!end) continue;
+        const length = segmentLength(from, to);
+        const ux = (to[0] - from[0]) / length, uz = (to[1] - from[1]) / length;
+        const past = (x - to[0]) * ux + (z - to[1]) * uz;
+
+        // Past the sample, the stamp's own end; short of it, the nearer of the
+        // side and the end, so the two meet without a step.
+        if (past > 0) return roundedBoxDistance(x - to[0], z - to[1], alongAngle(ux, uz), half, depth / 2, corner);
+        inside = Math.min(inside, depth / 2 - past);
+    }
+
+    return inside;
+}
+
+/**
+ * The angle that lays a box's depth along the way `dx`, `dz` goes.
+ *
+ * Negated because `unrotate` turns a point by the angle rather than turning the
+ * box, so the angle that lays the stamp's long side along the stretch is the
+ * one that brings the stretch back onto z. Without the sign the stamp is turned
+ * by twice the stretch's angle, which is right for a drag along either axis and
+ * perpendicular at 45 degrees.
+ */
+function alongAngle(dx, dz) {
+    return -Math.atan2(dx, dz);
+}
+
+function segmentLength(from, to) {
+    return Math.hypot(to[0] - from[0], to[1] - from[1]);
+}
+
+/** How far a point is from the nearest point of a segment. */
+function segmentDistance(x, z, from, to) {
+    const dx = to[0] - from[0], dz = to[1] - from[1];
+    const lengthSq = dx * dx + dz * dz;
+    const t = lengthSq > 0 ? Math.min(Math.max(((x - from[0]) * dx + (z - from[1]) * dz) / lengthSq, 0), 1) : 0;
+    return Math.hypot(x - (from[0] + dx * t), z - (from[1] + dz * t));
+}
+
+/** The first stretch of a way that goes somewhere, by the index of the sample it ends at. */
+function firstStretch(path) {
+    for (let i = 1; i < path.length; i++) if (segmentLength(path[i - 1], path[i]) > 0) return i;
+    return -1;
+}
+
+/** The last stretch of a way that goes somewhere, by the index of the sample it ends at. */
+function lastStretch(path) {
+    for (let i = path.length - 1; i >= 1; i--) if (segmentLength(path[i - 1], path[i]) > 0) return i;
+    return -1;
 }
 
 /** A rectangle or a square, hard-cornered at a `corner` of 0 and rounded above it. */
@@ -445,10 +614,11 @@ function falloff(inside, edge) {
 
 /**
  * The feather a footprint carries, which is the sampling's where it names none.
- * A combination carries none of its own: its two regions keep theirs.
+ * A combination carries none of its own: its two regions keep theirs. Nor does
+ * a frame, whose region's feather is stretched with it.
  */
 function feather(footprint) {
-    if (footprint?.kind === COMBINE_KIND) return 0;
+    if (footprint?.kind === COMBINE_KIND || footprint?.kind === PLACED_KIND) return 0;
     const stated = Number(footprint?.feather);
     if (Number.isFinite(stated) && stated >= 0) return stated;
     return DEFAULT_FEATHER;
@@ -604,6 +774,20 @@ function extent(footprint) {
             if (footprint.op === 'subtract') return a;
             const both = box(Math.max(a.minX, b.minX), Math.min(a.maxX, b.maxX), Math.max(a.minZ, b.minZ), Math.min(a.maxZ, b.maxZ));
             return both.minX < both.maxX && both.minZ < both.maxZ ? both : null;
+        }
+        case PLACED_KIND: {
+            // The square its region reaches in its own frame, feather and all,
+            // with its four corners set down as the frame sets them down - so
+            // turned, the square round it is the square round its turned box.
+            const frame = frameOf(footprint);
+            const inner = frame && footprintBounds(footprint.of);
+            if (inner == null) return null;
+            const corners = [[inner.minX, inner.minZ], [inner.maxX, inner.minZ], [inner.maxX, inner.maxZ], [inner.minX, inner.maxZ]]
+                .map(([u, v]) => {
+                    const [dx, dz] = unrotate(u * frame.scaleX, v * frame.scaleZ, -frame.angle);
+                    return [frame.x + dx, frame.z + dz];
+                });
+            return pointsBox(corners);
         }
         default:
             return null;

@@ -4372,3 +4372,35 @@ still be found by name.
     camera every frame, which a drawing in one perspective cannot be. The
     picker's cards are headed by their thumbnails.
   - From: Interactive Build Mode
+- [x] **Tool palette**: the marks from `assets/builder/` on the two-column
+  palette the base put down, replacing its text tiles, with each name moved to
+  `title` and `aria-label` and the live tool reading as live
+  - **Settled**: each tile is its tool's mark as an `<img>` - every export
+    carries the same ids and classes, so none is written into the page - with
+    `toolName` on its `aria-label` and title, in a navy column under a white
+    band as the art draws it, the live tool ringed in the art's green and the
+    accept tool's tick in the right-hand column at the foot. The taller column
+    came to lie under the narrow screen's control list, pinned 150 pixels down,
+    which covered the tick on a phone; the list now sits beside the palette.
+  - From: Interactive Build Mode
+- [x] **Hide the tool palette**: the palette collapsing to a chevron and coming
+  back on a click, so the canvas is clear while a handle is being dragged near
+  where it sits
+  - **Settled**: the chevrons on the band fold the tools away to the art's own
+    tab, `palette-folded.svg`, which the band carries turned in; the tab brings
+    them back, by pointer, `Enter` or a finger. `js/build-palette.js` keeps the
+    choice in storage, so the next canvas opens as the last was left; `Esc` and
+    every key work the same either way.
+  - From: Interactive Build Mode
+- [x] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
+  groups them into, with the chosen tool's own fields under it and a deselect
+  that is there only while something is selected
+  - **Settled**: `LASSO` joins the palette, and its dock is `LASSO SELECT
+    TOOLS` - the tools in the art's rows, each its icon cut from
+    `assets/builder/lasso-tools.svg` by a `#svgView` of its own box with its
+    name written in the page, the chosen one ringed, its fields under them
+    (Round Rect.'s `CORNER`), and `DESELECT` as the art's pale blue pill only
+    while something is selected. A tool is drawn once the kind it draws can be
+    read, so five of the ten are on the panel; the art's ten are declared in
+    `js/lasso.js` and the rest join with their kinds.
+  - From: Interactive Build Mode

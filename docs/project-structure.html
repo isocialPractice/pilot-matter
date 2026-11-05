@@ -127,17 +127,17 @@
 │   ├── control-settings.js # Pure control settings panel: the axes, the tilt, the attitude bound, what ends a level off, the keys, and their storage
 │   ├── element-editor.js # Pure element editor state: the placed elements and their ranges, what the builder kept laid over them, and the world a free flight is drawn on
 │   ├── properties-panel.js # Pure properties panel: the one row builder every panel of declared ranges is drawn from, its kinds and its gates
-│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, the placement picked with Select, the selection the lasso drew and the tool that drew it, a shape drawn into it, and what has been committed
+│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, a cover stroke laid into its batch and the cover tool's panel values, the placement picked with Select, the selection the lasso drew and the tool that drew it, a shape drawn into it, and what has been committed
 │   ├── lasso.js        # Pure lasso: the ten tools in the art's rows, the kind of region each draws, what a drag or a click per vertex comes to, and when a shape closes; how a shape meets the selection by the key held at its press, a figure reshaped by its fields, and shift in a drag squaring it
-│   ├── build-tools.js  # Pure tool registry: the twelve in palette order, the built ones the palette draws, and the placement a click drops
+│   ├── build-tools.js  # Pure tool registry: the twelve in palette order, the built ones the palette draws, the placement a click drops, and the cover tool - its brush in screen pixels and the stamp a stroke is laid with
 │   ├── build-picker.js # Pure picker: the six canvases a session can start from, and which is chosen
-│   ├── build-camera.js # Pure orbit camera over a canvas: the hold, every gesture, and the air cleared over it
+│   ├── build-camera.js # Pure orbit camera over a canvas: the hold, every gesture, the air cleared over it, and the ground a screen pixel spans
 │   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground
 │   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach, and whether a press was a click
-│   ├── build-overlay.js # Pure outlines and gumball: a placement's reach traced as a contour, a region's own edge stood on the ground for the selection and a shape being drawn, a combined selection's edge traced and chained into runs, projected onto the screen and stroked over the canvas, and the gumball drawn in the art's colours
+│   ├── build-overlay.js # Pure outlines and gumball: a placement's reach traced as a contour, a region's own edge stood on the ground for the selection and a shape being drawn, a combined selection's edge traced and chained into runs, the cover tool's stamp and the trail of a stroke being laid, projected onto the screen and stroked over the canvas, and the gumball drawn in the art's colours
 │   ├── build-palette.js # Pure palette fold: whether the tools are folded away, and the stored choice
-│   ├── gumball.js      # Pure gumball: the two handle sets the art declares, what each handle is bound to, what a drag writes, and where each handle lies on the screen
-│   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows - Select's camera with the pick or the world's own elements beneath it - and what the canvas is drawn from
+│   ├── gumball.js      # Pure gumball: the two handle sets the art declares, what each handle is bound to - a batch of strokes by its frame - what a drag writes, and where each handle lies on the screen
+│   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows - Select's camera with the pick or the world's own elements beneath it, or the cover tool's own panel - and what the canvas is drawn from
 │   ├── panel-view.js   # The one renderer the dock is drawn with: rows, sections that fold, the slides, the answers, and what was done to them
 │   ├── typed-value.js  # Pure keypad both number-holding panels read a typed figure through
 │   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
@@ -152,9 +152,9 @@
 │   ├── weather-math.js # Pure conditions, cloud drift, rain field, and strike timing
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
 │   ├── environment/
-│   │   ├── elements.js # Pure element registry, the field, and every generator
-│   │   ├── footprints.js # Pure region on a placement: the seven kinds a pointer draws, regular figures and curves among them, two regions combined into one, and how much of one covers a point, repeating across the canvas's edges
-│   │   ├── footprinted.js # Pure compositing of an element drawn on a copy of the field back through its footprint and the selection it was clipped to, and the stream a seeded placement draws from
+│   │   ├── elements.js # Pure element registry, the field, every generator, and the clumps a ground cover's density breaks it into
+│   │   ├── footprints.js # Pure region on a placement: the seven kinds a pointer draws, regular figures and curves among them, two regions combined into one, a region set down in a frame of its own, and how much of one covers a point, repeating across the canvas's edges
+│   │   ├── footprinted.js # Pure compositing of an element drawn on a copy of the field back through its footprint and the selection it was clipped to, what a footprint settles from the ground under it - a ground cover's band - and the stream a seeded placement draws from
 │   │   └── presets.js  # Pure assembled environments, and the builder
 │   ├── api/
 │   │   ├── index.js    # The public entry point, re-exporting both halves

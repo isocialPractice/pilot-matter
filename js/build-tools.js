@@ -13,6 +13,8 @@
  * and in what order, can be unit tested in Node.
  */
 
+import { scalar } from './environment/elements.js';
+
 /** The navigation state, and the tool a canvas opens on. */
 export const SELECT_TOOL = 'select';
 
@@ -46,15 +48,23 @@ export const ACCEPT_TOOL = 'accept';
  * own gesture settles, which its panel leaves off rather than showing and
  * ignoring - a mountain dropped at a click is one mountain, so its count is
  * the click's and not the pilot's to set to twelve and wonder why they got one.
+ *
+ * `cover` marks the cover tool: one tool, declared once for each of the four
+ * ground covers it is pointed at, that lays its element by dragging the
+ * `COVER_BRUSH` stamp along the ground. `starts` is what its panel starts at
+ * on a canvas before the pilot has moved it - a cover's density is the
+ * element's 1, which every preset draws with, and the tool's own figure is
+ * the walkthroughs': clumps of grass and sand at a half, and water and snow
+ * whole, so a line of either is not drawn with gaps.
  */
 export const BUILD_TOOLS = Object.freeze([
     { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false, heading: 'SELECTION MODE' },
     { id: 'lasso',     label: 'LASSO',           hint: 'Draw a region the tools below are clipped to', mindsLasso: false },
     { id: 'mountain',  label: 'MOUNTAIN',        hint: 'Drop a mountain at a click',                  mindsLasso: true,  element: 'mountain', heading: 'BUILD MOUNTAINS', drops: true, derived: Object.freeze({ count: 1 }) },
-    { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true,  element: 'grass', heading: 'BUILD GRASS' },
-    { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand', heading: 'BUILD SAND' },
-    { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER' },
-    { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW' },
+    { id: 'grass',     label: 'GRASS',           hint: 'Lay grass by dragging',                       mindsLasso: true,  element: 'grass', heading: 'BUILD GRASS', cover: true, starts: Object.freeze({ density: 0.5 }) },
+    { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand', heading: 'BUILD SAND', cover: true, starts: Object.freeze({ density: 0.5 }) },
+    { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER', cover: true, starts: Object.freeze({ density: 1 }) },
+    { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW', cover: true, starts: Object.freeze({ density: 1 }) },
     { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY' },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true },
@@ -98,8 +108,14 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
 /**
  * The tools that work today. A tool is added here in the commit that makes it
  * work, and not before, so the palette never offers one that does nothing.
+ *
+ * Grass and sand are the cover tool working. Water and snow are the same tool,
+ * declared and ready, but drawn they would show nothing on most of a canvas:
+ * water fills only what is under the sea's one level, and snow settles only
+ * above its line, both a few units off the ground a stroke is usually drawn
+ * on. They join when their elements are drawn where a stroke was drawn.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {
@@ -145,6 +161,59 @@ export function dropsAtClick(id) {
 }
 
 /**
+ * The cover tool's brush: the stamp a stroke is swept with, as its panel's
+ * first rows after `DENSITY`. Measured in screen pixels while it is drawn, and
+ * written to the stroke in world units once it is laid, at the scale the
+ * ground was under the press - so a stamp is the size on the glass the pilot
+ * set it to however far off the view stands, and a stroke laid does not change
+ * size when the camera moves afterwards.
+ *
+ * Named for the artwork's rows. `BUILD HEIGHT` is not an altitude - a cover
+ * has none - but the stamp's reach along the stroke, so it is written to the
+ * stamp's `depth`, the name the footprint already gives that axis; see
+ * `COVER_STAMP`.
+ */
+export const COVER_BRUSH = Object.freeze({
+    buildHeight:  Object.freeze(scalar(10, 400, 40)),
+    buildWidth:   Object.freeze(scalar(10, 400, 60)),
+    cornerRadius: Object.freeze(scalar(0, 200, 10))
+});
+
+/** Which of the stamp's three a brush row writes. */
+export const COVER_STAMP = Object.freeze({ buildHeight: 'depth', buildWidth: 'width', cornerRadius: 'corner' });
+
+/**
+ * The element's ranges the cover tool's panel carries - the same two for every
+ * cover it is pointed at - and so the whole of what a batch's configuration
+ * holds. The rest stay at what the element declares: a cover's band is settled
+ * by the stroke, and water's level and flatten and snow's line, coverage and
+ * slope are not the pilot's here.
+ */
+export const COVER_ELEMENT_ROWS = Object.freeze(['density', 'color']);
+
+/** True for the cover tool, pointed at whichever ground cover it lays. */
+export function isCoverTool(id) {
+    return buildTool(id)?.cover === true;
+}
+
+/**
+ * The stamp a cover stroke is laid with, in world units: the brush's pixels at
+ * `unitsPerPixel`, the ground's scale under the press, to the whole unit and
+ * never less than one. The corner is held to half the shorter side, past which
+ * a rounded rectangle has no straight edge left to round.
+ */
+export function coverStamp(brush = {}, unitsPerPixel = 1) {
+    const scale = Number(unitsPerPixel) > 0 ? Number(unitsPerPixel) : 1;
+    const stamp = {};
+    for (const [row, field] of Object.entries(COVER_STAMP)) {
+        const pixels = Number(brush?.[row] ?? COVER_BRUSH[row].default);
+        stamp[field] = Math.max(Math.round((Number.isFinite(pixels) ? pixels : COVER_BRUSH[row].default) * scale), field === 'corner' ? 0 : 1);
+    }
+    stamp.corner = Math.min(stamp.corner, Math.min(stamp.width, stamp.depth) / 2);
+    return stamp;
+}
+
+/**
  * The values a tool's gesture settles for it, which its panel does not show.
  * Empty for a tool whose panel shows every range its element declares.
  */
@@ -160,21 +229,27 @@ export function derivedValues(tool) {
  * that renders no panel of its own also builds down no path of its own, and an
  * edit that fails to register fails in one place for every tool.
  *
- * A tool lists in `shapes` the values that describe what its pointer drew - a
- * stamp's width, a brush's tip - and those go to the footprint, laid over what
- * was drawn. Everything else is the element's configuration.
+ * A tool with a brush - the cover tool's stamp - holds the brush's rows among
+ * its values, and they are left off: they say how the pointer draws, in
+ * pixels, and the gesture has already turned them into `drawn`, the footprint,
+ * in world units. Everything else is the element's configuration.
  */
 export function toolPlacement(tool, values = {}, drawn = null) {
+    const brush  = toolBrush(tool);
     const config = {};
-    const shape  = {};
 
     for (const [name, value] of Object.entries(values ?? {})) {
-        (tool?.shapes?.includes(name) ? shape : config)[name] = value;
+        if (!(name in brush)) config[name] = value;
     }
 
     const placement = { type: tool?.element, config };
-    if (drawn != null || Object.keys(shape).length > 0) placement.footprint = { ...(drawn ?? {}), ...shape };
+    if (drawn != null) placement.footprint = drawn;
     return placement;
+}
+
+/** The ranges a tool's pointer draws with, which are its own rather than its element's: the cover tool's stamp, or none. */
+export function toolBrush(tool) {
+    return tool?.cover === true ? COVER_BRUSH : {};
 }
 
 /**

@@ -267,6 +267,17 @@ export function orbitBuildCamera(state, dx = 0, dy = 0) {
 }
 
 /**
+ * How many world units one screen pixel spans, square to the view, at
+ * `distance` from the camera through a vertical field of view of `fov`
+ * degrees across a view `viewHeight` pixels tall: what a pan moves the ground
+ * by, and what a brush measured in pixels comes to in the world where it is
+ * pressed.
+ */
+export function unitsPerPixel(distance, fov = 70, viewHeight = 1) {
+    return 2 * (Number(distance) || 0) * Math.tan((Number(fov) || 70) * RADIANS / 2) / Math.max(Number(viewHeight) || 1, 1);
+}
+
+/**
  * Slides the view by a drag, the ground following the pointer: the target
  * moves the other way across the ground, by what one pixel spans at the
  * target's distance. The distance and the angles do not move.
@@ -276,7 +287,7 @@ export function orbitBuildCamera(state, dx = 0, dy = 0) {
  * slipping behind it.
  */
 export function panBuildCamera(state, dx = 0, dy = 0, { viewHeight = 1, fov = 70 } = {}) {
-    const perPixel = 2 * state.distance * Math.tan((Number(fov) || 70) * RADIANS / 2) / Math.max(Number(viewHeight) || 1, 1);
+    const perPixel = unitsPerPixel(state.distance, fov, viewHeight);
     const stretch  = 1 / Math.sin(clamp(state.pitch, MIN_PITCH, MAX_PITCH) * RADIANS);
     const { ahead, right } = groundAxes(state.yaw);
     const across = -(Number(dx) || 0) * perPixel;

@@ -16,7 +16,7 @@ import {
     writeCameraField, cameraFieldRanges, nudgeBuildCamera, wrapDegrees, CAMERA_NUDGES,
     DEFAULT_FOV, FOV_LOW, FOV_HIGH, MIN_PITCH, MAX_PITCH, CANVAS_PITCH
 } from '../js/build-camera.js';
-import { BUILD_TOOLS, toolForElement, toolPlacement } from '../js/build-tools.js';
+import { BUILD_TOOLS, toolForElement, toolPlacement, buildTool } from '../js/build-tools.js';
 import { rangeRows, stepRow, rowValue } from '../js/properties-panel.js';
 import { rowKey, fieldFigure } from '../js/panel-view.js';
 import { getElement } from '../js/environment/elements.js';
@@ -69,7 +69,7 @@ test('with an edit in hand the dock is that edit, headed as its tool\'s panel, w
 
     assert.equal(shown.kind, DOCK_DRAFT);
     assert.equal(shown.heading, 'BUILD WATER');
-    assert.deepEqual(shown.rows.map(entry => entry.row.label), ['LEVEL', 'COLOR LIGHT', 'COLOR DARK', 'FLATTEN']);
+    assert.deepEqual(shown.rows.map(entry => entry.row.label), ['LEVEL', 'COLOR LIGHT', 'COLOR DARK', 'FLATTEN', 'DENSITY']);
     assert.deepEqual(shown.actions, [DOCK_ACCEPT, DOCK_CANCEL]);
     assert.equal(shown.rows.find(entry => entry.name === 'level').value, 300, 'reading what the edit holds');
 });
@@ -82,7 +82,7 @@ test('an edit of an element no tool places yet is headed by the element', () => 
 
 test('a live tool with no panel yet shows nothing', () => {
     const state = onCanvas();
-    state.tool = 'grass';
+    state.tool = 'paint';
     assert.equal(dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE) }), null);
 });
 
@@ -210,16 +210,15 @@ test('the PAN and MOVE rows slide the view a tenth at a press', () => {
 // --- The split and the headings -------------------------------------------------------
 
 test('a tool\'s panel values split into the element\'s config and the footprint it drew', () => {
-    const brush = { element: 'grass', shapes: ['width', 'depth'] };
-    const drawn = { kind: 'stroke', points: [[0, 0], [100, 0]], stamp: { width: 1, depth: 1 } };
+    const drawn = { kind: 'stroke', points: [[0, 0], [100, 0]], stamp: { width: 300, depth: 120, corner: 0 } };
 
-    assert.deepEqual(toolPlacement(brush, { density: 0.5, width: 300, depth: 120 }, drawn), {
+    assert.deepEqual(toolPlacement(buildTool('grass'), { density: 0.5, buildWidth: 60, buildHeight: 40, cornerRadius: 10 }, drawn), {
         type: 'grass',
         config: { density: 0.5 },
-        footprint: { ...drawn, width: 300, depth: 120 }
-    });
+        footprint: drawn
+    }, 'the brush is how the pointer drew, in pixels, and the gesture already made it the footprint');
     assert.deepEqual(toolPlacement({ element: 'water' }, { level: 30 }), { type: 'water', config: { level: 30 } },
-        'a tool that drew nothing and shapes nothing makes no footprint');
+        'a tool that drew nothing makes no footprint');
 });
 
 test('the panels the artwork heads are headed the artwork\'s way', () => {

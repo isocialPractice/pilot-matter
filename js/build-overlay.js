@@ -412,6 +412,61 @@ export function projectPath(points, heightAt, project) {
     return paths;
 }
 
+/**
+ * A cover stroke as it is being drawn: the swathe the stamp sweeps, as wide on
+ * the glass as the brush, in the lasso art's blue and pale enough to see the
+ * ground through - so a stroke reads as what it will cover before it is let go
+ * of and the ground is drawn with it.
+ */
+export const COVER_TRAIL = Object.freeze({ colour: 'rgba(135, 206, 235, 0.4)' });
+
+/** How many points a stamp's rounded corner is drawn with. */
+const STAMP_CORNER_POINTS = 6;
+
+/**
+ * The cover tool's stamp on the screen: a rounded rectangle `width` across and
+ * `depth` down, centred on `x`, `y`, its corners rounded by `corner` - held to
+ * half the shorter side - as a closed run of screen points. It follows the
+ * pointer, so the pilot sees the stamp a press would lay before pressing.
+ */
+export function stampOutline(x, y, width, depth, corner = 0) {
+    const hw = Math.max(Number(width) || 0, 0) / 2;
+    const hd = Math.max(Number(depth) || 0, 0) / 2;
+    if (!(hw > 0) || !(hd > 0)) return [];
+
+    const r = Math.min(Math.max(Number(corner) || 0, 0), hw, hd);
+    const centres = [[hw - r, -hd + r, -Math.PI / 2], [hw - r, hd - r, 0], [-hw + r, hd - r, Math.PI / 2], [-hw + r, -hd + r, Math.PI]];
+    const points = [];
+    for (const [cx, cy, start] of centres) {
+        for (let i = 0; i <= STAMP_CORNER_POINTS; i++) {
+            const angle = start + (i / STAMP_CORNER_POINTS) * Math.PI / 2;
+            points.push({ x: x + cx + Math.cos(angle) * r, y: y + cy + Math.sin(angle) * r });
+        }
+    }
+    points.push({ ...points[0] });
+    return points;
+}
+
+/** Strokes screen paths as a cover trail: round-ended and round-jointed, `width` pixels wide. */
+export function strokeTrail(ctx, paths, width) {
+    if (!paths?.length || !(width > 0)) return;
+    ctx.setLineDash?.([]);
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = COVER_TRAIL.colour;
+    ctx.beginPath();
+    for (const path of paths) {
+        path.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+        // A press that never travelled is a stroke of one point, which a
+        // round cap still draws as the dot it is.
+        if (path.length === 1) ctx.lineTo(path[0].x, path[0].y);
+    }
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+}
+
 /** Strokes screen paths in a style: its under-stroke, then itself, dashed where the style says. */
 export function strokePaths(ctx, paths, style) {
     if (!paths?.length || style == null) return;

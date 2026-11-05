@@ -115,15 +115,31 @@ export function gumballHandles(kind) {
 
 // --- What each handle is bound to -------------------------------------------------
 
-/** A footprint's size along each ground axis, by kind: what a square handle scales. */
+/**
+ * A footprint's size along each ground axis, by kind: what a square handle
+ * scales. A region set down in a frame - a batch of strokes - is sized by the
+ * frame's two stretches, which grow the whole batch about its middle.
+ */
 const EXTENTS = Object.freeze({
     disc:    Object.freeze({ red: 'radius',  green: 'radius' }),
     ellipse: Object.freeze({ red: 'radiusX', green: 'radiusZ' }),
-    rect:    Object.freeze({ red: 'width',   green: 'depth' })
+    rect:    Object.freeze({ red: 'width',   green: 'depth' }),
+    placed:  Object.freeze({ red: 'scaleX',  green: 'scaleZ' })
 });
 
 /** The footprint kinds that carry an angle, which the blue arc turns. */
-const TURNED = Object.freeze(['ellipse', 'rect']);
+const TURNED = Object.freeze(['ellipse', 'rect', 'placed']);
+
+/**
+ * The least a frame may be stretched to along an axis: a twentieth, past which
+ * a batch is a line too thin to see, let alone to take hold of again.
+ */
+export const MIN_SCALE = 0.05;
+
+/** The least a footprint's extent may be scaled down to, by what it is: a stretch, or a size in world units. */
+function extentFloor(name) {
+    return name === 'scaleX' || name === 'scaleZ' ? MIN_SCALE : MIN_EXTENT;
+}
 
 /** True for a span an element declares under this name. */
 function spanOf(type, name) {
@@ -310,7 +326,7 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
                 changes.config[each.name] = scaleSpan(currentSpan(placement, each.name, range), factor, range);
             } else {
                 changes.footprint ??= { ...placement.footprint };
-                changes.footprint[each.name] = Math.max(placement.footprint[each.name] * factor, MIN_EXTENT);
+                changes.footprint[each.name] = Math.max(placement.footprint[each.name] * factor, extentFloor(each.name));
             }
         }
         if (changes.footprint == null) delete changes.footprint;

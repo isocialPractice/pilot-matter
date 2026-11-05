@@ -12,7 +12,7 @@ import {
 } from './build-camera.js';
 import { PHOTO_KEY } from './photo.js';
 import { MENU_SELECT_KEYS } from './menu.js';
-import { SELECT_TOOL, isBuiltTool, toolName } from './build-tools.js';
+import { SELECT_TOOL, BUILD_TOOLS, isBuiltTool, isCoverTool, toolName } from './build-tools.js';
 
 export const HELP_KEY = 'KeyH';
 
@@ -97,8 +97,10 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * A row's `click` is the tool whose own click on the ground the row is, listed
  * while that tool is built, and its `drag` the tool's own drag on the ground -
  * with a key `held` at the press, or pressed `then`, once the drag is under
- * way, which is how the one key gets its two meanings said. A row with `handle`
- * is a drag of the gumball on the edit in hand, which every tool answers to. An input one tool answers to and the rest do not
+ * way, which is how the one key gets its two meanings said. A `drag` may name
+ * several tools, which is the cover tool's one stroke for each ground cover it
+ * lays. A row with `handle` is a drag of the gumball on the edit in hand, which
+ * every tool answers to. An input one tool answers to and the rest do not
  * is named with that tool, so a drag that orbits in Select and does nothing
  * with Mountain live says so on the line rather than leaving it to be found.
  *
@@ -107,6 +109,9 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * label worked out at load would read it before it exists - the trap
  * `js/reserved-keys.js` describes.
  */
+/** The cover tool's ground covers that are built, in the palette's order. */
+const COVER_TOOLS = Object.freeze(BUILD_TOOLS.filter(tool => isCoverTool(tool.id) && isBuiltTool(tool.id)).map(tool => tool.id));
+
 export const BUILD_HELP_ROWS = Object.freeze([
     { id: 'orbit',   label: 'Orbit',   presses: CAMERA_GESTURES.filter(entry => entry.gesture === CAMERA_ORBIT) },
     { id: 'pan',     label: 'Pan',     presses: CAMERA_GESTURES.filter(entry => entry.gesture === CAMERA_PAN) },
@@ -125,6 +130,8 @@ export const BUILD_HELP_ROWS = Object.freeze([
         { id: 'lasso-point',  label: 'Place a Point, Double Click to Close', click: 'lasso' }
     ] : []),
     ...(isBuiltTool('mountain') ? [{ id: 'drop', label: 'Drop a Mountain', click: 'mountain' }] : []),
+    // The cover tool, named for each ground cover it is built for.
+    ...(COVER_TOOLS.length ? [{ id: 'cover', label: 'Lay a Stroke', drag: COVER_TOOLS }] : []),
     { id: 'handle',  label: 'Move or Shape What Is in Hand', handle: true },
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
     { id: 'answer',  label: 'Answer a Question',             keys: [MENU_SELECT_KEYS.slice(0, 1)] },
@@ -167,7 +174,7 @@ export function buildHelpLines() {
         const input = row.keys ? keysText(row.keys)
             : row.presses ? pressText(row.presses)
             : row.click ? `Click${forTools([row.click])}`
-            : row.drag ? `${row.held ? `${row.held}+` : ''}Drag${forTools([row.drag])}${row.then ? `, then ${row.then}` : ''}`
+            : row.drag ? `${row.held ? `${row.held}+` : ''}Drag${forTools([row.drag].flat())}${row.then ? `, then ${row.then}` : ''}`
             : row.handle ? 'Drag a Handle'
             : 'Wheel';
         return { id: row.id, text: `${input} - ${row.label}` };

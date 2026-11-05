@@ -742,16 +742,120 @@ const desert = {
 
 // --- Ground cover ---------------------------------------------------------
 
+/**
+ * How wide a clump of a ground cover laid at part density is, roughly, in
+ * world units: the size of the noise its coverage is drawn through. A few
+ * cells of the default sampling across, so a clump reads as a clump rather
+ * than as speckle.
+ */
+export const CLUMP_SIZE = 520;
+
+/**
+ * The noise the clumps are drawn through, at each tenth of the way through
+ * its values: where 10%, 20% and so on of the ground falls below. A density
+ * is turned into a threshold through these, so at 0.5 half of a stroke is
+ * covered and at 0.9 nine tenths of it, rather than whatever share of the
+ * ground the noise's own bunching about its middle happened to put under the
+ * figure. Measured off `clumpNoise` across a canvas.
+ */
+export const CLUMP_DECILES = Object.freeze([0, 0.313, 0.372, 0.417, 0.457, 0.496, 0.535, 0.574, 0.62, 0.681, 1]);
+
+/** How soft a clump's edge is, in the noise's own units: eased across this, rather than cut. */
+const CLUMP_EDGE = 0.05;
+
+/**
+ * How much of a ground cover lies at a vertex, from its `density`: all of it
+ * at 1, none at 0, and between them clumps - where a noise value falls under
+ * the threshold the density comes to, eased across a soft edge.
+ *
+ * The noise is keyed on the **canvas's** coordinates, the vertex's place with
+ * the tile's origin taken off, rather than on the seeded stream: drawn from
+ * the stream, the clumps would rearrange themselves every time a tile was
+ * drawn again, and grass that moves when the aircraft flies back over it is
+ * grass the pilot notices. And it repeats a field's width apart, as the canvas
+ * does, so a clump drawn over a seam carries on across it.
+ *
+ * At a density of 1 - every preset's - it is exactly 1 without the noise
+ * being asked, so the ground every world was drawn with is unchanged.
+ */
+export function coverAt(field, index, density = 1) {
+    if (!(density < 1)) return 1;
+    if (!(density > 0)) return 0;
+
+    const cells = Math.max(1, Math.round(field.size / CLUMP_SIZE));
+    const u = ((fieldX(field, index) - field.originX) / field.size + 0.5) * cells;
+    const v = ((fieldZ(field, index) - field.originZ) / field.size + 0.5) * cells;
+    return smoothstep((clumpThreshold(density) - clumpNoise(u, v, cells)) / CLUMP_EDGE + 0.5);
+}
+
+/** The noise value a density keeps the ground under, read off the deciles. */
+function clumpThreshold(density) {
+    const at = clamp(density, 0, 1) * 10;
+    const below = Math.min(Math.floor(at), 9);
+    return CLUMP_DECILES[below] + (CLUMP_DECILES[below + 1] - CLUMP_DECILES[below]) * (at - below);
+}
+
+/**
+ * Three octaves of value noise over a lattice that repeats every `cells`
+ * cells, so the noise at one edge of the canvas is the noise at the other.
+ * Exported so its deciles can be measured.
+ */
+export function clumpNoise(u, v, cells) {
+    let total = 0, amp = 0.5, weight = 0, freq = 1;
+    for (let octave = 0; octave < 3; octave++) {
+        total  += amp * tiledValueNoise(u * freq, v * freq, cells * freq);
+        weight += amp;
+        amp  *= 0.5;
+        freq *= 2;
+    }
+    return total / weight;
+}
+
+/** Value noise whose lattice wraps every `period` cells. */
+function tiledValueNoise(u, v, period) {
+    const iu = Math.floor(u), iv = Math.floor(v);
+    const fu = smoothstep(u - iu), fv = smoothstep(v - iv);
+    const at = (i, j) => hash(wrapCell(i, period), wrapCell(j, period));
+    const a = at(iu, iv), b = at(iu + 1, iv);
+    const c = at(iu, iv + 1), d = at(iu + 1, iv + 1);
+    return a + (b - a) * fu + (c - a) * fv + (a - b - c + d) * fu * fv;
+}
+
+function wrapCell(i, period) {
+    return ((i % period) + period) % period;
+}
+
+/**
+ * A colour laid over a vertex as far as a cover reaches it: painted outright
+ * where it lies whole, which is every preset's case, and mixed over what is
+ * there where it lies in part.
+ */
+function layColor(field, index, color, cover) {
+    if (cover >= 1) paint(field, index, color);
+    else mixColor(field, index, color, cover);
+}
+
+/**
+ * The ranges a ground cover drawn through a footprint has settled for it on
+ * each tile, rather than by the pilot: a cover's band, which is the ground's
+ * own relief under the stroke. See `settleFromFootprint` in `footprinted.js`.
+ */
+const SETTLED_BAND = Object.freeze({ band: 'relief' });
+
 const grass = {
     id: 'grass',
     label: 'Grass',
     ranges: {
-        color: gradient([0.36, 0.55, 0.16], [0.16, 0.31, 0.10]),
-        band:  span(0, 2000, 12, 130)
+        color:   gradient([0.36, 0.55, 0.16], [0.16, 0.31, 0.10]),
+        band:    span(0, 2000, 12, 130),
+        // How much of the ground it reaches it covers: a mat at 1, clumps
+        // with ground between them below.
+        density: scalar(0, 1, 1)
     },
+    footprintSettles: SETTLED_BAND,
 
     generate(field, config) {
-        return paintBand(field, config.band, config.color);
+        return paintBand(field, config.band, config.color, config.density);
     }
 };
 
@@ -759,12 +863,14 @@ const sand = {
     id: 'sand',
     label: 'Sand',
     ranges: {
-        color: gradient([0.85, 0.77, 0.55], [0.60, 0.51, 0.33]),
-        band:  span(0, 2000, 4, 12)
+        color:   gradient([0.85, 0.77, 0.55], [0.60, 0.51, 0.33]),
+        band:    span(0, 2000, 4, 12),
+        density: scalar(0, 1, 1)
     },
+    footprintSettles: SETTLED_BAND,
 
     generate(field, config) {
-        return paintBand(field, config.band, config.color);
+        return paintBand(field, config.band, config.color, config.density);
     }
 };
 
@@ -776,11 +882,14 @@ const water = {
         color:   gradient([0.22, 0.46, 0.74], [0.05, 0.15, 0.42]),
         // How much of the basin is pulled up to a flat surface. At 1 the water
         // is a still sheet; at 0 it is only a colour over the ground.
-        flatten: scalar(0, 1, 1)
+        flatten: scalar(0, 1, 1),
+        // How much of what is under the level the water reaches: a sheet at 1,
+        // pools with ground between them below - a marsh.
+        density: scalar(0, 1, 1)
     },
 
     generate(field, config) {
-        const { level, flatten, color } = config;
+        const { level, flatten, color, density } = config;
         let covered = 0;
 
         // The surface is left on the field rather than only in the heights, so
@@ -792,11 +901,14 @@ const water = {
             const h = field.height[i];
             if (h >= level) continue;
 
+            const cover = coverAt(field, i, density);
+            if (cover <= 0) continue;
+
             // Deep water is the dark end of the base hue, a shoreline the pale
             // end, so the drop-off reads without a second colour.
             const depth = level <= 0 ? 0 : (level - h) / level;
-            paint(field, i, blend(color, depth));
-            field.height[i] = h + (level - h) * flatten;
+            layColor(field, i, blend(color, depth), cover);
+            field.height[i] = h + (level - h) * flatten * cover;
             covered++;
         }
 
@@ -980,7 +1092,10 @@ const snow = {
         coverage: scalar(0, 1, 0.9),
         // The steepest ground snow will hold on to: past it a face is bare.
         slope:    scalar(0, 3, 0.9),
-        color:    gradient([1, 1, 1], [0.70, 0.74, 0.84])
+        color:    gradient([1, 1, 1], [0.70, 0.74, 0.84]),
+        // Whether snow lies at a point at all, where `coverage` is how thickly
+        // it lies wherever it does: every point at 1, drifts below.
+        density:  scalar(0, 1, 1)
     },
 
     generate(field, config) {
@@ -993,7 +1108,7 @@ const snow = {
 
             const depth = smoothstep(Math.min(above, 1)) * config.coverage;
             const grip  = config.slope <= 0 ? 0 : 1 - smoothstep(slopeAt(field, i) / config.slope);
-            const held  = depth * grip;
+            const held  = depth * grip * coverAt(field, i, config.density);
             if (held <= 0) continue;
 
             mixColor(field, i, blend(config.color, 1 - depth), held);
@@ -1829,14 +1944,17 @@ function groveCover(grove, x, z) {
     return distance >= edge ? 0 : smoothstep((edge - distance) / (edge * 0.45));
 }
 
-function paintBand(field, [low, high], color) {
+function paintBand(field, [low, high], color, density = 1) {
     const range = Math.max(high - low, 1e-6);
     let painted = 0;
 
     for (let i = 0; i < field.count; i++) {
         const h = field.height[i];
         if (h < low || h > high) continue;
-        paint(field, i, blend(color, (h - low) / range));
+
+        const cover = coverAt(field, i, density);
+        if (cover <= 0) continue;
+        layColor(field, i, blend(color, (h - low) / range), cover);
         painted++;
     }
 

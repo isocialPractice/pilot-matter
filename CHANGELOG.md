@@ -5,6 +5,92 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.48.0] - 2026-11-04
+
+The cover tool: grass and sand laid by dragging a stamp along the ground, each
+batch moved, turned and stretched by its gumball, broken into clumps by a
+density, and lying on all the ground under it.
+
+### Added
+
+- **Build Grass and Build Sand.** `GRASS` and `SAND` join the palette as one
+  cover tool, and its panel is on the dock from the moment it is chosen -
+  headed `BUILD GRASS` or `BUILD SAND`, with `DENSITY`, the stamp's
+  `BUILD HEIGHT`, `BUILD WIDTH` and `CORNER RADIUS`, and `COLOR LIGHT` and
+  `COLOR DARK` - because the stamp is set before a stroke. The stamp is a
+  rounded rectangle measured in screen pixels and follows the pointer. A drag
+  lays it swept whole along the way the pointer went, each sample stood on the
+  ground as it is taken, at the size it was on the screen where the drag was
+  pressed; a stroke drawn zoomed in is finer, and none changes size when the
+  view moves. The stroke owns the pointer until it is let go, so one dragged
+  over the dock or the palette is still the stroke, and `Esc`, a question or a
+  tool change lets go of one half laid. The strokes before `ACCEPT` are one
+  batch and one placement: `DENSITY` and the colours change all of it, the
+  stamp only the strokes still to come, and the next batch starts where the
+  panel was left. With a selection live the batch is clipped to it, and a
+  stroke that reaches none of it lays nothing. The tool is declared for water
+  and snow as well, which join the palette when they are drawn where a stroke
+  goes.
+- **A batch's gumball.** A batch of strokes is a union with no one middle, so
+  it is set down in a frame of its own - a new `placed` footprint, a region
+  moved, turned and stretched about its middle - and the Flat gumball's centre,
+  arc and squares move, turn and stretch the whole batch. A stroke laid after
+  the gumball changed it joins it without undoing the change.
+- **Cover density.** `grass`, `sand`, `water` and `snow` each take a `density`:
+  how much of the ground they reach they cover, in clumps drawn through noise
+  fixed to the canvas, so they stay where they are each time the ground is
+  drawn and carry on across a seam. The noise's deciles turn a density into
+  the share of the ground covered. It defaults to 1, at which every preset is
+  drawn exactly as before; the cover tool starts grass and sand at a half and
+  water and snow whole.
+- **A stroke's band is its ground.** Grass or sand drawn with a footprint of
+  its own is not held to its `band`: the band is worked out on each tile from
+  the ground the footprint covers there, its lowest point to its highest, so
+  the cover lies on all of it and its colour runs light to dark from the
+  stroke's low ground to its high. Elements declare what a footprint settles
+  for them as `footprintSettles`, and a batch picked again shows no band.
+- **The control list** carries `Drag (Grass/Sand) - Lay a Stroke`.
+
+### Fixed
+
+- **A stroke is whole down its middle.** A `stroke` footprint was measured as
+  boxes laid end to end, one a stretch, and a point on the way the drag went is
+  always near the end of two of them - so a drag sampled every few pixels,
+  with a stamp shallower than its feather was wide, came out only part covered
+  all the way along its middle. It is measured from the way itself now: half
+  the stamp's width either side, joined round at every bend, and the stamp's
+  own rounded end reaching half its depth past each end.
+
+Held in Node by the new `test/cover.test.js` - the four covers' density and
+its share, clumps soft-edged and fixed to the canvas, part density on each
+cover, a cover drawn through a footprint painted across its own ground on
+every tile, what settles and what does not, the frame weighed, moved, turned,
+stretched and carried over a seam, every kind moved, a batch joined stroke by
+stroke, the tool's declarations, the brush and its stamp, the panel's values,
+a batch begun, joined, changed, cancelled, clipped and refused, the dock, the
+holder, a batch picked again, its gumball, the stamp on the screen and a
+pixel's ground - with `test/footprints.test.js` for the stroke, and
+`test/page.test.js`, `test/build-panel.test.js`, `test/build-tools.test.js`
+and `test/controls-help.test.js` for the wiring, the palette and the list.
+Each rejected the defect it names when that was put back, seventy-one in all:
+among them a frame weighed where its region was drawn, turned the wrong way or
+left unstretched, every stroke wrapped in another frame, a turned frame taken
+off as if untouched, a stroke's middle or end measured wrongly, full density
+asking the noise, the clumps keyed on the world or not repeating, a density
+read straight off the noise, the band taken from the ground covered whole
+rather than all it reaches, a clip settling a band, the stamp laid in pixels,
+the brush written into the placement, each stroke replacing the batch, a
+stroke the selection cuts away laid, an accept forgetting the brush, a batch
+picked again showing its band, and a stroke cancelled being laid. A seventy-second, full density sent through the noise, is out of reach: the noise never comes near enough its top for full density through it to be anything but whole, so the guard that keeps every preset from asking it changes nothing a test can see.
+Settled in Chromium in 19 checks across a desktop and a phone: Grass and Sand
+on the palette, `BUILD GRASS` there before a stroke, the stamp following the
+pointer, a stroke laid at the press's scale, clumps at a half and the whole
+stroke at 1, the brush changing only the next stroke, a stroke zoomed in
+finer, `Esc` mid-stroke, a stroke over the dock, the batch's gumball moving it
+across the seam, three strokes kept as one placement, a selection's clip,
+`ACCEPT EDITS` on the way to Sand, sand lying on ground far above its band,
+the flight laying the grass where it was moved, and a finger laying a stroke.
+
 ## [1.0.0-alpha.1.47.0] - 2026-11-04
 
 The lasso's whole panel: regular figures and curves, every shape drawn against

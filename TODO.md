@@ -11,25 +11,30 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
-  the four, laying it by dragging a rounded-rectangle stamp swept whole along
-  the stroke, whose width, depth and corner are on the panel in pixels and
-  stored in world units once the stroke is laid
-  - **The Flat gumball is waiting for it.** Since `1.0.0-alpha.1.44.0`
-    `handleBinding` in `js/gumball.js` binds the squares to a footprint's extent
-    - `radius`, `radiusX`/`radiusZ`, `width`/`depth` - and the blue arc to its
-    angle, held in Node, but no placement on a canvas has a footprint yet, so
-    none of them has been seen dragged. A stroke's footprint has no extent the
-    squares know; giving it one is this item's.
+- [ ] **Water drawn above the sea**: a water line kept per vertex beside the
+  sea's one level, so water drawn on high ground is water where it was drawn and
+  nowhere else on the tile, and a runway is lifted clear of the water actually
+  under it
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for water, starting whole, and `footprintSettles` in
+    `js/environment/footprinted.js` is where a value worked out from the
+    ground under a stroke goes - the band is the first; the line is the next.
+    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
+    part density is pools under its level, which `waterSurface` still reads
+    as one sheet.
   - From: Interactive Build Mode
-- [ ] **Cover density**: how much of a stroke grass, sand, water or snow covers,
-  through noise that stays put when a tile is drawn again, defaulting to full
-  cover so every preset renders as it does today, with water and snow starting
-  full so their strokes are not drawn with gaps
+- [ ] **Drawn water lies in the ground**: the line set at the lowest bank within
+  the stroke's half-width and the ground cut down to it, with the colour running
+  from the bank to the middle, so a stroke drawn downhill is a stream and its
+  dark end shows wherever it rests
   - From: Interactive Build Mode
-- [ ] **A stroke's band is its ground**: a ground cover drawn with a footprint
-  painting all of the ground under it and graded across that ground's own
-  relief, worked out on each tile rather than once
+- [ ] **Drawn snow settles where it is drawn**: the snow line put under the
+  stroke's lowest ground on each tile, and the depth running from a thin,
+  shadowed edge to white in the middle, so snow drawn on low ground shows and
+  both colour ends show on any ground
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for snow, starting whole, and the snow line is the next
+    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -99,27 +104,17 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
-  the four, laying it by dragging a rounded-rectangle stamp swept whole along
-  the stroke, whose width, depth and corner are on the panel in pixels and
-  stored in world units once the stroke is laid
-  - **The Flat gumball is waiting for it.** Since `1.0.0-alpha.1.44.0`
-    `handleBinding` in `js/gumball.js` binds the squares to a footprint's extent
-    - `radius`, `radiusX`/`radiusZ`, `width`/`depth` - and the blue arc to its
-    angle, held in Node, but no placement on a canvas has a footprint yet, so
-    none of them has been seen dragged. A stroke's footprint has no extent the
-    squares know; giving it one is this item's.
-- [ ] **Cover density**: how much of a stroke grass, sand, water or snow covers,
-  through noise that stays put when a tile is drawn again, defaulting to full
-  cover so every preset renders as it does today, with water and snow starting
-  full so their strokes are not drawn with gaps
-- [ ] **A stroke's band is its ground**: a ground cover drawn with a footprint
-  painting all of the ground under it and graded across that ground's own
-  relief, worked out on each tile rather than once
 - [ ] **Water drawn above the sea**: a water line kept per vertex beside the
   sea's one level, so water drawn on high ground is water where it was drawn and
   nowhere else on the tile, and a runway is lifted clear of the water actually
   under it
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for water, starting whole, and `footprintSettles` in
+    `js/environment/footprinted.js` is where a value worked out from the
+    ground under a stroke goes - the band is the first; the line is the next.
+    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
+    part density is pools under its level, which `waterSurface` still reads
+    as one sheet.
 - [ ] **Drawn water lies in the ground**: the line set at the lowest bank within
   the stroke's half-width and the ground cut down to it, with the colour running
   from the bank to the middle, so a stroke drawn downhill is a stream and its
@@ -128,6 +123,9 @@ the order the work unblocks itself in.
   stroke's lowest ground on each tile, and the depth running from a thin,
   shadowed edge to white in the middle, so snow drawn on low ground shows and
   both colour ends show on any ground
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for snow, starting whole, and the snow line is the next
+    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
 - [ ] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
   panel row by ten points or ten steps, in every panel including the element
   editor's
@@ -152,9 +150,16 @@ the order the work unblocks itself in.
 - [ ] **Brush sizing**: a brush measured in screen pixels while painting and
   stored in world units once the stroke is laid, so a stroke does not change
   size when the camera moves
+  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
+    `coverStamp` turns a brush in pixels into a stamp in world units at the
+    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
+    goes the same way.
 - [ ] **Strokes land as they are drawn**: each pointer sample projected to the
   ground as it is taken, so the stroke on screen while painting is the stroke
   that gets committed
+  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
+    `js/main.js` stands each sample on the ground as it is taken, every six
+    pixels, and the trail on the overlay is drawn through them.
 - [ ] **Paint blending**: a stroke that takes the brush's hue and keeps the
   ground's own lightness, so a painted hillside is still lit from the same side
   rather than going flat
@@ -212,6 +217,10 @@ the order the work unblocks itself in.
     is a `derived` value on the tool, left off the panel by `panelRanges` for
     any placement carrying `at`. What is left is the cover band and drawn
     water's level, which a footprint rather than a click settles.
+  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
+    off a range the element's `footprintSettles` names for a placement with a
+    footprint, and the cover tool's own panel carries only density, the stamp
+    and the colours. What is left is drawn water's level.
 - [ ] **Builder settings**: a settings screen for the builder's own
   preferences, declared and stored the way the game's two settings screens are,
   with a reset to defaults, and read by nothing that generates ground, so a
@@ -300,40 +309,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 337 earlier items in `TODO-archive.md`, newest last.
+> 340 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Tool palette**: the marks from `assets/builder/` on the two-column
-  palette the base put down, replacing its text tiles, with each name moved to
-  `title` and `aria-label` and the live tool reading as live
-  - **Settled**: each tile is its tool's mark as an `<img>` - every export
-    carries the same ids and classes, so none is written into the page - with
-    `toolName` on its `aria-label` and title, in a navy column under a white
-    band as the art draws it, the live tool ringed in the art's green and the
-    accept tool's tick in the right-hand column at the foot. The taller column
-    came to lie under the narrow screen's control list, pinned 150 pixels down,
-    which covered the tick on a phone; the list now sits beside the palette.
-  - From: Interactive Build Mode
-- [x] **Hide the tool palette**: the palette collapsing to a chevron and coming
-  back on a click, so the canvas is clear while a handle is being dragged near
-  where it sits
-  - **Settled**: the chevrons on the band fold the tools away to the art's own
-    tab, `palette-folded.svg`, which the band carries turned in; the tab brings
-    them back, by pointer, `Enter` or a finger. `js/build-palette.js` keeps the
-    choice in storage, so the next canvas opens as the last was left; `Esc` and
-    every key work the same either way.
-  - From: Interactive Build Mode
-- [x] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
-  groups them into, with the chosen tool's own fields under it and a deselect
-  that is there only while something is selected
-  - **Settled**: `LASSO` joins the palette, and its dock is `LASSO SELECT
-    TOOLS` - the tools in the art's rows, each its icon cut from
-    `assets/builder/lasso-tools.svg` by a `#svgView` of its own box with its
-    name written in the page, the chosen one ringed, its fields under them
-    (Round Rect.'s `CORNER`), and `DESELECT` as the art's pale blue pill only
-    while something is selected. A tool is drawn once the kind it draws can be
-    read, so five of the ten are on the panel; the art's ten are declared in
-    `js/lasso.js` and the rest join with their kinds.
-  - From: Interactive Build Mode
 - [x] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
   two input gestures - a drag for the shapes and a click per vertex for the
   polylines and curves - rather than ten handlers
@@ -419,4 +396,53 @@ how the simulator got here rather than as a list still to be worked.
     drawn so while it is drawn. Held from the press it adds and squares
     nothing. The control list says both, as `Shift+Drag (Lasso)` and `Drag
     (Lasso), then Shift`.
+  - From: Interactive Build Mode
+- [x] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
+  the four, laying it by dragging a rounded-rectangle stamp swept whole along
+  the stroke, whose width, depth and corner are on the panel in pixels and
+  stored in world units once the stroke is laid
+  - **The Flat gumball is waiting for it.** Since `1.0.0-alpha.1.44.0`
+    `handleBinding` in `js/gumball.js` binds the squares to a footprint's extent
+    - `radius`, `radiusX`/`radiusZ`, `width`/`depth` - and the blue arc to its
+    angle, held in Node, but no placement on a canvas has a footprint yet, so
+    none of them has been seen dragged. A stroke's footprint has no extent the
+    squares know; giving it one is this item's.
+  - **Settled**: `js/build-tools.js` declares the cover tool once for each of
+    the four covers - `cover`, and `starts` at a half for grass and sand and
+    whole for water and snow - with `COVER_BRUSH`, its stamp in screen pixels,
+    as the panel's `BUILD HEIGHT`, `BUILD WIDTH` and `CORNER RADIUS`, the first
+    written to the stamp's `depth`. Grass and Sand are on the palette; water
+    and snow wait for their elements to be drawn where a stroke goes. The panel
+    is on the dock from the moment the tool is chosen. A drag is sampled every
+    six pixels, each sample stood on the ground as it is taken, and laid by
+    `layStroke` with `coverStamp` at the scale `unitsPerPixel` gives where it
+    was pressed. The strokes before an accept are one batch: a union set down
+    in a `placed` frame, which the Flat gumball moves, turns and stretches.
+    The panel's density and colours change the whole batch, the brush only
+    the strokes still to come. Laying it found the `stroke` kind short inside:
+    measured as boxes end to end, a drag sampled every few pixels with a
+    stamp shallower than its feather was part covered down its middle. It is
+    measured from the way the drag went now.
+  - From: Interactive Build Mode
+- [x] **Cover density**: how much of a stroke grass, sand, water or snow covers,
+  through noise that stays put when a tile is drawn again, defaulting to full
+  cover so every preset renders as it does today, with water and snow starting
+  full so their strokes are not drawn with gaps
+  - **Settled**: `density` on grass, sand, water and snow, 1 by default, at
+    which every preset is drawn exactly as before. `coverAt` in
+    `js/environment/elements.js` breaks a cover into clumps through value
+    noise keyed on the canvas's coordinates and repeating a canvas apart, a
+    density turned into a threshold through deciles measured off the noise so
+    it is the share of the ground covered. Water at part density is pools
+    under its level; snow's `coverage` stays how thickly it lies.
+  - From: Interactive Build Mode
+- [x] **A stroke's band is its ground**: a ground cover drawn with a footprint
+  painting all of the ground under it and graded across that ground's own
+  relief, worked out on each tile rather than once
+  - **Settled**: grass and sand declare `footprintSettles: { band: 'relief' }`,
+    and `applyFootprintedElement` works the band out on each tile - the lowest
+    and highest ground the footprint reaches there - before the element is
+    drawn, through `settleFromFootprint`, the generator left a whole-field
+    function. A clip alone settles nothing, and a batch picked again shows no
+    band on its panel.
   - From: Interactive Build Mode

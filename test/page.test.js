@@ -3602,8 +3602,8 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);\s*return;\s*\}/,
-        'and a plain press of the main button is a tool\'s that drops at a click, or the lasso\'s');
+    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && isCoverTool\(tool\)\) this\.coverPress\(e\);\s*return;\s*\}/,
+        'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, or the cover tool\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
 
@@ -3620,14 +3620,14 @@ test('a finger on a canvas is a gesture and not a scroll, and only on a canvas',
 // where it is rather than the builder being left from under it.
 test('Escape ends a drag before it asks to leave', () => {
     const keyed = methodBody(mainSource, 'onBuilderKey');
-    const ends  = keyed.indexOf('if ((this.canvasDrag || this.gumballDrag || this.lassoDrawing) && isCanvasLeaveKey(e.code))');
+    const ends  = keyed.indexOf('if ((this.canvasDrag || this.gumballDrag || this.lassoDrawing || this.coverDrawing) && isCanvasLeaveKey(e.code))');
     const leave = keyed.indexOf('leavesBuilder(this.builder');
 
     assert.ok(ends >= 0, 'the builder should end a drag on the leave key');
     assert.ok(ends < leave, 'ahead of the way out');
     assert.match(keyed.slice(ends),
-        /^if \(\(this\.canvasDrag \|\| this\.gumballDrag \|\| this\.lassoDrawing\) && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelLasso\(\);\s*return;/,
-        'the view\'s drag, a handle\'s and a shape half drawn alike');
+        /^if \(\(this\.canvasDrag \|\| this\.gumballDrag \|\| this\.lassoDrawing \|\| this\.coverDrawing\) && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelLasso\(\);\s*this\.cancelCover\(\);\s*return;/,
+        'the view\'s drag, a handle\'s, a shape half drawn and a stroke half laid alike');
 });
 
 test('a held key moves the view by the frame, and leaving lets go of it', () => {
@@ -3813,7 +3813,7 @@ test('an open confirm takes every key before anything on the canvas reads one', 
 test('a confirm opens on YES with the focus, and a press off it calls it off', () => {
     const opened = methodBody(mainSource, 'confirmOpened');
     assert.match(opened, /resetSelection\(this\.confirmState\);/);
-    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelLasso\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view, a handle or a shape, behind it');
+    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelLasso\(\);\s*this\.cancelCover\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view, a handle, a shape or a stroke, behind it');
     assert.match(opened, /this\.overlays\.confirmPanel\.focus\(\{ preventScroll: true \}\);/,
         'so Enter answers it rather than pressing the tile last clicked');
 
@@ -3850,8 +3850,8 @@ test('a click with a tool that drops picks the ground and drops there', () => {
         /this\.renderer\.domElement\.style\.cursor = canvas \? this\.canvasCursor\(\) : '';/,
         'over ground marked as somewhere to click');
     assert.match(methodBody(mainSource, 'canvasCursor'),
-        /const tool = buildModeTool\(this\.builder\);\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL\) return 'crosshair';/,
-        'which is a crosshair for a tool that drops, and for the lasso, which draws on it');
+        /const tool = buildModeTool\(this\.builder\);\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isCoverTool\(tool\)\) return 'crosshair';/,
+        'which is a crosshair for a tool that drops, and for the lasso and the cover tool, which draw on it');
 });
 
 // --- Picking a built element, and the outline over it ---------------------------
@@ -4212,7 +4212,7 @@ test('a click-per-vertex tool places a point a click, and closes on the first or
 });
 
 test('a shape half drawn is let go by Escape, a tool change, a question and leaving', () => {
-    assert.match(methodBody(mainSource, 'onBuilderKey'), /this\.cancelLasso\(\);\s*return;/);
+    assert.match(methodBody(mainSource, 'onBuilderKey'), /this\.cancelLasso\(\);\s*this\.cancelCover\(\);\s*return;/);
     assert.match(methodBody(mainSource, 'onPaletteClick'), /if \(buildModeTool\(this\.builder\) !== LASSO_PALETTE_TOOL\) this\.cancelLasso\(\);/);
     assert.match(methodBody(mainSource, 'confirmOpened'), /this\.cancelLasso\(\);/);
     assert.match(methodBody(mainSource, 'leaveBuilder'), /this\.cancelLasso\(\);/);
@@ -4245,7 +4245,7 @@ test('a press with the lasso draws, never orbits, and the cursor says so', () =>
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /else if \(e\.button === 0 && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);/,
         'shift and alt included, which are how a shape meets the selection');
-    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL\) return 'crosshair';/);
+    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isCoverTool\(tool\)\) return 'crosshair';/);
 });
 
 test('the lasso\'s tiles and its deselect are drawn as the artwork draws them', () => {
@@ -4298,4 +4298,69 @@ test('alt is the builder\'s on a canvas, pressed and let go, so the window\'s me
         'ahead of everything else the builder reads');
     assert.match(mainSource, /this\.buildKeys\.delete\(e\.code\);\s*if \(buildModeDrawing\(this\.builder\) && CANVAS_SWALLOWED_KEYS\.includes\(e\.code\)\) e\.preventDefault\(\);/,
         'and on the way back up, where some browsers act on it');
+});
+
+// --- The cover tool ----------------------------------------------------------------
+
+test('a cover stroke begins at the ground under the press, owns the pointer, and reads the scale there', () => {
+    const press = methodBody(mainSource, 'coverPress');
+    assert.match(press, /const ground = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);\s*if \(ground == null\) return;/,
+        'a press over the sky begins nothing');
+    assert.match(press, /surface\.setPointerCapture\(e\.pointerId\);/, 'so a stroke over the palette stays the stroke');
+    assert.match(press, /scale: unitsPerPixel\(distance, this\.camera\.fov, surface\.clientHeight\)/,
+        'what a pixel spans where it was pressed, which the stamp is laid at');
+});
+
+test('a stroke gathers the ground every few pixels, each sample stood on the ground as it is taken', () => {
+    assert.match(mainSource, /const COVER_SAMPLE_PIXELS = 6;/);
+    const drag = methodBody(mainSource, 'dragCover');
+    assert.match(drag, /if \(Math\.hypot\(screen\.x - drawing\.last\.x, screen\.y - drawing\.last\.y\) < COVER_SAMPLE_PIXELS\) return;/);
+    assert.match(drag, /const ground = this\.pickCanvasPoint\(screen\.x, screen\.y\);\s*if \(ground == null\) return;\s*drawing\.points\.push\(\[ground\.x, ground\.z\]\);/);
+    assert.match(methodBody(mainSource, 'onCanvasDrag'),
+        /if \(this\.coverDrawing && e\.pointerId === this\.coverDrawing\.pointer\) \{\s*this\.dragCover\(e\);\s*return;/);
+});
+
+test('a stroke let go of is laid with the brush at the press\'s scale; cancelled or taken away, it is not', () => {
+    assert.match(methodBody(mainSource, 'onCanvasRelease'),
+        /if \(this\.coverDrawing && e\.pointerId === this\.coverDrawing\.pointer\) \{[^}]*const drawn = this\.coverDrawing;\s*this\.cancelCover\(\);\s*if \(e\.type === 'pointerup'\) this\.finishCover\(drawn\);/);
+    const finish = methodBody(mainSource, 'finishCover');
+    assert.match(finish, /if \(drawn\.tool !== buildModeTool\(this\.builder\)\) return;/, 'a stroke of a tool no longer live lays nothing');
+    assert.match(finish, /const stamp = coverStamp\(coverValues\(this\.builder\), drawn\.scale\);/);
+    assert.match(finish, /if \(!layStroke\(this\.builder, drawn\.points, stamp, \{ size: this\.terrain\.size \}\)\) return;\s*this\.redrawCanvas\(\);/,
+        'and the ground drawn again only for a stroke that was laid');
+});
+
+test('a stroke half laid is let go by Escape, a question, a tool change and leaving', () => {
+    assert.match(methodBody(mainSource, 'onPaletteClick'), /if \(buildModeTool\(this\.builder\) !== this\.coverDrawing\?\.tool\) this\.cancelCover\(\);/);
+    assert.match(methodBody(mainSource, 'leaveBuilder'), /this\.cancelCover\(\);/);
+    assert.match(methodBody(mainSource, 'cancelCover'), /if \(surface\.hasPointerCapture\?\.\(drawing\.pointer\)\) surface\.releasePointerCapture\(drawing\.pointer\);/);
+});
+
+test('the cover tool\'s panel has a holder of its own, kept while the tool is live', () => {
+    assert.match(methodBody(mainSource, 'syncDock'),
+        /holder: isCoverTool\(buildModeTool\(this\.builder\)\) \? this\.currentCoverHolder\(\) : this\.currentDraftHolder\(\),/);
+    const holder = methodBody(mainSource, 'currentCoverHolder');
+    assert.match(holder, /if \(this\.coverHolder\?\.tool !== tool\) this\.coverHolder = \{ tool, \.\.\.coverHolderFor\(this\.builder, tool\) \};/);
+    assert.match(methodBody(mainSource, 'showCanvas'), /this\.coverHolder = null;/, 'and made again for a new canvas');
+});
+
+test('a row of the cover tool\'s panel is kept, and the ground drawn again only when the batch in hand changed', () => {
+    const apply = methodBody(mainSource, 'applyDockValue');
+    assert.match(apply, /if \(kind === DOCK_COVER\) \{\s*if \(setCoverValues\(this\.builder, holder\.config\)\) \{\s*this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);\s*return;\s*\}\s*this\.syncDock\(\);\s*return;\s*\}/);
+});
+
+test('a handle that moved only the footprint writes the footprint alone', () => {
+    const write = methodBody(mainSource, 'writeGumball');
+    assert.match(write, /if \(Object\.keys\(changes\.config \?\? \{\}\)\.length === 0\) \{\s*if \(footprint\) reviseDraft\(this\.builder, \{ footprint \}\);/);
+    assert.ok(write.indexOf('Object.keys(changes.config') < write.indexOf('this.currentDraftHolder()'),
+        'before the holder could fill the configuration in');
+});
+
+test('a stroke is drawn as it goes, as wide as the brush, and the stamp follows a pointer that can hover', () => {
+    const draw = methodBody(mainSource, 'drawBuildOverlay');
+    assert.match(draw, /const brush = isCoverTool\(buildModeTool\(this\.builder\)\) \? coverValues\(this\.builder\) : null;/);
+    assert.match(draw, /strokeTrail\(ctx, this\.screenRuns\(\[this\.coverDrawing\.points\], width, height\), brush\.buildWidth\);/);
+    assert.match(draw, /pointer\.type !== 'touch' && !confirmOpen\(this\.builder\)\s*&& this\.gumballHover == null && this\.gumballDrag == null/,
+        'not for a finger, under a question, or over a handle');
+    assert.match(draw, /stampOutline\(pointer\.x, pointer\.y, brush\.buildWidth, brush\.buildHeight, brush\.cornerRadius\)/);
 });

@@ -179,6 +179,66 @@ test('a stroke follows the way the drag went, whatever direction that was', () =
     }
 });
 
+/**
+ * A pointer is sampled every few pixels, so a drag is many short stretches. Laid
+ * as boxes end to end, a point on the way is always near the end of two of them
+ * and never more than half the stamp's depth inside either - and a stamp
+ * shallower than its feather is wide comes to a stroke only part covered down
+ * its middle. Measured from the way itself, the middle is the stamp's half-width
+ * in, whatever the samples did.
+ */
+test('a stroke sampled every few pixels is whole down its middle, however shallow its stamp', () => {
+    const drag = {
+        kind: 'stroke',
+        points: Array.from({ length: 40 }, (_, i) => [i * 37, Math.sin(i / 3) * 60]),
+        stamp: { width: 547, depth: 182, corner: 46 }
+    };
+    // Away from its two ends, where the end itself is within a feather.
+    for (const [x, z] of drag.points.slice(4, -4)) assert.equal(footprintWeight(drag, x, z), 1, `at ${x}`);
+    for (let i = 4; i < 35; i++) {
+        const [ax, az] = drag.points[i], [bx, bz] = drag.points[i + 1];
+        assert.equal(footprintWeight(drag, (ax + bx) / 2, (az + bz) / 2), 1, 'and between the samples');
+    }
+
+    const shallow = { kind: 'stroke', points: [[-2000, 0], [2000, 0]], stamp: { width: 600, depth: 200, corner: 0 } };
+    assert.ok(footprintWeight(shallow, 1950, 0) < 1,
+        'a shallow stamp\'s end face is under a feather from the last sample, and feathers what is short of it too');
+    assert.equal(footprintWeight(shallow, 1800, 0), 1, 'and only that');
+
+    const long = { kind: 'stroke', points: [[-2000, 0], [2000, 0]], stamp: { width: 600, depth: 400, corner: 0 } };
+    assert.equal(footprintWeight(long, 2000, 0), 1, 'a long stroke is whole out to its last sample, a feather short of its end');
+    let last = Infinity;
+    for (let x = 1500; x <= 2300; x += 10) {
+        const weight = footprintWeight(long, x, 0);
+        assert.ok(weight <= last, `and falls without climbing past it, at ${x}`);
+        last = weight;
+    }
+});
+
+test('a stroke that turns is joined round at the bend, and its ends are the stamp\'s', () => {
+    const bend = { kind: 'stroke', points: [[0, 0], [1000, 0], [1000, 1000]], stamp: { width: 400, depth: 200, corner: 0 }, feather: 0 };
+    assert.equal(footprintWeight(bend, 1100, -100), 1, 'inside the round of the bend');
+    assert.equal(footprintWeight(bend, 1150, -150), 0, 'and not the square corner a notch or a box would leave');
+    assert.equal(footprintWeight(bend, -50, 0), 1, 'half the stamp\'s depth past the first sample');
+    assert.equal(footprintWeight(bend, -150, 0), 0, 'and no further, though half its width is further');
+    assert.equal(footprintWeight(bend, 1000, 1090), 1);
+    assert.equal(footprintWeight(bend, 1000, 1110), 0);
+
+    const rounded = { ...bend, stamp: { width: 400, depth: 200, corner: 100 } };
+    assert.equal(footprintWeight(rounded, 1190, 1090), 0, 'the stamp\'s corners rounded at the end');
+    assert.equal(footprintWeight(bend, 1190, 1090), 1, 'which a square stamp keeps');
+});
+
+test('a sample that landed on the one before it leaves the stroke\'s ends the stamp\'s', () => {
+    // A pointer let go of where it last moved to repeats its last sample, and
+    // one pressed and held a moment repeats its first.
+    const held = { kind: 'stroke', points: [[0, 0], [0, 0], [1000, 0], [1000, 0]], stamp: { width: 600, depth: 200, corner: 0 }, feather: 0 };
+    assert.equal(footprintWeight(held, 1090, 0), 1);
+    assert.equal(footprintWeight(held, 1200, 0), 0, 'half the stamp\'s depth past the end, not half its width');
+    assert.equal(footprintWeight(held, -90, 0), 1);
+    assert.equal(footprintWeight(held, -200, 0), 0, 'and the same at the start');
+});
+
 test('a stroke that never travelled is the one stamp it was pressed as', () => {
     const pressed = { ...STROKE, points: [[0, 0]] };
 

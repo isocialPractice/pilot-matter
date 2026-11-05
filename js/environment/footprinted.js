@@ -19,7 +19,7 @@
  */
 
 import {
-    applyElement, cloneField, fieldX, fieldZ, readColor, mixColor, createRandom
+    applyElement, cloneField, fieldX, fieldZ, readColor, mixColor, createRandom, getElement
 } from './elements.js';
 import { footprintSampler } from './footprints.js';
 
@@ -65,6 +65,11 @@ import { footprintSampler } from './footprints.js';
  * wherever either region's edge was soft, and a placement with no clip costs
  * nothing for the clips other placements carry.
  *
+ * An element drawn through a footprint of its own has the ranges it declares
+ * in `footprintSettles` worked out here, from the ground the footprint covers
+ * on this tile, in place of whatever the placement holds - see
+ * `settleFromFootprint`.
+ *
  * Returns whatever the element's generator counted, as `applyElement` does.
  */
 export function applyFootprintedElement(field, placement, random = createRandom()) {
@@ -73,17 +78,26 @@ export function applyFootprintedElement(field, placement, random = createRandom(
 
     const region = placement.footprint != null ? footprintSampler(placement.footprint, field.size) : null;
     const clip   = placement.clip != null ? footprintSampler(placement.clip, field.size) : null;
-    const weigh  = (x, z) => (region ? region(x, z) : 1) * (clip ? clip(x, z) : 1);
     const draft = cloneField(field);
     const strips = field.runways.length;
+
+    // Weighed once, before the element is drawn, because the ground under the
+    // region is read twice: for what the footprint settles, on the ground as it
+    // was, and for the blend back afterwards.
+    const weights = new Float32Array(field.count);
+    for (let i = 0; i < field.count; i++) {
+        const x = fieldX(field, i) - field.originX;
+        const z = fieldZ(field, i) - field.originZ;
+        weights[i] = (region ? region(x, z) : 1) * (clip ? clip(x, z) : 1);
+    }
 
     // The element is drawn whatever its footprint turns out to cover, so it
     // takes from the seeded stream exactly what it would have taken - a region
     // that covers nothing leaves every placement after it laid out as it was.
-    const result = applyElement(draft, placement, random);
+    const result = applyElement(draft, settleFromFootprint(field, placement, weights), random);
 
     for (let i = 0; i < field.count; i++) {
-        const weight = weigh(fieldX(field, i) - field.originX, fieldZ(field, i) - field.originZ);
+        const weight = weights[i];
         if (weight <= 0) continue;
 
         field.height[i] += (draft.height[i] - field.height[i]) * weight;
@@ -93,6 +107,62 @@ export function applyFootprintedElement(field, placement, random = createRandom(
     field.runways.push(...draft.runways.slice(strips));
 
     return result;
+}
+
+/**
+ * How each value a footprint settles is worked out from the ground it covers:
+ * by name, as an element's `footprintSettles` names it, from the field before
+ * the element is drawn and the region's weight at every vertex of it.
+ *
+ * - `relief` - the lowest and the highest ground the region reaches, which is
+ *   a ground cover's band. Left at its declaration it clips: grass's default
+ *   ends at 130, so a stroke up a hillside would stop half way for no reason
+ *   the panel shows, and sand's is eight units wide above the waterline, so a
+ *   stroke of sand across a field would show nothing at all. Opened to the
+ *   whole range it clips nothing, but grades the colour over two thousand
+ *   units of height the stroke's ground does not have, so every patch lands
+ *   at the light end. The ground's own relief clips nothing inside the stroke
+ *   and runs the colour from its low ground to its high, so both ends show on
+ *   any slope. Null where the region reaches no vertex, which leaves the
+ *   declared value standing for a stroke that draws nothing here anyway.
+ */
+export const FOOTPRINT_SETTLERS = Object.freeze({
+    relief(field, weights) {
+        let low = Infinity, high = -Infinity;
+        for (let i = 0; i < field.count; i++) {
+            if (!(weights[i] > 0)) continue;
+            const h = field.height[i];
+            if (h < low) low = h;
+            if (h > high) high = h;
+        }
+        return low <= high ? [low, high] : null;
+    }
+});
+
+/**
+ * The placement as its element is drawn on this tile: its configuration with
+ * each range the element says a footprint settles worked out from the ground
+ * under the region, here. Worked out by the caller on the tile being drawn,
+ * rather than once and carried, because every tile has different ground under
+ * the same canvas coordinate - and handed to the generator as an ordinary
+ * value, so the generator stays a whole-field function that knows nothing of
+ * footprints.
+ *
+ * Only a placement with a footprint of its own: a clip alone settles nothing,
+ * and a placement with neither is drawn as it always was.
+ */
+export function settleFromFootprint(field, placement, weights) {
+    if (placement?.footprint == null) return placement;
+
+    const settles = getElement(placement.type)?.footprintSettles;
+    if (settles == null) return placement;
+
+    const config = { ...(placement.config ?? {}) };
+    for (const [name, how] of Object.entries(settles)) {
+        const value = FOOTPRINT_SETTLERS[how]?.(field, weights);
+        if (value != null) config[name] = value;
+    }
+    return { ...placement, config };
 }
 
 /**

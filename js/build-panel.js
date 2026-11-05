@@ -22,10 +22,12 @@
 
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
-    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues
+    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, coverValues
 } from './build-mode.js';
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
-import { BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues } from './build-tools.js';
+import {
+    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, COVER_BRUSH
+} from './build-tools.js';
 
 /** The palette's lasso tile, whose panel is its own ten tools rather than an element's ranges. */
 const LASSO_TOOL = 'lasso';
@@ -43,6 +45,9 @@ export const DOCK_WORLD  = 'world';
 
 /** What the dock shows with the lasso live: its tools, and the chosen one's fields. */
 export const DOCK_LASSO = 'lasso';
+
+/** What the dock shows with the cover tool live: its brush and its element's rows, and the batch's accept and cancel while one is in hand. */
+export const DOCK_COVER = 'cover';
 
 /** The answer that drops the selection, there only while something is selected. */
 export const DOCK_DESELECT = Object.freeze({ id: 'deselect', label: 'DESELECT' });
@@ -110,11 +115,49 @@ export function draftHolderFor(placement) {
 export function panelRanges(placement) {
     if (!isElementId(placement?.type)) return {};
 
-    const ranges = { ...getElement(placement.type).ranges };
+    const element = getElement(placement.type);
+    const ranges = { ...element.ranges };
+
+    // A range a footprint settles - a ground cover's band, which is the
+    // ground's own relief under the stroke - is worked out on every tile it is
+    // drawn on, so a figure for it here would be one the drawing ignores.
+    if (placement.footprint != null) {
+        for (const name of Object.keys(element.footprintSettles ?? {})) delete ranges[name];
+    }
+
     if (placement.config?.at == null) return ranges;
 
     for (const name of Object.keys(derivedValues(toolForElement(placement.type)))) delete ranges[name];
     return ranges;
+}
+
+/**
+ * The cover tool's panel, in the artwork's order: `DENSITY`, then the brush's
+ * three - `BUILD HEIGHT`, `BUILD WIDTH`, `CORNER RADIUS` - then the colour's
+ * two ends. The rest of what the element declares is not the pilot's here; see
+ * `COVER_ELEMENT_ROWS`.
+ */
+export function coverRanges(id) {
+    const tool = buildTool(id);
+    if (!isCoverTool(id) || !isElementId(tool.element)) return {};
+
+    const declared = getElement(tool.element).ranges;
+    return { density: declared.density, ...COVER_BRUSH, color: declared.color };
+}
+
+/**
+ * What the cover tool's panel is stepped through: its values - see
+ * `coverValues` - with each gradient held as the shade its ends are drawn at
+ * against the colours they were when the holder was made, as a draft's are.
+ * Null for a tool that is not the cover tool.
+ */
+export function coverHolderFor(state, id = state?.tool) {
+    const values = coverValues(state, id);
+    if (values == null) return null;
+
+    const config = {};
+    for (const name of Object.keys(coverRanges(id))) config[name] = structuredClone(values[name]);
+    return { config, shades: { color: { light: 1, dark: 1 } }, base: { color: structuredClone(config.color) } };
 }
 
 /**
@@ -142,6 +185,8 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
 
     const select = buildModeTool(state) === SELECT_TOOL && camera != null;
     const picked = pickedIndex(state) != null;
+
+    if (isCoverTool(buildModeTool(state))) return coverContent(state, holder, context);
 
     if (draftPending(state) && !(select && picked)) {
         const draft = buildDraft(state);
@@ -228,6 +273,30 @@ function lassoContent(state, context) {
         rows: panelRows(ranges, holder, context),
         nudges: [],
         actions: selectionLive(state) ? [DOCK_DESELECT] : [],
+        sections: []
+    };
+}
+
+/**
+ * The cover tool's panel, there from the moment the tool is chosen rather than
+ * from the first stroke, because its brush is how that stroke is drawn: the
+ * stamp is set before the drag, not after it. With the tool's batch in hand it
+ * is that batch's panel too, with the accept and cancel that settle it.
+ */
+function coverContent(state, holder, context) {
+    const id    = buildModeTool(state);
+    const held  = holder ?? coverHolderFor(state, id);
+    if (held == null) return null;
+
+    const ranges = coverRanges(id);
+    return {
+        kind: DOCK_COVER,
+        heading: buildTool(id).heading,
+        ranges,
+        holder: held,
+        rows: panelRows(ranges, held, context),
+        nudges: [],
+        actions: draftPending(state) ? [DOCK_ACCEPT, DOCK_CANCEL] : [],
         sections: []
     };
 }
