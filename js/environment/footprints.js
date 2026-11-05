@@ -128,15 +128,20 @@ export function placeFootprint(footprint) {
  * frame for every stroke; one the gumball has changed is kept whole inside the
  * new one, so what it did to the strokes already laid is not undone by the
  * next.
+ *
+ * `op` is how the region meets them: added, by default, or with `subtract`
+ * cut out of them - an erase stroke the other way from its batch. A batch
+ * with nothing in it yet has nothing to cut a region out of, and takes it as
+ * it is.
  */
-export function addToPlaced(placed, footprint) {
+export function addToPlaced(placed, footprint, op = 'union') {
     if (placed == null) return placeFootprint(footprint);
     if (!isFootprint(footprint)) return placed;
 
     const plain = placed.kind === PLACED_KIND
         && (Number(placed.angle) || 0) === 0 && placed.scaleX === 1 && placed.scaleZ === 1;
     const held = plain ? moveFootprint(placed.of, placed.x, placed.z) : placed;
-    return placeFootprint(combineFootprints('union', held, footprint));
+    return placeFootprint(combineFootprints(op === 'subtract' ? 'subtract' : 'union', held, footprint));
 }
 
 /** A frame's three numbers, read the way the region is weighed, or null for a frame that sets nothing down. */

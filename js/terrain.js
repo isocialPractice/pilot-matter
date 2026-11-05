@@ -4,6 +4,7 @@ import {
     matchEdges, matchWater, seamBand, flightStrip
 } from './environment/elements.js';
 import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
+import { isGroup } from './templates.js';
 import { animateWater } from './water.js';
 import { updateNormals } from './terrain-normals.js';
 import {
@@ -530,13 +531,14 @@ function relightSeam(geometry, field) {
  * rather than by a preset. The strip comes off every tile but the middle one,
  * for the reason it was only ever laid on that one: a runway is a place in the
  * world rather than a feature of the ground that repeats across it, and a
- * description handed whole to every tile would cut a strip into all nine.
+ * description handed whole to every tile would cut a strip into all nine. A
+ * placed template is a strip too, and comes off with it.
  *
  * Nothing at all for a world drawn from its preset, which is the case the
  * generator already answers from the environment itself.
  */
 function tileElements(elements, home) {
     if (!elements) return undefined;
-    return home ? elements : elements.filter(placement => placement.type !== 'runway');
+    return home ? elements : elements.filter(placement => placement.type !== 'runway' && !isGroup(placement));
 }
 

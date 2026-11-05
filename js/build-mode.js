@@ -21,13 +21,14 @@
  */
 
 import {
-    SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool,
-    toolBrush, toolElementRows, defaultBrush, toolPlacement, insertsTemplate
+    SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool, isEraseTool,
+    toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate
 } from './build-tools.js';
 import {
     templateBuilt, placeTemplate, groupConfig, groupReach, keepStripOnCanvas
 } from './templates.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
+import { isErase, eraseConfig } from './environment/erase.js';
 import {
     footprintWeight, isFootprint, combineFootprints, placeFootprint, addToPlaced
 } from './environment/footprints.js';
@@ -164,7 +165,10 @@ export function createBuildState() {
         runwayTemplate: null,
         // True while Free Paint's eye dropper is armed: the next click on the
         // ground takes the colour there rather than laying a stroke.
-        dropper: false
+        dropper: false,
+        // Where the popup a right click on the selection opens stands, as the
+        // screen point it was opened at, and null while it is shut.
+        popup: null
     };
 }
 
@@ -310,6 +314,8 @@ export function answerConfirm(state, answer) {
     const asked = state?.confirm;
     if (asked == null) return null;
     state.confirm = null;
+    // The popup was shut by the question, whatever it was asked by.
+    state.popup = null;
 
     if (answer !== CONFIRM_YES && answer !== CONFIRM_NO) return { stay: true };
 
@@ -398,7 +404,7 @@ export function samePlacement(a, b) {
 function placementKey(placement) {
     const config = isElementId(placement.type)
         ? resolveConfig(getElement(placement.type), placement.config)
-        : placement.config ?? null;
+        : isErase(placement) ? eraseConfig(placement) : placement.config ?? null;
     return JSON.stringify([placement.type, placement.seed ?? null, placement.footprint ?? null, config]);
 }
 
@@ -644,14 +650,15 @@ export function insertTemplate(state, point, heading = 0, { size = 0 } = {}) {
  * they are its values too.
  *
  * The cover tool's are its density, its stamp and its colour; Free Paint's are
- * its colour, opacity and blend, and its brush. Null for a tool that draws no
- * strokes.
+ * its colour, opacity and blend, and its brush; Erase's are its target and its
+ * strength, and the same brush. Null for a tool that draws no strokes.
  */
 export function strokeValues(state, id = state?.tool) {
     const tool = buildTool(id);
-    if (!isStrokeTool(id) || !isElementId(tool.element)) return null;
+    const ranges = toolRanges(tool);
+    if (!isStrokeTool(id) || ranges == null) return null;
 
-    const defaults = resolveConfig(getElement(tool.element), {});
+    const defaults = resolveConfig({ ranges }, {});
     const values = {
         ...Object.fromEntries(toolElementRows(tool).map(name => [name, defaults[name]])),
         ...(tool.starts ?? {}),
@@ -702,11 +709,17 @@ export function setStrokeValues(state, values = {}) {
  * reaches none of the selected ground is refused, since all of it would be cut
  * away.
  *
+ * With Erase, `alt` held at the press says which way a stroke goes. The first
+ * stroke of a batch says what the batch is - one that takes, or with `alt`
+ * one that puts back what the batches before it took - and a stroke after it
+ * the other way is cut out of the batch's own region rather than added to it,
+ * so an overshoot is put right without settling the batch first.
+ *
  * Refused off a canvas, with a confirm open, for a live tool that draws no
  * strokes, for a stroke that covers nothing, and with an edit in hand that
  * this tool did not begin. Returns true when the stroke was laid.
  */
-export function layStroke(state, points = [], stamp = {}, { size = 0 } = {}) {
+export function layStroke(state, points = [], stamp = {}, { size = 0, alt = false } = {}) {
     if (!buildModeDrawing(state) || confirmOpen(state)) return false;
 
     const tool = buildTool(state.tool);
@@ -727,13 +740,16 @@ export function layStroke(state, points = [], stamp = {}, { size = 0 } = {}) {
     const clip = pending ? state.draft.placement.clip ?? null : mindsLasso(tool.id) ? state.selection : null;
     if (clip != null && !coversGround(combineFootprints('intersect', stroke, clip), size)) return false;
 
+    const erasing = isEraseTool(tool.id);
     if (pending) {
         const placement = state.draft.placement;
-        placement.footprint = addToPlaced(placement.footprint, stroke);
+        const against = erasing && (alt === true) !== (placement.config?.restore === true);
+        placement.footprint = addToPlaced(placement.footprint, stroke, against ? 'subtract' : 'union');
         return true;
     }
 
     const placement = toolPlacement(tool, strokeValues(state, tool.id), placeFootprint(stroke));
+    if (erasing && alt === true) placement.config.restore = true;
     if (clip != null) placement.clip = own(clip);
     return startDraft(state, placement, tool.id);
 }
@@ -971,6 +987,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.lassoValues = {};
     state.runwayTemplate = null;
     state.dropper = false;
+    state.popup = null;
     return true;
 }
 
@@ -1010,6 +1027,7 @@ export function chooseBuildTool(state, id) {
     state.draft = null;
     state.tool = id;
     state.dropper = false;
+    state.popup = null;
     return true;
 }
 
@@ -1076,7 +1094,41 @@ export function deselect(state) {
     if (!buildModeDrawing(state) || confirmOpen(state) || !selectionLive(state)) return false;
     state.selection = null;
     state.selectionTool = null;
+    state.popup = null;
     return true;
+}
+
+// --- The popup a right click on the selection opens ------------------------------
+
+/**
+ * A right click on the selection: a small popup at the pointer carrying
+ * `DESELECT`, the quick way to drop the selection with no travel to the panel.
+ * It is the panel's answer in another place, and goes through `deselect` as
+ * that does. `at` is the screen point it opens at; `inside` says the click
+ * landed on the selected ground, and off it nothing opens.
+ *
+ * Refused off a canvas, with a confirm open, and with nothing selected.
+ * Returns true when the popup is open.
+ */
+export function openDeselectPopup(state, at, inside = true) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !selectionLive(state) || inside !== true) return false;
+    if (!Number.isFinite(at?.x) || !Number.isFinite(at?.y)) return false;
+    state.popup = { x: at.x, y: at.y };
+    return true;
+}
+
+/** Where the popup stands while it is open, as a copy, and null while it is shut. */
+export function deselectPopup(state) {
+    return buildModeDrawing(state) && !confirmOpen(state) && selectionLive(state) && state.popup != null
+        ? { ...state.popup }
+        : null;
+}
+
+/** Shuts the popup without dropping anything. Returns true when it was open. */
+export function closeDeselectPopup(state) {
+    const open = deselectPopup(state) != null;
+    if (state) state.popup = null;
+    return open;
 }
 
 /** The lasso tool chosen, which the next shape is drawn with. */

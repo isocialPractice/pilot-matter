@@ -3580,8 +3580,8 @@ test('the renderer\'s canvas listens for the pointer, with the wheel kept from t
     }
     assert.match(wired, /addEventListener\('wheel',\s*\(e\) => this\.onCanvasWheel\(e\), \{ passive: false \}\)/,
         'and for the wheel non-passively, so it can keep the page from zooming');
-    assert.match(wired, /if \(buildModeDrawing\(this\.builder\)\) e\.preventDefault\(\);/,
-        'the right button\'s menu kept off only while a canvas is open');
+    assert.match(wired, /addEventListener\('contextmenu', \(e\) => \{\s*if \(!buildModeDrawing\(this\.builder\)\) return;\s*e\.preventDefault\(\);\s*this\.onCanvasMenu\(e\);/,
+        'the right button\'s menu kept off only while a canvas is open, and a right click read as the builder\'s');
 
     const setups = mainSource.match(/this\.setupBuilderPointer\(\);/g) ?? [];
     assert.equal(setups.length, 1, 'attached once, for as long as the page is open');
@@ -4327,7 +4327,7 @@ test('a stroke let go of is laid with the brush at the press\'s scale; cancelled
     assert.match(finish, /if \(drawn\.tool !== buildModeTool\(this\.builder\)\) return;/, 'a stroke of a tool no longer live lays nothing');
     assert.match(finish, /const stamp = strokeStamp\(buildTool\(drawn\.tool\), strokeValues\(this\.builder\), drawn\.scale\);/,
         'the stamp of the tool that drew it, the cover tool\'s or the paint brush\'s');
-    assert.match(finish, /if \(!layStroke\(this\.builder, drawn\.points, stamp, \{ size: this\.terrain\.size \}\)\) return;\s*this\.redrawCanvas\(\);/,
+    assert.match(finish, /if \(!layStroke\(this\.builder, drawn\.points, stamp, \{ size: this\.terrain\.size, alt: drawn\.alt \}\)\) return;\s*this\.redrawCanvas\(\);/,
         'and the ground drawn again only for a stroke that was laid');
 });
 
@@ -4347,7 +4347,7 @@ test('the cover tool\'s panel has a holder of its own, kept while the tool is li
 
 test('a row of the cover tool\'s panel is kept, and the ground drawn again only when the batch in hand changed', () => {
     const apply = methodBody(mainSource, 'applyDockValue');
-    assert.match(apply, /if \(kind === DOCK_COVER \|\| kind === DOCK_PAINT\) \{\s*if \(setStrokeValues\(this\.builder, holder\.config\)\) \{\s*this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);\s*return;\s*\}\s*this\.syncDock\(\);\s*return;\s*\}/);
+    assert.match(apply, /if \(kind === DOCK_COVER \|\| kind === DOCK_PAINT \|\| kind === DOCK_ERASE\) \{\s*if \(setStrokeValues\(this\.builder, holder\.config\)\) \{\s*this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);\s*return;\s*\}\s*this\.syncDock\(\);\s*return;\s*\}/);
 });
 
 test('a handle that moved only the footprint writes the footprint alone', () => {
@@ -4364,9 +4364,14 @@ test('a stroke is drawn as it goes, as the region it will cover, and the stamp f
         'the stamp the stroke will be laid with, in world units at the press\'s scale');
     assert.match(draw, /strokeRibbon\(\{ points: this\.strokeDrawing\.points, stamp \}\)\s*\.flatMap\(loop => this\.screenRegion\(loop, true, width, height\)\);/,
         'worked out on the ground and stood on it, so it is as wide on the screen as the stroke laid will be');
-    assert.match(draw, /fillRegion\(ctx, runs, isPaintTool\(live\) \? paintTrailColour\(brush\.color, brush\.opacity\) : COVER_TRAIL\.colour\);/);
-    assert.match(draw, /pointer\.type !== 'touch' && !confirmOpen\(this\.builder\) && !eyeDropperArmed\(this\.builder\)\s*&& this\.gumballHover == null && this\.gumballDrag == null/,
-        'not for a finger, under a question, with the eye dropper armed, or over a handle');
+    assert.match(draw, /fillRegion\(ctx, runs, this\.strokeTrailColour\(live, brush, this\.strokeDrawing\)\);/);
+    const colour = methodBody(mainSource, 'strokeTrailColour');
+    assert.match(colour, /if \(isPaintTool\(tool\)\) return paintTrailColour\(brush\.color, brush\.opacity\);/);
+    assert.match(colour, /if \(isEraseTool\(tool\)\) return drawing\.alt \? ERASE_TRAIL\.restore : ERASE_TRAIL\.colour;/,
+        'an erase stroke in red, and one that puts back in green');
+    assert.match(colour, /return COVER_TRAIL\.colour;/);
+    assert.match(draw, /pointer\.type !== 'touch' && !confirmOpen\(this\.builder\) && !eyeDropperArmed\(this\.builder\)\s*&& deselectPopup\(this\.builder\) == null && this\.gumballHover == null && this\.gumballDrag == null/,
+        'not for a finger, under a question, with the eye dropper armed or the popup open, or over a handle');
     assert.match(draw, /stampOutline\(pointer\.x, pointer\.y, brush\.buildWidth, brush\.buildHeight, brush\.cornerRadius\)/);
     assert.match(draw, /stampOutline\(pointer\.x, pointer\.y, brush\.size, brush\.size, brush\.tip === 'square' \? 0 : brush\.size \/ 2\)/,
         'and the paint brush as its size and its tip');
@@ -4466,6 +4471,53 @@ test('the colour row is styled as the art lays it out, and a tap tints none of i
     assert.match(indexHtml, /\.dock-swatch \{[^}]*-webkit-tap-highlight-color: transparent;/);
     assert.match(indexHtml, /\.dock-picker-band \{[^}]*-webkit-tap-highlight-color: transparent;/);
     assert.match(indexHtml, /\.dock-row\.locked,\s*\.dock-color\.locked \{/);
+});
+
+// --- Erase, and Deselect from anywhere ----------------------------------------------
+
+test('an erase stroke reads alt once at the press and is laid with it', () => {
+    assert.match(methodBody(mainSource, 'strokePress'), /alt: e\.altKey === true,/);
+    assert.match(methodBody(mainSource, 'finishStroke'), /layStroke\(this\.builder, drawn\.points, stamp, \{ size: this\.terrain\.size, alt: drawn\.alt \}\)/);
+});
+
+test('a right click on the selection opens the popup, and a right drag that panned does not', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /this\.rightPress = e\.button === 2 \? \{ x: e\.clientX, y: e\.clientY, type: e\.pointerType \} : null;/);
+    const menu = methodBody(mainSource, 'onCanvasMenu');
+    assert.match(menu, /if \(press == null \|\| e\.shiftKey \|\| travelledPast\(press, \{ x: e\.clientX, y: e\.clientY \}, press\.type\)\) return;/,
+        'a pan, with shift or by travelling, opens nothing');
+    assert.match(menu, /if \(this\.strokeDrawing \|\| this\.lassoDrawing \|\| this\.gumballDrag \|\| this\.canvasDrag\) return;/);
+    assert.match(menu, /const inside = point != null && footprintWeight\(selection, point\.x, point\.z, this\.terrain\.size\) > 0;/,
+        'on the selected ground, measured on the canvas it repeats across');
+    assert.match(menu, /if \(openDeselectPopup\(this\.builder, \{ x: e\.clientX, y: e\.clientY \}, inside\)\) this\.syncOverlays\(\);/);
+});
+
+test('the popup is shut by a press anywhere off it, the canvas\'s press going no further, and by Escape first', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /if \(closeDeselectPopup\(this\.builder\)\) \{\s*e\.preventDefault\(\);\s*this\.syncOverlays\(\);\s*return;\s*\}/);
+    assert.ok(press.indexOf('closeDeselectPopup') < press.indexOf('gumballHit'), 'before a handle or the ground is pressed');
+    const wired = methodBody(mainSource, 'setupBuilderPointer');
+    assert.match(wired, /this\.overlays\.popup\.addEventListener\('click', \(e\) => this\.onPopupPress\(e\)\);/);
+    assert.match(wired, /document\.addEventListener\('pointerdown', \(e\) => \{\s*if \(e\.target === surface \|\| this\.overlays\.popup\.contains\(e\.target\)\) return;\s*if \(closeDeselectPopup\(this\.builder\)\) this\.syncOverlays\(\);\s*\}, true\);/);
+    const key = methodBody(mainSource, 'onBuilderKey');
+    assert.match(key, /if \(isCanvasLeaveKey\(e\.code\) && closeDeselectPopup\(this\.builder\)\) \{\s*this\.syncOverlays\(\);\s*return;\s*\}/);
+    assert.ok(key.indexOf('closeDeselectPopup') < key.indexOf('dropEyeDropper'), 'the innermost thing first');
+});
+
+test('the popup\'s DESELECT is the panel\'s, and it is drawn at the click, kept on the screen', () => {
+    const popup = methodBody(mainSource, 'onPopupPress');
+    assert.match(popup, /if \(!e\.target\.closest\('\[data-popup="deselect"\]'\)\) return;/);
+    assert.match(popup, /if \(!deselect\(this\.builder\)\) closeDeselectPopup\(this\.builder\);/);
+    const sync = methodBody(mainSource, 'syncPopup');
+    assert.match(sync, /const at = \(canvas \?\? buildModeDrawing\(this\.builder\)\) \? deselectPopup\(this\.builder\) : null;\s*popup\.style\.display = at \? 'block' : 'none';/);
+    assert.match(sync, /popup\.style\.left = `\$\{Math\.max\(Math\.min\(at\.x, window\.innerWidth - width - 4\), 4\)\}px`;/);
+    assert.match(methodBody(mainSource, 'syncOverlays'), /this\.syncPopup\(canvas\);/);
+    assert.match(indexHtml, /<div id="build-popup" role="menu" aria-label="Selection">\s*<button type="button" role="menuitem" data-popup="deselect">DESELECT<\/button>/);
+    assert.match(indexHtml, /#build-popup \{[^}]*position: fixed;[^}]*z-index: 300;/, 'over the canvas and the dock, under a confirm');
+});
+
+test('a placed template comes off every tile but the middle one, as a strip does', () => {
+    assert.match(terrainSource, /return home \? elements : elements\.filter\(placement => placement\.type !== 'runway' && !isGroup\(placement\)\);/);
 });
 
 // --- Insert Runway -----------------------------------------------------------------

@@ -27,6 +27,7 @@ import { placementRandom } from './environment/footprinted.js';
 import { footprintSampler, isFootprint } from './environment/footprints.js';
 import { mountainBump } from './terrain-math.js';
 import { isGroup, groupStrips } from './templates.js';
+import { isErase } from './environment/erase.js';
 
 /**
  * How strongly a placement has to reach a point for a click there to find it,
@@ -102,7 +103,9 @@ export function placementReach(placement, size = 0) {
         const strips = groupStrips(placement, size).map(strip => footprintSampler(strip, size));
         return strips.length > 0 ? (x, z) => Math.max(...strips.map(weigh => weigh(x, z))) : NOWHERE;
     }
-    if (!isElementId(placement?.type)) return NOWHERE;
+    // An erase batch is picked by the ground its strokes covered, as a cover
+    // batch is, so it can be picked up again to change what it takes.
+    if (!isElementId(placement?.type) && !isErase(placement)) return NOWHERE;
 
     const region = isFootprint(placement.footprint) ? footprintSampler(placement.footprint, size) : null;
     const point  = pointReach(placement, size);

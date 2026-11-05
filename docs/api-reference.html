@@ -1161,6 +1161,14 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
     footprint: { kind: 'stroke', points: [[-1200, 300], [900, -400]], stamp: { width: 500, depth: 500, corner: 250 }, feather: 250 }
 }</code></pre>
 
+<p>A placement of type <code>erase</code> lays nothing: it is cut out of the placements listed before it. <code>config.target</code> names what it takes - <code>'all'</code>, the default, for every element but <code>runway</code>, or any one element id - and <code>config.strength</code>, from 0 to 1, how much of it; its <code>footprint</code>, and its <code>clip</code> where it carries one, say where. Where a placement is taken the ground is as it stood before that element ran, and anything the placement's own footprint settled is worked out as drawn, before the cut. <code>config.restore: true</code> makes one that puts back instead: it is cut out of the regions the <code>erase</code> placements before it took, from the placements it names. A <code>runway</code> is taken whole or not at all, and only when it was placed with <code>at</code> and <code>'runway'</code> is the target named; <code>water</code> taken out of the sea is dry ground, its line gone where it was taken:</p>
+
+<pre><code>[
+    { type: 'mountain', config: { count: 4 } },
+    // Half of whatever is under the stroke, from everything before it.
+    { type: 'erase', config: { target: 'all', strength: 0.5 }, footprint: { kind: 'stroke', points: [[-2000, 0], [2000, 0]], stamp: { width: 800, depth: 800, corner: 400 } } }
+]</code></pre>
+
 <p>A placement may carry a <code>seed</code>, any finite number, and then draws from a random stream of its own rather than the world's. A world's placements otherwise share one stream in the order they are applied, which is what makes a description the same world every time - and also means a placement added among them moves every draw after it. Seeded, it takes nothing the others were going to draw, so they stay where they were, and it draws the same values on every tile.</p>
 
 <p>A placement of type <code>group</code> is a runway template placed whole: <code>config</code> holds where it stands, <code>at</code>, which way it runs, <code>heading</code>, and how long and wide its strip is, and <code>members</code> holds the placements it stands for, laid out in its own frame - world units from its middle, a heading of 0 running north. The members are copied in when it is placed rather than looked up by the template's name, so a template changed later leaves a world built with it as it was. When the world is built the group is expanded: each member turned through its heading and moved to where it stands, its strip given its length and width, and kept wholly on the square, so no copy of it crosses an edge.</p>

@@ -100,7 +100,8 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * way, which is how the one key gets its two meanings said. A `drag` may name
  * several tools, which is the cover tool's one stroke for each ground cover it
  * lays. A row with `handle` is a drag of the gumball on the edit in hand, which
- * every tool answers to. An input one tool answers to and the rest do not
+ * every tool answers to, and one with `rightClick` a right click, which every
+ * tool answers to as well. An input one tool answers to and the rest do not
  * is named with that tool, so a drag that orbits in Select and does nothing
  * with Mountain live says so on the line rather than leaving it to be found.
  *
@@ -137,6 +138,11 @@ export const BUILD_HELP_ROWS = Object.freeze([
         { id: 'paint',   label: 'Paint a Stroke', drag: 'paint' },
         { id: 'dropper', label: 'Take a Colour With the Eye Dropper', click: 'paint' }
     ] : []),
+    ...(isBuiltTool('erase') ? [
+        { id: 'erase',   label: 'Erase Through a Stroke', drag: 'erase' },
+        { id: 'restore', label: 'Put Back What Was Erased', drag: 'erase', held: 'Alt' }
+    ] : []),
+    { id: 'deselect', label: 'Offer Deselect, on the Selection', rightClick: true },
     { id: 'handle',  label: 'Move or Shape What Is in Hand', handle: true },
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
     { id: 'answer',  label: 'Answer a Question',             keys: [MENU_SELECT_KEYS.slice(0, 1)] },
@@ -181,6 +187,7 @@ export function buildHelpLines() {
             : row.click ? `Click${forTools([row.click])}`
             : row.drag ? `${row.held ? `${row.held}+` : ''}Drag${forTools([row.drag].flat())}${row.then ? `, then ${row.then}` : ''}`
             : row.handle ? 'Drag a Handle'
+            : row.rightClick ? 'Right Click'
             : 'Wheel';
         return { id: row.id, text: `${input} - ${row.label}` };
     });

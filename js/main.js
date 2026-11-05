@@ -25,11 +25,12 @@ import {
     drawIntoSelection, selectionLive, strokeValues, setStrokeValues, layStroke,
     buildRunwayTemplate, chooseRunwayTemplate, insertTemplate,
     resetBrush, eyeDropperArmed, toggleEyeDropper, dropEyeDropper, takeEyeDropperColor,
+    openDeselectPopup, deselectPopup, closeDeselectPopup,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
 import {
-    paletteTools, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, strokeStamp, buildTool,
+    paletteTools, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, strokeStamp, buildTool,
     insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
 import { placeTemplate, groupStrips, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
@@ -40,7 +41,7 @@ import { placementAt, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
-    regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL
+    regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL
 } from './build-overlay.js';
 import {
     boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle,
@@ -58,12 +59,12 @@ import {
 } from './build-camera.js';
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
-    DOCK_COVER, DOCK_PAINT, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH
+    DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH
 } from './build-panel.js';
 import {
     lassoTool, lassoFootprint, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
 } from './lasso.js';
-import { flattenPath } from './environment/footprints.js';
+import { flattenPath, footprintWeight } from './environment/footprints.js';
 import { PanelView } from './panel-view.js';
 import {
     stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces, coarseStep
@@ -517,6 +518,9 @@ class FlightSimulator {
             confirm:        document.getElementById('build-confirm'),
             confirmPanel:   document.getElementById('build-confirm-panel'),
             confirmHeading: document.getElementById('build-confirm-heading'),
+            // The popup a right click on the selection opens, carrying the
+            // one answer it has.
+            popup:          document.getElementById('build-popup'),
             // The layer over the ground the outlines are drawn on.
             buildOverlay:   document.getElementById('build-overlay')
         };
@@ -2158,18 +2162,19 @@ class FlightSimulator {
         // own colour; and the brush a press would lay with, following a
         // pointer that can hover - so it is seen before it is pressed, and not
         // over a handle, where a press would take the handle instead, nor with
-        // the eye dropper armed, where a press takes a colour.
+        // the eye dropper armed, where a press takes a colour, nor with the
+        // popup open, where a press shuts it.
         const live  = buildModeTool(this.builder);
         const brush = isStrokeTool(live) ? strokeValues(this.builder) : null;
         if (brush && this.strokeDrawing) {
             const stamp = strokeStamp(buildTool(live), brush, this.strokeDrawing.scale);
             const runs  = strokeRibbon({ points: this.strokeDrawing.points, stamp })
                 .flatMap(loop => this.screenRegion(loop, true, width, height));
-            fillRegion(ctx, runs, isPaintTool(live) ? paintTrailColour(brush.color, brush.opacity) : COVER_TRAIL.colour);
+            fillRegion(ctx, runs, this.strokeTrailColour(live, brush, this.strokeDrawing));
         }
         const pointer = this.canvasPointer;
         if (brush && pointer && pointer.type !== 'touch' && !confirmOpen(this.builder) && !eyeDropperArmed(this.builder)
-            && this.gumballHover == null && this.gumballDrag == null) {
+            && deselectPopup(this.builder) == null && this.gumballHover == null && this.gumballDrag == null) {
             const tip = isPaintTool(live)
                 ? stampOutline(pointer.x, pointer.y, brush.size, brush.size, brush.tip === 'square' ? 0 : brush.size / 2)
                 : stampOutline(pointer.x, pointer.y, brush.buildWidth, brush.buildHeight, brush.cornerRadius);
@@ -2231,6 +2236,17 @@ class FlightSimulator {
         }
 
         return gumballLayout(middle, axes, handles);
+    }
+
+    /**
+     * The colour a stroke being drawn is shown in: Free Paint's own, the cover
+     * trail's blue, or for Erase the take's red - or with `alt` held at the
+     * press the green of what is put back.
+     */
+    strokeTrailColour(tool, brush, drawing) {
+        if (isPaintTool(tool)) return paintTrailColour(brush.color, brush.opacity);
+        if (isEraseTool(tool)) return drawing.alt ? ERASE_TRAIL.restore : ERASE_TRAIL.colour;
+        return COVER_TRAIL.colour;
     }
 
     /** A placement's outline as it falls on a screen `width` by `height`. */
@@ -2302,8 +2318,20 @@ class FlightSimulator {
         surface.addEventListener('pointerleave',       () => { this.canvasPointer = null; });
         surface.addEventListener('wheel',              (e) => this.onCanvasWheel(e), { passive: false });
         surface.addEventListener('contextmenu', (e) => {
-            if (buildModeDrawing(this.builder)) e.preventDefault();
+            if (!buildModeDrawing(this.builder)) return;
+            e.preventDefault();
+            this.onCanvasMenu(e);
         });
+
+        // The popup's own button, and a press anywhere else off the canvas -
+        // the palette, the dock - shutting it. A press on the canvas shuts it
+        // in `onCanvasPress`, which also keeps that press off the ground.
+        this.overlays.popup.addEventListener('click', (e) => this.onPopupPress(e));
+        this.overlays.popup.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('pointerdown', (e) => {
+            if (e.target === surface || this.overlays.popup.contains(e.target)) return;
+            if (closeDeselectPopup(this.builder)) this.syncOverlays();
+        }, true);
     }
 
     /**
@@ -2318,6 +2346,18 @@ class FlightSimulator {
      */
     onCanvasPress(e) {
         if (!buildModeDrawing(this.builder) || this.canvasDrag || this.gumballDrag) return;
+
+        // A press anywhere off the popup shuts it, and does nothing else: it
+        // was the answer to the popup, not a press on the ground under it.
+        if (closeDeselectPopup(this.builder)) {
+            e.preventDefault();
+            this.syncOverlays();
+            return;
+        }
+
+        // Where a right press went down, so the click it ends in can be told
+        // from a drag that panned.
+        this.rightPress = e.button === 2 ? { x: e.clientX, y: e.clientY, type: e.pointerType } : null;
 
         // A press on a handle of the gumball drags that handle, whichever tool
         // is live: it is the edit in hand's, and comes before an orbit, a pick
@@ -2350,6 +2390,24 @@ class FlightSimulator {
             picks: tool === SELECT_TOOL && e.button === 0 && !e.shiftKey,
             travelled: false
         };
+    }
+
+    /**
+     * A right click on the canvas: on the selection, the popup carrying
+     * `DESELECT` opens at the pointer, whatever tool is live; anywhere else,
+     * and after a right drag that panned, nothing does. A click with `shift`
+     * is the start of a pan, and nothing is opened under a drag or a stroke.
+     */
+    onCanvasMenu(e) {
+        const press = this.rightPress;
+        this.rightPress = null;
+        if (press == null || e.shiftKey || travelledPast(press, { x: e.clientX, y: e.clientY }, press.type)) return;
+        if (this.strokeDrawing || this.lassoDrawing || this.gumballDrag || this.canvasDrag) return;
+
+        const selection = this.builder.selection;
+        const point = selection ? this.pickCanvasPoint(e.clientX, e.clientY) : null;
+        const inside = point != null && footprintWeight(selection, point.x, point.z, this.terrain.size) > 0;
+        if (openDeselectPopup(this.builder, { x: e.clientX, y: e.clientY }, inside)) this.syncOverlays();
     }
 
     /**
@@ -2710,6 +2768,8 @@ class FlightSimulator {
         const distance = this.camera.position.distanceTo(this.overlayPoint.set(ground.x, ground.y ?? this.terrain.getTerrainHeightAt(ground.x, ground.z), ground.z));
         this.strokeDrawing = {
             tool: buildModeTool(this.builder),
+            // `alt` at the press, read once: with Erase, a stroke that puts back.
+            alt: e.altKey === true,
             pointer: e.pointerId,
             points: [[ground.x, ground.z]],
             last: { x: e.clientX, y: e.clientY },
@@ -2743,7 +2803,7 @@ class FlightSimulator {
     finishStroke(drawn) {
         if (drawn.tool !== buildModeTool(this.builder)) return;
         const stamp = strokeStamp(buildTool(drawn.tool), strokeValues(this.builder), drawn.scale);
-        if (!layStroke(this.builder, drawn.points, stamp, { size: this.terrain.size })) return;
+        if (!layStroke(this.builder, drawn.points, stamp, { size: this.terrain.size, alt: drawn.alt })) return;
         this.redrawCanvas();
         this.syncOverlays();
     }
@@ -3059,7 +3119,7 @@ class FlightSimulator {
         // A stroke tool's panel: kept for the tool's next batch, and the
         // batch in hand changed with it - every stroke of it, so the ground
         // is drawn again. A brush row changes only the strokes still to come.
-        if (kind === DOCK_COVER || kind === DOCK_PAINT) {
+        if (kind === DOCK_COVER || kind === DOCK_PAINT || kind === DOCK_ERASE) {
             if (setStrokeValues(this.builder, holder.config)) {
                 this.redrawCanvas();
                 this.syncOverlays();
@@ -3087,6 +3147,29 @@ class FlightSimulator {
         }
 
         this.syncDock();
+    }
+
+    /**
+     * Draws the popup a right click on the selection opened, at the point it
+     * was opened and held inside the window, or takes it off the screen.
+     */
+    syncPopup(canvas = null) {
+        const popup = this.overlays.popup;
+        const at = (canvas ?? buildModeDrawing(this.builder)) ? deselectPopup(this.builder) : null;
+        popup.style.display = at ? 'block' : 'none';
+        if (!at) return;
+
+        const width = popup.offsetWidth, height = popup.offsetHeight;
+        popup.style.left = `${Math.max(Math.min(at.x, window.innerWidth - width - 4), 4)}px`;
+        popup.style.top  = `${Math.max(Math.min(at.y, window.innerHeight - height - 4), 4)}px`;
+    }
+
+    /** The popup's `DESELECT` pressed: the selection dropped, as the panel's answer drops it. */
+    onPopupPress(e) {
+        if (!e.target.closest('[data-popup="deselect"]')) return;
+        e.preventDefault();
+        if (!deselect(this.builder)) closeDeselectPopup(this.builder);
+        this.syncOverlays();
     }
 
     /** A `PAN` or `MOVE` row pressed: the view slid one press's worth. */
@@ -3170,6 +3253,12 @@ class FlightSimulator {
                 this.endGumballDrag();
                 this.cancelLasso();
                 this.cancelStroke();
+                return;
+            }
+
+            // The popup is shut before anything else is stepped out of.
+            if (isCanvasLeaveKey(e.code) && closeDeselectPopup(this.builder)) {
+                this.syncOverlays();
                 return;
             }
 
@@ -3920,6 +4009,10 @@ class FlightSimulator {
         // and Select marks a placement it would pick.
         this.renderer.domElement.style.cursor = canvas ? this.canvasCursor() : '';
         this.overlays.buildOverlay.style.display = canvas ? 'block' : 'none';
+
+        // The popup, at the point the right click opened it, kept on the
+        // screen.
+        this.syncPopup(canvas);
 
         // The confirm, over the canvas while one is asking.
         const asking = canvas ? buildConfirm(this.builder) : null;

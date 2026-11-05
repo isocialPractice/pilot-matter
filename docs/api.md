@@ -1383,6 +1383,26 @@ reaches, fading in across its feather:
 }
 ```
 
+A placement of type `erase` lays nothing: it is cut out of the placements listed
+before it. `config.target` names what it takes - `'all'`, the default, for every
+element but `runway`, or any one element id - and `config.strength`, from 0 to
+1, how much of it; its `footprint`, and its `clip` where it carries one, say
+where. Where a placement is taken the ground is as it stood before that element
+ran, and anything the placement's own footprint settled is worked out as drawn,
+before the cut. `config.restore: true` makes one that puts back instead: it is
+cut out of the regions the `erase` placements before it took, from the
+placements it names. A `runway` is taken whole or not at all, and only when it
+was placed with `at` and `'runway'` is the target named; `water` taken out of
+the sea is dry ground, its line gone where it was taken:
+
+```js
+[
+    { type: 'mountain', config: { count: 4 } },
+    // Half of whatever is under the stroke, from everything before it.
+    { type: 'erase', config: { target: 'all', strength: 0.5 }, footprint: { kind: 'stroke', points: [[-2000, 0], [2000, 0]], stamp: { width: 800, depth: 800, corner: 400 } } }
+]
+```
+
 A placement may carry a `seed`, any finite number, and then draws from a random
 stream of its own rather than the world's. A world's placements otherwise share
 one stream in the order they are applied, which is what makes a description the

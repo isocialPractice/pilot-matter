@@ -1397,18 +1397,21 @@ export function clearRunwayGround(field, elevation, strip = null) {
 }
 
 /**
- * The highest water a strip would lie in: the sea's level, and - given where
- * the strip lies - the highest line of any water drawn under it, so a strip
- * laid across a pond drawn on a hill is lifted clear of the pond rather than
- * of a sea a long way below it. -Infinity where there is no water at all.
+ * The highest water a strip would lie in: given where the strip lies, the
+ * highest line of any water under it - the sea's, which it writes wherever it
+ * reaches, or a drawn body's - so a strip laid across a pond drawn on a hill
+ * is lifted clear of the pond rather than of a sea a long way below it, and
+ * one laid over a hole erased in the sea is not lifted for water that is not
+ * there. Without a line, or a strip to look under, the sea's level. -Infinity
+ * where there is no water at all.
  */
 function waterUnder(field, strip) {
     const record = field.water;
-    let highest = Number.isFinite(record?.level) ? record.level : -Infinity;
     const line = record?.line;
-    if (line == null || strip == null) return highest;
+    if (line == null || strip == null) return Number.isFinite(record?.level) ? record.level : -Infinity;
 
     // A strip handed in by its bearing alone is given the axis it runs along.
+    let highest = -Infinity;
     const laid = Number.isFinite(strip.alongX) ? strip : { ...strip, ...runwayDirection(Number(strip.heading) || 0) };
     for (let i = 0; i < field.count; i++) {
         if (!(line[i] > highest)) continue;
@@ -1420,6 +1423,9 @@ function waterUnder(field, strip) {
 const runway = {
     id: 'runway',
     label: 'Runway',
+    // Erased whole or not at all: half a strip cannot be landed on, and the
+    // record the flight reads would still say the whole of it was there.
+    erasedWhole: true,
     ranges: {
         length: span(600, 8000, 2200, 3400),
         width:  span(80, 600, 220, 320),

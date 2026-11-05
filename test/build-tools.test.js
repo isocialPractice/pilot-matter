@@ -31,13 +31,14 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is Select, Lasso, Mountain, the four covers, Insert Runway, Free Paint and the way out, and nothing else', () => {
-    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', ACCEPT_TOOL]);
+test('today the palette is Select, Lasso, Mountain, the four covers, Insert Runway, Free Paint, Erase and the way out, and nothing else', () => {
+    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', ACCEPT_TOOL]);
     assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');
     assert.equal(isChoosableTool('lasso'), true, 'and so is the lasso, which draws the selection');
     assert.equal(isChoosableTool('water'), true, 'and the cover tool, pointed at any of its four');
     assert.equal(isChoosableTool('runway'), true, 'and Insert Runway, which places a template');
     assert.equal(isChoosableTool('paint'), true, 'and Free Paint, which lays a colour');
+    assert.equal(isChoosableTool('erase'), true, 'and Erase, which takes elements away');
     assert.equal(isChoosableTool('extrude'), false, 'but not yet Extrude, which draws nothing');
 });
 
@@ -94,7 +95,7 @@ test('the way out is drawn but is never the tool a canvas is worked with', () =>
     assert.equal(isBuiltTool(ACCEPT_TOOL), true);
     assert.equal(isChoosableTool(ACCEPT_TOOL), false);
     assert.equal(isChoosableTool(SELECT_TOOL), true);
-    assert.equal(isChoosableTool('erase'), false, 'and an unbuilt tool cannot be chosen either');
+    assert.equal(isChoosableTool('extrude'), false, 'and an unbuilt tool cannot be chosen either');
 });
 
 test('the declarations cannot be rewritten by whoever reads them', () => {

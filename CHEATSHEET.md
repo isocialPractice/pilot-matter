@@ -252,9 +252,12 @@ back.
 | Click, or a finger, in Runway | Place the chosen runway, lined up with the view; with one in hand, put it down there instead |
 | Drag, or a finger, in Free Paint | Paint a stroke in the panel's colour with the brush, which follows the pointer |
 | Click in Free Paint, with the eye dropper armed | Take the colour of the ground there as the brush's |
+| Drag, or a finger, in Erase | Take away the target under the stroke, from what was laid before it |
+| `Alt` and drag in Erase | Put back what was erased |
+| Right click on the selection | Open a popup carrying `DESELECT` |
 | `Shift` and a press on a spinner | A coarse step: ten points on a percentage, ten steps on anything else |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
-| `Esc` | End a drag being made, put an armed eye dropper down, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
+| `Esc` | End a drag being made, shut the popup, put an armed eye dropper down, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
 | `H` | Collapse the control list, and open it again |
 
@@ -340,6 +343,24 @@ its light and shade and black or white is the ground's own grey, and at
 batch, as a cover's are: the colour, opacity and blend change all of it, and
 the brush only the strokes still to come. The eye dropper, pressed, makes the
 next click on the ground take the colour there; `Esc` puts it down.
+
+Erase's panel is `TARGET` - `ALL`, or one element - `STRENGTH` as a percentage,
+and the paint brush's `TIP`, `EDGE` and `SIZE`. A drag, shown in red as it is
+drawn, takes away what was laid before it under the stroke - a preset's
+mountain as readily as a stroke of grass laid a minute ago - leaving the ground
+as it was without it rather than painting over it; at a strength below whole it
+thins what it takes. `ALL` takes every element but a runway: a strip is taken
+only when `RUNWAY` is the target, and then whole, wherever the stroke reaches
+it. Water erased is dry ground, even under the sea's level. `Alt` held at the
+press, drawn in green, puts back: as the first stroke of a batch it hands back
+what the batches before it took, and within a batch it cuts the stroke out of
+the batch, so an overshoot is put right before `ACCEPT`. Something laid after a
+batch is not touched by it.
+
+While something is selected, every tool's panel carries `DESELECT` beside its
+own answers - Mountain's, before a drop, is its heading over `DESELECT` alone -
+and a right click on the selection opens a small popup carrying it at the
+pointer. A press anywhere off the popup, or `Esc`, shuts it and drops nothing.
 
 `Shift` with a press on a spinner is a coarse step - ten points on a row read
 as a percentage, 100% to 110% to 120%, and ten steps on any other row - and

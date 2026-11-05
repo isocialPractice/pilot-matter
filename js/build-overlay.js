@@ -420,6 +420,13 @@ export function projectPath(points, heightAt, project) {
  */
 export const COVER_TRAIL = Object.freeze({ colour: 'rgba(135, 206, 235, 0.4)' });
 
+/**
+ * An erase stroke as it is being drawn: red for one that takes, and green for
+ * one laid with `alt` held, which puts back - so which way a stroke goes is
+ * seen before it is let go of.
+ */
+export const ERASE_TRAIL = Object.freeze({ colour: 'rgba(255, 96, 96, 0.4)', restore: 'rgba(120, 220, 120, 0.45)' });
+
 /** How many points a stamp's rounded corner is drawn with. */
 const STAMP_CORNER_POINTS = 6;
 

@@ -11,39 +11,42 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Deselect from anywhere**: the panel row every tool gets while a
-  selection exists, and a right click on the selection itself, both going
-  through the same place
-  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
-    the lasso's panel while something is selected, through `deselect` in
-    `js/build-mode.js`; this item puts the same answer on every tool's panel
-    and on a right click on the selection.
-  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
-    the lasso and its panel is three sections with no answer of their own; a
-    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
-    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
-    on the selection drawn over a paint stroke.
+- [ ] **Shape vocabulary**: the shape tools built once over the seven footprint
+  kinds, with each mode declaring the subset it offers, so Lasso's ten and
+  Extrude's seven are one implementation
+  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
+    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
+    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
+    gestures; this item is that table shared with Extrude's seven.
   - From: Interactive Build Mode
-- [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
-  elements laid before it, any one element or all of them, preset or built, at a
-  strength, and with `alt` held putting back what an earlier stroke took
-  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
-    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
-    once at the press through `lassoOp`; Erase's `alt` is read the same way.
-  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
-    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
-    `layStroke` and `strokeStamp` in `js/build-tools.js` and
-    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
-    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
-    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
+- [ ] **Extrude stages**: the draw, extrude and surface stages with one action
+  button reading its label and its enabled state off the stage it is in
   - From: Interactive Build Mode
-- [ ] **Erasing water and runways**: the sea held per vertex so a hole erased in
-  a lake is dry ground, and a strip erased whole and only when it is the target
-  named
-  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
-    one height a vertex beside the sea's level, and `waterSurface` reads a
-    vertex as wet only where it lies under its own line - so a hole erased in a
-    lake is the line set to `NaN` there.
+- [ ] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
+  by the gumball or by a number, previewing on the overlay and writing the field
+  once on release
+  - **The airport templates wait on it too.** Their buildings are extrusions
+    over rects at fixed distances from the strip's edge and ends - see
+    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
+    widens.
+  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
+    registry, so `extrude` is the last element the airports wait on; their
+    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
+  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
+    weighed after a footprint settles what it settles, so an extrusion's level
+    worked out through `footprintSettles` is the drawn shape's, and erasing
+    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
+    pattern for anything else that is all or nothing.
+  - From: Interactive Build Mode
+- [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
+  height as a single region, with two that overlap reading as one solid
+  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
+    with `union` weighs as the larger of its parts, so two shapes that overlap
+    already read as one region; this item lifts one to a single height.
+  - From: Interactive Build Mode
+- [ ] **Extrude a selection**: a live selection taken as the region to lift, so
+  the button is ready on arrival, and drawn in red while Extrude is the tool so
+  it reads as the thing that will be lifted rather than as a clip
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -113,37 +116,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Deselect from anywhere**: the panel row every tool gets while a
-  selection exists, and a right click on the selection itself, both going
-  through the same place
-  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
-    the lasso's panel while something is selected, through `deselect` in
-    `js/build-mode.js`; this item puts the same answer on every tool's panel
-    and on a right click on the selection.
-  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
-    the lasso and its panel is three sections with no answer of their own; a
-    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
-    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
-    on the selection drawn over a paint stroke.
-- [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
-  elements laid before it, any one element or all of them, preset or built, at a
-  strength, and with `alt` held putting back what an earlier stroke took
-  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
-    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
-    once at the press through `lassoOp`; Erase's `alt` is read the same way.
-  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
-    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
-    `layStroke` and `strokeStamp` in `js/build-tools.js` and
-    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
-    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
-    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
-- [ ] **Erasing water and runways**: the sea held per vertex so a hole erased in
-  a lake is dry ground, and a strip erased whole and only when it is the target
-  named
-  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
-    one height a vertex beside the sea's level, and `waterSurface` reads a
-    vertex as wet only where it lies under its own line - so a hole erased in a
-    lake is the line set to `NaN` there.
 - [ ] **Shape vocabulary**: the shape tools built once over the seven footprint
   kinds, with each mode declaring the subset it offers, so Lasso's ten and
   Extrude's seven are one implementation
@@ -163,6 +135,11 @@ the order the work unblocks itself in.
   - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
     registry, so `extrude` is the last element the airports wait on; their
     aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
+  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
+    weighed after a footprint settles what it settles, so an extrusion's level
+    worked out through `footprintSettles` is the drawn shape's, and erasing
+    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
+    pattern for anything else that is all or nothing.
 - [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
   height as a single region, with two that overlap reading as one solid
   - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
@@ -292,45 +269,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 353 earlier items in `TODO-archive.md`, newest last.
+> 356 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
-  panel row by ten points or ten steps, in every panel including the element
-  editor's
-  - **Settled**: `coarseStep` in `js/properties-panel.js` makes a press with
-    `shift` ten points on a row read as a percentage - added, so 100%, 110%,
-    120% - and ten of a row's own steps on any other. The dock's spinner hands
-    `shift` through `onStep`, and the element editor's arrow keys through
-    `adjustEditorRange`'s `coarse`. The game's own settings screens are not the
-    shared panel and keep their steps.
-  - From: Interactive Build Mode
-- [x] **Placed runway**: a strip inserted where it was asked for rather than
-  where the site search found room, graded to the ground under it on each tile
-  and lifted clear of any water, with width, length and a rotation about its
-  own centre
-  - **Settled**: a `runway` whose configuration carries `at` is laid by
-    `placeStrip` rather than searched for: at that canvas point on each tile,
-    along the low end of its heading span, its elevation measured under its own
-    footprint with the search's own `measureRunwayGround`, lifted clear of any
-    water by `clearRunwayGround`, `band` and `separation` unread, nothing taken
-    from the seeded stream, and recorded `placed: true`. A `centreline` toggle,
-    off by default so every preset's strip is unchanged, paints dashes down the
-    middle. A placed strip is kept wholly on the canvas: one across a seam
-    would be graded half on one tile's ground and half on the next's.
-  - From: Interactive Build Mode
-- [x] **Runway templates**: basic and commercial runways and airports as groups
-  of placements the registry already has, copied into the placement when it is
-  inserted so a template improved later leaves built worlds as they were
-  - **Settled**: `js/templates.js` declares the four in the panel's order.
-    `BASIC RUNWAY` and `COMMERCIAL` - longer, wider, and carrying its
-    centreline - are offered; the two airports are laid out from a `paint`
-    apron and `extrude` buildings, neither of which the registry draws yet, so
-    they are declared waiting on both and get their members with Free paint and
-    Extrude. A template is placed as one `group` placement with its members
-    copied in; `buildEnvironment` expands a group - each member turned through
-    its heading, moved into place, its strip sized and held on the canvas -
-    and Select picks a group by its strips, apron and all.
-  - From: Interactive Build Mode
 - [x] **Insert a template**: a card chosen on the panel, its outline carried
   over the ground and written only on the click, arriving lined up with the
   view to the nearest ten degrees, then turned and sized on the panel or by the
@@ -442,4 +382,90 @@ how the simulator got here rather than as a list still to be worked.
     and black divides by nothing. A tinted colour has the ground's luminance
     exactly, the paint's hue, and as much of its saturation as that lightness
     can carry; a colour with no hue is the ground's grey.
+  - From: Interactive Build Mode
+- [x] **Deselect from anywhere**: the panel row every tool gets while a
+  selection exists, and a right click on the selection itself, both going
+  through the same place
+  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
+    the lasso's panel while something is selected, through `deselect` in
+    `js/build-mode.js`; this item puts the same answer on every tool's panel
+    and on a right click on the selection.
+  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
+    the lasso and its panel is three sections with no answer of their own; a
+    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
+    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
+    on the selection drawn over a paint stroke.
+  - **Settled**: `dockContent` in `js/build-panel.js` puts `DESELECT` among
+    every panel's answers while something is selected, after the edit's own,
+    and the lasso's once; a tool with no panel yet - Mountain before a drop -
+    shows its heading over `DESELECT` alone. It is an answer rather than the
+    plan's `when: { 'ctx.lasso': true }` row, since the lasso's was one
+    already and a gated range would have to be declared on every tool's
+    ranges. A right click on the selected ground - a right press that did not
+    travel, without `shift`, with no drag or stroke under way - opens
+    `#build-popup` at the pointer, carrying the same answer through
+    `deselect`. The popup is session state, `openDeselectPopup`,
+    `deselectPopup` and `closeDeselectPopup`, and is shut by a press anywhere
+    off it - on the canvas the press goes no further - by `Esc` before
+    anything else, by a tool change, by any question once it is answered, and
+    by a new canvas; no brush is drawn under it. The control list reads
+    `Right Click - Offer Deselect, on the Selection`.
+  - From: Interactive Build Mode
+- [x] **Erase**: free paint inverted - a stroke cut out of the footprints of the
+  elements laid before it, any one element or all of them, preset or built, at a
+  strength, and with `alt` held putting back what an earlier stroke took
+  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
+    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
+    once at the press through `lassoOp`; Erase's `alt` is read the same way.
+  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
+    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
+    `layStroke` and `strokeStamp` in `js/build-tools.js` and
+    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
+    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
+    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
+  - **Settled**: `js/environment/erase.js`. An erase batch is
+    `{ type: 'erase', config: { target, strength, restore }, footprint, clip }`
+    and is applied to nothing: `buildEnvironment` hands the placements, once
+    templates are expanded, to `resolveErasures`, which gives each placement a
+    batch after it reaches a `cut` - the regions taken, their strengths, and
+    the put-back batches after each that hand part back. The compositor weighs
+    what the cut leaves beside the footprint rather than inside it, after the
+    footprint has settled what it settles, so a cover's band and drawn
+    water's line come from the footprint as drawn; that is why there is no
+    `WHOLE` footprint, as the plan sketched - a preset's placement goes through
+    the copy on its cut alone. A cut leaves `1 - strength * taken`, and a
+    put-back batch takes `1 - strength * putBack` off what it hands back. The
+    first stroke of a batch says what it is - `alt` held at its press makes one
+    that puts back - and a stroke the other way within a batch is cut out of
+    it through `addToPlaced`'s `subtract`, so an overshoot is put right before
+    an accept. `TARGET` is `ALL` and every registry id, read off it. Erase is
+    on the palette, its `element` the batch's type, with its own ranges
+    through `toolRanges`, the paint brush, and the panel `TARGET`, `STRENGTH`,
+    `TIP`, `EDGE` and `SIZE`; a stroke is drawn red, or green with `alt`. A
+    batch is picked by its strokes, carries the Flat gumball, and is edited by
+    its own rows. A placement erased whole is still picked where it stood,
+    since its reach is its own.
+  - From: Interactive Build Mode
+- [x] **Erasing water and runways**: the sea held per vertex so a hole erased in
+  a lake is dry ground, and a strip erased whole and only when it is the target
+  named
+  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
+    one height a vertex beside the sea's level, and `waterSurface` reads a
+    vertex as wet only where it lies under its own line - so a hole erased in a
+    lake is the line set to `NaN` there.
+  - **Settled**: the sea already wrote its line wherever it reached; the
+    compositor now carries a line back through what a cut leaves, so a hole
+    taken out of the sea has none and is dry ground, its basin uncut, and the
+    sea's level comes across from a sea drawn through a cut alone, being the
+    sea's still. `waterUnder` reads the highest line under a strip rather than
+    the sea's level wherever there is a line, so a strip over a dry hole is not
+    lifted - every preset's sea writes its level into the line under every
+    strip, so no preset strip moved. The `runway` element declares
+    `erasedWhole`: a strip any of whose vertices a cut reaches is not drawn at
+    all, record and grading with it. `ALL` leaves a strip, and only a placed
+    one - carrying `at` - can be taken by name, since a searched strip is laid
+    when the world is flown and never on the canvas the stroke was drawn over.
+    Found on the way: a placed template's strip was laid on all nine tiles of a
+    flown world, `tileElements` taking off only placements typed `runway`; a
+    group comes off every tile but the middle one now too.
   - From: Interactive Build Mode

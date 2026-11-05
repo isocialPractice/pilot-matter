@@ -15,6 +15,7 @@
 
 import { scalar, choice } from './environment/elements.js';
 import { DEFAULT_FEATHER } from './environment/footprints.js';
+import { ERASE_TYPE, placementRanges } from './environment/erase.js';
 
 /** The navigation state, and the tool a canvas opens on. */
 export const SELECT_TOOL = 'select';
@@ -64,7 +65,11 @@ export const ACCEPT_TOOL = 'accept';
  *
  * `paint` marks Free Paint, the other tool that draws by dragging: it lays
  * `paint` with the `PAINT_BRUSH` rather than a cover with the cover tool's
- * stamp. The two are the stroke tools, and share every gesture.
+ * stamp. `erase` marks Erase, which drags the same brush and lays nothing: its
+ * strokes are an erase batch, cut out of what was laid before them when the
+ * ground is built - see `js/environment/erase.js` - so its `element` is the
+ * batch's type rather than one of the registry's. The three are the stroke
+ * tools, and share every gesture.
  */
 export const BUILD_TOOLS = Object.freeze([
     { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false, heading: 'SELECTION MODE' },
@@ -76,7 +81,7 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW', cover: true, starts: Object.freeze({ density: 1 }) },
     { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY', inserts: true },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true,  element: 'paint', heading: 'FREE PAINT', paint: true },
-    { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true },
+    { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true,  element: ERASE_TYPE, heading: 'ERASE', erase: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },
     { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false }
 ].map(tool => Object.freeze(tool)));
@@ -124,9 +129,10 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * stroke would usually miss. Insert Runway places the templates whose every
  * element the registry draws - the two runways today, and the airports once
  * extrude is in it beside paint. Free Paint lays a colour and no height,
- * through the same stroke as the covers.
+ * through the same stroke as the covers, and Erase takes elements away
+ * through it.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {
@@ -264,16 +270,34 @@ export function isPaintTool(id) {
     return buildTool(id)?.paint === true;
 }
 
-/** True for a tool that lays its element by dragging a stroke: the cover tool and Free Paint. */
-export function isStrokeTool(id) {
-    return isCoverTool(id) || isPaintTool(id);
+/** True for Erase. */
+export function isEraseTool(id) {
+    return buildTool(id)?.erase === true;
 }
 
-/** The element's ranges a stroke tool's panel carries, or none for a tool that is not one. */
+/** True for a tool that lays what it lays by dragging a stroke: the cover tool, Free Paint and Erase. */
+export function isStrokeTool(id) {
+    return isCoverTool(id) || isPaintTool(id) || isEraseTool(id);
+}
+
+/** An erase batch's own ranges Erase's panel carries: what it takes, and how much of it. */
+export const ERASE_ELEMENT_ROWS = Object.freeze(['target', 'strength']);
+
+/** The element's ranges a stroke tool's panel carries - an erase batch's, for Erase - or none for a tool that is not one. */
 export function toolElementRows(tool) {
     if (tool?.cover === true) return COVER_ELEMENT_ROWS;
     if (tool?.paint === true) return PAINT_ELEMENT_ROWS;
+    if (tool?.erase === true) return ERASE_ELEMENT_ROWS;
     return [];
+}
+
+/**
+ * The ranges a tool's placement is configured through: its element's, or an
+ * erase batch's for Erase, which places no element. Null for a tool that
+ * places nothing.
+ */
+export function toolRanges(tool) {
+    return tool?.element != null ? placementRanges(tool.element) : null;
 }
 
 /** A tool's brush as it starts, which is the brush Free Paint's `DEFAULT` puts back. */
@@ -304,10 +328,10 @@ export function paintStamp(brush = {}, unitsPerPixel = 1) {
     };
 }
 
-/** The stamp a stroke tool lays a stroke with, at the scale under the press, or null for a tool that draws no strokes. */
+/** The stamp a stroke tool lays a stroke with, at the scale under the press, or null for a tool that draws no strokes. Erase's brush is the paint brush. */
 export function strokeStamp(tool, brush = {}, unitsPerPixel = 1) {
     if (tool?.cover === true) return coverStamp(brush, unitsPerPixel);
-    if (tool?.paint === true) return paintStamp(brush, unitsPerPixel);
+    if (tool?.paint === true || tool?.erase === true) return paintStamp(brush, unitsPerPixel);
     return null;
 }
 
@@ -346,10 +370,10 @@ export function toolPlacement(tool, values = {}, drawn = null) {
     return placement;
 }
 
-/** The ranges a tool's pointer draws with, which are its own rather than its element's: the cover tool's stamp, Free Paint's brush, or none. */
+/** The ranges a tool's pointer draws with, which are its own rather than its element's: the cover tool's stamp, the paint brush - Free Paint's and Erase's - or none. */
 export function toolBrush(tool) {
     if (tool?.cover === true) return COVER_BRUSH;
-    if (tool?.paint === true) return PAINT_BRUSH;
+    if (tool?.paint === true || tool?.erase === true) return PAINT_BRUSH;
     return {};
 }
 

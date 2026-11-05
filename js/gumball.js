@@ -32,6 +32,7 @@ import { bearingToDirection } from './units.js';
 import { getElement, isElementId, wrapOffset } from './environment/elements.js';
 import { rangeStep, stepPlaces } from './properties-panel.js';
 import { GROUP_TYPE, GROUP_RANGES, isGroup, groupReach, keepStripOnCanvas } from './templates.js';
+import { ERASE_TYPE } from './environment/erase.js';
 
 /** The gumball an element is drawn with: one that stands to a height, or one that lies flat. */
 export const GUMBALL_HEIGHTS = 'heights';
@@ -105,8 +106,9 @@ export function gumballHandle(id) {
 
 /** The gumball an element is drawn with: Heights for one that declares a height span, Flat otherwise. */
 export function gumballKind(type) {
-    // A placed runway lies flat, as every strip does.
-    if (type === GROUP_TYPE) return GUMBALL_FLAT;
+    // A placed runway lies flat, as every strip does, and so does an erase
+    // batch, which is a region of ground and nothing standing on it.
+    if (type === GROUP_TYPE || type === ERASE_TYPE) return GUMBALL_FLAT;
     if (!isElementId(type)) return null;
     return getElement(type).ranges.height?.kind === 'span' ? GUMBALL_HEIGHTS : GUMBALL_FLAT;
 }
@@ -149,6 +151,7 @@ function extentFloor(name) {
 
 /** True for a span an element declares under this name. */
 function spanOf(type, name) {
+    if (!isElementId(type)) return null;
     const range = getElement(type).ranges[name];
     return range?.kind === 'span' ? range : null;
 }

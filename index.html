@@ -1496,6 +1496,40 @@
            layer behind the panel takes every press, so the palette, the dock
            and the canvas wait on the answer, and a press anywhere off the panel
            calls the question off. */
+        /* The popup a right click on the selection opens: the lasso's DESELECT
+           pill at the pointer, over the canvas and the dock and under a
+           confirm. */
+        #build-popup {
+            display: none;
+            position: fixed;
+            padding: 4px;
+            background: #061d43;
+            border: 1px solid #1e375b;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            z-index: 300;
+        }
+
+        #build-popup button {
+            min-width: 120px;
+            min-height: 36px;
+            padding: 0 14px;
+            color: #061d43;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            letter-spacing: 2px;
+            background: #87ceeb;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        #build-popup button:hover,
+        #build-popup button:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px #90c090;
+        }
+
         #build-confirm {
             display: none;
             position: fixed;
@@ -2074,6 +2108,10 @@
             <div id="build-help-rows"></div>
         </div>
         <div id="build-help-hint">H - CONTROL REFERENCE</div>
+    </div>
+
+    <div id="build-popup" role="menu" aria-label="Selection">
+        <button type="button" role="menuitem" data-popup="deselect">DESELECT</button>
     </div>
 
     <div id="build-confirm">

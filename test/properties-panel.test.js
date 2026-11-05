@@ -12,6 +12,7 @@ import {
 } from '../js/environment/elements.js';
 import { CHOICE_FIELD, TOGGLE_FIELD } from '../js/config.js';
 import { BUILD_TOOLS } from '../js/build-tools.js';
+import { ERASE_TYPE, ERASE_RANGES } from '../js/environment/erase.js';
 
 /**
  * A holder for an element's ranges as a panel holds them: the configuration
@@ -241,6 +242,12 @@ test('every tool that edits an element draws that element\'s ranges, and they co
     assert.ok(drawing.length > 0, 'some tools edit an element');
 
     for (const tool of drawing) {
+        // Erase places an erase batch, which is not in the registry and has
+        // ranges of its own; every other tool's element is the registry's.
+        if (tool.element === ERASE_TYPE) {
+            conforms(tool.id, ERASE_RANGES);
+            continue;
+        }
         assert.ok(isElementId(tool.element), `${tool.id} edits ${tool.element}, which the registry does not hold`);
         conforms(tool.id, getElement(tool.element).ranges);
     }

@@ -28,9 +28,10 @@ import {
 import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } from './templates.js';
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import {
-    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isStrokeTool,
-    COVER_BRUSH, PAINT_BRUSH, insertsTemplate
+    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isEraseTool,
+    isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate
 } from './build-tools.js';
+import { isErase, ERASE_RANGES } from './environment/erase.js';
 
 /** The palette's lasso tile, whose panel is its own ten tools rather than an element's ranges. */
 const LASSO_TOOL = 'lasso';
@@ -57,6 +58,12 @@ export const DOCK_RUNWAY = 'runway';
 
 /** What the dock shows with Free Paint live: its colour, its brush and the brush's properties, each a section. */
 export const DOCK_PAINT = 'paint';
+
+/** What the dock shows with Erase live: what it takes and how much, and its brush. */
+export const DOCK_ERASE = 'erase';
+
+/** What the dock shows for a tool with no panel of its own yet while something is selected: its heading over `DESELECT`. */
+export const DOCK_TOOL = 'tool';
 
 /**
  * Free Paint's three sections, in the artwork's order, and the ranges each
@@ -110,6 +117,10 @@ export function draftHolderFor(placement) {
         const { heading, length, width } = groupConfig(placement);
         return { config: { heading, length, width }, shades: {}, base: {} };
     }
+    // An erase batch's own two, what it takes and how much of it.
+    if (isErase(placement)) {
+        return { config: resolveConfig({ ranges: ERASE_RANGES }, placement.config), shades: {}, base: {} };
+    }
     if (!isElementId(placement?.type)) return null;
 
     const element = getElement(placement.type);
@@ -144,6 +155,7 @@ export function draftHolderFor(placement) {
  */
 export function panelRanges(placement) {
     if (isGroup(placement)) return { ...GROUP_RANGES };
+    if (isErase(placement)) return { ...ERASE_RANGES };
     if (!isElementId(placement?.type)) return {};
 
     const element = getElement(placement.type);
@@ -173,13 +185,18 @@ export function panelRanges(placement) {
  * `BUILD WIDTH`, `CORNER RADIUS` - then the colour's two ends; the rest of what
  * the element declares is not the pilot's here, see `COVER_ELEMENT_ROWS`. Free
  * Paint's is its colour, its brush's tip and edge, then its opacity, size and
- * blend - every range `paint` declares, and the brush between them.
+ * blend - every range `paint` declares, and the brush between them. Erase's is
+ * what it takes and how much - `TARGET`, `ALL` or one element, and `STRENGTH`
+ * - then the paint brush it is drawn with.
  */
 export function strokeRanges(id) {
     const tool = buildTool(id);
-    if (!isStrokeTool(id) || !isElementId(tool.element)) return {};
+    const declared = toolRanges(tool);
+    if (!isStrokeTool(id) || declared == null) return {};
 
-    const declared = getElement(tool.element).ranges;
+    if (isEraseTool(id)) {
+        return { target: declared.target, strength: declared.strength, ...PAINT_BRUSH };
+    }
     if (isPaintTool(id)) {
         return {
             color: declared.color, tip: PAINT_BRUSH.tip, edge: PAINT_BRUSH.edge,
@@ -232,14 +249,37 @@ export function strokeHolderFor(state, id = state?.tool) {
  * holder is what a row in it writes: the edit in hand's holder for the pick,
  * and the session's own row for an element of the world - so a value stepped
  * there is the world changed, and the canvas is drawn again from it.
+ *
+ * While something is selected every panel carries `DESELECT` among its
+ * answers, whatever tool is live - the one way to drop the selection that can
+ * be seen without knowing it is there. The lasso's panel has it already, where
+ * a pilot looks for it first. A tool with no panel of its own yet - Mountain,
+ * before a click has dropped one - shows its heading over `DESELECT` alone,
+ * since the selection belongs to the session rather than to any one tool.
  */
-export function dockContent(state, { camera = null, fov, holder = null, context = {}, open = [] } = {}) {
+export function dockContent(state, options = {}) {
+    const content = panelContent(state, options);
+    if (!buildModeDrawing(state) || !selectionLive(state)) return content;
+    if (content == null) {
+        const tool = buildTool(buildModeTool(state));
+        return {
+            kind: DOCK_TOOL, heading: tool?.heading ?? tool?.label ?? '', ranges: {}, holder: { config: {} },
+            rows: [], nudges: [], actions: [DOCK_DESELECT], sections: []
+        };
+    }
+    if (content.actions.some(action => action.id === DOCK_DESELECT.id)) return content;
+    return { ...content, actions: [...content.actions, DOCK_DESELECT] };
+}
+
+/** What the dock shows before the answer every panel gets while something is selected - see `dockContent`. */
+function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [] } = {}) {
     if (!buildModeDrawing(state)) return null;
 
     const select = buildModeTool(state) === SELECT_TOOL && camera != null;
     const picked = pickedIndex(state) != null;
 
-    if (isCoverTool(buildModeTool(state))) return coverContent(state, holder, context);
+    if (isCoverTool(buildModeTool(state))) return coverContent(state, holder, context, DOCK_COVER);
+    if (isEraseTool(buildModeTool(state))) return coverContent(state, holder, context, DOCK_ERASE);
     if (isPaintTool(buildModeTool(state))) return paintContent(state, holder, context);
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
 
@@ -337,15 +377,16 @@ function lassoContent(state, context) {
  * from the first stroke, because its brush is how that stroke is drawn: the
  * stamp is set before the drag, not after it. With the tool's batch in hand it
  * is that batch's panel too, with the accept and cancel that settle it.
+ * Erase's is drawn the same way, as `kind`.
  */
-function coverContent(state, holder, context) {
+function coverContent(state, holder, context, kind = DOCK_COVER) {
     const id    = buildModeTool(state);
     const held  = holder ?? strokeHolderFor(state, id);
     if (held == null) return null;
 
     const ranges = strokeRanges(id);
     return {
-        kind: DOCK_COVER,
+        kind,
         heading: buildTool(id).heading,
         ranges,
         holder: held,

@@ -255,8 +255,8 @@ test('Free Paint is built: on the palette, choosable, and a stroke tool beside t
     assert.equal(isPaintTool('paint'), true);
     assert.equal(isStrokeTool('paint'), true);
     assert.equal(isCoverTool('paint'), false, 'it is not a cover: no density, and its own brush');
-    for (const id of ['grass', 'sand', 'water', 'snow']) assert.equal(isStrokeTool(id), true, id);
-    for (const id of ['select', 'lasso', 'mountain', 'runway', 'erase', 'hammer']) {
+    for (const id of ['grass', 'sand', 'water', 'snow', 'erase']) assert.equal(isStrokeTool(id), true, id);
+    for (const id of ['select', 'lasso', 'mountain', 'runway', 'extrude', 'hammer']) {
         assert.equal(isStrokeTool(id), false, id);
         assert.equal(isPaintTool(id), false, id);
     }

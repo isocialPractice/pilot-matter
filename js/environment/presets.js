@@ -18,6 +18,7 @@ import {
     DEFAULT_SIZE, DEFAULT_SEGMENTS
 } from './elements.js';
 import { applyFootprintedElement } from './footprinted.js';
+import { resolveErasures } from './erase.js';
 import { expandGroups } from '../templates.js';
 
 /**
@@ -344,6 +345,11 @@ export function environmentElements(environment, runway = false) {
  * then drawn only where the region reaches - on this field, wherever in the
  * world it was laid, and continuing across the field's edges. A placement with
  * none is drawn across the whole field as it always was.
+ *
+ * An erase batch is applied to nothing: it is cut out of the placements listed
+ * before it - see `resolveErasures` - once a placed template has become the
+ * placements it stands for, so a batch reaches into a template member by
+ * member.
  */
 export function buildEnvironment(environment = getEnvironment(), options = {}) {
     const { runway = false, base, elements, seed, ...size } = options;
@@ -355,7 +361,7 @@ export function buildEnvironment(environment = getEnvironment(), options = {}) {
     // A placed template is the placements it stands for, each applied in the
     // pipeline's order with everything else: its strip last with the other
     // runways, its buildings where extrusions go.
-    const placements = expandGroups(elements ?? environmentElements(environment, runway), field.size);
+    const placements = resolveErasures(expandGroups(elements ?? environmentElements(environment, runway), field.size));
     for (const placement of orderPlacements(placements)) {
         applyFootprintedElement(field, placement, random);
     }

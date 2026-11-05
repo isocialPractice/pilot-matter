@@ -4597,3 +4597,40 @@ still be found by name.
     the middle on any ground; `slope` still leaves steep faces bare. Snow
     joins the palette.
   - From: Interactive Build Mode
+- [x] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
+  panel row by ten points or ten steps, in every panel including the element
+  editor's
+  - **Settled**: `coarseStep` in `js/properties-panel.js` makes a press with
+    `shift` ten points on a row read as a percentage - added, so 100%, 110%,
+    120% - and ten of a row's own steps on any other. The dock's spinner hands
+    `shift` through `onStep`, and the element editor's arrow keys through
+    `adjustEditorRange`'s `coarse`. The game's own settings screens are not the
+    shared panel and keep their steps.
+  - From: Interactive Build Mode
+- [x] **Placed runway**: a strip inserted where it was asked for rather than
+  where the site search found room, graded to the ground under it on each tile
+  and lifted clear of any water, with width, length and a rotation about its
+  own centre
+  - **Settled**: a `runway` whose configuration carries `at` is laid by
+    `placeStrip` rather than searched for: at that canvas point on each tile,
+    along the low end of its heading span, its elevation measured under its own
+    footprint with the search's own `measureRunwayGround`, lifted clear of any
+    water by `clearRunwayGround`, `band` and `separation` unread, nothing taken
+    from the seeded stream, and recorded `placed: true`. A `centreline` toggle,
+    off by default so every preset's strip is unchanged, paints dashes down the
+    middle. A placed strip is kept wholly on the canvas: one across a seam
+    would be graded half on one tile's ground and half on the next's.
+  - From: Interactive Build Mode
+- [x] **Runway templates**: basic and commercial runways and airports as groups
+  of placements the registry already has, copied into the placement when it is
+  inserted so a template improved later leaves built worlds as they were
+  - **Settled**: `js/templates.js` declares the four in the panel's order.
+    `BASIC RUNWAY` and `COMMERCIAL` - longer, wider, and carrying its
+    centreline - are offered; the two airports are laid out from a `paint`
+    apron and `extrude` buildings, neither of which the registry draws yet, so
+    they are declared waiting on both and get their members with Free paint and
+    Extrude. A template is placed as one `group` placement with its members
+    copied in; `buildEnvironment` expands a group - each member turned through
+    its heading, moved into place, its strip sized and held on the canvas -
+    and Select picks a group by its strips, apron and all.
+  - From: Interactive Build Mode

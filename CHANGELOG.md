@@ -5,6 +5,98 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.52.0] - 2026-11-05
+
+Erase, and Deselect from anywhere: a stroke that takes elements away -
+whatever laid them - and puts them back, water erased to dry ground, a strip
+taken whole and only by name, and the selection dropped from any panel or with
+a right click on it.
+
+### Added
+
+- **Erase.** `ERASE` joins the palette as the third stroke tool, drawn with
+  the paint brush, its panel `TARGET` - `ALL`, or any one element - and
+  `STRENGTH`, then `TIP`, `EDGE` and `SIZE`. A batch of strokes writes nothing
+  to the ground: when the world is built it is cut out of the placements laid
+  before it, a preset's mountain as readily as a stroke laid a minute ago, and
+  where one is taken the ground is as it stood before that element ran. It
+  cuts nothing laid after it. Below whole strength it thins what it takes.
+  Anything a footprint settles - a cover's band, drawn water's line - is
+  worked out from the footprint as drawn, so erasing part of a thing leaves
+  the rest as it was. `Alt` held at the press of a batch's first stroke makes
+  one that puts back what the batches before it took; within a batch, a
+  stroke the other way is cut out of it. A stroke is drawn red, or green with
+  `Alt`. A batch is picked again with Select by the ground it covered, carries
+  the Flat gumball, and is edited by its own rows. `erase` placements are
+  accepted by `createEnvironment` like any other, with `config.target`,
+  `config.strength` and `config.restore`.
+- **Erasing water and runways.** Water taken out of the sea is dry ground,
+  even where its ground lies under the sea's level - the sea's line is carried
+  only where the sea is left, and its level stays the sea's. A runway is taken
+  whole - its record and its grading with it - wherever a stroke reaches it,
+  only when `RUNWAY` is the target named, and only a strip that was placed.
+- **Deselect from anywhere.** While something is selected, every tool's panel
+  carries `DESELECT` among its answers; Mountain, before a drop, shows its
+  heading over `DESELECT` alone. A right click on the selection opens a popup
+  carrying it at the pointer, shut by a press anywhere off it - which goes no
+  further on the canvas - by `Esc`, by a tool change and by a question.
+- **The control list** carries `Drag (Erase) - Erase Through a Stroke`,
+  `Alt+Drag (Erase) - Put Back What Was Erased` and
+  `Right Click - Offer Deselect, on the Selection`.
+
+### Changed
+
+- A strip is lifted clear of the water under it by the line there rather than
+  by the sea's level, so one laid over a hole erased in the sea is not lifted
+  for water that is not there. Every preset's sea writes its level under every
+  strip, so no preset strip moved.
+
+### Fixed
+
+- A placed runway template was laid on every tile of a flown world rather than
+  on the middle one; it comes off the others now, as a runway does.
+- The popup shut by a question no longer comes back once the question is
+  answered.
+
+Held in Node by the new `test/erase.test.js` - the targets read off the
+registry, a batch filled in, what a target reaches and the strip's rule, a
+batch inside its selection, resolving and the list left as it was, the cut's
+arithmetic, a batch written down, a preset's mountain taken to the ground it
+was raised from, grass to the ground's own colour with sand under the same
+stroke left, half taken and put back whole or in part, nothing laid after cut,
+a put-back batch for the wrong target, part of a stroke of grass erased, a
+preset nothing reaches unchanged, the sea erased to dry ground, drawn water
+erased, a strip over a dry hole, a strip taken whole, missed and put back, a
+template's strip by name, a searched strip never taken, the stream a cut
+placement takes, the tool, its panel, its strokes either way, a batch picked
+and its gumball, the canvas drawn with a batch in hand, `DESELECT` on every
+panel, and the popup opened and shut - with `test/page.test.js`,
+`test/paint.test.js`, `test/build-panel.test.js`, `test/build-tools.test.js`,
+`test/controls-help.test.js` and `test/properties-panel.test.js`. Each
+rejected the defect it names when that was put back, sixty-four in all: among
+them `ALL` taking the strip, a searched strip taken, a target taking every
+element, a batch reaching past its selection or cutting what came after it,
+a put-back batch taken as an erase or handing back what it does not name, a
+cut ignored or a preset's placement uncuttable, a footprint settling on what
+is left of it, strength not scaling the cut, a strip thinned rather than
+taken, an erased hole keeping the sea's line or the sea losing its level, a
+drawn body raising it, a strip lifted for a sea erased under it, erasures
+resolved before a template is expanded, an alt stroke added to its batch, alt
+never read or meaning something to a cover, `DESELECT` the lasso's alone or
+carried twice, the popup opening off the selection or after a pan, left open
+by a tool change, a question answered or a press on the canvas, and a placed
+template laid on every tile. Two more - a drawn body raising the sea's level, and a question leaving the popup open - put back code nothing could reach, which was taken out rather than tested.
+Settled in Chromium in 17 checks across a desktop and a phone: Erase on the
+palette with the way out still clear of the list, its panel, a stroke drawn in
+red taking the preset's mountains under it and nothing outside it, an alt
+stroke in green putting back exactly the ground it had taken, `TARGET` changed
+to water drawing the mountains back, a batch kept and picked again, a placed
+strip left by `ALL` and taken whole by `RUNWAY` at its end, `DESELECT` on six
+panels and Mountain's before a drop, the popup at a right click on the
+selection and none off it, shut by `Esc` and by a press on the ground, none
+after a pan, its `DESELECT` dropping the selection, and a finger's erase
+stroke.
+
 ## [1.0.0-alpha.1.51.0] - 2026-11-05
 
 Free Paint: a colour laid on the ground and no height, its panel of swatches,

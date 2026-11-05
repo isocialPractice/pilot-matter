@@ -19,7 +19,8 @@
  */
 
 import {
-    applyElement, cloneField, fieldX, fieldZ, readColor, mixColor, createRandom, getElement, waterRecord
+    applyElement, cloneField, fieldX, fieldZ, readColor, mixColor, createRandom, getElement, waterRecord,
+    isOnRunway
 } from './elements.js';
 import { footprintSampler, featherFor, PLACED_KIND, COMBINE_KIND } from './footprints.js';
 
@@ -48,11 +49,16 @@ import { footprintSampler, featherFor, PLACED_KIND, COMBINE_KIND } from './footp
  * - **A strip the element cut** is recorded on the field as well as in it,
  *   because the flight model finds a runway by asking for one by name. Every
  *   strip the copy gained is added to the field's.
- * - **The water's line comes across, and its level does not.** A drawn body is
- *   water where it was drawn and nowhere else: its line is carried back
- *   wherever the region reaches, and a renderer finds it there. The level is
- *   the sea's, one height for the whole tile, and raising it to a body drawn on
- *   a hill would lift every strip on the tile clear of a pond far above it.
+ * - **The water's line comes across where the placement is drawn, and the
+ *   sea's level comes across whole.** A drawn body is water where it was drawn
+ *   and nowhere else: its line is carried back wherever the region reaches,
+ *   and a renderer finds it there. It writes no level - the level is the
+ *   sea's, one height for the whole tile, and raising it to a body drawn on a
+ *   hill would lift every strip on the tile clear of a pond far above it - so
+ *   the level that comes across is only ever a sea's: a preset's sea drawn
+ *   through a cut, whose level is still the sea's wherever its water was
+ *   taken out, while the line carried only where it is left says a hole
+ *   erased in it is dry.
  *
  * A placement carrying a `seed` draws from a stream of its own rather than from
  * `random` - see `placementRandom`.
@@ -69,11 +75,23 @@ import { footprintSampler, featherFor, PLACED_KIND, COMBINE_KIND } from './footp
  * on this tile, in place of whatever the placement holds - see
  * `settleFromFootprint`.
  *
+ * A placement carrying a `cut` - the erase batches `resolveErasures` found
+ * reaching it - is weighed by what they leave of it as well: see `cutSampler`.
+ * The cut is taken after the footprint has settled what it settles, so
+ * erasing part of a thing takes that part away and leaves the rest exactly as
+ * it was drawn, rather than working it out again from the ground that is left.
+ * A placement with no footprint of its own - a preset's, which covers the
+ * whole tile - is drawn through the cut alone, so every one of them can be
+ * erased, at the price of the copy only the ones erased pay. An element that
+ * declares `erasedWhole` - the strip - is not cut at all: reached anywhere, it
+ * is not drawn, and nothing of it is recorded.
+ *
  * Returns whatever the element's generator counted, as `applyElement` does.
  */
 export function applyFootprintedElement(field, placement, random = createRandom()) {
     random = placementRandom(placement, random);
-    if (placement?.footprint == null && placement?.clip == null) return applyElement(field, placement, random);
+    const cut = cutSampler(placement?.cut, field.size);
+    if (placement?.footprint == null && placement?.clip == null && cut == null) return applyElement(field, placement, random);
 
     const region = placement.footprint != null ? footprintSampler(placement.footprint, field.size) : null;
     const clip   = placement.clip != null ? footprintSampler(placement.clip, field.size) : null;
@@ -82,12 +100,15 @@ export function applyFootprintedElement(field, placement, random = createRandom(
 
     // Weighed once, before the element is drawn, because the ground under the
     // region is read twice: for what the footprint settles, on the ground as it
-    // was, and for the blend back afterwards.
+    // was, and for the blend back afterwards. What a cut leaves is weighed
+    // beside it, apart, so the footprint settles what it was drawn over.
     const weights = new Float32Array(field.count);
+    const left    = cut ? new Float32Array(field.count) : null;
     for (let i = 0; i < field.count; i++) {
         const x = fieldX(field, i) - field.originX;
         const z = fieldZ(field, i) - field.originZ;
         weights[i] = (region ? region(x, z) : 1) * (clip ? clip(x, z) : 1);
+        if (left) left[i] = cut(x, z);
     }
 
     // The element is drawn whatever its footprint turns out to cover, so it
@@ -95,8 +116,14 @@ export function applyFootprintedElement(field, placement, random = createRandom(
     // that covers nothing leaves every placement after it laid out as it was.
     const result = applyElement(draft, settleFromFootprint(field, placement, weights), random);
 
+    // A strip reached anywhere is not drawn at all: half a strip cannot be
+    // landed on, and the record would say the whole of it was there.
+    const whole = left != null && getElement(placement.type)?.erasedWhole === true;
+    if (whole && stripReached(field, draft.runways.slice(strips), left)) return result;
+
+    const blend = left == null || whole ? weights : weights.map((weight, i) => weight * left[i]);
     for (let i = 0; i < field.count; i++) {
-        const weight = weights[i];
+        const weight = blend[i];
         if (weight <= 0) continue;
 
         field.height[i] += (draft.height[i] - field.height[i]) * weight;
@@ -104,9 +131,69 @@ export function applyFootprintedElement(field, placement, random = createRandom(
     }
 
     field.runways.push(...draft.runways.slice(strips));
-    carryWaterLine(field, draft, weights);
+    carryWaterLine(field, draft, blend);
+    carrySeaLevel(field, draft);
 
     return result;
+}
+
+/**
+ * What the erase batches cutting a placement leave of it at a point of the
+ * canvas, as a function of `x` and `z`: 1 where none of them reaches, and
+ * where one does, `1 - strength * taken`, its weight there, less what a
+ * put-back batch after it hands back - each of those cutting the region the
+ * erase took, `1 - strength * putBack`. Several cuts multiply, so a second
+ * pass over thinned ground thins it again.
+ *
+ * Null for a placement with nothing cut, which is then drawn as it always was.
+ */
+export function cutSampler(cut, wrap = 0) {
+    if (!Array.isArray(cut) || cut.length === 0) return null;
+
+    const takes = cut.map(entry => ({
+        weigh: footprintSampler(entry.footprint, wrap),
+        strength: clampUnit(entry.strength),
+        kept: (entry.kept ?? []).map(back => ({ weigh: footprintSampler(back.footprint, wrap), strength: clampUnit(back.strength) }))
+    }));
+
+    return (x, z) => {
+        let left = 1;
+        for (const take of takes) {
+            let taken = take.weigh(x, z);
+            if (!(taken > 0)) continue;
+            for (const back of take.kept) taken *= 1 - back.strength * back.weigh(x, z);
+            left *= 1 - take.strength * taken;
+        }
+        return left;
+    };
+}
+
+function clampUnit(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(Math.max(number, 0), 1) : 1;
+}
+
+/** True when any vertex lying on one of the strips was cut, which takes the strip whole. */
+function stripReached(field, strips, left) {
+    if (strips.length === 0) return false;
+    for (let i = 0; i < field.count; i++) {
+        if (!(left[i] < 1)) continue;
+        const x = fieldX(field, i), z = fieldZ(field, i);
+        if (strips.some(strip => isOnRunway(strip, x, z))) return true;
+    }
+    return false;
+}
+
+/**
+ * The sea's level, carried from the copy: one height for the whole tile, which
+ * only a sea writes, and which is still the sea's wherever its water was taken
+ * out - a strip or a renderer asking where the sea is reads it here.
+ */
+function carrySeaLevel(field, draft) {
+    const level = draft.water?.level;
+    if (!Number.isFinite(level)) return;
+    const record = waterRecord(field);
+    record.level = Number.isFinite(record.level) ? Math.max(record.level, level) : level;
 }
 
 /**
