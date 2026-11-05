@@ -242,6 +242,7 @@ back.
 | Click, or a finger, in Select | Pick the built placement under it, keep the one picked, or let go of it on bare ground |
 | Click, or a finger, in Mountain | Drop a mountain there, or put the one in hand down there instead |
 | Drag a gumball handle | Move, slide, raise or spread what is in hand, whatever tool is live |
+| The chevrons atop the palette | Fold the tools away to a tab, and bring them back; kept for the next canvas |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
@@ -429,6 +430,7 @@ The whole surface is in [docs/api.md](docs/api.md).
 | `npm test` | The whole suite, no dependencies |
 | `node --test` | The same thing without npm |
 | `npm run docs:api` | Builds the site's API reference page from `docs/api.md` |
+| `npm run assets:builder` | Copies the builder's art into `assets/builder/`, on the machine the art is drawn on |
 
 ## Photo names
 

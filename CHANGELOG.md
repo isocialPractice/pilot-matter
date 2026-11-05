@@ -5,6 +5,74 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.45.0] - 2026-11-04
+
+The builder in its own art: the marks, the folded palette's tab and the
+canvases' thumbnails copied into the repository, the palette drawn from them,
+and the chevrons that fold it out of the way.
+
+### Added
+
+- **Builder art in the repository.** `assets/builder/` holds every piece of art
+  the builder shows, tracked, and is the only place the page and the code take
+  art from: the twelve tool marks named for their tools, the folded palette's
+  tab, and one thumbnail a canvas. They are copied by
+  `tools/sync-builder-assets.mjs` - `npm run assets:builder` - from an explicit
+  list that renames each file on the way in, three of the originals carrying
+  typos. It copies and never prunes, and it refuses when the art's source
+  cannot be reached rather than reporting a copy it never made. It runs on the
+  machine the art is drawn on and nowhere else; nothing in the suite or the
+  site's build runs it.
+- **The picker's cards are headed by their pictures.** Each canvas's card shows
+  a render of the ground it opens on above its name and its line, which stay
+  type the page sets. The card under the cursor keeps its picture in its band.
+- **The tool palette is drawn from the marks.** A navy column two tiles wide
+  under a white band, as the artwork draws it: each tile the tool's own mark,
+  its name on the tile's title and label for a pointer resting on it and a
+  screen reader rather than written on its face, the live tool ringed in the
+  art's green, and the accept tool's tick at the foot of the right-hand column
+  where the art puts it. The marks are images rather than drawings written
+  into the page, since every export carries the same ids and class names.
+- **Hide the tool palette.** The chevrons on the band fold the tools away to
+  the art's own small tab in the corner, so the canvas is clear while a handle
+  is dragged near where they sat, and the tab brings them back - by a click,
+  by `Enter` with the focus on it, or by a finger. The choice is kept, so the
+  next canvas opens as the last one was left.
+
+### Changed
+
+- **On a narrow screen the control list sits beside the palette.** It was
+  pinned a fixed distance under the palette, and the taller palette came to lie
+  under it - the list covered the accept tool's tick, the one way out a finger
+  has. It now sits in the corner the dock leaves, past the palette's edge
+  however tall the palette grows, and scrolls rather than running down into the
+  dock.
+
+Held in Node by the new `test/build-art.test.js` - every tool's mark and every
+canvas's thumbnail tracked, asked of git rather than of the disk, every file
+the page names tracked, the copy step's list and the repository agreeing,
+nothing that ships naming the art's source, and no shipped drawing linking
+outside itself - by the new `test/build-palette.test.js` for the fold and its
+storage, and by `test/page.test.js` for the palette's marks, names, band, fold
+and ring, the cards' pictures, and the narrow screen's layout measured off the
+palette's own sizes. Each rejected the defect it names when that was put back,
+twenty-four in all: among them the art read from a folder git does not track, a
+card naming a thumbnail the copy step does not give it, a first canvas opening
+folded, the fold not kept, the chevrons saying the opposite of what they do, a
+tile keeping its name on its face, a mark read out over its button's name, the
+tick running across the foot, the live tool unringed, a tile too small for a
+fingertip, the card under the cursor spreading its picture, the page reaching
+the art's source for a picture, the control list back under the palette on a
+narrow screen, and a shipped drawing linking a picture back into the source.
+Settled in Chromium in 24 checks across a desktop and a phone: every picture
+and mark loading from the repository, the palette's three marks with no text
+on them and their names on their titles, the tick in the right-hand column,
+the live tool ringed, the chevrons folding the tools to a tab that keeps the
+choice across a reload, `Enter` bringing them back, `Esc` still asking with
+them folded, and on a phone a finger folding and unfolding them while the
+control list, open or shut, sits clear of the palette and the dock. The
+previous phase's 28 checks pass again over the new palette.
+
 ## [1.0.0-alpha.1.44.0] - 2026-11-04
 
 Select finished: the edit in hand carries the gumball the artwork draws, every

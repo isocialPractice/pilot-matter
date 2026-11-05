@@ -1,6 +1,7 @@
 /**
  * Build tools - the twelve tools the builder's palette is drawn from, in the
- * order the tour gives them, and which of them are built.
+ * order the tour gives them, which of them are built, and the mark each tile
+ * carries.
  *
  * The palette draws only tools that work. A tile that does nothing is a row
  * that does nothing with a picture on it, and the pause menu already drops the
@@ -60,6 +61,32 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },
     { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false }
 ].map(tool => Object.freeze(tool)));
+
+/**
+ * Where the builder's art is served from: tracked in the repository, beside
+ * `js/`, at the same relative address on the site and under `npm run serve`.
+ * Nothing the page or the code draws is read from anywhere else.
+ */
+export const BUILDER_ART = 'assets/builder';
+
+/**
+ * The mark a tool's tile carries: the artwork's own, copied into the
+ * repository under the tool's id. Every one of the twelve has one, built or
+ * not, so a tool joining the palette brings no art with it. Null for a name
+ * that is no tool.
+ */
+export function toolMark(id) {
+    return isBuildTool(id) ? `${BUILDER_ART}/${id}.svg` : null;
+}
+
+/**
+ * A tool's name as a tile says it to a pointer resting on it and to a screen
+ * reader - its label in the case the rest of the page's sentences are in.
+ */
+export function toolName(id) {
+    const label = buildTool(id)?.label ?? '';
+    return label.charAt(0) + label.slice(1).toLowerCase();
+}
 
 /** True for a tool drawn only inside a live selection, which is the tour's lasso column. */
 export function mindsLasso(id) {

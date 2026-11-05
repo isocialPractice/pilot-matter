@@ -4217,3 +4217,40 @@ still be found by name.
     across the screen - the tour lists both, and the two differ only in that
     `PAN` slides by a share of the screen and `MOVE` by a share of the distance.
   - From: Interactive Build Mode
+- [x] **A panel that scrolls**: the fields scrolling while the heading and the
+  accept and cancel stay pinned, with the wheel going to the panel under the
+  pointer and to the camera everywhere else
+  - **Settled**: only `#build-dock-fields` scrolls, with
+    `overscroll-behavior: contain`, between a heading and answers that do not;
+    the canvas's wheel listener never sees a wheel over the dock. On a narrow
+    screen the dock runs across the foot and the list moves under the palette,
+    collapsed on a machine with no keyboard. Confirmed in a 420-pixel window
+    and on a 390-pixel phone.
+  - From: Interactive Build Mode
+- [x] **Placed mountains**: a mountain dropped at a click, each one placement,
+  each edited alone
+  - **Settled**: `MOUNTAIN` is built; a click is `dropDraft` in
+    `js/build-mode.js`, making `droppedPlacement` from `js/build-tools.js` - the
+    panel's values, the tool's `derived` count of one, and the point as `at` -
+    and a click with one in hand moves it rather than adding another. The
+    generator honours `at` as one peak measured to the nearest repeat of the
+    square, spending the draws it always did. Each drop carries a `seed` and
+    `applyFootprintedElement` gives a seeded placement a stream of its own:
+    without it one mountain moved ground far from it on four presets of five.
+    The panel is every range the mountain declares, less the count the click
+    settles - the artwork's six lead in its order, the ranges added since
+    follow - and the next mountain starts from where the panel was left.
+  - From: Interactive Build Mode
+- [x] **Accept and exit**: the two confirms the artwork names, accepting the
+  pending edit and then saving and leaving, with the first skipped when nothing
+  is pending and the first returning to the editor rather than running on into
+  the second, so committing work never doubles as leaving
+  - **Settled**: `requestLeave` asks `ACCEPT EDITS` or `SAVE AND EXIT MODE` and
+    `answerConfirm` settles it; one panel, `#build-confirm`, opens on `YES` with
+    the focus, and `Esc` or a press off it calls it off. `YES` keeps the
+    canvas's environment as the one flown with what was built laid over it in
+    the element editor's placements, and the next canvas on it opens with that
+    committed. From the pause menu with the world changed the flight starts
+    again, until `Re-seat the aircraft`. Confirmed in Chromium, including
+    `Enter` on the focused tile asking once and not running on.
+  - From: Interactive Build Mode

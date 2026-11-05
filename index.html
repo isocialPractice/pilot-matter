@@ -963,9 +963,10 @@
         }
 
         /* The canvases are cards rather than rows: two columns of them, each a
-           label band over the line that says what ground it starts from. The
-           picture of that ground is art the builder ships and arrives with it;
-           until then the band and the line are the card. */
+           picture of the ground it starts from over a label band and the line
+           that says what that ground is. The picture is a render the builder
+           ships in assets/builder/; the label and the line are written in the
+           page, so they are set like every other piece of type. */
         #build-picker-cards {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -974,9 +975,27 @@
 
         #build-picker-cards li {
             min-height: 58px;
+            padding-top: 76px;
             border-color: rgba(0, 255, 0, 0.25);
-            background: rgba(0, 255, 0, 0.05);
+            background-color: rgba(0, 255, 0, 0.05);
         }
+
+        /* The picture and where it sits, written after the cursor's own rule
+           and weighed as it is: that rule sets the background whole, and the
+           card under the cursor keeps its picture in its band rather than
+           spread across the card. */
+        #build-picker-cards li[data-entry] {
+            background-position: 6px 6px;
+            background-size: calc(100% - 12px) 64px;
+            background-repeat: no-repeat;
+        }
+
+        #build-picker-cards li[data-entry="highlands"]      { background-image: url('assets/builder/thumb-highlands.png'); }
+        #build-picker-cards li[data-entry="river-basin"]    { background-image: url('assets/builder/thumb-river-basin.png'); }
+        #build-picker-cards li[data-entry="canyon-country"] { background-image: url('assets/builder/thumb-canyon-country.png'); }
+        #build-picker-cards li[data-entry="dune-sea"]       { background-image: url('assets/builder/thumb-dune-sea.png'); }
+        #build-picker-cards li[data-entry="lakeside"]       { background-image: url('assets/builder/thumb-lakeside.png'); }
+        #build-picker-cards li[data-entry="blank-canvas"]   { background-image: url('assets/builder/thumb-blank-canvas.png'); }
 
         /* The two answers under the cards read as answers rather than as two
            more canvases, so they are drawn across the whole card and apart from
@@ -1000,53 +1019,115 @@
             z-index: 110;
         }
 
-        /* The builder's palette: the tools down the left of a canvas, as a
-           column of tiles two wide. It holds only the tools that work - Select,
-           Mountain, and the accept tool across the foot of the column, which is
-           the way out a pointer and a finger can find - with the live tool lit.
-           A tile is tall enough for a fingertip, and named in text until the
-           marks the builder ships are in the repository. */
+        /* The builder's palette: the tools down the left of a canvas, drawn as
+           the artwork draws it - a navy column two tiles wide under a white
+           band carrying the chevrons that fold it away. It holds only the tools
+           that work, each tile the tool's own mark from assets/builder/, its
+           name on the tile's title and label, and the live one ringed in the
+           art's green. The accept tool's tick sits in the right-hand column at
+           the foot, where the art puts it, as the way out a pointer and a
+           finger can find. A tile is tall enough for a fingertip. */
         #build-palette {
             display: none;
             position: fixed;
             top: 20px;
             left: 20px;
-            grid-template-columns: repeat(2, 88px);
-            gap: 6px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.55);
-            border: 1px solid rgba(0, 255, 0, 0.4);
-            border-radius: 8px;
+            grid-template-columns: repeat(2, 60px);
+            gap: 14px;
+            padding: 0 14px 16px;
+            background: #061d43;
+            border: 2px solid #1e375b;
+            border-radius: 12px;
             z-index: 120;
         }
 
-        #build-palette button {
-            min-height: 44px;
-            padding: 6px 4px;
-            color: #f0f2f3;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            letter-spacing: 1px;
-            background: rgba(0, 255, 0, 0.05);
-            border: 1px solid rgba(0, 255, 0, 0.25);
-            border-radius: 4px;
+        #build-palette button[data-tool] {
+            width: 60px;
+            height: 60px;
+            padding: 0;
+            background: none;
+            border: none;
+            border-radius: 6px;
             cursor: pointer;
         }
 
-        #build-palette button:hover,
-        #build-palette button:focus-visible {
-            border-color: #0f0;
+        #build-palette button img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
 
-        /* The live tool is lit the way the entry under a menu's cursor is. */
-        #build-palette button[aria-pressed="true"] {
-            color: #000;
-            background: #0f0;
-            border-color: #0f0;
+        #build-palette button[data-tool]:hover,
+        #build-palette button[data-tool]:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px #87ceeb;
+        }
+
+        /* The live tool is ringed in the green the art lights things with. */
+        #build-palette button[aria-pressed="true"],
+        #build-palette button[aria-pressed="true"]:hover {
+            box-shadow: 0 0 0 4px #90c090;
         }
 
         #build-palette button[data-tool="accept"] {
+            grid-column: 2;
+        }
+
+        /* The band across the head of the column, and the chevrons on it that
+           fold the tools away. The art draws them pointing in, as the tab the
+           folded palette leaves points out, so the one mark serves both. */
+        #build-palette .palette-fold {
             grid-column: 1 / -1;
+            height: 34px;
+            margin: 0 -14px;
+            padding: 4px 0;
+            background: #fff;
+            border: none;
+            border-radius: 10px 10px 0 0;
+            cursor: pointer;
+        }
+
+        #build-palette .palette-fold img {
+            margin: 0 auto;
+            width: auto;
+            transform: scaleX(-1);
+            /* The tab's own edge stays on the tab: in the band only its
+               chevrons are wanted. */
+            clip-path: inset(9%);
+        }
+
+        #build-palette .palette-fold:hover img,
+        #build-palette .palette-fold:focus-visible img {
+            filter: drop-shadow(0 0 2px #87ceeb);
+        }
+
+        /* Folded, the palette is the tab and nothing else: the art's own small
+           white box with its chevrons pointing out, which brings the tools
+           back. The canvas beside it is clear. */
+        #build-palette.folded {
+            padding: 0;
+            background: none;
+            border: none;
+        }
+
+        #build-palette.folded button[data-tool] {
+            display: none;
+        }
+
+        #build-palette.folded .palette-fold {
+            width: 104px;
+            height: 30px;
+            margin: 0;
+            padding: 0;
+            background: none;
+            border-radius: 0;
+        }
+
+        #build-palette.folded .palette-fold img {
+            width: 100%;
+            transform: none;
+            clip-path: none;
         }
 
         /* The builder's control list, drawn the way the flight's is and in the
@@ -1307,7 +1388,10 @@
 
         /* On a narrow screen there is no room down the side of the canvas, so
            the dock runs across the foot of it, and the control list moves up
-           under the palette to clear it. */
+           into the corner the dock left, beside the palette rather than under
+           it - so it covers none of the tools, the way out among them, however
+           tall the palette grows as tools join it. It scrolls rather than
+           running down into the dock. */
         @media (max-width: 640px) {
             #build-dock {
                 top: auto;
@@ -1320,7 +1404,11 @@
 
             #build-help {
                 bottom: auto;
-                top: 150px;
+                top: 20px;
+                left: 196px;
+                right: 10px;
+                max-height: calc(60vh - 40px);
+                overflow-y: auto;
             }
         }
 

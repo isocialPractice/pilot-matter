@@ -14,11 +14,22 @@
 
 import { BUILDER_ENVIRONMENTS, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
 import { BUILDER_LABEL } from './build-mode.js';
+import { BUILDER_ART } from './build-tools.js';
 
 /** The picker carries the name of the entry that opened it, and not a second one. */
 export const PICKER_TITLE = BUILDER_LABEL;
 
 export const PICKER_HEADING = 'CHOOSE A CANVAS';
+
+/**
+ * The picture a canvas's card is headed by: a render of its ground, copied
+ * into the repository under the canvas's id. The card's name and its line are
+ * written in the page beside it rather than baked into the picture, so they
+ * are type the page sets like every other piece of type.
+ */
+export function cardThumbnail(id) {
+    return isPickerEnvironmentId(id) ? `${BUILDER_ART}/thumb-${id}.png` : null;
+}
 
 export const PICKER_START_ID    = 'picker-start';
 export const PICKER_START_LABEL = 'START';

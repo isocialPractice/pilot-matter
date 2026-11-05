@@ -3498,12 +3498,15 @@ test('a canvas carries a palette and a control list, styled and hidden until one
         assert.match(rule, /position:\s*fixed/, 'and lie over the canvas rather than in the page');
     }
 
-    assert.ok(styled(indexHtml, '#build-palette button', /min-height:\s*44px/),
-        'a tile should be tall enough for a fingertip, the only way out a touch screen has');
-    assert.ok(styled(indexHtml, '#build-palette button[data-tool="accept"]', /grid-column:\s*1\s*\/\s*-1/),
-        'and the way out should run across the foot of the column');
-    assert.ok(styled(indexHtml, '#build-palette button[aria-pressed="true"]', /background:\s*#0f0/),
-        'with the live tool lit');
+    const tile = styleRule(indexHtml, 'build-palette button[data-tool]') ?? '';
+    for (const side of ['width', 'height']) {
+        const size = Number(tile.match(new RegExp(`(?:^|[^-])${side}:\\s*(\\d+)px`))?.[1]);
+        assert.ok(size >= 44, `a tile should be ${side === 'width' ? 'wide' : 'tall'} enough for a fingertip, the only way out a touch screen has: ${size}`);
+    }
+    assert.ok(styled(indexHtml, '#build-palette button[data-tool="accept"]', /grid-column:\s*2;/),
+        'and the way out should sit at the foot of the right-hand column, where the art puts its tick');
+    assert.ok(styled(indexHtml, '#build-palette button[aria-pressed="true"]', /box-shadow:\s*0 0 0 4px #90c090/),
+        'with the live tool ringed in the art\'s green');
 });
 
 test('the palette is drawn from the tools that work rather than written into the page', () => {
@@ -3761,7 +3764,7 @@ test('on a narrow screen the dock runs across the foot and the list moves clear 
     assert.ok(narrow, 'index.html should lay the dock out for a narrow screen');
     assert.match(narrow[1], /bottom:\s*10px/, 'across the foot');
     assert.match(narrow[1], /max-height:\s*40vh/, 'leaving most of the canvas to be seen');
-    assert.match(narrow[2], /top:\s*150px/, 'and the list moved up under the palette');
+    assert.match(narrow[2], /top:\s*20px/, 'and the list moved up into the corner the dock left');
 });
 
 // --- The two confirms, and a mountain dropped at a click -----------------------------
@@ -4088,4 +4091,85 @@ test('a handle writes nothing until its press has travelled further than a click
     assert.match(drag, /if \(!drag\.travelled\) \{\s*if \(!travelledPast\(drag\.start, now, drag\.type\)\) return;\s*drag\.travelled = true;\s*\}/);
     assert.ok(drag.indexOf('travelledPast(') < drag.indexOf('dragHandle('), 'before anything is worked out');
     assert.match(methodBody(mainSource, 'beginGumballDrag'), /type: e\.pointerType,\s*travelled: false/);
+});
+
+// --- The art on the palette and the picker ------------------------------------------
+
+/**
+ * Every Illustrator export carries the same ids and class names, so the marks
+ * are referenced as images rather than written into the page: an image is its
+ * own document, and nothing in it collides with anything outside it.
+ */
+test('each tile carries its tool\'s mark as an image, and its name where a pointer and a reader find it', () => {
+    const drawn = methodBody(mainSource, 'drawPalette');
+    assert.match(drawn, /tile\.append\(markImage\(toolMark\(tool\.id\)\)\);/);
+    assert.match(drawn, /tile\.setAttribute\('aria-label', toolName\(tool\.id\)\);/);
+    assert.match(drawn, /tile\.title = `\$\{toolName\(tool\.id\)\} - \$\{tool\.hint\}`;/);
+    assert.doesNotMatch(drawn, /tile\.textContent/, 'the name moved off the face of the tile onto its title and label');
+
+    const image = mainSource.match(/function markImage\(src\) \{[\s\S]*?\n\}/)?.[0] ?? '';
+    assert.match(image, /document\.createElement\('img'\)/, 'an image, never the drawing written into the page');
+    assert.match(image, /image\.alt = '';/, 'and silent, the button around it being named');
+});
+
+test('the palette is headed by the chevrons that fold it away, which are no tool', () => {
+    const drawn = methodBody(mainSource, 'drawPalette');
+    assert.ok(drawn.indexOf("fold.dataset.palette = 'fold';") < drawn.indexOf('for (const tool of paletteTools())'), 'first, across the head');
+    assert.match(drawn, /fold\.append\(markImage\(PALETTE_FOLD_MARK\)\);/);
+    assert.match(drawn, /this\.onPaletteFold\(\);/);
+    assert.match(methodBody(mainSource, 'onPaletteFold'), /togglePalette\(this\.paletteState\);\s*this\.syncOverlays\(\);/);
+
+    const sync = methodBody(mainSource, 'syncOverlays');
+    assert.match(sync, /this\.overlays\.palette\.classList\.toggle\('folded', folded\);/);
+    assert.match(sync, /if \(tile\.dataset\.palette === 'fold'\) \{[\s\S]*?tile\.setAttribute\('aria-expanded', String\(!folded\)\);\s*continue;\s*\}/,
+        'saying which way it goes, and never lit as a live tool');
+    assert.match(mainSource, /this\.paletteState += createPaletteState\(defaultStorage\(\)\);/, 'and the choice kept for the next canvas');
+});
+
+test('folded, the palette is its tab and nothing else, and the art turned in heads it open', () => {
+    assert.ok(styled(indexHtml, '#build-palette.folded button[data-tool]', /display:\s*none;/), 'the tools go');
+    assert.ok(styled(indexHtml, '#build-palette.folded', /background:\s*none;/), 'and the column with them');
+    assert.ok(styled(indexHtml, '#build-palette .palette-fold img', /transform:\s*scaleX\(-1\);/), 'open, the chevrons point in');
+    assert.ok(styled(indexHtml, '#build-palette.folded .palette-fold img', /transform:\s*none;/), 'folded, out');
+});
+
+test('every canvas\'s card is headed by its picture, and the card under the cursor keeps it in its band', async () => {
+    const { cardThumbnail } = await import('../js/build-picker.js');
+    const { BUILDER_ENVIRONMENTS } = await import('../js/environment/presets.js');
+    for (const environment of BUILDER_ENVIRONMENTS) {
+        assert.ok(styled(indexHtml, `#build-picker-cards li[data-entry="${environment.id}"]`,
+            new RegExp(`background-image:\\s*url\\('${cardThumbnail(environment.id).replace(/[.]/g, '\\.')}'\\)`)),
+            `${environment.id}'s card names its thumbnail`);
+    }
+
+    const rules = styleRules(indexHtml);
+    const cursor = rules.findIndex(rule => rule.selectors.includes('#build-picker-cards li.selected'));
+    const band = rules.findIndex(rule => rule.selectors.includes('#build-picker-cards li[data-entry]'));
+    assert.ok(cursor >= 0 && band > cursor, 'the band is written after the cursor\'s rule, which sets the background whole');
+    assert.deepEqual(specificity('#build-picker-cards li[data-entry]'), specificity('#build-picker-cards li.selected'),
+        'and weighs what it weighs, so it is the later that wins');
+    assert.match(rules[band].body, /background-size:\s*calc\(100% - 12px\) 64px;/);
+});
+
+/**
+ * Found on a phone in Chromium: the palette grew when its tiles became marks,
+ * and the control list, pinned a fixed distance down the screen under it, came
+ * to lie over the tick - the way out a finger has. On a narrow screen the list
+ * sits beside the palette instead, past its right edge however tall it grows.
+ */
+test('on a narrow screen the control list lies beside the palette, clear of every tile', () => {
+    const px = (body, name) => Number(body.match(new RegExp(`(?:^|[\\s;])${name}:\\s*(-?\\d+)px`))?.[1]);
+    const palette = styleRule(indexHtml, 'build-palette');
+    const tile = styleRule(indexHtml, 'build-palette button[data-tool]');
+    const columns = Number(palette.match(/grid-template-columns:\s*repeat\((\d+),/)?.[1]);
+    const padding = Number(palette.match(/padding:\s*\S+ (\d+)px/)?.[1]);
+    const border = Number(palette.match(/border:\s*(\d+)px/)?.[1]);
+    const right = px(palette, 'left') + columns * px(tile, 'width') + (columns - 1) * px(palette, 'gap') + 2 * padding + 2 * border;
+    assert.ok(Number.isFinite(right) && right > 100, `the palette's right edge reads as ${right}`);
+
+    const narrow = styleRules(indexHtml).filter(rule => rule.nested && rule.selectors.includes('#build-help'));
+    const beside = narrow.find(rule => /top:\s*20px/.test(rule.body));
+    assert.ok(beside, 'the narrow screen\'s rule puts the list up at the top, beside the palette');
+    assert.ok(px(beside.body, 'left') > right, `starting past the palette's right edge at ${right}: ${px(beside.body, 'left')}`);
+    assert.match(beside.body, /overflow-y:\s*auto;/, 'and scrolling rather than running down into the dock');
 });

@@ -11,17 +11,20 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Builder art in the repository**: the marks, panels and thumbnails the
-  builder ships copied into `assets/builder/` from an explicit list, renamed on
-  the way in, so the site and CI have every file the markup names
+- [ ] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
+  groups them into, with the chosen tool's own fields under it and a deselect
+  that is there only while something is selected
   - From: Interactive Build Mode
-- [ ] **Tool palette**: the marks from `assets/builder/` on the two-column
-  palette the base put down, replacing its text tiles, with each name moved to
-  `title` and `aria-label` and the live tool reading as live
+- [ ] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
+  two input gestures - a drag for the shapes and a click per vertex for the
+  polylines and curves - rather than ten handlers
   - From: Interactive Build Mode
-- [ ] **Hide the tool palette**: the palette collapsing to a chevron and coming
-  back on a click, so the canvas is clear while a handle is being dragged near
-  where it sits
+- [ ] **The active selection**: session state drawn as a dashed outline lying on
+  the ground, surviving a tool change and cleared only by deselect
+  - From: Interactive Build Mode
+- [ ] **Clipping to a selection**: the product of the tool's weight and the
+  lasso's, so a clipped edge keeps both feathers and a tool that does not mind
+  the lasso costs nothing
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -91,15 +94,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Builder art in the repository**: the marks, panels and thumbnails the
-  builder ships copied into `assets/builder/` from an explicit list, renamed on
-  the way in, so the site and CI have every file the markup names
-- [ ] **Tool palette**: the marks from `assets/builder/` on the two-column
-  palette the base put down, replacing its text tiles, with each name moved to
-  `title` and `aria-label` and the live tool reading as live
-- [ ] **Hide the tool palette**: the palette collapsing to a chevron and coming
-  back on a click, so the canvas is clear while a handle is being dragged near
-  where it sits
 - [ ] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
   groups them into, with the chosen tool's own fields under it and a deselect
   that is there only while something is selected
@@ -229,6 +223,11 @@ the order the work unblocks itself in.
 - [ ] **Builder settings from the builder**: a gear in the palette's header and
   the `O` key opening the screen over the canvas, suspending the live tool the
   way a pan does so a stroke still pending is not committed by it
+  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
+    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
+    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
+    repository goes in `assets/builder/` beside the copied art -
+    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
 - [ ] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
   settings screen opening the same screen, with `BACK` returning to whichever
   screen opened it
@@ -305,45 +304,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 326 earlier items in `TODO-archive.md`, newest last.
+> 329 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **A panel that scrolls**: the fields scrolling while the heading and the
-  accept and cancel stay pinned, with the wheel going to the panel under the
-  pointer and to the camera everywhere else
-  - **Settled**: only `#build-dock-fields` scrolls, with
-    `overscroll-behavior: contain`, between a heading and answers that do not;
-    the canvas's wheel listener never sees a wheel over the dock. On a narrow
-    screen the dock runs across the foot and the list moves under the palette,
-    collapsed on a machine with no keyboard. Confirmed in a 420-pixel window
-    and on a 390-pixel phone.
-  - From: Interactive Build Mode
-- [x] **Placed mountains**: a mountain dropped at a click, each one placement,
-  each edited alone
-  - **Settled**: `MOUNTAIN` is built; a click is `dropDraft` in
-    `js/build-mode.js`, making `droppedPlacement` from `js/build-tools.js` - the
-    panel's values, the tool's `derived` count of one, and the point as `at` -
-    and a click with one in hand moves it rather than adding another. The
-    generator honours `at` as one peak measured to the nearest repeat of the
-    square, spending the draws it always did. Each drop carries a `seed` and
-    `applyFootprintedElement` gives a seeded placement a stream of its own:
-    without it one mountain moved ground far from it on four presets of five.
-    The panel is every range the mountain declares, less the count the click
-    settles - the artwork's six lead in its order, the ranges added since
-    follow - and the next mountain starts from where the panel was left.
-  - From: Interactive Build Mode
-- [x] **Accept and exit**: the two confirms the artwork names, accepting the
-  pending edit and then saving and leaving, with the first skipped when nothing
-  is pending and the first returning to the editor rather than running on into
-  the second, so committing work never doubles as leaving
-  - **Settled**: `requestLeave` asks `ACCEPT EDITS` or `SAVE AND EXIT MODE` and
-    `answerConfirm` settles it; one panel, `#build-confirm`, opens on `YES` with
-    the focus, and `Esc` or a press off it calls it off. `YES` keeps the
-    canvas's environment as the one flown with what was built laid over it in
-    the element editor's placements, and the next canvas on it opens with that
-    committed. From the pause menu with the world changed the flight starts
-    again, until `Re-seat the aircraft`. Confirmed in Chromium, including
-    `Enter` on the focused tile asking once and not running on.
-  - From: Interactive Build Mode
 - [x] **A tool change asks**: picking another tool with a draft pending asking
   `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
   discarding, and `Escape` staying where it was, so leaving a tool never decides
@@ -447,4 +409,38 @@ how the simulator got here rather than as a list still to be worked.
     drawn by `canvasElements`, and handed back by the way out to
     `keepBuiltWorld`, so `YES` keeps them and `NO` does not. The element
     editor's own panel is still unreachable; its rows live here now.
+  - From: Interactive Build Mode
+- [x] **Builder art in the repository**: the marks, panels and thumbnails the
+  builder ships copied into `assets/builder/` from an explicit list, renamed on
+  the way in, so the site and CI have every file the markup names
+  - **Settled**: `tools/sync-builder-assets.mjs`, run as `npm run
+    assets:builder` on the machine the art is drawn on, copies nineteen files
+    from an explicit list - the twelve tool marks named for their tool ids, the
+    folded palette's tab, and one thumbnail a canvas from the PNGs rather than
+    the wrappers - never prunes, and refuses when the source does not resolve.
+    `test/build-art.test.js` asks git, not the disk, that every file the page
+    and the code name is tracked, and refuses the source folder in anything
+    that ships. The gumball's exports are not shipped: it is laid out from the
+    camera every frame, which a drawing in one perspective cannot be. The
+    picker's cards are headed by their thumbnails.
+  - From: Interactive Build Mode
+- [x] **Tool palette**: the marks from `assets/builder/` on the two-column
+  palette the base put down, replacing its text tiles, with each name moved to
+  `title` and `aria-label` and the live tool reading as live
+  - **Settled**: each tile is its tool's mark as an `<img>` - every export
+    carries the same ids and classes, so none is written into the page - with
+    `toolName` on its `aria-label` and title, in a navy column under a white
+    band as the art draws it, the live tool ringed in the art's green and the
+    accept tool's tick in the right-hand column at the foot. The taller column
+    came to lie under the narrow screen's control list, pinned 150 pixels down,
+    which covered the tick on a phone; the list now sits beside the palette.
+  - From: Interactive Build Mode
+- [x] **Hide the tool palette**: the palette collapsing to a chevron and coming
+  back on a click, so the canvas is clear while a handle is being dragged near
+  where it sits
+  - **Settled**: the chevrons on the band fold the tools away to the art's own
+    tab, `palette-folded.svg`, which the band carries turned in; the tab brings
+    them back, by pointer, `Enter` or a finger. `js/build-palette.js` keeps the
+    choice in storage, so the next canvas opens as the last was left; `Esc` and
+    every key work the same either way.
   - From: Interactive Build Mode

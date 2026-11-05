@@ -134,6 +134,7 @@
 │   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground
 │   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach, and whether a press was a click
 │   ├── build-overlay.js # Pure outlines and gumball: a placement's reach traced as a contour, projected onto the screen and stroked over the canvas, and the gumball drawn in the art's colours
+│   ├── build-palette.js # Pure palette fold: whether the tools are folded away, and the stored choice
 │   ├── gumball.js      # Pure gumball: the two handle sets the art declares, what each handle is bound to, what a drag writes, and where each handle lies on the screen
 │   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows - Select's camera with the pick or the world's own elements beneath it - and what the canvas is drawn from
 │   ├── panel-view.js   # The one renderer the dock is drawn with: rows, sections that fold, the slides, the answers, and what was done to them
@@ -166,6 +167,8 @@
 │   ├── attitude.js     # Pure artificial horizon geometry, and its SVG face
 │   ├── minimap.js      # Pure world-to-chart projection, and its SVG face
 │   └── hud.js          # On-screen instrument display and warnings
+├── assets/
+│   └── builder/        # The builder's art: the tool marks, the folded palette's tab, the picker's thumbnails - tracked, and the only place the page takes art from
 ├── docs/
 │   ├── index.html      # This documentation site
 │   ├── assets/         # The site's stylesheet and its one script
@@ -176,7 +179,8 @@
 │   └── host.js         # The Pilot API over host ground, the Matter API under a host aircraft
 ├── tools/
 │   ├── serve.mjs       # Zero-dependency static server behind `npm run serve`
-│   └── build-api-reference.mjs # Renders docs/api.md into its page
+│   ├── build-api-reference.mjs # Renders docs/api.md into its page
+│   └── sync-builder-assets.mjs # Copies the builder's art into assets/builder/ from an explicit list, renaming on the way in; run where the art is drawn, never in CI
 └── test/               # Zero-dependency node:test unit tests</code></pre>
 
             <nav class="page-nav" aria-label="Nearby pages">

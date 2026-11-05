@@ -24,7 +24,10 @@ import {
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
-import { paletteTools, dropsAtClick, ACCEPT_TOOL, SELECT_TOOL } from './build-tools.js';
+import { paletteTools, dropsAtClick, toolMark, toolName, ACCEPT_TOOL, SELECT_TOOL } from './build-tools.js';
+import {
+    createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK
+} from './build-palette.js';
 import { placementAt, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE
@@ -161,6 +164,19 @@ function sameStart(start, applied) {
  * when the handle is let go.
  */
 const GROUND_REDRAW_MS = 120;
+
+/**
+ * One of the builder's marks as an image inside a button. Its own document, so
+ * the ids and class names every Illustrator export carries stay inside it and
+ * collide with nothing; and silent, since the button around it is named.
+ */
+function markImage(src) {
+    const image = document.createElement('img');
+    image.src = src;
+    image.alt = '';
+    image.draggable = false;
+    return image;
+}
 
 class FlightSimulator {
     constructor() {
@@ -351,6 +367,8 @@ class FlightSimulator {
         // is the same question the panel is already asking.
         this.helpState      = createHelpState(referenceOpenWanted(this.controlSettings));
         this.hudVisibility  = createHudVisibilityState(defaultStorage());
+        // Whether the builder's tools are folded away, kept for the next canvas.
+        this.paletteState   = createPaletteState(defaultStorage());
         this.audioState     = createAudioState(defaultStorage());
         this.audio          = new FlightAudio(this.audioState);
         this.photoState     = createPhotoState();
@@ -2779,12 +2797,29 @@ class FlightSimulator {
         const palette = this.overlays.palette;
         palette.replaceChildren();
 
+        // The chevrons across the head of the column, which fold the tools
+        // away and bring them back: the one button on the palette that is not
+        // a tool, so it carries no tool's id and is never lit as live.
+        const fold = document.createElement('button');
+        fold.type = 'button';
+        fold.className = 'palette-fold';
+        fold.dataset.palette = 'fold';
+        fold.append(markImage(PALETTE_FOLD_MARK));
+        fold.addEventListener('click', (event) => {
+            this.onPaletteFold();
+            if (event.detail > 0) fold.blur();
+        });
+        palette.append(fold);
+
         for (const tool of paletteTools()) {
             const tile = document.createElement('button');
             tile.type = 'button';
             tile.dataset.tool = tool.id;
-            tile.textContent = tool.label;
-            tile.title = tool.hint;
+            // The tool's own mark, and its name where a pointer resting on it
+            // and a screen reader find it.
+            tile.append(markImage(toolMark(tool.id)));
+            tile.setAttribute('aria-label', toolName(tool.id));
+            tile.title = `${toolName(tool.id)} - ${tool.hint}`;
             tile.addEventListener('click', (event) => {
                 this.onPaletteClick(tool.id);
                 // A tile clicked with the pointer gives the focus back, or the
@@ -2794,6 +2829,12 @@ class FlightSimulator {
             });
             palette.append(tile);
         }
+    }
+
+    /** The chevrons pressed: the tools folded away, or brought back, and the choice kept. */
+    onPaletteFold() {
+        togglePalette(this.paletteState);
+        this.syncOverlays();
     }
 
     /**
@@ -3298,7 +3339,16 @@ class FlightSimulator {
         // named for the question it will ask if it is pressed now, which is
         // the question Escape asks too.
         const live = buildModeTool(this.builder);
+        const folded = paletteFolded(this.paletteState);
+        this.overlays.palette.classList.toggle('folded', folded);
         for (const tile of this.overlays.palette.children) {
+            if (tile.dataset.palette === 'fold') {
+                const name = paletteFoldName(this.paletteState);
+                tile.title = name;
+                tile.setAttribute('aria-label', name);
+                tile.setAttribute('aria-expanded', String(!folded));
+                continue;
+            }
             if (tile.dataset.tool === ACCEPT_TOOL) {
                 const name = acceptToolName(this.builder);
                 tile.title = `${name} (Esc)`;

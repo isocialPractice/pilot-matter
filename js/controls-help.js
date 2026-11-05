@@ -12,7 +12,7 @@ import {
 } from './build-camera.js';
 import { PHOTO_KEY } from './photo.js';
 import { MENU_SELECT_KEYS } from './menu.js';
-import { BUILD_TOOLS, SELECT_TOOL, isBuiltTool } from './build-tools.js';
+import { SELECT_TOOL, isBuiltTool, toolName } from './build-tools.js';
 
 export const HELP_KEY = 'KeyH';
 
@@ -150,12 +150,6 @@ function pressText(presses) {
 function forTools(tools) {
     if (!tools?.length) return '';
     return ` (${tools.map(toolName).join('/')})`;
-}
-
-/** A tool as the control list names it: its tile's label, in the list's case. */
-function toolName(id) {
-    const label = BUILD_TOOLS.find(tool => tool.id === id)?.label ?? id;
-    return label.charAt(0) + label.slice(1).toLowerCase();
 }
 
 /** The builder's list, as the lines it is written on screen, in its order. */
