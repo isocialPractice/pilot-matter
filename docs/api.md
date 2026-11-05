@@ -1290,9 +1290,16 @@ footprint reaches rather than across the whole square:
 The kinds are `disc` (`x`, `z`, `radius`), `ring` (`points`, a closed outline of
 `[x, z]` pairs), `stroke` (`points` with a `stamp` of `width`, `depth` and
 `corner` swept along them), `rect` (`x`, `z`, `width`, `depth`, `angle`,
-`corner`) and `ellipse` (`x`, `z`, `radiusX`, `radiusZ`, `angle`), each with an
+`corner`), `ellipse` (`x`, `z`, `radiusX`, `radiusZ`, `angle`), `polygon` (`x`,
+`z`, `radius`, `sides`, `angle`, and an `inner` between 0 and 1 that pulls every
+other corner in to that share of the radius, making a star) and `path`
+(`points`, run through by a smooth curve, round the loop unless `closed` is
+`false`, when it ends on its last point and closes straight back), each with an
 optional `feather`: the width in world units of the band the element fades out
-across at the edge, two cells of the sampling where none is given. The
+across at the edge, two cells of the sampling where none is given. A `combine`
+(`op`, `a`, `b`) makes one region of two: `union` covers either, `intersect`
+only both and `subtract` the first without the second, each part keeping its
+own feather, and either part may itself be a `combine`. The
 coordinates are the square's own, measured from its middle, so the same
 footprint lands in the same place on every tile of a tiled world, and one drawn
 over an edge of the square carries on across the opposite edge - which is what

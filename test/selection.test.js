@@ -90,7 +90,7 @@ test('nothing is selected or dropped under a question', () => {
 test('the lasso starts on Free Select, chooses only tools that work, and keeps their fields', () => {
     const state = onCanvas();
     assert.equal(buildLassoTool(state), 'free');
-    assert.equal(chooseLassoTool(state, 'star'), false, 'a tool whose kind cannot be drawn yet');
+    assert.equal(chooseLassoTool(state, 'lasso-of-truth'), false, 'a tool the lasso does not have');
     assert.equal(chooseLassoTool(state, 'round-rect'), true);
     assert.deepEqual(lassoValues(state), { corner: 600 }, 'its own field at its default');
     assert.deepEqual(setLassoValues(state, { corner: 250, sides: 9 }), { corner: 250 }, 'and only what it declares is kept');
@@ -246,7 +246,9 @@ test('the lasso\'s panel is its built tools in the art\'s rows, the chosen one\'
     let shown = dockContent(state, {});
     assert.equal(shown.kind, DOCK_LASSO);
     assert.equal(shown.heading, 'LASSO SELECT TOOLS');
-    assert.deepEqual(shown.shapes.map(row => row.tools.map(tool => tool.id)), [['free', 'rectangle', 'ellipse'], ['round-rect'], ['polyline']]);
+    assert.deepEqual(shown.shapes.map(row => row.tools.map(tool => tool.id)),
+        [['free', 'rectangle', 'ellipse'], ['round-rect', 'triangle', 'star'], ['polygon', 'polyline'], ['curved-polygon', 'curved-polyline']],
+        'all ten, now every kind they draw can be read');
     assert.deepEqual(shown.shapes.flatMap(row => row.tools).filter(tool => tool.live).map(tool => tool.id), ['free']);
     assert.deepEqual(shown.rows, [], 'Free Select has no fields of its own');
     assert.deepEqual(shown.actions, [], 'and with nothing selected there is no deselect');

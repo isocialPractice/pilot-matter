@@ -11,35 +11,25 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Parametric shapes**: a regular figure held as its centre, radius, sides
-  and star ratio, so changing the number of sides reshapes what was drawn
-  instead of asking for it again
-  - **The tools are waiting for the kind.** Since `1.0.0-alpha.1.46.0`
-    Triangle, Star and Polygon Select are declared in `js/lasso.js` with their
-    row and their art, drawing a `polygon`, and `lassoToolBuilt` puts them on
-    the lasso's panel the moment `js/environment/footprints.js` can read that
-    kind. This item is that kind, `lassoFootprint`'s case for it, and Polygon
-    Select's `Number of Sides` field.
+- [ ] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
+  the four, laying it by dragging a rounded-rectangle stamp swept whole along
+  the stroke, whose width, depth and corner are on the panel in pixels and
+  stored in world units once the stroke is laid
+  - **The Flat gumball is waiting for it.** Since `1.0.0-alpha.1.44.0`
+    `handleBinding` in `js/gumball.js` binds the squares to a footprint's extent
+    - `radius`, `radiusX`/`radiusZ`, `width`/`depth` - and the blue arc to its
+    angle, held in Node, but no placement on a canvas has a footprint yet, so
+    none of them has been seen dragged. A stroke's footprint has no extent the
+    squares know; giving it one is this item's.
   - From: Interactive Build Mode
-- [ ] **Curved selections**: a boundary of curve segments, flattened once per
-  pass rather than once per vertex, with the control points kept so the curve
-  stays editable
-  - **The gesture is there.** Since `1.0.0-alpha.1.46.0` the click-per-vertex
-    gesture - `clickVertex` in `js/lasso.js`, closed by the first point or a
-    double click - draws Polyline Select's ring, and the two curved tools are
-    declared drawing a `path`, joining the panel once that kind can be read.
+- [ ] **Cover density**: how much of a stroke grass, sand, water or snow covers,
+  through noise that stays put when a tile is drawn again, defaulting to full
+  cover so every preset renders as it does today, with water and snow starting
+  full so their strokes are not drawn with gaps
   - From: Interactive Build Mode
-- [ ] **Drawing against a selection**: a shape added to it with `shift`, cut out
-  of it with `alt`, or drawn inside it with neither, read once at the press, so
-  every tool that minds the lasso shares one rule for combining with it
-  - **Until then a new shape replaces the selection.** Since
-    `1.0.0-alpha.1.46.0` `setSelection` puts a new lasso in place of the old,
-    and a clipped tool multiplies by the selection through `clip`; the ops
-    this item adds combine regions before they become the selection.
-  - From: Interactive Build Mode
-- [ ] **Shift at the press, shift in the drag**: the key that adds a shape to a
-  selection when it is held at the press, and keeps the shape square or round
-  when it is pressed after the drag has begun
+- [ ] **A stroke's band is its ground**: a ground cover drawn with a footprint
+  painting all of the ground under it and graded across that ground's own
+  relief, worked out on each tile rather than once
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -109,32 +99,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Parametric shapes**: a regular figure held as its centre, radius, sides
-  and star ratio, so changing the number of sides reshapes what was drawn
-  instead of asking for it again
-  - **The tools are waiting for the kind.** Since `1.0.0-alpha.1.46.0`
-    Triangle, Star and Polygon Select are declared in `js/lasso.js` with their
-    row and their art, drawing a `polygon`, and `lassoToolBuilt` puts them on
-    the lasso's panel the moment `js/environment/footprints.js` can read that
-    kind. This item is that kind, `lassoFootprint`'s case for it, and Polygon
-    Select's `Number of Sides` field.
-- [ ] **Curved selections**: a boundary of curve segments, flattened once per
-  pass rather than once per vertex, with the control points kept so the curve
-  stays editable
-  - **The gesture is there.** Since `1.0.0-alpha.1.46.0` the click-per-vertex
-    gesture - `clickVertex` in `js/lasso.js`, closed by the first point or a
-    double click - draws Polyline Select's ring, and the two curved tools are
-    declared drawing a `path`, joining the panel once that kind can be read.
-- [ ] **Drawing against a selection**: a shape added to it with `shift`, cut out
-  of it with `alt`, or drawn inside it with neither, read once at the press, so
-  every tool that minds the lasso shares one rule for combining with it
-  - **Until then a new shape replaces the selection.** Since
-    `1.0.0-alpha.1.46.0` `setSelection` puts a new lasso in place of the old,
-    and a clipped tool multiplies by the selection through `clip`; the ops
-    this item adds combine regions before they become the selection.
-- [ ] **Shift at the press, shift in the drag**: the key that adds a shape to a
-  selection when it is held at the press, and keeps the shape square or round
-  when it is pressed after the drag has begun
 - [ ] **Build Grass, Sand, Water and Snow**: one cover tool, pointed at any of
   the four, laying it by dragging a rounded-rectangle stamp swept whole along
   the stroke, whose width, depth and corner are on the panel in pixels and
@@ -204,12 +168,19 @@ the order the work unblocks itself in.
 - [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
   elements laid before it, any one element or all of them, preset or built, at a
   strength, and with `alt` held putting back what an earlier stroke took
+  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
+    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
+    once at the press through `lassoOp`; Erase's `alt` is read the same way.
 - [ ] **Erasing water and runways**: the sea held per vertex so a hole erased in
   a lake is dry ground, and a strip erased whole and only when it is the target
   named
 - [ ] **Shape vocabulary**: the shape tools built once over the seven footprint
   kinds, with each mode declaring the subset it offers, so Lasso's ten and
   Extrude's seven are one implementation
+  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
+    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
+    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
+    gestures; this item is that table shared with Extrude's seven.
 - [ ] **Extrude stages**: the draw, extrude and surface stages with one action
   button reading its label and its enabled state off the stage it is in
 - [ ] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
@@ -217,6 +188,9 @@ the order the work unblocks itself in.
   once on release
 - [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
   height as a single region, with two that overlap reading as one solid
+  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
+    with `union` weighs as the larger of its parts, so two shapes that overlap
+    already read as one region; this item lifts one to a single height.
 - [ ] **Extrude a selection**: a live selection taken as the region to lift, so
   the button is ready on arrival, and drawn in red while Extrude is the tool so
   it reads as the thing that will be lifted rather than as a clip
@@ -326,73 +300,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 333 earlier items in `TODO-archive.md`, newest last.
+> 337 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **The gumball**: the two handle sets the artwork declares, one for
-  elements with a height and one for those without, drawn at the placement's
-  centre with its axes projected from the camera
-  - **Settled**: `js/gumball.js` declares every handle by the id the art gives
-    it, Heights for an element declaring a `height` span and Flat for the
-    rest, and `gumballLayout` lays the bound ones out from the camera's
-    projection of the three axes - translated once from the art's blue-up
-    frame through `bearingToDirection`: red east, green north, blue up. It is
-    drawn on the edit in hand, picked or dropped, by `strokeGumball` on
-    `#build-overlay`, in the art's colours with the handle under the pointer
-    lit. Drawn in canvas 2D rather than from the SVGs, which are under
-    `.support` until `Builder art in the repository`.
-  - From: Interactive Build Mode
-- [x] **Gumball bindings**: each handle writing one declared value and nothing
-  else, clamped to the bounds the panel clamps to, so a drag and a typed number
-  are two ways into the same schema, with the centre moving the element on both
-  gumballs
-  - **Settled**: `handleBinding` names what each handle writes and a handle
-    bound to nothing is not drawn: the centre and the ground arrows the point
-    or the footprint's middle, the blue arrow a Heights element's height range
-    raised whole, the dot its `radius` and the tick its `height` scaled, the
-    squares a footprint's extent and the blue arc its angle. `dragHandle`
-    works out a drag as a whole from the grab, clamped and stepped as the
-    panel's rows are, and `writeGumball` writes it through the dock's holder.
-    `shift` at the press scales together; `ctrl` and the centre does nothing.
-    A handle moves nothing until it has travelled past a click - found in
-    Chromium, where a wobble on the centre changed a pick nobody meant to.
-  - From: Interactive Build Mode
-- [x] **Select shows what is selected**: the picked-up placement's own rows on
-  Select's panel beneath the camera fields, so a committed batch's density and
-  colour can still be changed
-  - **This is the item that brings the element editor back.** `L` moved to the
-    builder in `1.0.0-alpha.1.34.0`, and on 11.04.2026 the user decided to wait
-    for this rather than add an interim way in. So Select's panel also carries
-    the environment's own ranges - the element editor's rows, moved across the
-    whole world - as a section of its own, one editor with two scopes.
-  - **The rows are already reachable.** Since `1.0.0-alpha.1.43.0` a placement
-    picked with Select is the draft standing on it, and the dock draws that
-    draft's rows with `ACCEPT` and `CANCEL` in place of the camera fields. What
-    is left is the camera fields kept above them, and the environment's own
-    rows when nothing is picked.
-  - **Settled**: `dockContent` gives Select's panel `sections` beneath the
-    camera - the pick under `SELECTED` and its name, or with nothing picked
-    one `WORLD:` section for each of the environment's own elements, folded
-    until its heading is pressed - each row carrying its section and written
-    through that section's holder. The world's rows are the element editor's,
-    handed to `beginCanvas` by `canvasWorld`, held by the session as `world`,
-    drawn by `canvasElements`, and handed back by the way out to
-    `keepBuiltWorld`, so `YES` keeps them and `NO` does not. The element
-    editor's own panel is still unreachable; its rows live here now.
-  - From: Interactive Build Mode
-- [x] **Builder art in the repository**: the marks, panels and thumbnails the
-  builder ships copied into `assets/builder/` from an explicit list, renamed on
-  the way in, so the site and CI have every file the markup names
-  - **Settled**: `tools/sync-builder-assets.mjs`, run as `npm run
-    assets:builder` on the machine the art is drawn on, copies nineteen files
-    from an explicit list - the twelve tool marks named for their tool ids, the
-    folded palette's tab, and one thumbnail a canvas from the PNGs rather than
-    the wrappers - never prunes, and refuses when the source does not resolve.
-    `test/build-art.test.js` asks git, not the disk, that every file the page
-    and the code name is tracked, and refuses the source folder in anything
-    that ships. The gumball's exports are not shipped: it is laid out from the
-    camera every frame, which a drawing in one perspective cannot be. The
-    picker's cards are headed by their thumbnails.
-  - From: Interactive Build Mode
 - [x] **Tool palette**: the marks from `assets/builder/` on the two-column
   palette the base put down, replacing its text tiles, with each name moved to
   `title` and `aria-label` and the live tool reading as live
@@ -460,4 +369,54 @@ how the simulator got here rather than as a list still to be worked.
     multiplies the clip in too, so a clipped mountain is picked where it
     stands. Confirmed in Chromium on the canvas and in the flight it was kept
     for.
+  - From: Interactive Build Mode
+- [x] **Parametric shapes**: a regular figure held as its centre, radius, sides
+  and star ratio, so changing the number of sides reshapes what was drawn
+  instead of asking for it again
+  - **Settled**: a `polygon` footprint is its centre, `radius`, `sides`,
+    `angle` and an `inner` ratio that makes it a star, read by
+    `polygonPoints` in `js/environment/footprints.js`, so Triangle, Star and
+    Polygon Select are on the panel - each standing on the press, reaching to
+    the pointer and turned the way it went. A tool's `fields` name what each
+    of its rows writes on the figure, and `setLassoValues` puts a changed row
+    onto the selection the same tool drew through `reshapeFootprint`: an
+    octagon from a hexagon where it stood, and Round Rect.'s `CORNER` the same
+    way. A selection another tool drew, or a combined one, is left alone.
+  - From: Interactive Build Mode
+- [x] **Curved selections**: a boundary of curve segments, flattened once per
+  pass rather than once per vertex, with the control points kept so the curve
+  stays editable
+  - **Settled**: a `path` footprint is its control points and whether it is
+    `closed`; `flattenPath` runs a Catmull-Rom curve through them, twelve
+    pieces a stretch, once per footprint and kept in a `WeakMap`, so the
+    points stay the record. Curved Polygon runs round the loop and Curved
+    Polyline from the first point to the last and straight back, both through
+    the click-per-vertex gesture, drawn on the ground as they will come out
+    while the points are placed. All ten tools are on the panel.
+  - From: Interactive Build Mode
+- [x] **Drawing against a selection**: a shape added to it with `shift`, cut out
+  of it with `alt`, or drawn inside it with neither, read once at the press, so
+  every tool that minds the lasso shares one rule for combining with it
+  - **Settled**: a `combine` footprint - `op`, `a`, `b` - weighs `union` as
+    the larger of its parts, `intersect` as their product and `subtract` as
+    `a * (1 - b)`, each part keeping its own feather and either one nestable.
+    `lassoOp` reads the key once at the press - `alt` cuts, `shift` adds, and
+    neither draws inside a live selection or adds to none - and a shape of
+    clicks keeps what its first click said. `drawIntoSelection` in
+    `js/build-mode.js` combines the shape with the selection and drops the
+    selection when no ground is left. A combined selection is outlined by
+    `regionEdges`, the contour of its weight chained into runs and kept until
+    it changes, and a mountain dropped in it is clipped by the whole
+    combination. `AltLeft` and `AltRight` are swallowed on a canvas.
+  - From: Interactive Build Mode
+- [x] **Shift at the press, shift in the drag**: the key that adds a shape to a
+  selection when it is held at the press, and keeps the shape square or round
+  when it is pressed after the drag has begun
+  - **Settled**: `squareInDrag` keeps the two apart. A drag remembers whether
+    `shift` was down at its press; `shift` pressed once that has been let go,
+    or only after the drag began, squares the box or rounds the ellipse -
+    grown from the press toward the pointer by the longer side - and it is
+    drawn so while it is drawn. Held from the press it adds and squares
+    nothing. The control list says both, as `Shift+Drag (Lasso)` and `Drag
+    (Lasso), then Shift`.
   - From: Interactive Build Mode

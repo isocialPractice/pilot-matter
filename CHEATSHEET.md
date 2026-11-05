@@ -243,8 +243,11 @@ back.
 | Click, or a finger, in Mountain | Drop a mountain there, or put the one in hand down there instead |
 | Drag a gumball handle | Move, slide, raise or spread what is in hand, whatever tool is live |
 | The chevrons atop the palette | Fold the tools away to a tab, and bring them back; kept for the next canvas |
-| Drag, or a finger, in Lasso | Draw a selection with the chosen lasso tool - Free, Rectangle, Ellipse or Round Rect. |
-| Click in Lasso, with Polyline | Place a point; click the first one again, or double click, to close the shape |
+| Drag, or a finger, in Lasso | Draw a selection with the chosen lasso tool - Free, Rectangle, Ellipse, Round Rect., Triangle, Star or Polygon - or, with one live, draw within it |
+| `Shift` and drag in Lasso | Add the shape to the selection |
+| `Alt` and drag in Lasso | Cut the shape out of the selection |
+| Drag in Lasso, then `Shift` | Keep a box square or an ellipse round |
+| Click in Lasso, with Polyline or a curved tool | Place a point; click the first one again, or double click, to close the shape |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
@@ -275,6 +278,17 @@ something is selected. The selection is a dashed white line on the ground that
 stays across tool changes until `DESELECT` drops it. A mountain dropped inside
 it is cut at its edge, and a click outside it drops nothing. A selection is not
 an edit, so leaving with one asks only whether to save.
+
+Triangle, Star and Polygon stand on the press and reach to the pointer, turned
+the way it went. `NUMBER OF SIDES`, `NUMBER OF POINTS`, `STAR RATIO` and a
+rounded box's `CORNER` reshape the selection the tool drew, where it stands.
+Curved Polygon runs a smooth curve through the points clicked and round the
+loop; Curved Polyline runs it through them and closes straight back to the
+start. The key held at the press says how a shape meets the selection, and
+holds to the end of the shape: `Shift` adds it, `Alt` cuts it out, and neither
+keeps only the ground inside both. A shape that leaves no ground selected drops
+the selection. `Shift` pressed once a drag is under way squares the box or
+rounds the ellipse instead, so the one key does both.
 
 What is in hand carries the gumball, in the art's colours: red east, green
 north, blue up. The white centre moves it over the ground, the red and green

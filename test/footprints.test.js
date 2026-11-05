@@ -34,8 +34,8 @@ const EVERY_KIND = [
     ['disc', DISC], ['ring', RING], ['stroke', STROKE], ['rect', RECT], ['ellipse', ELLIPSE]
 ];
 
-test('the vocabulary is the five kinds a pointer can draw', () => {
-    assert.deepEqual([...FOOTPRINT_KINDS], ['disc', 'ring', 'stroke', 'rect', 'ellipse']);
+test('the vocabulary is the seven kinds a pointer can draw', () => {
+    assert.deepEqual([...FOOTPRINT_KINDS], ['disc', 'ring', 'stroke', 'rect', 'ellipse', 'polygon', 'path']);
 
     for (const [name, footprint] of EVERY_KIND) {
         assert.ok(FOOTPRINT_KINDS.includes(name), `${name} should be in the vocabulary`);

@@ -45,16 +45,17 @@ test('the ten come down to a handful of kinds and two gestures', () => {
     });
 });
 
-test('a tool is drawn once the kind it draws can be read, and the rest wait for theirs', () => {
-    assert.deepEqual(ids(LASSO_TOOLS.filter(tool => lassoToolBuilt(tool.id))), ['free', 'rectangle', 'ellipse', 'round-rect', 'polyline']);
+test('a tool is drawn once the kind it draws can be read, which is now every one of the ten', () => {
     for (const tool of LASSO_TOOLS) assert.equal(lassoToolBuilt(tool.id), FOOTPRINT_KINDS.includes(tool.kind), tool.id);
+    assert.deepEqual(ids(LASSO_TOOLS.filter(tool => lassoToolBuilt(tool.id))), ids(LASSO_TOOLS));
     assert.equal(lassoToolBuilt('lasso-of-truth'), false);
 
     assert.deepEqual(lassoRows().map(({ row, tools }) => [row, ids(tools)]), [
         ['row-shapes-1', ['free', 'rectangle', 'ellipse']],
-        ['row-shapes-2', ['round-rect']],
-        ['row-polygons', ['polyline']]
-    ], 'and a row with none of its tools built is left out');
+        ['row-shapes-2', ['round-rect', 'triangle', 'star']],
+        ['row-polygons', ['polygon', 'polyline']],
+        ['row-curves', ['curved-polygon', 'curved-polyline']]
+    ], 'every row the artwork draws');
     assert.equal(lassoToolBuilt(DEFAULT_LASSO_TOOL), true, 'a lasso starts on a tool that works');
 });
 
@@ -112,10 +113,7 @@ test('an ellipse fills the box a drag spans', () => {
     assert.equal(lassoFootprint('ellipse', [P(0, 0)]), null, 'a press that went nowhere selects nothing');
 });
 
-test('a tool whose kind cannot be drawn yet draws nothing', () => {
-    for (const id of ['triangle', 'star', 'polygon', 'curved-polygon', 'curved-polyline']) {
-        assert.equal(lassoFootprint(id, [P(0, 0), P(1000, 1000)]), null, id);
-    }
+test('a tool the lasso does not have draws nothing', () => {
     assert.equal(lassoFootprint('nothing', [P(0, 0), P(1000, 1000)]), null);
 });
 

@@ -5,6 +5,79 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.47.0] - 2026-11-04
+
+The lasso's whole panel: regular figures and curves, every shape drawn against
+the selection by the key held at its press, and shift in a drag squaring it.
+
+### Added
+
+- **Parametric shapes.** Triangle, Star and Polygon Select join the panel.
+  Each draws a regular figure standing on the press and reaching to the
+  pointer, turned the way it went: three sides; as many points as `NUMBER OF
+  POINTS`, every other corner pulled in to the `STAR RATIO` of the reach; and
+  as many sides as `NUMBER OF SIDES`. A field on the panel reshapes the
+  selection its tool drew where it stands - an octagon from a hexagon, a
+  sharper star, a rounder corner on a Round Rect. - as well as the next shape
+  drawn with it.
+- **Curved selections.** Curved Polygon and Curved Polyline Select join the
+  panel, so all ten of the art's tools are on it. Both place a point a click,
+  as Polyline does, and run a smooth curve through every point: the first
+  round the whole loop, the second from the first point to the last and
+  straight back. The curve is drawn on the ground as it will come out while the
+  points are placed.
+- **Drawing against a selection.** A shape drawn while a selection is live is
+  drawn against it, by the key held at its press: `Shift` adds it, `Alt` cuts
+  it out, and neither keeps only the ground inside both - "clipped to the area
+  selected" as the rule rather than the exception. Drawn with nothing
+  selected, a shape is simply the selection, and one that leaves no ground
+  selected drops it. The key is read once, at the press, so a shape of clicks
+  keeps what its first click said. A combined selection is outlined as the
+  edge of the ground it covers, holes and all, and a mountain dropped in it is
+  clipped by the whole combination. `Alt` pressed on a canvas is kept from the
+  browser, so its menu never takes the focus.
+- **Shift in the drag.** `Shift` pressed once a drag is under way keeps a box
+  square or an ellipse round, grown from the press toward the pointer; held
+  from the press it only adds, so the one key does both.
+- **Footprint kinds.** A footprint may now be a `polygon` (a regular figure or
+  a star), a `path` (a smooth curve through its points, open or closed) or a
+  `combine` of two footprints by `union`, `intersect` or `subtract`, nested as
+  deep as it is drawn - see the API reference.
+- **The control list** carries `Shift+Drag (Lasso) - Add to the Selection`,
+  `Alt+Drag (Lasso) - Cut From the Selection` and `Drag (Lasso), then Shift -
+  Keep It Square or Round`, and the drag reads `Draw a Selection, or Within
+  One`.
+
+Held in Node by the new `test/shapes.test.js` - a polygon's corners, a star's,
+a curve through its points open and closed, each combining op at a point, a
+combination's extent and its feather, combinations nested and across the
+seams, the five new tools' regions, the key at the press, shift in the drag, a
+shape drawn into a selection and leaving none, a field reshaping a selection
+where it stands, and a combined selection's traced edge chained into runs -
+with `test/lasso.test.js`, `test/selection.test.js`,
+`test/controls-help.test.js` and `test/page.test.js` for the panel, the list
+and the wiring. Each rejected the defect it names when that was put back,
+seventy-two in all: among them a union taking the lesser, an intersection adding,
+a cut leaving what it cut, a combination sampled without the wrap, a cut
+spanning what was cut out, two parts that never meet still spanning ground, a
+star's points all reaching as far, a polygon not turned by the drag, an open
+path looping round or stopping short, a curve missing its points, a triangle
+not three sided, a field not reshaping its figure, alt not cutting, a plain
+shape adding, a cut from nothing selecting the shape, a combined selection
+kept as its first tool's, the panel reshaping another tool's selection, a
+combined selection traced every frame or outlined as a shape, shift from the
+press squaring, a squared drag coming out unsquared, and alt reaching the
+browser. A seventy-third, an op not known weighed as a union, is out of
+reach: a combination with such an op has no extent, so it weighs nothing
+before its op is read. Settled in Chromium in 20 checks across a desktop and a phone: all
+ten icons loading, a hexagon reshaped to an octagon where it stood, a triangle
+drawn inside it and then alone, a star and its ratio, both curves closed their
+own ways, shift adding, alt cutting a hole that is outlined and drops nothing,
+a mountain beside it clipped by the whole combination, a plain shape drawn
+within and one that misses leaving nothing selected, shift in a drag
+squaring a box and shift from the press not, alt kept from the browser, and a
+finger dragging a star.
+
 ## [1.0.0-alpha.1.46.0] - 2026-11-04
 
 The lasso: a selection drawn on the ground, kept across tools until it is

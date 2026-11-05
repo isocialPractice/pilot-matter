@@ -24,13 +24,44 @@ import { smoothstep } from '../terrain-math.js';
 import { DEFAULT_SIZE, DEFAULT_SEGMENTS } from './elements.js';
 
 /**
- * The kinds a pointer can draw: a click, a closed outline, a drag, and the two
- * shapes a box and a circle come to.
+ * The kinds a pointer can draw: a click, a closed outline, a drag, the two
+ * shapes a box and a circle come to, a regular figure held as its parameters,
+ * and a boundary of curves.
  *
  * Listed so a caller can ask what the vocabulary is rather than matching
  * against a literal, which is what the conformance checks read.
  */
-export const FOOTPRINT_KINDS = Object.freeze(['disc', 'ring', 'stroke', 'rect', 'ellipse']);
+export const FOOTPRINT_KINDS = Object.freeze(['disc', 'ring', 'stroke', 'rect', 'ellipse', 'polygon', 'path']);
+
+/**
+ * Two regions made one: `{ kind: 'combine', op, a, b }`. Not a kind a pointer
+ * draws but how a shape meets a selection already there - added to it, drawn
+ * inside it, or cut out of it - and every region is a weight between 0 and 1,
+ * so each is one expression over the two weights:
+ *
+ * - `union`: the larger, `max(a, b)`.
+ * - `intersect`: the product, `a * b`, which is what clipping already was.
+ * - `subtract`: `a * (1 - b)`.
+ *
+ * Feathers carry through all three, so an edge stays soft wherever either
+ * region's edge was soft. A combination may hold combinations, so a lasso
+ * drawn, a box added and a circle cut out is three regions in one.
+ */
+export const COMBINE_KIND = 'combine';
+export const COMBINE_OPS = Object.freeze(['union', 'intersect', 'subtract']);
+
+/** Two regions as one, by one of `COMBINE_OPS`. */
+export function combineFootprints(op, a, b) {
+    return { kind: COMBINE_KIND, op, a, b };
+}
+
+/** The weight a combination comes to from the weights of its two regions. */
+function combineWeights(op, a, b) {
+    if (op === 'union') return Math.max(a, b);
+    if (op === 'intersect') return a * b;
+    if (op === 'subtract') return a * (1 - b);
+    return 0;
+}
 
 /**
  * How wide the band a region's weight falls across is, in world units, when
@@ -67,6 +98,11 @@ export const DEFAULT_FEATHER = featherFor(DEFAULT_SIZE / DEFAULT_SEGMENTS);
 export function footprintWeight(footprint, x, z, wrap = 0) {
     if (wrap > 0) return footprintSampler(footprint, wrap)(x, z);
 
+    if (footprint?.kind === COMBINE_KIND) {
+        if (!isFootprint(footprint)) return 0;
+        return combineWeights(footprint.op, footprintWeight(footprint.a, x, z), footprintWeight(footprint.b, x, z));
+    }
+
     const inside = insideDistance(footprint, x, z);
     if (inside == null) return 0;
 
@@ -101,6 +137,15 @@ const REPEATS = Object.freeze([
 export function footprintSampler(footprint, wrap = 0) {
     const square = footprintBounds(footprint);
     if (square == null) return () => 0;
+
+    // A combination is weighed from its two regions each weighed with the
+    // wrap, rather than wrapped whole: a selection cut out across a seam is
+    // cut out on both sides of it.
+    if (footprint.kind === COMBINE_KIND) {
+        const a = footprintSampler(footprint.a, wrap);
+        const b = footprintSampler(footprint.b, wrap);
+        return (x, z) => combineWeights(footprint.op, a(x, z), b(x, z));
+    }
 
     const edge   = feather(footprint);
     const across = Number(wrap) > 0 ? Number(wrap) : 0;
@@ -179,8 +224,100 @@ function insideDistance(footprint, x, z) {
         case 'stroke':  return strokeDistance(footprint, x, z);
         case 'rect':    return rectDistance(footprint, x, z);
         case 'ellipse': return ellipseDistance(footprint, x, z);
+        case 'polygon': return outlineDistance(polygonPoints(footprint), x, z);
+        case 'path':    return outlineDistance(flattenPath(footprint), x, z);
         default:        return null;
     }
+}
+
+/** How far inside a closed outline a point is, negative outside, or null for no outline. */
+function outlineDistance(corners, x, z) {
+    if (corners.length < 3) return null;
+    const edge = distanceToOutline(corners, x, z, true);
+    return insidePolygon(corners, x, z) ? edge : -edge;
+}
+
+/**
+ * A regular figure's corners: `sides` of them, `radius` from its middle, the
+ * first at `angle` - or, with an `inner` below 1, a star of `sides` points,
+ * every other corner pulled in to `inner` of the radius. Worked out from the
+ * figure each time rather than kept, because the figure is what is held: a
+ * hexagon with its `sides` set to 7 is a heptagon, not six points to redraw.
+ *
+ * Empty for a figure that is no region - no radius, or fewer than three sides.
+ */
+export function polygonPoints(footprint) {
+    const { x = 0, z = 0, radius = 0, angle = 0 } = footprint ?? {};
+    const sides = Math.round(Number(footprint?.sides));
+    if (!(radius > 0) || !(sides >= 3)) return [];
+
+    const count = Math.min(sides, 64);
+    const inner = Number(footprint?.inner);
+    const star  = Number.isFinite(inner) && inner > 0 && inner < 1;
+    const steps = star ? count * 2 : count;
+    const points = [];
+    for (let i = 0; i < steps; i++) {
+        const theta = (Number(angle) || 0) + (i / steps) * Math.PI * 2;
+        const reach = star && i % 2 === 1 ? radius * inner : radius;
+        points.push([x + Math.cos(theta) * reach, z + Math.sin(theta) * reach]);
+    }
+    return points;
+}
+
+/** How many straight pieces each curve of a path is flattened into. */
+export const PATH_PIECES = 12;
+
+/** The flattened outline of each path, worked out once for as long as the path is held. */
+const FLATTENED = new WeakMap();
+
+/**
+ * A boundary of curves as the closed outline it is weighed by: a smooth curve
+ * through every control point, as a Catmull-Rom spline does - round the whole
+ * loop when the path is `closed`, and through its points in order with the
+ * last joined straight back to the first when it is not, which is what a
+ * curved polyline closes with.
+ *
+ * Flattened once per path rather than once per point weighed: a tile weighs a
+ * region at every one of its 40,401 vertices, and the curve is the same curve
+ * at all of them. The control points stay on the footprint, which is what a
+ * curve is edited by; the flattened outline is a derived thing, kept only while
+ * the footprint itself is.
+ */
+export function flattenPath(footprint) {
+    if (footprint == null || typeof footprint !== 'object') return [];
+    const held = FLATTENED.get(footprint);
+    if (held) return held;
+
+    const points = usablePoints(footprint.points);
+    const closed = footprint.closed !== false;
+    let outline = [];
+    if (points.length >= 3) {
+        const count = points.length;
+        const at = i => (closed ? points[(i + count) % count] : points[Math.min(Math.max(i, 0), count - 1)]);
+        const segments = closed ? count : count - 1;
+        for (let i = 0; i < segments; i++) {
+            const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+            for (let j = 0; j < PATH_PIECES; j++) {
+                const t = j / PATH_PIECES;
+                outline.push(catmullRom(p0, p1, p2, p3, t));
+            }
+        }
+        if (!closed) outline.push([...points[count - 1]]);
+    }
+    FLATTENED.set(footprint, outline);
+    return outline;
+}
+
+/** A point on the uniform Catmull-Rom curve between `p1` and `p2`, `t` of the way along. */
+function catmullRom(p0, p1, p2, p3, t) {
+    const t2 = t * t, t3 = t2 * t;
+    const along = k => 0.5 * (
+        2 * p1[k]
+        + (-p0[k] + p2[k]) * t
+        + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2
+        + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3
+    );
+    return [along(0), along(1)];
 }
 
 /** A click, which is what a dropped element covers. */
@@ -306,8 +443,12 @@ function falloff(inside, edge) {
     return smoothstep(inside / edge);
 }
 
-/** The feather a footprint carries, which is the sampling's where it names none. */
+/**
+ * The feather a footprint carries, which is the sampling's where it names none.
+ * A combination carries none of its own: its two regions keep theirs.
+ */
 function feather(footprint) {
+    if (footprint?.kind === COMBINE_KIND) return 0;
     const stated = Number(footprint?.feather);
     if (Number.isFinite(stated) && stated >= 0) return stated;
     return DEFAULT_FEATHER;
@@ -439,6 +580,30 @@ function extent(footprint) {
             if (!(radiusX > 0) || !(radiusZ > 0)) return null;
             const reach = Math.max(radiusX, radiusZ);
             return box(x - reach, x + reach, z - reach, z + reach);
+        }
+        case 'polygon': {
+            const corners = polygonPoints(footprint);
+            return corners.length >= 3 ? pointsBox(corners) : null;
+        }
+        case 'path': {
+            const outline = flattenPath(footprint);
+            return outline.length >= 3 ? pointsBox(outline) : null;
+        }
+        case COMBINE_KIND: {
+            // The squares of the two regions, feathers and all, since a
+            // combination has none of its own: both of them for a union, where
+            // they overlap for an intersection - and nowhere, which is no
+            // region, where they do not - and the first's for a cut.
+            if (!COMBINE_OPS.includes(footprint.op)) return null;
+            const a = footprintBounds(footprint.a);
+            const b = footprintBounds(footprint.b);
+            if (a == null || b == null) return null;
+            if (footprint.op === 'union') {
+                return box(Math.min(a.minX, b.minX), Math.max(a.maxX, b.maxX), Math.min(a.minZ, b.minZ), Math.max(a.maxZ, b.maxZ));
+            }
+            if (footprint.op === 'subtract') return a;
+            const both = box(Math.max(a.minX, b.minX), Math.min(a.maxX, b.maxX), Math.max(a.minZ, b.minZ), Math.min(a.maxZ, b.maxZ));
+            return both.minX < both.maxX && both.minZ < both.maxZ ? both : null;
         }
         default:
             return null;

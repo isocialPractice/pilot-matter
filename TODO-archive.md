@@ -4307,3 +4307,68 @@ still be found by name.
     edit in hand, picked or dropped. Confirmed in Chromium off the layer's own
     pixels.
   - From: Interactive Build Mode
+- [x] **The gumball**: the two handle sets the artwork declares, one for
+  elements with a height and one for those without, drawn at the placement's
+  centre with its axes projected from the camera
+  - **Settled**: `js/gumball.js` declares every handle by the id the art gives
+    it, Heights for an element declaring a `height` span and Flat for the
+    rest, and `gumballLayout` lays the bound ones out from the camera's
+    projection of the three axes - translated once from the art's blue-up
+    frame through `bearingToDirection`: red east, green north, blue up. It is
+    drawn on the edit in hand, picked or dropped, by `strokeGumball` on
+    `#build-overlay`, in the art's colours with the handle under the pointer
+    lit. Drawn in canvas 2D rather than from the SVGs, which are under
+    `.support` until `Builder art in the repository`.
+  - From: Interactive Build Mode
+- [x] **Gumball bindings**: each handle writing one declared value and nothing
+  else, clamped to the bounds the panel clamps to, so a drag and a typed number
+  are two ways into the same schema, with the centre moving the element on both
+  gumballs
+  - **Settled**: `handleBinding` names what each handle writes and a handle
+    bound to nothing is not drawn: the centre and the ground arrows the point
+    or the footprint's middle, the blue arrow a Heights element's height range
+    raised whole, the dot its `radius` and the tick its `height` scaled, the
+    squares a footprint's extent and the blue arc its angle. `dragHandle`
+    works out a drag as a whole from the grab, clamped and stepped as the
+    panel's rows are, and `writeGumball` writes it through the dock's holder.
+    `shift` at the press scales together; `ctrl` and the centre does nothing.
+    A handle moves nothing until it has travelled past a click - found in
+    Chromium, where a wobble on the centre changed a pick nobody meant to.
+  - From: Interactive Build Mode
+- [x] **Select shows what is selected**: the picked-up placement's own rows on
+  Select's panel beneath the camera fields, so a committed batch's density and
+  colour can still be changed
+  - **This is the item that brings the element editor back.** `L` moved to the
+    builder in `1.0.0-alpha.1.34.0`, and on 11.04.2026 the user decided to wait
+    for this rather than add an interim way in. So Select's panel also carries
+    the environment's own ranges - the element editor's rows, moved across the
+    whole world - as a section of its own, one editor with two scopes.
+  - **The rows are already reachable.** Since `1.0.0-alpha.1.43.0` a placement
+    picked with Select is the draft standing on it, and the dock draws that
+    draft's rows with `ACCEPT` and `CANCEL` in place of the camera fields. What
+    is left is the camera fields kept above them, and the environment's own
+    rows when nothing is picked.
+  - **Settled**: `dockContent` gives Select's panel `sections` beneath the
+    camera - the pick under `SELECTED` and its name, or with nothing picked
+    one `WORLD:` section for each of the environment's own elements, folded
+    until its heading is pressed - each row carrying its section and written
+    through that section's holder. The world's rows are the element editor's,
+    handed to `beginCanvas` by `canvasWorld`, held by the session as `world`,
+    drawn by `canvasElements`, and handed back by the way out to
+    `keepBuiltWorld`, so `YES` keeps them and `NO` does not. The element
+    editor's own panel is still unreachable; its rows live here now.
+  - From: Interactive Build Mode
+- [x] **Builder art in the repository**: the marks, panels and thumbnails the
+  builder ships copied into `assets/builder/` from an explicit list, renamed on
+  the way in, so the site and CI have every file the markup names
+  - **Settled**: `tools/sync-builder-assets.mjs`, run as `npm run
+    assets:builder` on the machine the art is drawn on, copies nineteen files
+    from an explicit list - the twelve tool marks named for their tool ids, the
+    folded palette's tab, and one thumbnail a canvas from the PNGs rather than
+    the wrappers - never prunes, and refuses when the source does not resolve.
+    `test/build-art.test.js` asks git, not the disk, that every file the page
+    and the code name is tracked, and refuses the source folder in anything
+    that ships. The gumball's exports are not shipped: it is laid out from the
+    camera every frame, which a drawing in one perspective cannot be. The
+    picker's cards are headed by their thumbnails.
+  - From: Interactive Build Mode

@@ -22,6 +22,7 @@ import {
     dropDraft, confirmOpen, buildConfirm, answerConfirm, acceptToolName,
     selectPlacement, pickedIndex, pickablePlacements,
     setSelection, deselect, buildLassoTool, chooseLassoTool, lassoValues, setLassoValues,
+    drawIntoSelection, selectionLive,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
@@ -32,7 +33,8 @@ import {
 import { placementAt, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
-    footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP
+    footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
+    regionEdges, contoured
 } from './build-overlay.js';
 import {
     boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle,
@@ -52,7 +54,10 @@ import {
     dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
     DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT
 } from './build-panel.js';
-import { lassoTool, lassoFootprint, clickVertex, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS } from './lasso.js';
+import {
+    lassoTool, lassoFootprint, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
+} from './lasso.js';
+import { flattenPath } from './environment/footprints.js';
 import { PanelView } from './panel-view.js';
 import {
     stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces
@@ -170,6 +175,9 @@ const LASSO_PALETTE_TOOL = 'lasso';
  * not a thousand points.
  */
 const LASSO_SAMPLE_PIXELS = 6;
+
+/** Keys a canvas keeps from the browser, whose own use of them would take the page from the builder. */
+const CANVAS_SWALLOWED_KEYS = ['AltLeft', 'AltRight'];
 
 /** How soon after a click a second on the same spot is the same double click, in milliseconds. */
 const DOUBLE_CLICK_MS = 500;
@@ -377,6 +385,9 @@ class FlightSimulator {
         // Where and when a click-per-vertex shape was last closed, so the
         // second press of the double click that closed it starts nothing.
         this.lassoClosed = null;
+        // A combined selection's edge as last traced, and which selection it
+        // was traced for.
+        this.selectionTrace = null;
 
         // What the dock last drew, which a press on it is read against, and
         // the holder an edit in hand is stepped through - its configuration,
@@ -1032,7 +1043,10 @@ class FlightSimulator {
         // release lands, and every one is let go of when the window loses the
         // keys - a release made behind another window never arrives, and the
         // view would slide on after it.
-        window.addEventListener('keyup', (e) => this.buildKeys.delete(e.code));
+        window.addEventListener('keyup', (e) => {
+            this.buildKeys.delete(e.code);
+            if (buildModeDrawing(this.builder) && CANVAS_SWALLOWED_KEYS.includes(e.code)) e.preventDefault();
+        });
         window.addEventListener('blur', () => this.buildKeys.clear());
     }
 
@@ -2103,7 +2117,12 @@ class FlightSimulator {
         // The selection, whatever tool is live - it outlives the one that drew
         // it - and the shape the lasso is drawing, under everything else.
         const selection = this.builder.selection;
-        if (selection) strokePaths(ctx, this.screenRegion(footprintLoop(selection), true, width, height), SELECTION_OUTLINE);
+        if (selection) {
+            const edge = contoured(selection)
+                ? this.screenRuns(this.selectionEdges(selection), width, height)
+                : this.screenRegion(footprintLoop(selection), true, width, height);
+            strokePaths(ctx, edge, SELECTION_OUTLINE);
+        }
         const drawing = this.lassoDrawingPath();
         if (drawing) strokePaths(ctx, this.screenRegion(drawing.points, drawing.closed, width, height), DRAWING_OUTLINE);
 
@@ -2256,7 +2275,7 @@ class FlightSimulator {
         const gesture = cameraGesture(e, tool);
         if (!gesture) {
             if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
-            else if (e.button === 0 && !e.shiftKey && tool === LASSO_PALETTE_TOOL) this.lassoPress(e);
+            else if (e.button === 0 && tool === LASSO_PALETTE_TOOL) this.lassoPress(e);
             return;
         }
 
@@ -2342,7 +2361,7 @@ class FlightSimulator {
             // Let go of, the shape is made; cancelled or taken away, it is not.
             const drawn = this.lassoDrawing;
             this.cancelLasso();
-            if (e.type === 'pointerup' && drawn.travelled) this.finishLasso(drawn.tool, drawn.points);
+            if (e.type === 'pointerup' && drawn.travelled) this.finishLasso(drawn.tool, drawn.points, drawn.op, drawn.square);
             return;
         }
 
@@ -2466,6 +2485,10 @@ class FlightSimulator {
         const screen = { x: e.clientX, y: e.clientY };
         e.preventDefault();
 
+        // How the shape meets the selection, read here once and never again:
+        // `shift` adds it, `alt` cuts it out, and neither draws it inside.
+        const op = lassoOp(e, selectionLive(this.builder));
+
         if (tool.gesture === LASSO_CLICKS) {
             // The second press of the double click that closed a shape is
             // still that double click, not the first point of another.
@@ -2479,9 +2502,13 @@ class FlightSimulator {
             if (shape.closed) {
                 this.cancelLasso();
                 this.lassoClosed = { ...screen, time: performance.now() };
-                this.finishLasso(tool.id, shape.points);
+                this.finishLasso(tool.id, shape.points, drawing?.op ?? op, false);
             } else {
-                this.lassoDrawing = { gesture: LASSO_CLICKS, tool: tool.id, points: shape.points, screens: shape.screens };
+                // A shape of clicks keeps the op its first click latched.
+                this.lassoDrawing = {
+                    gesture: LASSO_CLICKS, tool: tool.id, points: shape.points, screens: shape.screens,
+                    op: drawing?.op ?? op
+                };
             }
             return;
         }
@@ -2490,7 +2517,8 @@ class FlightSimulator {
         this.renderer.domElement.setPointerCapture(e.pointerId);
         this.lassoDrawing = {
             gesture: LASSO_DRAG, tool: tool.id, pointer: e.pointerId, points: [ground], last: screen,
-            start: screen, type: e.pointerType, travelled: false
+            start: screen, type: e.pointerType, travelled: false,
+            op, shiftUp: !e.shiftKey, square: false
         };
     }
 
@@ -2502,6 +2530,11 @@ class FlightSimulator {
     dragLasso(e) {
         const drawing = this.lassoDrawing;
         const screen  = { x: e.clientX, y: e.clientY };
+
+        // `shift` held from the press is the add it latched; pressed again
+        // once the drag is under way, it keeps a box square and an ellipse
+        // round.
+        Object.assign(drawing, squareInDrag(drawing, e.shiftKey));
 
         // A drag is a shape only once it has travelled further than a click
         // may, the rule every press on the canvas keeps: a box a few pixels
@@ -2524,14 +2557,14 @@ class FlightSimulator {
     }
 
     /**
-     * A shape finished: the region it comes to becomes the selection, in place
-     * of any before it - and a shape that came to no region, a box a few pixels
-     * across or a ring of two points, selects nothing and leaves the selection
-     * as it was.
+     * A shape finished: the region it comes to drawn into the selection by the
+     * op its press latched - the selection where there was none, added to it,
+     * drawn inside it or cut out of it - and a shape that came to no region, a
+     * box a few pixels across or a ring of two points, changes nothing.
      */
-    finishLasso(tool, points) {
-        const footprint = lassoFootprint(tool, points, lassoValues(this.builder));
-        if (footprint) setSelection(this.builder, footprint);
+    finishLasso(tool, points, op, square = false) {
+        const footprint = lassoFootprint(tool, points, lassoValues(this.builder), { square });
+        if (footprint) drawIntoSelection(this.builder, footprint, op, { tool, size: this.terrain.size });
         this.syncOverlays();
     }
 
@@ -2557,7 +2590,7 @@ class FlightSimulator {
         const points = drawing.points.map(p => [p.x, p.z]);
 
         if (drawing.gesture === LASSO_DRAG && tool?.kind !== 'ring') {
-            const region = lassoFootprint(drawing.tool, drawing.points, lassoValues(this.builder));
+            const region = lassoFootprint(drawing.tool, drawing.points, lassoValues(this.builder), { square: drawing.square });
             return region ? { points: footprintLoop(region), closed: true } : { points, closed: false };
         }
 
@@ -2565,11 +2598,33 @@ class FlightSimulator {
             const ground = this.pickCanvasPoint(this.canvasPointer.x, this.canvasPointer.y);
             if (ground) points.push([ground.x, ground.z]);
         }
+
+        // A curve is drawn as the curve it will be, through its points and out
+        // to the pointer, left open until it is closed.
+        if (tool?.kind === 'path' && points.length >= 3) {
+            return { points: flattenPath({ kind: 'path', points, closed: false }), closed: false };
+        }
         return { points, closed: false };
+    }
+
+    /**
+     * A combined selection's edge, traced from its weight the first time it is
+     * asked for and kept for as long as the selection is that one - a trace is
+     * a few hundredths of a second, and a frame comes many times a second.
+     */
+    selectionEdges(selection) {
+        const key = `${this.terrain.size}:${JSON.stringify(selection)}`;
+        if (this.selectionTrace?.key !== key) this.selectionTrace = { key, runs: regionEdges(selection, this.terrain.size) };
+        return this.selectionTrace.runs;
     }
 
     /** A run of canvas points as it falls on a screen `width` by `height`, wherever on the canvas it repeats. */
     screenRegion(points, closed, width, height) {
+        return this.screenRuns(canvasPieces(subdividePath(points, PATH_STEP, closed), this.terrain.size), width, height);
+    }
+
+    /** Runs of canvas points already on the canvas, each stood on the ground and projected. */
+    screenRuns(runs, width, height) {
         const point = this.overlayPoint;
         const project = (x, y, z) => {
             point.set(x, y, z).project(this.camera);
@@ -2577,8 +2632,7 @@ class FlightSimulator {
             return { x: (point.x + 1) / 2 * width, y: (1 - point.y) / 2 * height };
         };
         const heightAt = (x, z) => this.terrain.getTerrainHeightAt(x, z);
-        return canvasPieces(subdividePath(points, PATH_STEP, closed), this.terrain.size)
-            .flatMap(piece => projectPath(piece, heightAt, project));
+        return runs.flatMap(run => projectPath(run, heightAt, project));
     }
 
     /**
@@ -2806,6 +2860,15 @@ class FlightSimulator {
     }
 
     onBuilderKey(e) {
+        // `alt` cuts a shape out of the selection, and on its own some browsers
+        // lift the focus to the window's menu with it, which in the middle of
+        // a cut takes the next key from the canvas. On a canvas it is the
+        // builder's.
+        if (buildModeDrawing(this.builder) && CANVAS_SWALLOWED_KEYS.includes(e.code)) {
+            e.preventDefault();
+            return;
+        }
+
         // A confirm open on the canvas takes every key: it is the one thing
         // the pilot has been asked, and nothing behind it moves until it is
         // answered or called off.

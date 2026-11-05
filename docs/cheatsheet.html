@@ -296,8 +296,11 @@
         <tr><td>Click, or a finger, in Mountain</td><td>Drop a mountain there, or put the one in hand down there instead</td></tr>
         <tr><td>Drag a gumball handle</td><td>Move, slide, raise or spread what is in hand, whatever tool is live</td></tr>
         <tr><td>The chevrons atop the palette</td><td>Fold the tools away to a tab, and bring them back; kept for the next canvas</td></tr>
-        <tr><td>Drag, or a finger, in Lasso</td><td>Draw a selection with the chosen lasso tool - Free, Rectangle, Ellipse or Round Rect.</td></tr>
-        <tr><td>Click in Lasso, with Polyline</td><td>Place a point; click the first one again, or double click, to close the shape</td></tr>
+        <tr><td>Drag, or a finger, in Lasso</td><td>Draw a selection with the chosen lasso tool - Free, Rectangle, Ellipse, Round Rect., Triangle, Star or Polygon - or, with one live, draw within it</td></tr>
+        <tr><td><kbd>Shift</kbd> and drag in Lasso</td><td>Add the shape to the selection</td></tr>
+        <tr><td><kbd>Alt</kbd> and drag in Lasso</td><td>Cut the shape out of the selection</td></tr>
+        <tr><td>Drag in Lasso, then <kbd>Shift</kbd></td><td>Keep a box square or an ellipse round</td></tr>
+        <tr><td>Click in Lasso, with Polyline or a curved tool</td><td>Place a point; click the first one again, or double click, to close the shape</td></tr>
         <tr><td><kbd>Shift</kbd> and a dot or a tick</td><td>Stretch a mountain's height and spread together</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>End a drag being made, or ask <code>ACCEPT EDITS</code> with an edit in hand and <code>SAVE AND EXIT MODE</code> without</td></tr>
         <tr><td><kbd>Enter</kbd></td><td>Answer the question asked, on the button under the cursor</td></tr>
@@ -313,6 +316,7 @@
 <p>In Select, the placement under the pointer is outlined in white and the one picked, or dropped and in hand, in blue. A press that travels more than a few pixels orbits and picks nothing. A pick changed on the dock asks <code>ACCEPT EDITS</code> before it is let go; one left as it was asks nothing.</p>
 
 <p>The lasso's panel is its tools in the art's rows, and <code>DESELECT</code> while something is selected. The selection is a dashed white line on the ground that stays across tool changes until <code>DESELECT</code> drops it. A mountain dropped inside it is cut at its edge, and a click outside it drops nothing. A selection is not an edit, so leaving with one asks only whether to save.</p>
+<p>Triangle, Star and Polygon stand on the press and reach to the pointer, turned the way it went. <code>NUMBER OF SIDES</code>, <code>NUMBER OF POINTS</code>, <code>STAR RATIO</code> and a rounded box's <code>CORNER</code> reshape the selection the tool drew, where it stands. Curved Polygon runs a smooth curve through the points clicked and round the loop; Curved Polyline runs it through them and closes straight back to the start. The key held at the press says how a shape meets the selection, and holds to the end of the shape: <kbd>Shift</kbd> adds it, <kbd>Alt</kbd> cuts it out, and neither keeps only the ground inside both. A shape that leaves no ground selected drops the selection. <kbd>Shift</kbd> pressed once a drag is under way squares the box or rounds the ellipse instead, so the one key does both.</p>
 
 <p>What is in hand carries the gumball, in the art's colours: red east, green north, blue up. The white centre moves it over the ground, the red and green arrows slide it along one axis, the blue arrow makes a mountain taller rather than lifting it, the dot on each axis spreads it and the tick stands it taller or lower. A handle moves nothing until it has been dragged further than a click, and holds to the same bounds the dock's rows do.</p>
 

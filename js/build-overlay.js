@@ -22,6 +22,7 @@
  */
 
 import { placementReach, PICK_WEIGHT } from './build-select.js';
+import { footprintSampler, polygonPoints, flattenPath, COMBINE_KIND } from './environment/footprints.js';
 import { canvasPickBounds } from './build-picking.js';
 import { AXIS_COLOURS } from './gumball.js';
 
@@ -306,6 +307,10 @@ export function footprintLoop(footprint) {
             const points = (footprint.points ?? []).filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
             return points.length >= 3 ? points.map(([x, z]) => [x, z]) : [];
         }
+        case 'polygon':
+            return polygonPoints(footprint);
+        case 'path':
+            return flattenPath(footprint).map(([x, z]) => [x, z]);
         case 'disc': {
             const { x = 0, z = 0, radius = 0 } = footprint;
             return radius > 0 ? around(64, t => [x + Math.cos(t) * radius, z + Math.sin(t) * radius]) : [];
@@ -422,4 +427,78 @@ export function strokePaths(ctx, paths, style) {
         ctx.stroke();
     }
     ctx.setLineDash?.([]);
+}
+
+// --- A selection of shapes combined -----------------------------------------------
+
+/**
+ * The weight a combined region's edge is traced at: a hair inside where it
+ * reaches nothing, so the line lies on the outer edge of the feathers.
+ */
+export const EDGE_LEVEL = 0.01;
+
+/**
+ * The edge of a region with no one outline of its own - shapes added to a
+ * selection, drawn inside it or cut out of it - as runs of canvas points, the
+ * contour of its weight chained end to end so a dashed line flows along it.
+ * Traced over the canvas through the region's wrapped weight, so it is drawn on
+ * both sides of a seam it crosses. A region that has an outline of its own is
+ * better drawn from `footprintLoop`, which is its exact edge.
+ */
+export function regionEdges(footprint, size = 0, cells = OUTLINE_CELLS) {
+    if (!(Number(size) > 0)) return [];
+    const segments = contourSegments(footprintSampler(footprint, size), canvasPickBounds(size), cells, EDGE_LEVEL);
+    return chainSegments(segments);
+}
+
+/** True for a region that is drawn from its contour rather than its own outline. */
+export function contoured(footprint) {
+    return footprint?.kind === COMBINE_KIND;
+}
+
+/**
+ * Segments that meet end to end joined into runs of points: each run followed
+ * from a loose end, or round a loop from anywhere on it, until it closes or
+ * stops. Ends are matched to the thousandth of a unit, which is how marching
+ * squares hands two neighbouring cells the same crossing.
+ */
+export function chainSegments(segments) {
+    const key = (x, z) => `${x.toFixed(3)},${z.toFixed(3)}`;
+    const ends = new Map();
+    const used = new Array(segments.length).fill(false);
+    segments.forEach(([x1, z1, x2, z2], i) => {
+        for (const k of [key(x1, z1), key(x2, z2)]) {
+            if (!ends.has(k)) ends.set(k, []);
+            ends.get(k).push(i);
+        }
+    });
+
+    const follow = (start, fromEnd) => {
+        const run = [];
+        let i = start;
+        let at = fromEnd;
+        while (i != null && !used[i]) {
+            used[i] = true;
+            const [x1, z1, x2, z2] = segments[i];
+            const [from, to] = at === 0 ? [[x1, z1], [x2, z2]] : [[x2, z2], [x1, z1]];
+            if (run.length === 0) run.push(from);
+            run.push(to);
+            const next = (ends.get(key(to[0], to[1])) ?? []).find(j => !used[j]);
+            if (next == null) break;
+            const [nx1, nz1] = segments[next];
+            at = key(nx1, nz1) === key(to[0], to[1]) ? 0 : 1;
+            i = next;
+        }
+        return run;
+    };
+
+    const runs = [];
+    // Loose ends first, so an open run is followed from one end to the other.
+    segments.forEach(([x1, z1, x2, z2], i) => {
+        if (used[i]) return;
+        if (ends.get(key(x1, z1)).length === 1) runs.push(follow(i, 0));
+        else if (ends.get(key(x2, z2)).length === 1) runs.push(follow(i, 1));
+    });
+    segments.forEach((_, i) => { if (!used[i]) runs.push(follow(i, 0)); });
+    return runs.filter(run => run.length > 1);
 }

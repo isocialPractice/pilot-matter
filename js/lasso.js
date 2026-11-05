@@ -10,16 +10,21 @@
  * closed by clicking the first point again or the last one twice.
  *
  * A tool is drawn only once the kind it draws is one `js/environment/footprints.js`
- * can read. Triangle, Star and Polygon Select are a `polygon`, and the two
- * curved tools a `path`; until those kinds exist they are declared here with
- * their rows and their art, and the sub-palette does not draw them - the same
- * rule the palette keeps for its own tiles.
+ * can read - the rule the palette keeps for its own tiles - and all ten now are.
+ *
+ * A shape meets a selection already there one of three ways, read once at the
+ * press: added to it with `shift`, cut out of it with `alt`, or drawn inside it
+ * with neither - and with nothing selected, a shape is simply the selection.
+ * `shift` pressed again once a drag is under way is the other thing the key
+ * means: it keeps a box square and an ellipse round.
  *
  * Pure module with no DOM or Three.js dependency, so what a gesture comes to
  * can be unit tested in Node.
  */
 
-import { FOOTPRINT_KINDS, isFootprint } from './environment/footprints.js';
+import {
+    FOOTPRINT_KINDS, isFootprint, combineFootprints, footprintSampler, footprintBounds, flattenPath
+} from './environment/footprints.js';
 import { scalar } from './environment/elements.js';
 import { BUILDER_ART } from './build-tools.js';
 
@@ -47,7 +52,9 @@ export const LASSO_ROWS = Object.freeze(['row-shapes-1', 'row-shapes-2', 'row-po
  * icon and none of its label, which the page writes instead.
  *
  * `ranges` are the tool's own fields, drawn under the tiles while it is the
- * chosen tool.
+ * chosen tool, and `fields` says which value of the region each one is - so a
+ * value changed after the region is drawn reshapes the region, rather than
+ * asking for it to be drawn again.
  */
 export const LASSO_TOOLS = Object.freeze([
     { id: 'free',            label: 'FREE SELECT',            row: 'row-shapes-1', kind: 'ring',    gesture: LASSO_DRAG,   art: [24.1, 97.64, 29.23, 26.1] },
@@ -58,11 +65,27 @@ export const LASSO_TOOLS = Object.freeze([
         art: [20.47, 159.79, 52.76, 31.36],
         // How round the corners are, in world units: the radius of the arc
         // each corner is cut to, held to half the shorter side when it is drawn.
-        ranges: Object.freeze({ corner: scalar(0, 4000, 600) })
+        ranges: Object.freeze({ corner: scalar(0, 4000, 600) }),
+        fields: Object.freeze({ corner: 'corner' })
     },
-    { id: 'triangle',        label: 'TRIANGLE SELECT',        row: 'row-shapes-2', kind: 'polygon', gesture: LASSO_DRAG,   art: [121.82, 159.79, 42.25, 31.35] },
-    { id: 'star',            label: 'STAR SELECT',            row: 'row-shapes-2', kind: 'polygon', gesture: LASSO_DRAG,   art: [205.85, 156.1, 33.6, 34.35] },
-    { id: 'polygon',         label: 'POLYGON SELECT',         row: 'row-polygons', kind: 'polygon', gesture: LASSO_DRAG,   art: [56.79, 223.71, 52.55, 30.11] },
+    { id: 'triangle',        label: 'TRIANGLE SELECT',        row: 'row-shapes-2', kind: 'polygon', gesture: LASSO_DRAG,   art: [121.82, 159.79, 42.25, 31.35], sides: 3 },
+    {
+        id: 'star', label: 'STAR SELECT', row: 'row-shapes-2', kind: 'polygon', gesture: LASSO_DRAG,
+        art: [205.85, 156.1, 33.6, 34.35],
+        // How many points it has, and how far in between them it is drawn,
+        // as a share of how far out the points reach.
+        ranges: Object.freeze({
+            numberOfPoints: Object.freeze({ ...scalar(3, 12, 5), step: 1 }),
+            starRatio: scalar(0.1, 0.9, 0.45)
+        }),
+        fields: Object.freeze({ numberOfPoints: 'sides', starRatio: 'inner' })
+    },
+    {
+        id: 'polygon', label: 'POLYGON SELECT', row: 'row-polygons', kind: 'polygon', gesture: LASSO_DRAG,
+        art: [56.79, 223.71, 52.55, 30.11],
+        ranges: Object.freeze({ numberOfSides: Object.freeze({ ...scalar(3, 12, 6), step: 1 }) }),
+        fields: Object.freeze({ numberOfSides: 'sides' })
+    },
     { id: 'polyline',        label: 'POLYLINE SELECT',        row: 'row-polygons', kind: 'ring',    gesture: LASSO_CLICKS, art: [143.38, 223.71, 52.55, 32.11] },
     { id: 'curved-polygon',  label: 'CURVED POLYGON SELECT',  row: 'row-curves',   kind: 'path',    gesture: LASSO_CLICKS, art: [46.57, 290.68, 45.35, 27.81] },
     { id: 'curved-polyline', label: 'CURVED POLYLINE SELECT', row: 'row-curves',   kind: 'path',    gesture: LASSO_CLICKS, art: [166.16, 286.41, 49.22, 37.69] }
@@ -127,8 +150,17 @@ const SAME_POINT = 1;
  * - **A box** is the two corners a drag spans, square to the canvas, its
  *   corners rounded to the panel's `corner` and held to half its shorter side.
  * - **An ellipse** fills the box a drag spans.
+ * - **A regular figure** stands on the press, its first corner where the
+ *   pointer is, so the drag sizes it and turns it; its sides and its points'
+ *   depth are the panel's.
+ * - **A curve** runs smoothly through the points clicked, round the whole loop
+ *   for a curved polygon, and joined straight back to its start for a curved
+ *   polyline.
+ *
+ * `square` - `shift` pressed once the drag is under way - keeps a box square
+ * and an ellipse round, sized to the longer way the drag went.
  */
-export function lassoFootprint(id, points = [], values = {}) {
+export function lassoFootprint(id, points = [], values = {}, { square = false } = {}) {
     const tool = lassoTool(id);
     if (tool == null || !lassoToolBuilt(id)) return null;
 
@@ -146,9 +178,31 @@ export function lassoFootprint(id, points = [], values = {}) {
         return { kind: 'ring', points: ring };
     }
 
+    if (tool.kind === 'path') {
+        const ring = distinct(usable);
+        if (ring.length < 3) return null;
+        const path = { kind: 'path', points: ring, closed: tool.id === 'curved-polygon' };
+        return Math.abs(ringArea(flattenPath(path))) < MIN_REGION * MIN_REGION / 2 ? null : path;
+    }
+
     if (usable.length < 2) return null;
     const a = usable[0];
-    const b = usable[usable.length - 1];
+    let   b = usable[usable.length - 1];
+
+    if (tool.kind === 'polygon') {
+        const radius = Math.hypot(b.x - a.x, b.z - a.z);
+        if (radius < MIN_REGION / 2) return null;
+        const field = name => Number(values?.[name] ?? tool.ranges?.[name]?.default);
+        const sides = tool.sides ?? Math.round(field(tool.ranges?.numberOfSides ? 'numberOfSides' : 'numberOfPoints'));
+        const inner = tool.ranges?.starRatio ? field('starRatio') : 1;
+        return { kind: 'polygon', x: a.x, z: a.z, radius, sides, inner, angle: Math.atan2(b.z - a.z, b.x - a.x) };
+    }
+
+    if (square) {
+        const side = Math.max(Math.abs(b.x - a.x), Math.abs(b.z - a.z));
+        b = { x: a.x + Math.sign(b.x - a.x || 1) * side, z: a.z + Math.sign(b.z - a.z || 1) * side };
+    }
+
     const width = Math.abs(b.x - a.x);
     const depth = Math.abs(b.z - a.z);
     if (width < MIN_REGION || depth < MIN_REGION) return null;
@@ -167,6 +221,17 @@ export function lassoFootprint(id, points = [], values = {}) {
     }
 
     return null;
+}
+
+/** The points a gesture gave, each one that landed on the one before it dropped. */
+function distinct(points) {
+    const out = [];
+    for (const p of points) {
+        const last = out[out.length - 1];
+        if (last && Math.hypot(p.x - last[0], p.z - last[1]) < SAME_POINT) continue;
+        out.push([p.x, p.z]);
+    }
+    return out;
 }
 
 /** Twice the area a ring encloses, signed by the way it winds. */
@@ -216,4 +281,89 @@ export function clickVertex(shape, ground, screen) {
 /** True for a footprint a selection can be: one the region arithmetic can read. */
 export function isSelection(footprint) {
     return isFootprint(footprint);
+}
+
+// --- A shape against a selection --------------------------------------------------
+
+/** How a shape is combined with the selection, by the key held at its press. */
+export const LASSO_ADD      = 'union';
+export const LASSO_CUT      = 'subtract';
+export const LASSO_WITHIN   = 'intersect';
+
+/**
+ * The way a shape meets the selection, read once, at the press: `shift` adds it,
+ * `alt` cuts it out, and neither draws it inside - which is the clip every tool
+ * that minds the lasso already has. With nothing selected there is nothing to
+ * draw inside, so the default is to add, and the shape becomes the selection.
+ *
+ * Read at the press and never again, so a shape does not change what it does
+ * halfway through because a key came up early.
+ */
+export function lassoOp({ shiftKey = false, altKey = false } = {}, selected = false) {
+    if (altKey) return LASSO_CUT;
+    if (shiftKey) return LASSO_ADD;
+    return selected ? LASSO_WITHIN : LASSO_ADD;
+}
+
+/**
+ * The selection a shape leaves: the shape itself where nothing was selected and
+ * it adds, the two combined by its op where something was, and nothing at all
+ * where it cuts out of nothing. Null where the shape is no region.
+ */
+export function combineSelection(selection, shape, op) {
+    if (shape == null) return selection ?? null;
+    if (selection == null) return op === LASSO_CUT ? null : shape;
+    return combineFootprints(op, selection, shape);
+}
+
+/**
+ * True for a region that covers any ground on a canvas `size` wide - which a
+ * shape drawn inside a selection it does not touch, or one cut out of the
+ * whole of it, does not. Sampled across its square rather than weighed
+ * everywhere, finely enough that a sliver a few cells wide is found.
+ */
+export function coversGround(footprint, size = 0) {
+    const square = footprintBounds(footprint);
+    if (square == null) return false;
+    const weigh = footprintSampler(footprint, size);
+    const across = 96;
+    for (let j = 0; j <= across; j++) {
+        for (let i = 0; i <= across; i++) {
+            const x = square.minX + (square.maxX - square.minX) * i / across;
+            const z = square.minZ + (square.maxZ - square.minZ) * j / across;
+            if (weigh(x, z) > 0) return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * A region drawn by a tool, reshaped by the values on its panel: each field the
+ * tool declares written to the value of the region it stands for, so six sides
+ * set to seven is the heptagon in the same place rather than a hexagon to draw
+ * again. A rounded box's corner is held to half its shorter side, as it was
+ * when it was drawn. Null for a region the tool did not draw.
+ */
+export function reshapeFootprint(footprint, id, values = {}) {
+    const tool = lassoTool(id);
+    if (tool == null || footprint == null || footprint.kind !== tool.kind) return null;
+    const shaped = { ...footprint };
+    for (const [name, field] of Object.entries(tool.fields ?? {})) {
+        const value = Number(values?.[name]);
+        if (!Number.isFinite(value)) continue;
+        shaped[field] = field === 'sides' ? Math.round(value) : value;
+    }
+    if (shaped.kind === 'rect') shaped.corner = Math.min(Math.max(shaped.corner ?? 0, 0), Math.min(shaped.width, shaped.depth) / 2);
+    return shaped;
+}
+
+/**
+ * Whether a drag is kept square, from `shift` as it is now and as it was. A
+ * `shift` held from the press is the add, latched there, and keeps nothing
+ * square; once it has been up, pressing it again does. Returns the drag's new
+ * reading, `{ shiftUp, square }`.
+ */
+export function squareInDrag(drawing, shiftKey) {
+    const shiftUp = Boolean(drawing?.shiftUp) || !shiftKey;
+    return { shiftUp, square: Boolean(shiftKey) && shiftUp };
 }

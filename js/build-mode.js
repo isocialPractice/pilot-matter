@@ -23,7 +23,9 @@
 import { SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso } from './build-tools.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
 import { footprintWeight } from './environment/footprints.js';
-import { DEFAULT_LASSO_TOOL, lassoTool, lassoToolBuilt, isSelection } from './lasso.js';
+import {
+    DEFAULT_LASSO_TOOL, lassoTool, lassoToolBuilt, isSelection, combineSelection, coversGround, reshapeFootprint
+} from './lasso.js';
 
 /**
  * The one name, on the menu entry and on the picker that entry opens. A pilot
@@ -141,6 +143,10 @@ export function createBuildState() {
         // outlives the tool that drew it, so a lasso drawn once is the region
         // every tool that minds it works inside, until a deselect.
         selection: null,
+        // The lasso tool the selection was drawn with while it is one shape -
+        // its fields on the panel reshape it - and null once shapes have been
+        // combined into it, when no one tool's fields describe it.
+        selectionTool: null,
         // Which of the lasso's ten tools is chosen, and where its fields were
         // left.
         lassoTool: DEFAULT_LASSO_TOOL,
@@ -718,6 +724,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.dropped = state.placements.length;
     // A canvas opens with nothing selected and the lasso on its first tool.
     state.selection = null;
+    state.selectionTool = null;
     state.lassoTool = DEFAULT_LASSO_TOOL;
     state.lassoValues = {};
     return true;
@@ -781,10 +788,38 @@ export function buildSelection(state) {
  * A selection is not an edit: it asks nothing when it is drawn, replaced or
  * dropped, and leaving a canvas with one drawn keeps nothing of it.
  */
-export function setSelection(state, footprint) {
+export function setSelection(state, footprint, { tool = null } = {}) {
     if (!buildModeDrawing(state) || confirmOpen(state) || !isSelection(footprint)) return false;
     state.selection = own(footprint);
+    state.selectionTool = lassoToolBuilt(tool) ? tool : null;
     return true;
+}
+
+/**
+ * A finished shape drawn into the selection by the op its press latched -
+ * added, drawn inside, or cut out - by `tool`, on a canvas `size` wide.
+ *
+ * With nothing selected a shape that adds is the selection, drawn by its tool,
+ * and one that cuts out of nothing leaves nothing. Combined with a selection,
+ * the result belongs to no one tool. A result that covers no ground - a shape
+ * drawn inside a selection it does not touch, or cut out of the whole of it -
+ * leaves nothing selected, since that is what it selects. A shape that came to
+ * no region changes nothing.
+ *
+ * Returns true when the selection changed.
+ */
+export function drawIntoSelection(state, shape, op, { tool = null, size = 0 } = {}) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !isSelection(shape)) return false;
+
+    const before = state.selection;
+    const next = combineSelection(before, shape, op);
+    if (next == null || !coversGround(next, size)) {
+        if (before == null) return false;
+        state.selection = null;
+        state.selectionTool = null;
+        return true;
+    }
+    return setSelection(state, next, { tool: before == null ? tool : null });
 }
 
 /**
@@ -795,6 +830,7 @@ export function setSelection(state, footprint) {
 export function deselect(state) {
     if (!buildModeDrawing(state) || confirmOpen(state) || !selectionLive(state)) return false;
     state.selection = null;
+    state.selectionTool = null;
     return true;
 }
 
@@ -818,11 +854,26 @@ export function lassoValues(state) {
     return values;
 }
 
-/** Keeps a value moved on the chosen lasso tool's panel, for the next shape it draws. */
+/**
+ * Keeps a value moved on the chosen lasso tool's panel, for the next shape it
+ * draws - and, while the selection is one shape that tool drew, for that shape
+ * too: a hexagon's sides set to seven reshape the hexagon already on the
+ * ground rather than waiting for the next to be drawn.
+ */
 export function setLassoValues(state, values = {}) {
     const ranges = lassoTool(state?.lassoTool)?.ranges ?? {};
     const kept = { ...(state.lassoValues ?? {}) };
     for (const name of Object.keys(ranges)) if (Number.isFinite(values?.[name])) kept[name] = values[name];
     state.lassoValues = kept;
+
+    if (state.selection != null && state.selectionTool === state.lassoTool) {
+        const shaped = reshapeFootprint(state.selection, state.lassoTool, lassoValues(state));
+        if (shaped != null && isSelection(shaped)) state.selection = shaped;
+    }
     return lassoValues(state);
+}
+
+/** The lasso tool the selection was drawn with, while it is one shape, or null. */
+export function selectionTool(state) {
+    return selectionLive(state) ? state.selectionTool : null;
 }
