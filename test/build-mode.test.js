@@ -9,6 +9,7 @@ import {
     reviseDraft, acceptDraft, cancelDraft, builtPlacements, ACCEPT_EDITS, SAVE_AND_EXIT,
     confirmOpen, buildConfirm, answerConfirm, acceptToolName, dropDraft, placementSeed,
     toolStartValues, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_YES, CONFIRM_NO, CONFIRM_STAY,
+    selectPlacement, pickedIndex, pickablePlacements, editPending, samePlacement,
     ACCEPTED, CANCELLED,
     BUILDER_LABEL, BUILDER_ENTRY_ID, BUILDER_OPEN_KEYS, PICKER_CLOSE_KEYS, CANVAS_LEAVE_KEYS,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE, BUILD_PICKER, BUILD_CANVAS
@@ -25,6 +26,7 @@ import { PAUSE_KEY } from '../js/pause.js';
 import { PHOTO_KEY } from '../js/photo.js';
 import { CAMERA_CYCLE_KEY } from '../js/camera-math.js';
 import { reservedRole, isReservedKey } from '../js/reserved-keys.js';
+import { getElement, resolveConfig } from '../js/environment/elements.js';
 
 test('a session is closed until something opens it', () => {
     const state = createBuildState();
@@ -553,7 +555,7 @@ test('YES on ACCEPT EDITS from the way out commits the edit and stays, so accept
     requestLeave(state);
 
     const answered = answerConfirm(state, CONFIRM_YES);
-    assert.deepEqual(answered, { settled: ACCEPTED, tool: 'mountain' });
+    assert.deepEqual(answered, { settled: ACCEPTED, tool: 'mountain', picked: null });
     assert.equal(buildModeDrawing(state), true, 'still on the canvas');
     assert.equal(confirmOpen(state), false);
     assert.equal(committedPlacements(state).length, 1, 'the mountain is kept');
@@ -567,7 +569,7 @@ test('NO on ACCEPT EDITS from the way out drops the edit and stays', () => {
     const state = withMountainDropped();
     requestLeave(state);
 
-    assert.deepEqual(answerConfirm(state, CONFIRM_NO), { settled: CANCELLED, tool: 'mountain' });
+    assert.deepEqual(answerConfirm(state, CONFIRM_NO), { settled: CANCELLED, tool: 'mountain', picked: null });
     assert.equal(buildModeDrawing(state), true);
     assert.equal(draftPending(state), false);
     assert.deepEqual(committedPlacements(state), [], 'nothing was there before, so nothing is');
@@ -589,13 +591,13 @@ test('a confirm called off settles nothing, and anything but YES or NO calls it 
 test('YES on a tool change commits and changes, and NO drops and changes', () => {
     const kept = withMountainDropped();
     chooseBuildTool(kept, SELECT_TOOL);
-    assert.deepEqual(answerConfirm(kept, CONFIRM_YES), { settled: ACCEPTED, tool: SELECT_TOOL });
+    assert.deepEqual(answerConfirm(kept, CONFIRM_YES), { settled: ACCEPTED, tool: SELECT_TOOL, picked: null });
     assert.equal(buildModeTool(kept), SELECT_TOOL);
     assert.equal(committedPlacements(kept).length, 1);
 
     const dropped = withMountainDropped();
     chooseBuildTool(dropped, SELECT_TOOL);
-    assert.deepEqual(answerConfirm(dropped, CONFIRM_NO), { settled: CANCELLED, tool: SELECT_TOOL },
+    assert.deepEqual(answerConfirm(dropped, CONFIRM_NO), { settled: CANCELLED, tool: SELECT_TOOL, picked: null },
         'the click on the tile already said where the pilot is going');
     assert.equal(buildModeTool(dropped), SELECT_TOOL);
     assert.deepEqual(committedPlacements(dropped), []);
@@ -810,4 +812,196 @@ test('a canvas opens with what was kept on it already committed, as copies', () 
     dropDraft(state, { x: 0, z: 0 });
     assert.equal(buildDraft(state).seed, placementSeed(2),
         'seeds count on from what it opened with');
+});
+
+// --- Picking a built element with Select ----------------------------------------
+
+/** A canvas with two placements committed and Select live, which is where a pick is made. */
+function withTwoToPick() {
+    const state = withTwo();
+    chooseBuildTool(state, SELECT_TOOL);
+    return state;
+}
+
+test('a click on a placement picks it, as an edit standing on it', () => {
+    const state = withTwoToPick();
+
+    assert.deepEqual(selectPlacement(state, 1), { picked: 1 });
+    assert.equal(pickedIndex(state), 1);
+    assert.deepEqual(buildDraft(state), MEADOW, 'the draft is the placement as it was committed');
+    assert.equal(state.draft.replaces, 1, 'and stands on it, so accepting changes it rather than adding one');
+    assert.equal(editPending(state), false, 'but nothing has been done to it yet');
+    assert.deepEqual(committedPlacements(state), [PEAK, MEADOW], 'and the committed list is untouched');
+});
+
+test('a second click on the picked placement keeps it, rather than letting it go', () => {
+    const state = withTwoToPick();
+    selectPlacement(state, 0);
+
+    assert.equal(selectPlacement(state, 0), null, 'nothing changes');
+    assert.equal(pickedIndex(state), 0, 'and it is still picked');
+});
+
+test('a click on another placement picks that one instead', () => {
+    const state = withTwoToPick();
+    selectPlacement(state, 0);
+
+    assert.deepEqual(selectPlacement(state, 1), { picked: 1 });
+    assert.equal(pickedIndex(state), 1);
+    assert.equal(confirmOpen(state), false, 'without asking, because the first was not changed');
+});
+
+test('a click on bare ground lets go of the pick, and with nothing picked does nothing', () => {
+    const state = withTwoToPick();
+    assert.equal(selectPlacement(state, null), null, 'nothing picked, nothing to let go');
+
+    selectPlacement(state, 1);
+    assert.deepEqual(selectPlacement(state, null), { picked: null });
+    assert.equal(draftPending(state), false);
+    assert.equal(selectPlacement(state, 7), null, 'an index nothing is committed at is bare ground');
+});
+
+test('only Select picks, only on a canvas, and never under a question', () => {
+    const mountain = withTwo();
+    chooseBuildTool(mountain, 'mountain');
+    assert.equal(selectPlacement(mountain, 0), null, 'a click with Mountain drops one rather than picking');
+    assert.equal(draftPending(mountain), false);
+
+    const asking = withTwoToPick();
+    requestLeave(asking);
+    assert.equal(selectPlacement(asking, 0), null);
+    assert.equal(pickedIndex(asking), null);
+
+    const picker = createBuildState();
+    openBuildMode(picker, BUILD_FROM_TITLE);
+    assert.equal(selectPlacement(picker, 0), null);
+});
+
+/**
+ * A pick that was changed is work in hand, and letting it go decides what
+ * happens to that work - so it is asked about, the way a tool change asks.
+ */
+test('letting go of a changed pick asks ACCEPT EDITS first, holding where the click was going', () => {
+    const state = withTwoToPick();
+    selectPlacement(state, 0);
+    reviseDraft(state, { config: { height: [900, 900] } });
+    assert.equal(editPending(state), true);
+
+    assert.deepEqual(selectPlacement(state, 1), { confirm: ACCEPT_EDITS });
+    assert.equal(pickedIndex(state), 0, 'the changed pick is still in hand while it is asked about');
+
+    assert.deepEqual(answerConfirm(state, CONFIRM_YES), { settled: ACCEPTED, tool: SELECT_TOOL, picked: 1 },
+        'YES keeps the change, then picks the one the click was on');
+    assert.deepEqual(committedPlacements(state)[0].config.height, [900, 900]);
+    assert.deepEqual(buildDraft(state), MEADOW);
+});
+
+test('NO drops the change and goes on; calling it off keeps the change in hand', () => {
+    const dropped = withTwoToPick();
+    selectPlacement(dropped, 0);
+    reviseDraft(dropped, { config: { height: [900, 900] } });
+    selectPlacement(dropped, null);
+    assert.deepEqual(answerConfirm(dropped, CONFIRM_NO), { settled: CANCELLED, tool: SELECT_TOOL, picked: null },
+        'a click on bare ground, once answered, leaves nothing picked');
+    assert.deepEqual(committedPlacements(dropped), [PEAK, MEADOW], 'and the placement is as it was committed');
+
+    const stayed = withTwoToPick();
+    selectPlacement(stayed, 0);
+    reviseDraft(stayed, { config: { height: [900, 900] } });
+    selectPlacement(stayed, 1);
+    assert.deepEqual(answerConfirm(stayed, CONFIRM_STAY), { stay: true });
+    assert.equal(pickedIndex(stayed), 0);
+    assert.deepEqual(buildDraft(stayed).config.height, [900, 900]);
+});
+
+/**
+ * An edit nothing was done to is not an edit: the dock writes a placement's
+ * whole configuration back as it is stepped, and stepping a value away and
+ * back is the placement it was.
+ */
+test('a pick is changed only when what it draws changed', () => {
+    const state = withTwoToPick();
+    selectPlacement(state, 0);
+
+    reviseDraft(state, { config: resolveConfig(getElement('mountain'), PEAK.config) });
+    assert.equal(editPending(state), false, 'the defaults written out in full are no change');
+
+    reviseDraft(state, { config: { height: [300, 310] } });
+    assert.equal(editPending(state), true);
+    reviseDraft(state, { config: { height: [300, 300] } });
+    assert.equal(editPending(state), false, 'and a value stepped away and back is none either');
+
+    assert.equal(samePlacement(PEAK, { ...PEAK, seed: 5 }), false, 'a different seed is different ground');
+    assert.equal(samePlacement(PEAK, { ...PEAK, footprint: { ...PEAK.footprint, radius: 700 } }), false);
+    assert.equal(samePlacement(null, null), true);
+    assert.equal(samePlacement(PEAK, null), false);
+});
+
+test('a placement drawn on bare ground is always work in hand', () => {
+    const state = withMountainDropped();
+    assert.equal(editPending(state), true);
+    assert.equal(pickedIndex(state), null, 'and is not a pick');
+});
+
+test('an untouched pick asks nothing: the way out asks to save, and a tool change just changes', () => {
+    const leaving = withTwoToPick();
+    selectPlacement(leaving, 1);
+    assert.equal(acceptToolName(leaving), 'Save and exit');
+    assert.deepEqual(requestLeave(leaving), { confirm: SAVE_AND_EXIT });
+
+    const changing = withTwoToPick();
+    selectPlacement(changing, 1);
+    assert.equal(chooseBuildTool(changing, 'mountain'), true, 'the tool changes at once');
+    assert.equal(draftPending(changing), false, 'and the pick is let go of');
+    assert.equal(confirmOpen(changing), false);
+});
+
+test('a changed pick asks before the way out or a tool change, like any edit', () => {
+    const state = withTwoToPick();
+    selectPlacement(state, 1);
+    reviseDraft(state, { config: { band: [0, 600] } });
+
+    assert.equal(acceptToolName(state), 'Accept edits');
+    assert.equal(chooseBuildTool(state, 'mountain'), false);
+    assert.equal(buildConfirm(state), ACCEPT_EDITS);
+});
+
+test('a pick looks through the committed placements as they stand, the picked one with its changes', () => {
+    const state = withTwoToPick();
+    selectPlacement(state, 0);
+    reviseDraft(state, { config: { height: [900, 900] } });
+
+    const shown = pickablePlacements(state);
+    assert.equal(shown.length, 2);
+    assert.deepEqual(shown[0].config.height, [900, 900], 'its reach is the ground on the canvas');
+    assert.deepEqual(shown[1], MEADOW);
+
+    const drawing = withMountainDropped();
+    assert.deepEqual(pickablePlacements(drawing), [], 'and a placement not yet committed is not one to pick');
+});
+
+// --- Back to the built world --------------------------------------------------------
+
+test('a builder with a built world to go back to opens on it, with no picker', () => {
+    const state = createBuildState();
+    openBuildMode(state, BUILD_FROM_PAUSE, { environment: 'blank-canvas', placements: [PEAK, MEADOW] });
+
+    assert.equal(buildModeDrawing(state), true, 'straight onto the canvas');
+    assert.equal(buildModePicking(state), false);
+    assert.equal(buildModeEnvironment(state), 'blank-canvas');
+    assert.equal(buildModeFrom(state), BUILD_FROM_PAUSE, 'still returning to what opened it');
+    assert.equal(buildModeTool(state), SELECT_TOOL, 'looking at it');
+    assert.deepEqual(committedPlacements(state), [PEAK, MEADOW], 'with every placement it had committed');
+
+    assert.deepEqual(selectPlacement(state, 0), { picked: 0 }, 'each one still a placement that can be picked up');
+    reviseDraft(state, { config: { height: [500, 500] } });
+    acceptDraft(state);
+    assert.deepEqual(committedPlacements(state)[0].config.height, [500, 500], 'and changed');
+});
+
+test('a builder with nothing built opens on the picker, as the first session does', () => {
+    const state = createBuildState();
+    openBuildMode(state, BUILD_FROM_TITLE, null);
+    assert.equal(buildModePicking(state), true);
+    assert.deepEqual(committedPlacements(state), []);
 });

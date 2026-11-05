@@ -985,6 +985,21 @@
             margin-top: 12px;
         }
 
+        /* The layer the builder draws over the ground rather than into it: the
+           outline of the placement under the pointer and of the one in hand,
+           stood on the terrain each frame. It is over the ground and under
+           every panel, and takes no presses - a click on an outline is a click
+           on the ground it lies over. */
+        #build-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 110;
+        }
+
         /* The builder's palette: the tools down the left of a canvas, as a
            column of tiles two wide. It holds only the tools that work - Select,
            Mountain, and the accept tool across the foot of the column, which is
@@ -1738,6 +1753,8 @@
         <ul id="build-picker-actions"></ul>
         <small>W/S, ↑/↓ OR MOUSE TO SELECT &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO LEAVE</small>
     </div>
+
+    <canvas id="build-overlay" aria-hidden="true"></canvas>
 
     <nav id="build-palette" aria-label="Builder tools"></nav>
 

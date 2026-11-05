@@ -228,7 +228,9 @@ runway last.
 A canvas carries the tools that work down the left and its own control list in
 the corner. `ACCEPT AND EXIT` and `Esc` are the one way out, back to whichever
 menu opened the builder, and both ask first; `Backspace` leaves the picker but
-not a canvas.
+not a canvas. Once a build has been kept, `L` opens straight onto it with no
+picker; choosing another world in the settings lets go of it, and the picker is
+back.
 
 | Input | Does |
 |-------|------|
@@ -237,6 +239,7 @@ not a canvas.
 | Wheel | Zoom toward the ground under the pointer, out no further than the whole canvas |
 | `W`/`A`/`S`/`D` or the arrows | Move across the ground, the way the view faces |
 | `Home` | Back to the view the canvas opened on |
+| Click, or a finger, in Select | Pick the built placement under it, keep the one picked, or let go of it on bare ground |
 | Click, or a finger, in Mountain | Drop a mountain there, or put the one in hand down there instead |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
@@ -251,6 +254,11 @@ off the panel calls the question off. `YES` on `ACCEPT EDITS` keeps the edit and
 stays, so keeping work never doubles as leaving; `YES` on `SAVE AND EXIT MODE`
 keeps what was built as the world flown and leaves. Choosing another tool with
 an edit in hand asks `ACCEPT EDITS` first.
+
+In Select, the placement under the pointer is outlined in white and the one
+picked, or dropped and in hand, in blue. A press that travels more than a few
+pixels orbits and picks nothing. A pick changed on the dock asks `ACCEPT EDITS`
+before it is let go; one left as it was asks nothing.
 
 ## Element editor
 

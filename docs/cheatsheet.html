@@ -281,7 +281,7 @@
 
 <h2 id="builder-canvas-cheat">Builder canvas</h2>
 
-<p>A canvas carries the tools that work down the left and its own control list in the corner. <code>ACCEPT AND EXIT</code> and <kbd>Esc</kbd> are the one way out, back to whichever menu opened the builder, and both ask first; <kbd>Backspace</kbd> leaves the picker but not a canvas.</p>
+<p>A canvas carries the tools that work down the left and its own control list in the corner. <code>ACCEPT AND EXIT</code> and <kbd>Esc</kbd> are the one way out, back to whichever menu opened the builder, and both ask first; <kbd>Backspace</kbd> leaves the picker but not a canvas. Once a build has been kept, <kbd>L</kbd> opens straight onto it with no picker; choosing another world in the settings lets go of it, and the picker is back.</p>
 
 <div class="table-wrap">
 <table>
@@ -292,6 +292,7 @@
         <tr><td>Wheel</td><td>Zoom toward the ground under the pointer, out no further than the whole canvas</td></tr>
         <tr><td><kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd> or the arrows</td><td>Move across the ground, the way the view faces</td></tr>
         <tr><td><kbd>Home</kbd></td><td>Back to the view the canvas opened on</td></tr>
+        <tr><td>Click, or a finger, in Select</td><td>Pick the built placement under it, keep the one picked, or let go of it on bare ground</td></tr>
         <tr><td>Click, or a finger, in Mountain</td><td>Drop a mountain there, or put the one in hand down there instead</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>End a drag being made, or ask <code>ACCEPT EDITS</code> with an edit in hand and <code>SAVE AND EXIT MODE</code> without</td></tr>
         <tr><td><kbd>Enter</kbd></td><td>Answer the question asked, on the button under the cursor</td></tr>
@@ -303,6 +304,8 @@
 <p>Down the right is the dock: <code>SELECTION MODE</code>, the camera written out as fields to read and type into, or the edit in hand with <code>ACCEPT</code> and <code>CANCEL</code> under it. Only its fields scroll, and the wheel over it scrolls them.</p>
 
 <p>The two questions open on <code>YES</code>; the arrows cross to <code>NO</code>, and <kbd>Esc</kbd> or a press off the panel calls the question off. <code>YES</code> on <code>ACCEPT EDITS</code> keeps the edit and stays, so keeping work never doubles as leaving; <code>YES</code> on <code>SAVE AND EXIT MODE</code> keeps what was built as the world flown and leaves. Choosing another tool with an edit in hand asks <code>ACCEPT EDITS</code> first.</p>
+
+<p>In Select, the placement under the pointer is outlined in white and the one picked, or dropped and in hand, in blue. A press that travels more than a few pixels orbits and picks nothing. A pick changed on the dock asks <code>ACCEPT EDITS</code> before it is let go; one left as it was asks nothing.</p>
 
 <h2 id="element-editor-cheat">Element editor</h2>
 

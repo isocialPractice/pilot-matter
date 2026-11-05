@@ -260,6 +260,7 @@ test('the builder list reads as the input and then what it does', () => {
         'Wheel - Zoom',
         'W/A/S/D or ↑/←/↓/→ - Move',
         'Home - Reframe',
+        'Click (Select) - Pick a Built Element',
         'Click (Mountain) - Drop a Mountain',
         'Esc - Accept Edits or Save and Exit',
         'Enter - Answer a Question',

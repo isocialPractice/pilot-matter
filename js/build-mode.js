@@ -5,9 +5,10 @@
  * The builder is an editor laid over one tile of the world, where ground is
  * shaped by pointing at it rather than by stepping a number in a list. This
  * module is the session that holds while that is happening: the live tool, the
- * edit in hand and what has been committed, and the two questions asked before
- * work is settled or the builder is left. What the ground looks like is the
- * generator's, drawn from the placements this holds.
+ * edit in hand and what has been committed, the placement picked up again with
+ * Select, and the two questions asked before work is settled or the builder is
+ * left. What the ground looks like is the generator's, drawn from the
+ * placements this holds.
  *
  * There are three ways in - the title screen's entry, the pause menu's entry
  * and the `L` key - and they are one action, because three ways into the same
@@ -20,6 +21,7 @@
  */
 
 import { SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement } from './build-tools.js';
+import { getElement, isElementId, resolveConfig } from './environment/elements.js';
 
 /**
  * The one name, on the menu entry and on the picker that entry opens. A pilot
@@ -110,7 +112,9 @@ export function createBuildState() {
         // The edit in hand, and null while nothing is pending: a placement
         // being drawn or changed, the index of the committed placement it
         // replaces, or null for one drawn on bare ground, and the tool that
-        // began it, or null for one picked up again.
+        // began it, or null for one picked up again. A placement picked with
+        // Select is a draft standing on it, so the pick and the edit of it are
+        // one thing rather than two that could disagree.
         draft: null,
         // The question waiting on the pilot, and null while nothing is asked:
         // which confirm is open, and what goes ahead once it is answered - the
@@ -129,17 +133,26 @@ export function createBuildState() {
 /**
  * Opens the builder, remembering what opened it.
  *
- * On its picker, which is where a session with nothing built yet starts. A
- * session that reopens straight onto what was built is the branch that arrives
- * with the built world; until there is one, every session starts by choosing
- * what to start from.
+ * On its picker the first time, and straight onto the built world every time
+ * after that. `built` is the world an earlier session kept - `{ environment,
+ * placements }` - and with one the session opens on its canvas with every
+ * placement it had already committed, each still one that can be picked up and
+ * changed: a pilot who comes back to their world wants their world, not a
+ * choice of six and a blank canvas. With none, which is a world nothing has
+ * been built on, it opens on the picker to choose what to start from.
+ *
+ * Starting again from another base is choosing another world in the settings,
+ * which lets go of what was built on the old one, so the builder opens on the
+ * picker again.
  */
-export function openBuildMode(state, from = BUILD_FROM_TITLE) {
+export function openBuildMode(state, from = BUILD_FROM_TITLE, built = null) {
     state.screen = BUILD_PICKER;
     state.from = from === BUILD_FROM_PAUSE ? BUILD_FROM_PAUSE : BUILD_FROM_TITLE;
     state.environment = null;
     state.tool = null;
     state.confirm = null;
+
+    if (built != null) beginCanvas(state, built.environment, built.placements);
     return state;
 }
 
@@ -209,6 +222,8 @@ export const CANCELLED = 'cancelled';
  *   a question about saving.
  * - **With nothing in hand** it asks `SAVE AND EXIT MODE`, whether or not
  *   anything was built - a session with nothing built meets it like any other.
+ *   A placement picked and not changed is nothing in hand: there is no edit in
+ *   it to keep or drop.
  *
  * So leaving by keyboard is `Escape` to ask and `Enter` on `YES`, and never one
  * press. With a confirm already open it asks nothing: `Escape` then calls that
@@ -221,7 +236,7 @@ export function requestLeave(state) {
     if (!buildModeShowing(state) || confirmOpen(state)) return null;
     if (buildModePicking(state)) return { leave: true };
 
-    const ask = draftPending(state) ? ACCEPT_EDITS : SAVE_AND_EXIT;
+    const ask = editPending(state) ? ACCEPT_EDITS : SAVE_AND_EXIT;
     state.confirm = { ask, then: null };
     return { confirm: ask };
 }
@@ -241,8 +256,8 @@ export function buildConfirm(state) {
  *
  * `ACCEPT EDITS` settles the edit in hand - `YES` commits it, `NO` drops it -
  * and then does what it was asked on the way to: changes the tool a palette
- * click named, or, asked by the way out, returns to the editor with the panel
- * where it was left. `SAVE AND EXIT MODE` leaves either way: `YES` keeping what
+ * click named, picks the placement a click with Select landed on, or, asked by
+ * the way out, returns to the editor with the panel where it was left. `SAVE AND EXIT MODE` leaves either way: `YES` keeping what
  * was built, `NO` dropping it for the world the session opened on.
  *
  * Calling a confirm off settles nothing. The edit is still in hand, the tool
@@ -250,8 +265,8 @@ export function buildConfirm(state) {
  *
  * Returns what the caller has to do: `{ leave: true, keep, environment,
  * placements }` for the way out - the world to keep, read before the session
- * closes - `{ settled, tool }` for an edit settled, `{ stay: true }` for a
- * confirm called off, or null when nothing was asked.
+ * closes - `{ settled, tool, picked }` for an edit settled, `{ stay: true }`
+ * for a confirm called off, or null when nothing was asked.
  */
 export function answerConfirm(state, answer) {
     const asked = state?.confirm;
@@ -274,7 +289,11 @@ export function answerConfirm(state, answer) {
 
     const tool = asked.then?.tool;
     if (tool != null && tool !== state.tool && isChoosableTool(tool)) state.tool = tool;
-    return { settled: answer === CONFIRM_YES ? ACCEPTED : CANCELLED, tool: state.tool };
+
+    const pick = asked.then?.pick;
+    if (Number.isInteger(pick)) pickUpPlacement(state, pick);
+
+    return { settled: answer === CONFIRM_YES ? ACCEPTED : CANCELLED, tool: state.tool, picked: pickedIndex(state) };
 }
 
 /**
@@ -285,7 +304,7 @@ export function answerConfirm(state, answer) {
  * ask too.
  */
 export function acceptToolName(state) {
-    return draftPending(state) ? 'Accept edits' : 'Save and exit';
+    return editPending(state) ? 'Accept edits' : 'Save and exit';
 }
 
 // --- The draft and the built world --------------------------------------------
@@ -299,9 +318,105 @@ function own(placement) {
     return structuredClone(placement);
 }
 
-/** True while an edit is in hand, which is the one predicate every confirm reads. */
+/** True while a draft is held - something drawn, or a placement picked up. */
 export function draftPending(state) {
     return state?.draft != null;
+}
+
+/**
+ * True while there is work in hand that a question has to settle, which is the
+ * one predicate every confirm reads: a placement drawn on bare ground, or a
+ * picked one changed since it was picked.
+ *
+ * A pick nothing has been done to is not an edit. It is the placement as it
+ * was committed, being looked at, and a question about keeping or dropping it
+ * would be a question with the same answer either way - so it is let go
+ * without one.
+ */
+export function editPending(state) {
+    if (!draftPending(state)) return false;
+
+    const picked = pickedIndex(state);
+    if (picked == null) return true;
+    return !samePlacement(state.draft.placement, state.placements[picked]);
+}
+
+/**
+ * True for two placements that draw the same ground: the same element, seed and
+ * footprint, and the same configuration once each is resolved against the
+ * ranges the element declares - so a value the panel wrote out in full, or
+ * stepped away and back again, is no change.
+ */
+export function samePlacement(a, b) {
+    if (a == null || b == null) return a == null && b == null;
+    return placementKey(a) === placementKey(b);
+}
+
+/** A placement written down so two can be compared: its configuration as the generator reads it. */
+function placementKey(placement) {
+    const config = isElementId(placement.type)
+        ? resolveConfig(getElement(placement.type), placement.config)
+        : placement.config ?? null;
+    return JSON.stringify([placement.type, placement.seed ?? null, placement.footprint ?? null, config]);
+}
+
+/** The committed placement the draft stands on - the one picked - or null. */
+export function pickedIndex(state) {
+    const replaces = state?.draft?.replaces;
+    return Number.isInteger(replaces) ? replaces : null;
+}
+
+/**
+ * The placements a pick looks through: the committed ones, each as it stands
+ * right now - the one picked with whatever has been done to it, so the reach a
+ * click is measured against is the ground on the canvas. Indexed as the
+ * committed list is, which is what a pick hands back.
+ */
+export function pickablePlacements(state) {
+    return builtPlacements(state).slice(0, state?.placements?.length ?? 0);
+}
+
+/**
+ * A click with Select on the canvas: `index` is the committed placement under
+ * it, or null for bare ground.
+ *
+ * - **On a placement** it picks it, replacing whatever was picked before - the
+ *   placement becomes the draft, so the dock draws its rows with the accept
+ *   and cancel that settle them, and the ground it stands for is redrawn as
+ *   they move.
+ * - **On the placement already picked** it keeps it. A pick that let go on a
+ *   second click would be one a pilot loses by clicking to be sure.
+ * - **On bare ground** it lets go of the pick. A live lasso is a different
+ *   selection, which only Deselect clears, and a click here never touches it.
+ *
+ * A pick that was changed is work in hand, so before it is let go of - for
+ * another placement or for bare ground - `ACCEPT EDITS` is asked, with what
+ * the click was on its way to held until it is answered. A pick nothing was
+ * done to is let go without asking.
+ *
+ * Refused off a canvas, with a confirm open, and for any tool but Select.
+ *
+ * Returns `{ picked }` for the placement now picked, or null when the click
+ * let go of it; `{ confirm }` when `ACCEPT EDITS` is now asking; or null when
+ * nothing changed.
+ */
+export function selectPlacement(state, index = null) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || state.tool !== SELECT_TOOL) return null;
+
+    const target = Number.isInteger(index) && index >= 0 && index < state.placements.length ? index : null;
+    const picked = pickedIndex(state);
+
+    if (target != null && target === picked) return null;
+    if (target == null && !draftPending(state)) return null;
+
+    if (editPending(state)) {
+        state.confirm = { ask: ACCEPT_EDITS, then: { pick: target } };
+        return { confirm: ACCEPT_EDITS };
+    }
+
+    state.draft = null;
+    if (target != null) pickUpPlacement(state, target);
+    return { picked: target };
 }
 
 /** The placement being drawn or changed, and null while nothing is pending. */
@@ -570,7 +685,9 @@ export function buildModeTool(state) {
  * to answer, so `ACCEPT EDITS` opens with the tool chosen held as what goes
  * ahead once it is answered, and the tool does not change yet: the panel stays
  * the one the edit is on until the answer changes both. A live selection is
- * not an edit, so leaving the lasso with one drawn will ask nothing.
+ * not an edit, so leaving the lasso with one drawn will ask nothing - and nor
+ * is a placement picked and left as it was, which is let go as the tool
+ * changes.
  *
  * Returns true when the live tool changed, and false when it did not - which,
  * with an edit pending, is because `ACCEPT EDITS` is now asking.
@@ -579,11 +696,12 @@ export function chooseBuildTool(state, id) {
     if (!buildModeDrawing(state) || confirmOpen(state) || !isChoosableTool(id)) return false;
     if (state.tool === id) return false;
 
-    if (draftPending(state)) {
+    if (editPending(state)) {
         state.confirm = { ask: ACCEPT_EDITS, then: { tool: id } };
         return false;
     }
 
+    state.draft = null;
     state.tool = id;
     return true;
 }

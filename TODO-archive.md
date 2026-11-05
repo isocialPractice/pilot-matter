@@ -4149,3 +4149,37 @@ still be found by name.
     committed, and while it is being edited `builtPlacements` shows the edit in
     its place.
   - From: Interactive Build Mode
+- [x] **Ground picking**: the canvas point under the pointer, raycast against
+  the ground rather than projected onto a plane, so a tilted view still lands on
+  what it is pointing at
+  - **Settled**: `pickGround` in the new `js/build-picking.js` walks the ray
+    against the heights the ground is drawn from and halves down to the
+    crossing, so a pick on a hill's face lands on the face; a ray meeting
+    ground off the canvas is a miss. Read off the heights rather than the mesh,
+    against the plan's suggestion of `THREE.Raycaster`, so it stays pure and
+    tested in Node; the two are the same surface to within a cell. Its first
+    consumer is the wheel, which now zooms toward the ground under the pointer.
+    Confirmed in Chromium: picks project back to the pixel they were taken at,
+    and a zoom leaves the pointed-at ground on the same pixel.
+  - From: Interactive Build Mode
+- [x] **One properties panel**: the element editor's row builder lifted into a
+  module of its own and the editor pointed at it, so there is one panel
+  generated from declared ranges rather than one drawn per tool
+  - **Settled**: `js/properties-panel.js`, lifted word for word, and the
+    element editor drawing through `panelRows` and stepping through `stepRow`
+    while still publishing every name it did. Its behaviour is unchanged by a
+    character: the editor at the commit before and after were driven through
+    the same session over all eleven worlds and gave the same 27,831 readings,
+    and `test/element-editor.test.js` passes untouched.
+  - From: Interactive Build Mode
+- [x] **Panel field kinds**: a toggle, a choice and a gate that disables a row
+  while its toggle is off, named for what `js/config.js` already calls them, so
+  the configurable features still queued are a registry edit rather than a
+  panel edit
+  - **Settled**: `toggle` already existed and is `TOGGLE_FIELD`; `choice` is
+    new and is `CHOICE_FIELD`. The gate is the plan's widened form, a `when`
+    option on any range - a field and the values that open it, or `ctx.<name>`
+    for the session - drawn held and kept rather than reset. The shipped
+    `gated` kind, whose bounds stay settable while its switch is off, is left as
+    it was. `color` is left for **Free paint**, the first thing that needs it.
+  - From: Interactive Build Mode

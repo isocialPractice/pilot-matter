@@ -12,7 +12,7 @@ import {
 } from './build-camera.js';
 import { PHOTO_KEY } from './photo.js';
 import { MENU_SELECT_KEYS } from './menu.js';
-import { BUILD_TOOLS, isBuiltTool } from './build-tools.js';
+import { BUILD_TOOLS, SELECT_TOOL, isBuiltTool } from './build-tools.js';
 
 export const HELP_KEY = 'KeyH';
 
@@ -113,6 +113,7 @@ export const BUILD_HELP_ROWS = Object.freeze([
         keys: [BUILD_MOVE_KEYS.forward, BUILD_MOVE_KEYS.left, BUILD_MOVE_KEYS.back, BUILD_MOVE_KEYS.right]
     },
     { id: 'reframe', label: 'Reframe',           keys: [REFRAME_KEYS] },
+    { id: 'pick',    label: 'Pick a Built Element', click: SELECT_TOOL },
     ...(isBuiltTool('mountain') ? [{ id: 'drop', label: 'Drop a Mountain', click: 'mountain' }] : []),
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
     { id: 'answer',  label: 'Answer a Question',             keys: [MENU_SELECT_KEYS.slice(0, 1)] },

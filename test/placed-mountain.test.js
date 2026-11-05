@@ -21,7 +21,10 @@ import {
     buildDraft, placementSeed, BUILD_FROM_TITLE
 } from '../js/build-mode.js';
 import { dockContent, draftHolderFor, panelRanges, canvasElements, DOCK_DRAFT } from '../js/build-panel.js';
-import { createEditorState, keepBuiltWorld, keptPlacements, editorPlacements, setEditorWorld } from '../js/element-editor.js';
+import {
+    createEditorState, keepBuiltWorld, keptPlacements, editorPlacements, setEditorWorld,
+    builtWorld, flownEnvironment
+} from '../js/element-editor.js';
 
 /** One peak of a known size, so where it stands can be read off the heights. */
 const PEAK = { height: [500, 500], radius: [1000, 1000] };
@@ -283,4 +286,61 @@ test('what was kept goes with its environment, and not with the strip', () => {
     setEditorWorld(editor, 'highlands', true);
     setEditorWorld(editor, 'lakeside', true);
     assert.deepEqual(keptPlacements(editor, 'lakeside'), [], 'another world drops it, being ground it was never built on');
+});
+
+// --- The built world, flown and gone back to ------------------------------------
+
+test('the builder goes back to the world a build was kept on, and to nothing before one is', () => {
+    const editor = createEditorState('highlands');
+    assert.equal(builtWorld(editor), null, 'nothing kept, so the builder opens on its picker');
+
+    keepBuiltWorld(editor, 'lakeside', false, KEPT);
+    assert.deepEqual(builtWorld(editor), { environment: 'lakeside', placements: KEPT });
+    builtWorld(editor).placements[0].config.count = 99;
+    assert.equal(builtWorld(editor).placements[0].config.count, 1, 'handed out as copies');
+
+    keepBuiltWorld(editor, 'lakeside', false, []);
+    assert.equal(builtWorld(editor), null, 'and a canvas kept with nothing on it is nothing built');
+});
+
+test('a build kept on a world the settings offer is flown on that world', () => {
+    const editor = createEditorState('highlands');
+    keepBuiltWorld(editor, 'lakeside', false, KEPT, 'lakeside');
+    assert.equal(flownEnvironment(editor, 'lakeside'), 'lakeside');
+    assert.equal(setEditorWorld(editor, 'lakeside', false), false, 'and the settings applied again change nothing');
+    assert.deepEqual(keptPlacements(editor, 'lakeside'), KEPT);
+});
+
+/**
+ * Blank Canvas is offered by the builder and not by the settings, so a build
+ * kept on it cannot be chosen there. It is flown on its own flat ground - not
+ * on the world the settings still hold, which is ground it was never built on
+ * - and kept through every setting applied after it, until another world is
+ * chosen.
+ */
+test('a build kept on Blank Canvas is flown on it, and kept until the settings choose another world', () => {
+    const editor = createEditorState('highlands');
+    keepBuiltWorld(editor, 'blank-canvas', false, KEPT, 'highlands');
+
+    assert.equal(flownEnvironment(editor, 'highlands'), 'blank-canvas', 'its own flat ground, not the world the settings hold');
+    assert.deepEqual(builtWorld(editor), { environment: 'blank-canvas', placements: KEPT });
+
+    assert.equal(setEditorWorld(editor, 'highlands', false), false, 'the weather or the units applied keep it');
+    assert.equal(setEditorWorld(editor, 'highlands', true), true, 'and a strip turned on keeps it too');
+    assert.equal(flownEnvironment(editor, 'highlands'), 'blank-canvas');
+    assert.deepEqual(keptPlacements(editor, 'blank-canvas'), KEPT);
+    assert.deepEqual(editorPlacements(editor).slice(0, -1).map(row => row.type),
+        environmentElements(getEnvironment('blank-canvas'), true).map(row => row.type),
+        'with the rows of the canvas it was built on');
+
+    setEditorWorld(editor, 'canyon-reach', true);
+    assert.equal(flownEnvironment(editor, 'canyon-reach'), 'canyon-reach', 'another world chosen is flown');
+    assert.equal(builtWorld(editor), null, 'and lets go of the build, so the builder opens on its picker again');
+});
+
+test('a world chosen in the settings is flown even before the editor has been put on it', () => {
+    const editor = createEditorState('highlands');
+    keepBuiltWorld(editor, 'blank-canvas', false, KEPT, 'highlands');
+    assert.equal(flownEnvironment(editor, 'lakeside'), 'lakeside');
+    assert.equal(flownEnvironment(createEditorState('highlands'), 'highlands'), 'highlands');
 });

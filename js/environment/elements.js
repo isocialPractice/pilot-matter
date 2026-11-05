@@ -555,74 +555,11 @@ const mountain = {
     },
 
     generate(field, config, random) {
-        // A mountain dropped at a point is one peak standing on it: the click
-        // said where and how many, so the count is not read. Measured to the
-        // nearest repeat of the square, so a peak dropped near an edge carries
-        // on across the seam into the next tile rather than stopping at it.
-        const at     = config.at ?? null;
-        const total  = at ? 1 : config.count > 0 ? Math.round(config.count) : mountainCount(field.size);
-        const half   = field.size / 2 - field.size * 0.10;
-        const wrap   = at ? field.size : 0;
-        const peaks  = [];
-
-        // The bulk mode read once rather than per peak, and as the two answers
-        // it gives rather than as itself, so the loop below reads one question
-        // per axis whichever way the mode is set. The third question is asked
-        // of `girthRange` alone: the mode reaches the two axes said outright,
-        // and under it `long` is already true, so there is no girth left to
-        // draw whatever that switch says.
-        const wide    = config.bulk || config.width.on;
-        const long    = config.bulk || config.length.on;
-        const stretch = config.girthRange.on;
-
-        for (let i = 0; i < total; i++) {
-            // Every value is drawn in the order it has always been drawn in,
-            // and each gate spends exactly the one draw the value it replaces
-            // spent: a gated range is read with `pick` where `radius` was read
-            // with `pick`, and in place of the single `random()` the girth
-            // stretch took. So turning a gate on changes that peak's footprint
-            // and nothing else about the world - every peak after it stands
-            // where it stood, because the stream it is laid out from is the
-            // same length whichever way the gates are set.
-            //
-            // Six draws a peak, and the bulk mode is no exception: it answers
-            // two of the three questions below rather than adding a question
-            // of its own, so a world laid in the mode has its peaks in the same
-            // places as the same world laid out of it.
-            //
-            // A peak dropped at a point spends the two draws its place would
-            // have taken and stands where it was dropped, so it takes from the
-            // stream exactly what a peak laid out of it does.
-            const drawnX = field.originX + (random() * 2 - 1) * half;
-            const drawnZ = field.originZ + (random() * 2 - 1) * half;
-            const x = at ? field.originX + at[0] : drawnX;
-            const z = at ? field.originZ + at[1] : drawnZ;
-
-            // The footprint, as the two axes of the ellipse the bump is drawn
-            // on. Held as a radius and a stretch rather than as the pair,
-            // because that is what `ellipticalDistance` measures with, and
-            // because an ungated peak then works out to the exact peak it
-            // always was rather than one that rounds to it.
-            const across = wide
-                ? pick(random, config.width.range)
-                : pick(random, config.radius);
-
-            const peak  = pick(random, config.height);
-            const angle = random() * Math.PI * 2;
-
-            // Three ways to the long axis and one draw whichever is taken: the
-            // length asked for outright, a girth drawn out of its own bounds,
-            // or the single girth stretched by the generator's own spread.
-            // The order is what gives a range said outright the last word over
-            // one the generator is working out for itself.
-            const along = long
-                ? pick(random, config.length.range)
-                : across * (1 + (stretch
-                    ? pick(random, config.girthRange.range)
-                    : config.girth * (0.4 + random())));
-
-            peaks.push({ x, z, radius: across, peak, angle, stretch: along / across });
-        }
+        const peaks = mountainPeaks(field, config, random);
+        // A peak dropped at a point is measured to the nearest repeat of the
+        // square, so one dropped near an edge carries on across the seam into
+        // the next tile rather than stopping at it.
+        const wrap  = config.at ? field.size : 0;
 
         for (let i = 0; i < field.count; i++) {
             const x = fieldX(field, i);
@@ -643,6 +580,87 @@ const mountain = {
         return peaks.length;
     }
 };
+
+/**
+ * The peaks a mountain lays out on a field: where each stands, the radius and
+ * stretch of the ellipse it is drawn on, the angle that ellipse is turned to,
+ * and how high it stands. The mountain's generator draws its bumps from these,
+ * and a pick reads them back to find a placed mountain under the pointer - the
+ * ground has no mountain in it to hit, only height, so the peaks are worked
+ * out again from the same configuration and the same stream.
+ *
+ * Takes from `random` exactly what the generator does, six draws a peak, so a
+ * caller handed a placement's own stream reads the peaks that placement drew.
+ */
+export function mountainPeaks(field, config, random) {
+    // A mountain dropped at a point is one peak standing on it: the click
+    // said where and how many, so the count is not read.
+    const at     = config.at ?? null;
+    const total  = at ? 1 : config.count > 0 ? Math.round(config.count) : mountainCount(field.size);
+    const half   = field.size / 2 - field.size * 0.10;
+    const peaks  = [];
+
+    // The bulk mode read once rather than per peak, and as the two answers
+    // it gives rather than as itself, so the loop below reads one question
+    // per axis whichever way the mode is set. The third question is asked
+    // of `girthRange` alone: the mode reaches the two axes said outright,
+    // and under it `long` is already true, so there is no girth left to
+    // draw whatever that switch says.
+    const wide    = config.bulk || config.width.on;
+    const long    = config.bulk || config.length.on;
+    const stretch = config.girthRange.on;
+
+    for (let i = 0; i < total; i++) {
+        // Every value is drawn in the order it has always been drawn in,
+        // and each gate spends exactly the one draw the value it replaces
+        // spent: a gated range is read with `pick` where `radius` was read
+        // with `pick`, and in place of the single `random()` the girth
+        // stretch took. So turning a gate on changes that peak's footprint
+        // and nothing else about the world - every peak after it stands
+        // where it stood, because the stream it is laid out from is the
+        // same length whichever way the gates are set.
+        //
+        // Six draws a peak, and the bulk mode is no exception: it answers
+        // two of the three questions below rather than adding a question
+        // of its own, so a world laid in the mode has its peaks in the same
+        // places as the same world laid out of it.
+        //
+        // A peak dropped at a point spends the two draws its place would
+        // have taken and stands where it was dropped, so it takes from the
+        // stream exactly what a peak laid out of it does.
+        const drawnX = field.originX + (random() * 2 - 1) * half;
+        const drawnZ = field.originZ + (random() * 2 - 1) * half;
+        const x = at ? field.originX + at[0] : drawnX;
+        const z = at ? field.originZ + at[1] : drawnZ;
+
+        // The footprint, as the two axes of the ellipse the bump is drawn
+        // on. Held as a radius and a stretch rather than as the pair,
+        // because that is what `ellipticalDistance` measures with, and
+        // because an ungated peak then works out to the exact peak it
+        // always was rather than one that rounds to it.
+        const across = wide
+            ? pick(random, config.width.range)
+            : pick(random, config.radius);
+
+        const peak  = pick(random, config.height);
+        const angle = random() * Math.PI * 2;
+
+        // Three ways to the long axis and one draw whichever is taken: the
+        // length asked for outright, a girth drawn out of its own bounds,
+        // or the single girth stretched by the generator's own spread.
+        // The order is what gives a range said outright the last word over
+        // one the generator is working out for itself.
+        const along = long
+            ? pick(random, config.length.range)
+            : across * (1 + (stretch
+                ? pick(random, config.girthRange.range)
+                : config.girth * (0.4 + random())));
+
+        peaks.push({ x, z, radius: across, peak, angle, stretch: along / across });
+    }
+
+    return peaks;
+}
 
 const canyon = {
     id: 'canyon',
@@ -1605,7 +1623,13 @@ export function applyElement(field, placement, random = createRandom()) {
 
 // --- Shared algorithms ----------------------------------------------------
 
-function ellipticalDistance(dx, dz, angle, stretch) {
+/**
+ * How far a point is from a peak's middle, measured on the ellipse the peak is
+ * drawn on: 1 radius along its turned long axis is `stretch` radii out. A
+ * mountain's bump and a pick of it both measure with this, so the ground a
+ * pick finds a mountain on is the ground the mountain raised.
+ */
+export function ellipticalDistance(dx, dz, angle, stretch) {
     const cos = Math.cos(angle), sin = Math.sin(angle);
     const along  = (dx * cos + dz * sin) / stretch;
     const across = -dx * sin + dz * cos;

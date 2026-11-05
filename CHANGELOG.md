@@ -5,6 +5,114 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.43.0] - 2026-11-04
+
+What was built can be reached again: Select picks up a placement by clicking
+it, the one under the pointer and the one in hand are outlined over the
+ground, and once a build has been kept the builder opens straight onto it -
+so every mountain built is still one that can be picked up and changed.
+
+### Added
+
+- **Select a built element.** With Select live, a click on something built
+  picks it up: it becomes the edit in hand, drawn on the dock with its own
+  rows under `ACCEPT` and `CANCEL`, so a mountain kept a session ago can still
+  have its height or its radius changed. A second click on it keeps it picked
+  rather than letting it go, and a click on bare ground - or over the sky -
+  lets go of it. A built element has no mesh to hit, being a write into the
+  ground's height and colour, so a click is measured against each committed
+  placement's reach instead: a mountain dropped at a point reaches as far as
+  the peak it stands as, worked out again from its own seeded stream, and is
+  found across the seam where its slope carries on; a placement drawn in a
+  region reaches through that region. Where two reach the click, the one
+  standing out most strongly there wins, so a small peak on the slope of a
+  large one is picked near its own top, and a tie goes to the one drawn on top.
+- **A click, not an orbit.** Select's left drag orbits, so a press is a click
+  only while it has travelled no more than five pixels - ten for a finger,
+  since a tap is never quite still. The view does not turn until a press has
+  gone further than that, and then turns by the whole of the way it came, so a
+  click never nudges the view and an orbit never ends by picking whatever the
+  pointer stopped over.
+- **A pick asks only when it carries work.** A pick nothing has been done to
+  is the placement as committed, being looked at, so it is let go without a
+  question - by a click elsewhere, by choosing another tool, and by the way
+  out, which asks `SAVE AND EXIT MODE` over it. One changed on the dock is work
+  in hand: letting it go asks `ACCEPT EDITS` first, and the click goes on to
+  pick what it landed on once that is answered. A value stepped away and back
+  again is no change.
+- **Selection highlight.** The placement under the pointer is outlined in a
+  thin white line, and the one in hand - picked with Select, or a mountain
+  dropped and not yet kept - in a firm blue one over a navy edge, with the
+  pointer a hand over anything a click would take. The outlines are drawn on a
+  layer over the canvas rather than into the ground: each is traced once round
+  the placement's reach, at exactly the strength a click needs, and stood on
+  the terrain through the camera every frame, so hovering and picking rebuild
+  no ground and an outline lies over the hillside however the view is turned.
+  A finger has no hover, only the outline of what it tapped.
+- **Back to the built world.** Once a build has been kept the builder opens
+  straight onto it - by `L`, by the title screen's entry and by the pause
+  menu's - with no picker in front of it, every placement on it committed and
+  each one Select can pick up. Starting over from another base is choosing
+  another world in the settings, which lets go of the build, and the picker is
+  back; a canvas kept with nothing built on it opens on the picker too.
+- **The control list** carries `Click (Select) - Pick a Built Element`.
+
+### Fixed
+
+- **A build kept on Blank Canvas was flown over the wrong ground.** Blank
+  Canvas is offered by the builder and not by the settings, so keeping a build
+  on it left the settings holding the world they held before, and the flight
+  laid the build over that world's hills rather than over the flat ground it
+  was built on. A free flight is now drawn on the world the build was kept on,
+  and the build is kept through every setting applied after it - the weather,
+  the units, the strip - until another world is chosen there.
+- **The accept tile could name the wrong question.** A value changed on the
+  dock redrew the dock alone, so with a pick changed the tile went on saying
+  `Save and exit` until something else redrew the palette. A value changed on
+  the edit in hand now redraws both.
+
+### Changed
+
+- **Mountain peaks are laid out by `mountainPeaks`.** The generator's peak
+  layout is exported from `js/environment/elements.js`, with
+  `ellipticalDistance`, so a pick reads the peak the ground was raised by
+  rather than a copy of the arithmetic. Every draw is taken in the order it
+  always was, and every world is the ground it was.
+
+Held in Node by the new `test/build-select.test.js` - the travel a click may
+make, a dropped mountain's reach agreeing with the ground the generator raised
+at every vertex, the seam, the stream of its own, footprints, the faint last
+stretch of a slope reading as bare, and the strongest and then the one drawn
+on top winning - and the new `test/build-overlay.test.js` - the contour, both
+readings of a saddle, an outline drawn exactly where a click stops finding the
+placement and carried across the seam, the projection and the stroke. In
+`test/build-mode.test.js`, every rule of a pick: picked as an edit standing on
+the placement, kept by a second click, let go on bare ground, refused for any
+tool but Select and under a question, asked about when changed and carried on
+once answered, let go silently by a tool change and by the way out when
+untouched, and a builder opening on its built world with no picker. In
+`test/placed-mountain.test.js`, the built world handed back and the world a
+flight is drawn on, Blank Canvas included; in `test/page.test.js`, the wiring.
+Each rejected the defect it names when that was put back, forty in all:
+among them a peak not found across the seam, a placed peak read off the
+world's stream, the last stretch of a slope picking, a tie ignoring what is
+drawn on top, a press of five pixels orbiting, a finger given a mouse's room, a
+saddle always joined, an outline end not stood on the ground, an untouched pick
+asking, a repeated click letting go, a changed pick let go without asking, the
+builder opening on its picker over a built world, a setting applied letting go
+of a Blank Canvas build, an orbit ending in a pick, a click nudging the view, a
+finger leaving a hover behind, and the accept tile's name going stale. Settled
+in Chromium in 35 checks across a desktop, the pause menu and a phone: the
+hover outlined in white with a hand for a cursor and nothing over bare ground,
+a click outlined in blue with its rows on the dock, a three-pixel wander still
+a click with the view unturned, a drag orbiting and picking nothing, a picked
+mountain lowered on its panel and the tile turning to `Accept edits`, bare
+ground then asking and `NO` putting it back, `L` reopening onto both mountains
+with no picker and either picked again, another world chosen in the settings
+bringing the picker back, a Blank Canvas build flown on flat ground and kept
+through a change of units, the pause menu reopening onto the built world with
+the flight kept, and a finger tapping a mountain to pick it.
+
 ## [1.0.0-alpha.1.42.0] - 2026-11-04
 
 The first tool that builds: Mountain drops a mountain where the ground is

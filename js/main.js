@@ -20,10 +20,15 @@ import {
     buildModeTool, chooseBuildTool, requestLeave, leavesBuilder, isCanvasLeaveKey,
     buildModeEnvironment, draftPending, buildDraft, reviseDraft, acceptDraft, cancelDraft,
     dropDraft, confirmOpen, buildConfirm, answerConfirm, acceptToolName,
+    selectPlacement, pickedIndex, pickablePlacements,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
-import { paletteTools, dropsAtClick, ACCEPT_TOOL } from './build-tools.js';
+import { paletteTools, dropsAtClick, ACCEPT_TOOL, SELECT_TOOL } from './build-tools.js';
+import { placementAt, travelledPast } from './build-select.js';
+import {
+    placementOutline, projectOutline, strokeOutline, HOVER_OUTLINE, CHOSEN_OUTLINE
+} from './build-overlay.js';
 import {
     createPickerState, pickerEntries, choosePickerEntry,
     CARD_ENTRY, PICKER_STARTED, PICKER_LEFT
@@ -100,7 +105,8 @@ import {
     createEditorState, setEditorWorld, editorShowing, openEditor, closeEditor,
     typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
-    setEditorClearance, isEditorCloseKey, keepBuiltWorld, keptPlacements, EDITOR_BACK_ID
+    setEditorClearance, isEditorCloseKey, keepBuiltWorld, keptPlacements, builtWorld,
+    flownEnvironment, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
@@ -292,6 +298,17 @@ class FlightSimulator {
         this.canvasGround = null;
         this.pointerRay   = new THREE.Raycaster();
 
+        // Where the pointer last was over a canvas, and the committed
+        // placement under it - which Select outlines lightly as what a click
+        // would take - with the outlines traced so far, kept by what they are
+        // the outline of so a placement is traced once rather than once a
+        // frame, and the point each end of one is projected through.
+        this.canvasPointer = null;
+        this.hovered       = null;
+        this.outlines      = new Map();
+        this.overlayPoint  = new THREE.Vector3();
+        this.overlayDrawn  = false;
+
         // What the dock last drew, which a press on it is read against, and
         // the holder an edit in hand is stepped through - its configuration,
         // and its gradients held as shades of the colours the edit began with.
@@ -397,8 +414,11 @@ class FlightSimulator {
             // The two confirms a canvas asks, drawn in one panel over it.
             confirm:        document.getElementById('build-confirm'),
             confirmPanel:   document.getElementById('build-confirm-panel'),
-            confirmHeading: document.getElementById('build-confirm-heading')
+            confirmHeading: document.getElementById('build-confirm-heading'),
+            // The layer over the ground the outlines are drawn on.
+            buildOverlay:   document.getElementById('build-overlay')
         };
+        this.overlayContext = this.overlays.buildOverlay.getContext('2d');
 
         // The pads write the same input state the keys do, which is what lets
         // the flight model stay ignorant of where a control came from.
@@ -637,7 +657,10 @@ class FlightSimulator {
     buildWorld() {
         const mode  = runningMode(this.run);
         const world = mode ? stageWorld(this.run) : {
-            environment: currentEnvironment(this.settings),
+            // The settings' world, or the canvas a build kept on it was made
+            // on - Blank Canvas is one the settings do not offer, and its
+            // build is flown on its own flat ground rather than on theirs.
+            environment: flownEnvironment(this.editor, currentEnvironment(this.settings)),
             runway: runwayWanted(startSettings(this.settings)),
             // A free flight is drawn from the elements the editor is holding
             // rather than from the preset directly, because those elements are
@@ -1664,6 +1687,11 @@ class FlightSimulator {
      * here, so the three cannot drift into opening slightly different things,
      * and `from` is what the way out returns to.
      *
+     * On the picker the first time, and straight onto the built world once a
+     * build has been kept: its canvas, with every placement on it committed
+     * and each one Select can pick up again. Choosing another world in the
+     * settings lets go of the build, and the picker is back.
+     *
      * Every other panel is closed on the way in, the way each of them closes
      * the others: a panel left open behind this one would come back out from
      * under it.
@@ -1678,9 +1706,10 @@ class FlightSimulator {
         closeControlSettings(this.controlSettings);
         closeEditor(this.editor);
 
-        openBuildMode(this.builder, from);
+        openBuildMode(this.builder, from, builtWorld(this.editor));
         this.redrawPicker();
         resetSelection(this.pickerState);
+        if (buildModeDrawing(this.builder)) this.showCanvas(this.builder.environment);
 
         return true;
     }
@@ -1719,11 +1748,14 @@ class FlightSimulator {
     leaveBuilder(changed = false) {
         const canvas = buildModeDrawing(this.builder);
 
-        // A drag or a held key does not outlive the canvas it was moving.
+        // A drag, a held key or a hover does not outlive the canvas it was on.
         this.endCanvasDrag();
         this.buildKeys.clear();
         this.buildCamera = null;
         this.canvasGround = null;
+        this.canvasPointer = null;
+        this.hovered = null;
+        this.outlines.clear();
 
         closeBuildMode(this.builder);
 
@@ -1747,8 +1779,13 @@ class FlightSimulator {
     saveBuiltWorld(environment, placements) {
         const before = this.flightWorldKey();
 
+        // Chosen in the settings first, so the editor is told which world the
+        // settings now hold: the canvas's own, or for a canvas they do not
+        // offer, the one they held - which the build is kept under until
+        // another is chosen there.
         chooseSetting(this.settings, environment);
-        keepBuiltWorld(this.editor, environment, runwayWanted(startSettings(this.settings)), placements);
+        keepBuiltWorld(this.editor, environment, runwayWanted(startSettings(this.settings)), placements,
+            currentEnvironment(this.settings));
         this.redrawEditor();
 
         return this.flightWorldKey() !== before;
@@ -1757,7 +1794,7 @@ class FlightSimulator {
     /** The world a free flight is drawn from, written down so two can be compared. */
     flightWorldKey() {
         return JSON.stringify({
-            environment: currentEnvironment(this.settings),
+            environment: flownEnvironment(this.editor, currentEnvironment(this.settings)),
             runway: runwayWanted(startSettings(this.settings)),
             elements: editorPlacements(this.editor)
         });
@@ -1774,7 +1811,16 @@ class FlightSimulator {
      */
     startCanvas(environmentId) {
         if (!beginCanvas(this.builder, environmentId, keptPlacements(this.editor, environmentId))) return false;
+        this.showCanvas(environmentId);
+        return true;
+    }
 
+    /**
+     * Draws a canvas the session has just opened on: the ground, as the one
+     * tile it is, and the camera held over it. The picker's `START` and a
+     * builder reopening onto its built world both come here.
+     */
+    showCanvas(environmentId) {
         this.terrain.setCanvas(true);
         this.terrain.setEnvironment(environmentId, {
             runway: false,
@@ -1788,8 +1834,6 @@ class FlightSimulator {
         this.buildCamera = createBuildCamera(this.terrain.size);
         this.canvasGround = this.readCanvasGround();
         this.holdCanvasView();
-
-        return true;
     }
 
     /**
@@ -1881,6 +1925,134 @@ class FlightSimulator {
 
         // Select's panel reads back whatever a gesture just did to the view.
         this.syncDock();
+
+        // What is under the pointer is asked again every frame rather than
+        // only when it moves, because the view moving under a still pointer
+        // moves the ground under it too.
+        this.trackHover();
+    }
+
+    /**
+     * The committed placement under the pointer, which Select outlines lightly
+     * as what a click would take - one ray and a weight per placement, so it
+     * can follow the pointer every frame.
+     *
+     * Only with Select live, which is the tool a click picks with; never under
+     * a question, which holds the canvas still; never while the view is being
+     * dragged; and never for a finger, which has no hover - it is down on the
+     * glass or not there at all.
+     */
+    trackHover() {
+        const pointer  = this.canvasPointer;
+        const drag     = this.canvasDrag;
+        const dragging = drag != null && (drag.travelled || !drag.picks);
+        const hovers   = pointer != null
+            && pointer.type !== 'touch'
+            && !dragging
+            && buildModeTool(this.builder) === SELECT_TOOL
+            && !confirmOpen(this.builder)
+            && this.builder.placements.length > 0;
+
+        let hovered = null;
+        if (hovers) {
+            const point = this.pickCanvasPoint(pointer.x, pointer.y);
+            if (point) hovered = placementAt(pickablePlacements(this.builder), point.x, point.z, this.terrain.size);
+        }
+
+        if (hovered !== this.hovered) {
+            this.hovered = hovered;
+            this.renderer.domElement.style.cursor = this.canvasCursor();
+        }
+    }
+
+    /**
+     * The pointer over a canvas: a crosshair for a tool that drops at a click,
+     * a hand over something Select would pick, and the arrow otherwise.
+     */
+    canvasCursor() {
+        if (!buildModeDrawing(this.builder)) return '';
+        if (dropsAtClick(buildModeTool(this.builder))) return 'crosshair';
+        return this.hovered != null ? 'pointer' : '';
+    }
+
+    /**
+     * Draws the outlines over the canvas for the frame just rendered: the
+     * placement under the pointer lightly, and the one in hand - picked with
+     * Select or dropped by a tool - firmly. Each is traced once round its
+     * reach and stood on the ground under it here, through the camera the
+     * frame was drawn from, so it lies over the terrain however the view has
+     * moved and costs no ground to draw.
+     */
+    drawBuildOverlay() {
+        const layer = this.overlays.buildOverlay;
+        const ctx   = this.overlayContext;
+        if (!ctx) return;
+
+        if (!buildModeDrawing(this.builder) || photoPending(this.photoState)) {
+            if (this.overlayDrawn) {
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, layer.width, layer.height);
+                this.overlayDrawn = false;
+            }
+            return;
+        }
+
+        // Drawn at the screen's own density, so a line is as sharp as the
+        // ground under it.
+        const ratio  = window.devicePixelRatio || 1;
+        const width  = layer.clientWidth;
+        const height = layer.clientHeight;
+        const across = Math.round(width * ratio);
+        const down   = Math.round(height * ratio);
+        if (layer.width !== across || layer.height !== down) {
+            layer.width = across;
+            layer.height = down;
+        }
+
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        this.overlayDrawn = true;
+
+        const picked  = pickedIndex(this.builder);
+        const hovered = this.hovered != null && this.hovered !== picked ? this.builder.placements[this.hovered] : null;
+        const chosen  = buildDraft(this.builder);
+
+        if (hovered) strokeOutline(ctx, this.screenOutline(hovered, width, height), HOVER_OUTLINE);
+        if (chosen) strokeOutline(ctx, this.screenOutline(chosen, width, height), CHOSEN_OUTLINE);
+    }
+
+    /** A placement's outline as it falls on a screen `width` by `height`. */
+    screenOutline(placement, width, height) {
+        const point = this.overlayPoint;
+        return projectOutline(
+            this.outlineOf(placement),
+            (x, z) => this.terrain.getTerrainHeightAt(x, z),
+            (x, y, z) => {
+                point.set(x, y, z).project(this.camera);
+                if (!(point.z >= -1 && point.z <= 1)) return null;
+                return { x: (point.x + 1) / 2 * width, y: (1 - point.y) / 2 * height };
+            }
+        );
+    }
+
+    /**
+     * A placement's outline on the canvas, traced the first time it is asked
+     * for and kept by what it is the outline of - a value stepped on the panel
+     * is a different placement, traced again, and a placement the pointer
+     * passes back over is the one traced before.
+     */
+    outlineOf(placement) {
+        const size = this.terrain.size;
+        const key  = `${size}:${JSON.stringify(placement)}`;
+        let segments = this.outlines.get(key);
+        if (!segments) {
+            // A session stepping a value through its range traces a new
+            // outline at every step, and none of the old ones is wanted again.
+            if (this.outlines.size >= 32) this.outlines.clear();
+            segments = placementOutline(placement, size);
+            this.outlines.set(key, segments);
+        }
+        return segments;
     }
 
     /** Stands the renderer's camera where the build camera's state says, clear of the ground. */
@@ -1915,6 +2087,7 @@ class FlightSimulator {
         surface.addEventListener('pointerup',          (e) => this.onCanvasRelease(e));
         surface.addEventListener('pointercancel',      (e) => this.onCanvasRelease(e));
         surface.addEventListener('lostpointercapture', (e) => this.onCanvasRelease(e));
+        surface.addEventListener('pointerleave',       () => { this.canvasPointer = null; });
         surface.addEventListener('wheel',              (e) => this.onCanvasWheel(e), { passive: false });
         surface.addEventListener('contextmenu', (e) => {
             if (buildModeDrawing(this.builder)) e.preventDefault();
@@ -1925,6 +2098,11 @@ class FlightSimulator {
      * A press on the canvas: the camera takes it if the press and the live tool
      * make a gesture, and a tool that drops at a click takes a plain press of
      * the main button - a mouse's left, or a finger.
+     *
+     * A plain press of the main button with Select live is held as one that
+     * may yet be a click: the view does not turn until it has travelled past
+     * what a click may, and one let go of before then picks what is under it
+     * rather than orbiting.
      */
     onCanvasPress(e) {
         if (!buildModeDrawing(this.builder) || this.canvasDrag) return;
@@ -1938,7 +2116,13 @@ class FlightSimulator {
 
         e.preventDefault();
         this.renderer.domElement.setPointerCapture(e.pointerId);
-        this.canvasDrag = { pointer: e.pointerId, gesture, x: e.clientX, y: e.clientY };
+        this.canvasDrag = {
+            pointer: e.pointerId, gesture, x: e.clientX, y: e.clientY,
+            start: { x: e.clientX, y: e.clientY },
+            type: e.pointerType,
+            picks: tool === SELECT_TOOL && e.button === 0 && !e.shiftKey,
+            travelled: false
+        };
     }
 
     /**
@@ -1956,10 +2140,23 @@ class FlightSimulator {
         this.syncOverlays();
     }
 
-    /** The pointer moving under a drag: the camera turns or slides by how far it went. */
+    /**
+     * The pointer moving over a canvas, which is where the hover is read from,
+     * and under a drag: the camera turns or slides by how far it went. A press
+     * that may yet be a click moves nothing until it has travelled past one,
+     * and then moves by the whole of the way it came, so no turn is lost.
+     */
     onCanvasDrag(e) {
+        if (!buildModeDrawing(this.builder)) return;
+        this.canvasPointer = { x: e.clientX, y: e.clientY, type: e.pointerType };
+
         const drag = this.canvasDrag;
-        if (!buildModeDrawing(this.builder) || !drag || e.pointerId !== drag.pointer) return;
+        if (!drag || e.pointerId !== drag.pointer) return;
+
+        if (drag.picks && !drag.travelled) {
+            if (!travelledPast(drag.start, { x: e.clientX, y: e.clientY }, drag.type)) return;
+            drag.travelled = true;
+        }
 
         const dx = e.clientX - drag.x;
         const dy = e.clientY - drag.y;
@@ -1974,9 +2171,32 @@ class FlightSimulator {
             });
     }
 
-    /** The press let go of, cancelled, or its capture lost: the drag ends where it is. */
+    /**
+     * The press let go of, cancelled, or its capture lost: the drag ends where
+     * it is. A Select press let go of before it travelled was a click, and
+     * picks what is under it; one cancelled or taken away picks nothing.
+     */
     onCanvasRelease(e) {
-        if (this.canvasDrag && e.pointerId === this.canvasDrag.pointer) this.endCanvasDrag();
+        const drag = this.canvasDrag;
+        if (!drag || e.pointerId !== drag.pointer) return;
+
+        const click = e.type === 'pointerup' && drag.picks && !drag.travelled;
+        this.endCanvasDrag();
+        if (click) this.pickAt(e.clientX, e.clientY);
+    }
+
+    /**
+     * A click with Select: the committed placement under it picked, the one
+     * already picked kept, or - on bare ground, or over the sky - the pick let
+     * go of. A pick that was changed asks `ACCEPT EDITS` before it is let go.
+     */
+    pickAt(clientX, clientY) {
+        const point = this.pickCanvasPoint(clientX, clientY);
+        const index = point ? placementAt(pickablePlacements(this.builder), point.x, point.z, this.terrain.size) : null;
+
+        const answer = selectPlacement(this.builder, index);
+        if (answer?.confirm) this.confirmOpened();
+        else if (answer) this.syncOverlays();
     }
 
     /** Ends the drag being made, if one is, and gives the pointer back. */
@@ -2090,6 +2310,11 @@ class FlightSimulator {
         } else if (shown.kind === DOCK_DRAFT) {
             reviseDraft(this.builder, { config: shown.holder.config });
             this.redrawCanvas();
+            // A picked placement changed, or changed back, turns the accept
+            // tile's question from saving to accepting or back again, so the
+            // palette is drawn with the dock rather than after it.
+            this.syncOverlays();
+            return;
         }
 
         this.syncDock();
@@ -2850,8 +3075,10 @@ class FlightSimulator {
             tile.setAttribute('aria-pressed', String(tile.dataset.tool === live));
         }
 
-        // A tool that drops at a click marks the ground as somewhere to click.
-        this.renderer.domElement.style.cursor = canvas && dropsAtClick(live) ? 'crosshair' : '';
+        // A tool that drops at a click marks the ground as somewhere to click,
+        // and Select marks a placement it would pick.
+        this.renderer.domElement.style.cursor = canvas ? this.canvasCursor() : '';
+        this.overlays.buildOverlay.style.display = canvas ? 'block' : 'none';
 
         // The confirm, over the canvas while one is asking.
         const asking = canvas ? buildConfirm(this.builder) : null;
@@ -3059,6 +3286,10 @@ class FlightSimulator {
         }));
 
         this.renderer.render(this.scene, this.camera);
+
+        // The outlines over a canvas, through the camera this frame was drawn
+        // from, so they sit on the ground the frame shows.
+        this.drawBuildOverlay();
 
         // Read back inside the pass that drew it: a drawing buffer is cleared
         // once its frame has been composited, so a picture taken any later than

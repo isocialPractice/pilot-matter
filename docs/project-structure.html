@@ -125,13 +125,15 @@
 │   ├── menu.js         # Pure keyboard and pointer menu, and the list any menu is drawn into
 │   ├── settings.js     # Pure settings panel state, its options, and their storage
 │   ├── control-settings.js # Pure control settings panel: the axes, the tilt, the attitude bound, what ends a level off, the keys, and their storage
-│   ├── element-editor.js # Pure element editor state: the placed elements and their ranges, and what the builder kept laid over them
+│   ├── element-editor.js # Pure element editor state: the placed elements and their ranges, what the builder kept laid over them, and the world a free flight is drawn on
 │   ├── properties-panel.js # Pure properties panel: the one row builder every panel of declared ranges is drawn from, its kinds and its gates
-│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, and what has been committed
+│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, the placement picked with Select, and what has been committed
 │   ├── build-tools.js  # Pure tool registry: the twelve in palette order, the built ones the palette draws, and the placement a click drops
 │   ├── build-picker.js # Pure picker: the six canvases a session can start from, and which is chosen
 │   ├── build-camera.js # Pure orbit camera over a canvas: the hold, every gesture, and the air cleared over it
 │   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground
+│   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach, and whether a press was a click
+│   ├── build-overlay.js # Pure outlines: a placement's reach traced as a contour, projected onto the screen and stroked over the canvas
 │   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows, and what the canvas is drawn from
 │   ├── panel-view.js   # The one renderer the dock is drawn with: rows, the slides, the answers, and what was done to them
 │   ├── typed-value.js  # Pure keypad both number-holding panels read a typed figure through

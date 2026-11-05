@@ -128,7 +128,17 @@ function shadeDefaults(element) {
 export function createEditorState(environmentId, runway = false) {
     const state = {
         open: false,
+        // The world the rows are of and a free flight is drawn on. It is the
+        // world the settings chose, except after the builder kept one built
+        // on a canvas the settings do not offer - Blank Canvas - when it is
+        // that canvas, since that is the ground the build was made on.
         environmentId: null,
+        // The world the settings last chose, which is what says whether a
+        // choice made there is a different world. Held apart from the one
+        // above so that a setting applied for any other reason - the weather,
+        // the units - is never read as a new world and never lets go of a
+        // build kept on a canvas the settings cannot name.
+        chosen: null,
         runway: null,
         elements: [],
         // What the builder built on this world and was told to keep, as the
@@ -167,18 +177,27 @@ export function createEditorState(environmentId, runway = false) {
  * turning the strip on or off keeps it - the strip is laid after it, and a
  * start state changed in the settings is no reason to lose a built mountain.
  *
+ * "Another environment" is another than the settings last chose, read off
+ * `chosen` rather than off the world the editor is on. The two differ after a
+ * build on Blank Canvas is kept, which the settings cannot name, and asking
+ * the editor's own world would read every setting applied after it as a new
+ * world and let go of the build.
+ *
  * Returns true when the panel was rebuilt.
  */
 export function setEditorWorld(state, environmentId, runway = false) {
     const wanted = getEnvironment(environmentId).id;
     const strip  = runway === true;
 
-    if (state.environmentId === wanted && state.runway === strip) return false;
+    if (state.chosen === wanted && state.runway === strip) return false;
 
-    if (state.environmentId !== wanted) state.built = [];
-    state.environmentId = wanted;
+    if (state.chosen !== wanted) {
+        state.built = [];
+        state.environmentId = wanted;
+    }
+    state.chosen = wanted;
     state.runway = strip;
-    state.elements = editorElements(getEnvironment(wanted), strip);
+    state.elements = editorElements(getEnvironment(state.environmentId), strip);
     // A different world is a different set of rows, so a figure being typed into
     // one of the old ones has nowhere left to land.
     state.typing = null;
@@ -197,11 +216,17 @@ export function setEditorWorld(state, environmentId, runway = false) {
  * `runway` is whether the start wants a strip, which is the flight's to say
  * rather than the canvas's: the canvas is drawn without one, and the flight
  * searches for one after everything built is down.
+ *
+ * `chosen` is the world the settings hold once the build is kept, which is the
+ * canvas's own for a world they offer - the caller chooses it there first -
+ * and the one they held before for a canvas they do not. The build is kept
+ * until the settings choose another.
  */
-export function keepBuiltWorld(state, environmentId, runway = false, placements = []) {
+export function keepBuiltWorld(state, environmentId, runway = false, placements = [], chosen = environmentId) {
     const wanted = getEnvironment(environmentId).id;
 
     state.environmentId = wanted;
+    state.chosen = getEnvironment(chosen).id;
     state.runway = runway === true;
     state.elements = editorElements(getEnvironment(wanted), state.runway);
     state.built = (Array.isArray(placements) ? placements : []).map(placement => structuredClone(placement));
@@ -217,6 +242,27 @@ export function keepBuiltWorld(state, environmentId, runway = false, placements 
 export function keptPlacements(state, environmentId) {
     if (state.environmentId == null || state.environmentId !== getEnvironment(environmentId).id) return [];
     return (state.built ?? []).map(placement => structuredClone(placement));
+}
+
+/**
+ * The built world the builder goes back to - the canvas a build was kept on
+ * and every placement kept on it, as copies - or null while nothing built is
+ * kept, which is when the builder opens on its picker instead.
+ */
+export function builtWorld(state) {
+    if (state?.environmentId == null || !(state.built?.length > 0)) return null;
+    return { environment: state.environmentId, placements: keptPlacements(state, state.environmentId) };
+}
+
+/**
+ * The world a free flight is drawn on: the one the editor is on, which is the
+ * settings' choice or the canvas a build on it was kept on - and the settings'
+ * own choice whenever the editor has not been put on it yet, so a world chosen
+ * there is never flown as the one before it.
+ */
+export function flownEnvironment(state, chosen) {
+    const wanted = getEnvironment(chosen).id;
+    return state?.chosen === wanted && state.environmentId != null ? state.environmentId : wanted;
 }
 
 /** True when the world had to hold an element off the strip it cut. */

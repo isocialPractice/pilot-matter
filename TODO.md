@@ -11,24 +11,28 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Back to the built world**: the builder reopening straight onto what was
-  built rather than on the picker, with every earlier batch still a placement
-  that can be picked up and changed
-  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
-    environment a session kept opens with what it kept already committed -
-    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
-    second save keeps the first one's work. What is left is reopening straight
-    onto it rather than through the picker.
+- [ ] **The gumball**: the two handle sets the artwork declares, one for
+  elements with a height and one for those without, drawn at the placement's
+  centre with its axes projected from the camera
   - From: Interactive Build Mode
-- [ ] **Select a built element**: the placement under the pointer, found through
-  the footprints rather than off the scene because a built element has no mesh
-  to hit, with the one on top winning where two overlap, a click told from an
-  orbit by how far it travelled, and a click on bare ground dropping the pick
-  but never the lasso
+- [ ] **Gumball bindings**: each handle writing one declared value and nothing
+  else, clamped to the bounds the panel clamps to, so a drag and a typed number
+  are two ways into the same schema, with the centre moving the element on both
+  gumballs
   - From: Interactive Build Mode
-- [ ] **Selection highlight**: the hovered placement outlined lightly and the
-  chosen one firmly, on the overlay the lasso already draws on, so hovering and
-  picking rebuild no ground
+- [ ] **Select shows what is selected**: the picked-up placement's own rows on
+  Select's panel beneath the camera fields, so a committed batch's density and
+  colour can still be changed
+  - **This is the item that brings the element editor back.** `L` moved to the
+    builder in `1.0.0-alpha.1.34.0`, and on 11.04.2026 the user decided to wait
+    for this rather than add an interim way in. So Select's panel also carries
+    the environment's own ranges - the element editor's rows, moved across the
+    whole world - as a section of its own, one editor with two scopes.
+  - **The rows are already reachable.** Since `1.0.0-alpha.1.43.0` a placement
+    picked with Select is the draft standing on it, and the dock draws that
+    draft's rows with `ACCEPT` and `CANCEL` in place of the camera fields. What
+    is left is the camera fields kept above them, and the environment's own
+    rows when nothing is picked.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -98,14 +102,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Select a built element**: the placement under the pointer, found through
-  the footprints rather than off the scene because a built element has no mesh
-  to hit, with the one on top winning where two overlap, a click told from an
-  orbit by how far it travelled, and a click on bare ground dropping the pick
-  but never the lasso
-- [ ] **Selection highlight**: the hovered placement outlined lightly and the
-  chosen one firmly, on the overlay the lasso already draws on, so hovering and
-  picking rebuild no ground
 - [ ] **The gumball**: the two handle sets the artwork declares, one for
   elements with a height and one for those without, drawn at the placement's
   centre with its axes projected from the camera
@@ -153,14 +149,6 @@ the order the work unblocks itself in.
   through noise that stays put when a tile is drawn again, defaulting to full
   cover so every preset renders as it does today, with water and snow starting
   full so their strokes are not drawn with gaps
-- [ ] **Back to the built world**: the builder reopening straight onto what was
-  built rather than on the picker, with every earlier batch still a placement
-  that can be picked up and changed
-  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
-    environment a session kept opens with what it kept already committed -
-    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
-    second save keeps the first one's work. What is left is reopening straight
-    onto it rather than through the picker.
 - [ ] **Select shows what is selected**: the picked-up placement's own rows on
   Select's panel beneath the camera fields, so a committed batch's density and
   colour can still be changed
@@ -169,6 +157,11 @@ the order the work unblocks itself in.
     for this rather than add an interim way in. So Select's panel also carries
     the environment's own ranges - the element editor's rows, moved across the
     whole world - as a section of its own, one editor with two scopes.
+  - **The rows are already reachable.** Since `1.0.0-alpha.1.43.0` a placement
+    picked with Select is the draft standing on it, and the dock draws that
+    draft's rows with `ACCEPT` and `CANCEL` in place of the camera fields. What
+    is left is the camera fields kept above them, and the environment's own
+    rows when nothing is picked.
 - [ ] **A stroke's band is its ground**: a ground cover drawn with a footprint
   painting all of the ground under it and graded across that ground's own
   relief, worked out on each tile rather than once
@@ -337,42 +330,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 320 earlier items in `TODO-archive.md`, newest last.
+> 323 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Ground picking**: the canvas point under the pointer, raycast against
-  the ground rather than projected onto a plane, so a tilted view still lands on
-  what it is pointing at
-  - **Settled**: `pickGround` in the new `js/build-picking.js` walks the ray
-    against the heights the ground is drawn from and halves down to the
-    crossing, so a pick on a hill's face lands on the face; a ray meeting
-    ground off the canvas is a miss. Read off the heights rather than the mesh,
-    against the plan's suggestion of `THREE.Raycaster`, so it stays pure and
-    tested in Node; the two are the same surface to within a cell. Its first
-    consumer is the wheel, which now zooms toward the ground under the pointer.
-    Confirmed in Chromium: picks project back to the pixel they were taken at,
-    and a zoom leaves the pointed-at ground on the same pixel.
-  - From: Interactive Build Mode
-- [x] **One properties panel**: the element editor's row builder lifted into a
-  module of its own and the editor pointed at it, so there is one panel
-  generated from declared ranges rather than one drawn per tool
-  - **Settled**: `js/properties-panel.js`, lifted word for word, and the
-    element editor drawing through `panelRows` and stepping through `stepRow`
-    while still publishing every name it did. Its behaviour is unchanged by a
-    character: the editor at the commit before and after were driven through
-    the same session over all eleven worlds and gave the same 27,831 readings,
-    and `test/element-editor.test.js` passes untouched.
-  - From: Interactive Build Mode
-- [x] **Panel field kinds**: a toggle, a choice and a gate that disables a row
-  while its toggle is off, named for what `js/config.js` already calls them, so
-  the configurable features still queued are a registry edit rather than a
-  panel edit
-  - **Settled**: `toggle` already existed and is `TOGGLE_FIELD`; `choice` is
-    new and is `CHOICE_FIELD`. The gate is the plan's widened form, a `when`
-    option on any range - a field and the values that open it, or `ctx.<name>`
-    for the session - drawn held and kept rather than reset. The shipped
-    `gated` kind, whose bounds stay settable while its switch is off, is left as
-    it was. `color` is left for **Free paint**, the first thing that needs it.
-  - From: Interactive Build Mode
 - [x] **Panel conformance**: a test walking every tool and every range it
   declares, so a kind with no renderer fails the suite on the commit that
   declares it rather than drawing an empty row later
@@ -451,4 +410,49 @@ how the simulator got here rather than as a list still to be worked.
   - **Settled**: `chooseBuildTool` opens `ACCEPT EDITS` with the tool held in
     the question, and `answerConfirm` changes it once answered. While a question
     is open no tile, click or key behind it changes anything.
+  - From: Interactive Build Mode
+- [x] **Back to the built world**: the builder reopening straight onto what was
+  built rather than on the picker, with every earlier batch still a placement
+  that can be picked up and changed
+  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
+    environment a session kept opens with what it kept already committed -
+    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
+    second save keeps the first one's work. What is left is reopening straight
+    onto it rather than through the picker.
+  - **Settled**: `openBuildMode` takes the built world `builtWorld` in
+    `js/element-editor.js` hands it and opens on its canvas with every
+    placement committed, so `L` and both menus' entries skip the picker once a
+    build is kept. Starting over is choosing another world in the settings,
+    decided with the user on 11.04.2026 - it lets go of the build and the
+    picker is back. A build kept on Blank Canvas, which the settings cannot
+    name, was being flown over the settings' world; the editor now holds the
+    settings' choice apart from its own world, and `flownEnvironment` is what
+    a free flight is drawn on.
+  - From: Interactive Build Mode
+- [x] **Select a built element**: the placement under the pointer, found through
+  the footprints rather than off the scene because a built element has no mesh
+  to hit, with the one on top winning where two overlap, a click told from an
+  orbit by how far it travelled, and a click on bare ground dropping the pick
+  but never the lasso
+  - **Settled**: `placementAt` in the new `js/build-select.js` measures a click
+    against each placement's reach - a footprint's weight, or a dropped
+    mountain's peak read again through `mountainPeaks` from its own seed - the
+    strongest winning and `ELEMENT_ORDER` then the later committed breaking a
+    tie. A pick is `selectPlacement` in `js/build-mode.js`: the draft standing
+    on the placement, kept by a second click, let go on bare ground. A press is
+    a click within five pixels, ten for a finger, and the view does not turn
+    until it has gone further. A pick nothing was done to asks nothing when it
+    is let go; a changed one asks `ACCEPT EDITS` first. There is no lasso yet,
+    so nothing a click could drop.
+  - From: Interactive Build Mode
+- [x] **Selection highlight**: the hovered placement outlined lightly and the
+  chosen one firmly, on the overlay the lasso already draws on, so hovering and
+  picking rebuild no ground
+  - **Settled**: the overlay is new, `#build-overlay` drawn through
+    `js/build-overlay.js`, since the lasso that was to carry it is not built.
+    An outline is the placement's reach traced as a contour at the weight a
+    click needs, once per placement, and stood on the ground through the
+    camera every frame: white and thin for the hover, blue and firm for the
+    edit in hand, picked or dropped. Confirmed in Chromium off the layer's own
+    pixels.
   - From: Interactive Build Mode

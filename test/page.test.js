@@ -3405,8 +3405,10 @@ test('both menus open the builder through the one function the key opens it with
 
     const body = mainSource.match(/openBuilder\(from = BUILD_FROM_TITLE\)\s*\{[\s\S]*?\n    \}/);
     assert.ok(body, 'js/main.js should define openBuilder(from)');
-    assert.match(body[0], /openBuildMode\(this\.builder, from\)/,
-        'carrying what opened it into the session');
+    assert.match(body[0], /openBuildMode\(this\.builder, from, builtWorld\(this\.editor\)\)/,
+        'carrying what opened it into the session, and the built world it goes back to');
+    assert.match(body[0], /if \(buildModeDrawing\(this\.builder\)\) this\.showCanvas\(this\.builder\.environment\);/,
+        'drawing that world\'s canvas straight away when there is one, with no picker in front of it');
 });
 
 /**
@@ -3433,16 +3435,20 @@ test('a canvas stands the flight down rather than being drawn behind it', () => 
 });
 
 test('opening a canvas draws one tile of it, with no strip and the camera held over it', () => {
-    const body = mainSource.match(/startCanvas\(environmentId\)\s*\{[\s\S]*?\n    \}/);
-    assert.ok(body, 'js/main.js should define startCanvas()');
+    const start = methodBody(mainSource, 'startCanvas');
+    assert.ok(start, 'js/main.js should define startCanvas()');
+    assert.match(start, /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\)\)/,
+        'which opens with what an earlier session kept on it already committed');
+    assert.match(start, /this\.showCanvas\(environmentId\);/,
+        'and draws it the way a builder reopening onto its built world does');
 
-    assert.match(body[0], /this\.terrain\.setCanvas\(true\)/, 'one tile rather than nine');
-    assert.match(body[0],
+    const show = methodBody(mainSource, 'showCanvas');
+    assert.ok(show, 'js/main.js should define showCanvas()');
+    assert.match(show, /this\.terrain\.setCanvas\(true\)/, 'one tile rather than nine');
+    assert.match(show,
         /setEnvironment\(environmentId, \{\s*runway: false,\s*elements: canvasElements\(getEnvironment\(environmentId\), this\.builder\)\s*\}\)/,
         'on the canvas the picker chose, with nothing prepared to arrive on and drawn from what is on it');
-    assert.match(body[0], /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\)\)/,
-        'which opens with what an earlier session kept on it already committed');
-    assert.match(body[0], /this\.holdCanvasView\(\)/, 'and the camera held over it');
+    assert.match(show, /this\.holdCanvasView\(\)/, 'and the camera held over it');
 
     const leaving = mainSource.match(/leaveBuilder\(changed = false\)\s*\{[\s\S]*?\n    \}/);
     assert.ok(leaving, 'js/main.js should define leaveBuilder()');
@@ -3640,7 +3646,7 @@ test('a held key moves the view by the frame, and leaving lets go of it', () => 
 });
 
 test('a canvas opens on a camera seeded from the hold', () => {
-    assert.match(methodBody(mainSource, 'startCanvas'),
+    assert.match(methodBody(mainSource, 'showCanvas'),
         /this\.buildCamera = createBuildCamera\(this\.terrain\.size\);/);
 });
 
@@ -3664,7 +3670,7 @@ test('a pick is cast from the camera as it stands, against the canvas alone', ()
     assert.match(pick, /pickGround\(origin, direction, \(x, z\) => this\.terrain\.getTerrainHeightAt\(x, z\)/,
         'against the ground the canvas is drawn from');
 
-    assert.match(methodBody(mainSource, 'startCanvas'), /this\.canvasGround = this\.readCanvasGround\(\);/,
+    assert.match(methodBody(mainSource, 'showCanvas'), /this\.canvasGround = this\.readCanvasGround\(\);/,
         'the ground a pick reads is worked out when the canvas opens');
     assert.match(methodBody(mainSource, 'placeCanvasCamera'), /this\.camera\.updateMatrixWorld\(\);/,
         'and a camera stood between frames is one a ray can be cast from');
@@ -3822,8 +3828,10 @@ test('an answer leaves, keeping the built world on YES, or settles the edit and 
 
     const save = methodBody(mainSource, 'saveBuiltWorld');
     assert.match(save, /chooseSetting\(this\.settings, environment\);/, 'the canvas\'s environment becomes the one flown');
-    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements\);/,
-        'with what was built held where an edited world already lives');
+    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements,\s*currentEnvironment\(this\.settings\)\);/,
+        'with what was built held where an edited world already lives, under the world the settings now hold');
+    assert.ok(save.indexOf('chooseSetting(') < save.indexOf('keepBuiltWorld('),
+        'which is read after the canvas\'s world is chosen there');
     assert.match(save, /return this\.flightWorldKey\(\) !== before;/, 'and says whether the flight\'s world changed');
 });
 
@@ -3832,6 +3840,139 @@ test('a click with a tool that drops picks the ground and drops there', () => {
     assert.match(drop, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);\s*if \(!point \|\| !dropDraft\(this\.builder, point\)\) return;/);
     assert.match(drop, /this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);/, 'and the ground is drawn with it');
     assert.match(methodBody(mainSource, 'syncOverlays'),
-        /this\.renderer\.domElement\.style\.cursor = canvas && dropsAtClick\(live\) \? 'crosshair' : '';/,
+        /this\.renderer\.domElement\.style\.cursor = canvas \? this\.canvasCursor\(\) : '';/,
         'over ground marked as somewhere to click');
+    assert.match(methodBody(mainSource, 'canvasCursor'),
+        /if \(dropsAtClick\(buildModeTool\(this\.builder\)\)\) return 'crosshair';/,
+        'which is a crosshair for a tool that drops');
+});
+
+// --- Picking a built element, and the outline over it ---------------------------
+
+/**
+ * Select's left drag orbits, so a click is a press that orbits nowhere. The
+ * press is held as one that may yet be a click, the view does not turn until
+ * it travels past one, and a release before then picks - so an orbit never
+ * ends by picking whatever the pointer stopped over, and a click never nudges
+ * the view.
+ */
+test('a Select press that does not travel is a click, and picks; one that travels orbits', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /picks: tool === SELECT_TOOL && e\.button === 0 && !e\.shiftKey,/,
+        'a plain main-button press with Select live may yet be a click');
+    assert.match(press, /start: \{ x: e\.clientX, y: e\.clientY \},/, 'measured from where it began');
+    assert.match(press, /travelled: false/);
+
+    const drag = methodBody(mainSource, 'onCanvasDrag');
+    assert.match(drag,
+        /if \(drag\.picks && !drag\.travelled\) \{\s*if \(!travelledPast\(drag\.start, \{ x: e\.clientX, y: e\.clientY \}, drag\.type\)\) return;\s*drag\.travelled = true;\s*\}/,
+        'the view does not turn until the press has travelled past a click');
+    assert.ok(drag.indexOf('this.canvasPointer = ') < drag.indexOf('const drag = this.canvasDrag;'),
+        'and every move over the canvas is where the hover is read from, drag or not');
+
+    const release = methodBody(mainSource, 'onCanvasRelease');
+    assert.match(release, /const click = e\.type === 'pointerup' && drag\.picks && !drag\.travelled;/,
+        'only a press let go of, not one cancelled or taken away, is a click');
+    assert.ok(release.indexOf('this.endCanvasDrag();') < release.indexOf('if (click) this.pickAt(e.clientX, e.clientY);'),
+        'and it picks once the drag is over');
+});
+
+test('a click picks the committed placement under it through its reach, not off the scene', () => {
+    const pick = methodBody(mainSource, 'pickAt');
+    assert.match(pick, /const point = this\.pickCanvasPoint\(clientX, clientY\);/);
+    assert.match(pick,
+        /placementAt\(pickablePlacements\(this\.builder\), point\.x, point\.z, this\.terrain\.size\) : null;/,
+        'the placement whose reach the ground point is in, or bare ground');
+    assert.match(pick, /const answer = selectPlacement\(this\.builder, index\);/);
+    assert.match(pick, /if \(answer\?\.confirm\) this\.confirmOpened\(\);/, 'a changed pick asks before it is let go');
+});
+
+test('the hover follows the pointer every frame, with Select, and never for a finger or under a question', () => {
+    assert.match(methodBody(mainSource, 'trackCanvasCamera'), /this\.trackHover\(\);/,
+        'read every frame, since the view moving under a still pointer moves the ground under it');
+
+    const hover = methodBody(mainSource, 'trackHover');
+    assert.match(hover, /pointer\.type !== 'touch'/, 'a finger has no hover');
+    assert.match(hover, /buildModeTool\(this\.builder\) === SELECT_TOOL/, 'Select is what a click picks with');
+    assert.match(hover, /!confirmOpen\(this\.builder\)/, 'a question holds the canvas still');
+    assert.match(hover, /!dragging/, 'and an orbit is not a hover');
+    assert.match(hover, /placementAt\(pickablePlacements\(this\.builder\), point\.x, point\.z, this\.terrain\.size\)/,
+        'found the way a click finds it, so what is outlined is what a click takes');
+
+    assert.match(mainSource, /surface\.addEventListener\('pointerleave', +\(\) => \{ this\.canvasPointer = null; \}\);/,
+        'and a pointer gone off the canvas hovers over nothing');
+    const leaving = methodBody(mainSource, 'leaveBuilder');
+    assert.match(leaving, /this\.canvasPointer = null;\s*this\.hovered = null;/, 'nor does a hover outlive the canvas');
+});
+
+test('the outlines are drawn over each frame, the hover lightly and the edit in hand firmly', () => {
+    const frame = methodBody(mainSource, 'animate');
+    assert.ok(frame.indexOf('this.renderer.render(this.scene, this.camera);') < frame.indexOf('this.drawBuildOverlay();'),
+        'after the frame is drawn, through the camera it was drawn from');
+
+    const draw = methodBody(mainSource, 'drawBuildOverlay');
+    assert.match(draw, /if \(!buildModeDrawing\(this\.builder\) \|\| photoPending\(this\.photoState\)\)/,
+        'nothing off a canvas, and nothing over a picture');
+    assert.match(draw, /this\.hovered !== picked/, 'the placement picked is outlined as picked, not as hovered');
+    assert.match(draw, /const chosen  = buildDraft\(this\.builder\);/, 'the edit in hand, picked or dropped');
+    assert.match(draw, /strokeOutline\(ctx, this\.screenOutline\(hovered, width, height\), HOVER_OUTLINE\)/);
+    assert.match(draw, /strokeOutline\(ctx, this\.screenOutline\(chosen, width, height\), CHOSEN_OUTLINE\)/);
+
+    const traced = methodBody(mainSource, 'outlineOf');
+    assert.match(traced, /segments = placementOutline\(placement, size\);/,
+        'traced round the placement\'s reach');
+    assert.match(traced, /this\.outlines\.get\(key\)/, 'once, rather than once a frame');
+
+    assert.match(methodBody(mainSource, 'screenOutline'), /this\.terrain\.getTerrainHeightAt\(x, z\)/,
+        'stood on the ground under it, so it lies over the terrain');
+});
+
+test('the overlay is a layer over the ground that takes no presses', () => {
+    assert.match(indexHtml, /<canvas id="build-overlay" aria-hidden="true"><\/canvas>/);
+    const rule = indexHtml.match(/#build-overlay \{[^}]*\}/)?.[0] ?? '';
+    assert.match(rule, /pointer-events: none;/, 'a click on an outline is a click on the ground under it');
+    assert.match(rule, /z-index: 110;/, 'over the ground and under the palette, the dock and the list');
+
+    const palette = indexHtml.match(/#build-palette \{[^}]*\}/)?.[0] ?? '';
+    assert.ok(Number(palette.match(/z-index: (\d+)/)?.[1]) > 110);
+    assert.match(methodBody(mainSource, 'syncOverlays'), /this\.overlays\.buildOverlay\.style\.display = canvas \? 'block' : 'none';/);
+});
+
+test('Select marks a placement it would pick, and a dropping tool its ground', () => {
+    const cursor = methodBody(mainSource, 'canvasCursor');
+    assert.match(cursor, /return this\.hovered != null \? 'pointer' : '';/);
+});
+
+// --- Back to the built world -------------------------------------------------------
+
+test('the builder reopens on the canvas it drew, through the one drawing a START uses', () => {
+    const show = methodBody(mainSource, 'showCanvas');
+    assert.ok(show, 'js/main.js should define showCanvas()');
+    assert.match(methodBody(mainSource, 'startCanvas'), /this\.showCanvas\(environmentId\);/);
+    assert.match(methodBody(mainSource, 'openBuilder'), /this\.showCanvas\(this\.builder\.environment\);/);
+});
+
+/**
+ * Blank Canvas is a world the builder offers and the settings do not, so the
+ * flight cannot read a build kept on it off the settings: it would fly the
+ * build over the ground the settings hold instead.
+ */
+test('a free flight is drawn on the world a build was kept on', () => {
+    assert.match(methodBody(mainSource, 'buildWorld'),
+        /environment: flownEnvironment\(this\.editor, currentEnvironment\(this\.settings\)\),/);
+    assert.match(methodBody(mainSource, 'flightWorldKey'),
+        /environment: flownEnvironment\(this\.editor, currentEnvironment\(this\.settings\)\),/,
+        'and the world a kept build is compared against is the same one');
+});
+
+/**
+ * A pick changed on the dock - or stepped back to what it was - turns what the
+ * accept tile and Escape will ask, so the palette is drawn with the dock. Found
+ * in Chromium: drawing the dock alone left the tile saying Save and exit over a
+ * changed mountain until something else redrew it.
+ */
+test('a value changed on the edit in hand redraws the palette, so the accept tile says what it will ask', () => {
+    const apply = methodBody(mainSource, 'applyDockValue');
+    assert.match(apply,
+        /reviseDraft\(this\.builder, \{ config: shown\.holder\.config \}\);\s*this\.redrawCanvas\(\);[\s\S]*?this\.syncOverlays\(\);\s*return;/);
 });
