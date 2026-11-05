@@ -145,3 +145,42 @@ test('the hover is lighter than the pick', () => {
     assert.notEqual(HOVER_OUTLINE.colour, CHOSEN_OUTLINE.colour, 'and in another colour');
     assert.ok(Object.isFrozen(HOVER_OUTLINE) && Object.isFrozen(CHOSEN_OUTLINE));
 });
+
+// --- The gumball drawn ----------------------------------------------------------------
+
+/** A context that writes down the colours and widths it was stroked and filled with. */
+function recorder() {
+    const calls = [];
+    const ctx = {
+        set lineWidth(v) { calls.push(['width', v]); },
+        set strokeStyle(v) { calls.push(['stroke', v]); },
+        set fillStyle(v) { calls.push(['fill', v]); },
+        set lineCap(v) {},
+        setLineDash() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, arc() {},
+        stroke() { calls.push(['stroked']); }, fill() { calls.push(['filled']); },
+        fillRect() { calls.push(['filled']); }, strokeRect() { calls.push(['stroked']); }
+    };
+    return { ctx, calls };
+}
+
+test('the gumball is drawn in the art\'s colours, and the handle under the pointer over a white edge', async () => {
+    const { gumballLayout, boundHandles } = await import('../js/gumball.js');
+    const { strokeGumball, GUMBALL_LIT } = await import('../js/build-overlay.js');
+    const mountain = { type: 'mountain', config: { at: [0, 0], height: [300, 500] }, seed: 3 };
+    const layout = gumballLayout({ x: 100, y: 100 }, { red: { x: -9, y: 1 }, green: { x: 1, y: 7 }, blue: { x: 0, y: -5 } }, boundHandles(mountain));
+
+    const plain = recorder();
+    strokeGumball(plain.ctx, layout, null);
+    const colours = new Set(plain.calls.filter(([kind]) => kind === 'stroke' || kind === 'fill').map(([, v]) => v));
+    for (const colour of ['#fa2020', '#20fa20', '#2020fa', '#ffffff', '#000000']) assert.ok(colours.has(colour), colour);
+
+    const lit = recorder();
+    strokeGumball(lit.ctx, layout, 'move');
+    const edges = calls => calls.filter(([kind, v]) => kind === 'stroke' && v === GUMBALL_LIT).length;
+    assert.ok(edges(lit.calls) > edges(plain.calls), 'the hovered arrow gets a white edge it otherwise has not');
+
+    const none = recorder();
+    strokeGumball(none.ctx, { handles: [] }, null);
+    strokeGumball(none.ctx, null, null);
+    assert.deepEqual(none.calls, [], 'and nothing laid out draws nothing');
+});

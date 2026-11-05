@@ -1141,6 +1141,43 @@
             opacity: 0.6;
         }
 
+        /* A section of the dock under the first part: the placement picked
+           with Select, or one of the world's own elements. A section that folds
+           has a heading that is a button, marked open or shut, tall enough for
+           a fingertip. */
+        .dock-section {
+            display: block;
+            width: 100%;
+            margin: 10px 0 4px;
+            padding: 6px 0 4px;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: normal;
+            letter-spacing: 2px;
+            text-align: left;
+            background: none;
+            border: none;
+            border-top: 1px solid rgba(0, 255, 0, 0.25);
+        }
+
+        button.dock-section {
+            min-height: 30px;
+            cursor: pointer;
+        }
+
+        button.dock-section::before {
+            content: '\25B8\00A0';
+        }
+
+        button.dock-section[aria-expanded="true"]::before {
+            content: '\25BE\00A0';
+        }
+
+        button.dock-section:hover {
+            color: #f0f2f3;
+        }
+
         .dock-step,
         .dock-action {
             min-height: 24px;

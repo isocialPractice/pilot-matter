@@ -2148,6 +2148,7 @@ test('the card is floated by the run that floats the rest of them', () => {
  * rest of what it does with a panel is.
  */
 const mainSource = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
+const panelViewSource = readFileSync(fileURLToPath(new URL('../js/panel-view.js', import.meta.url)), 'utf8');
 
 const TYPING_HANDLERS = [
     ['onSettingsKey', 'typedSettingRow(this.settings)', 'applyTypedSettingKey', 'beginTypedSetting'],
@@ -3437,8 +3438,8 @@ test('a canvas stands the flight down rather than being drawn behind it', () => 
 test('opening a canvas draws one tile of it, with no strip and the camera held over it', () => {
     const start = methodBody(mainSource, 'startCanvas');
     assert.ok(start, 'js/main.js should define startCanvas()');
-    assert.match(start, /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\)\)/,
-        'which opens with what an earlier session kept on it already committed');
+    assert.match(start, /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\),\s*canvasWorld\(this\.editor, environmentId\)\)/,
+        'which opens with what an earlier session kept on it already committed, over the rows of the world as they were kept');
     assert.match(start, /this\.showCanvas\(environmentId\);/,
         'and draws it the way a builder reopening onto its built world does');
 
@@ -3616,12 +3617,14 @@ test('a finger on a canvas is a gesture and not a scroll, and only on a canvas',
 // where it is rather than the builder being left from under it.
 test('Escape ends a drag before it asks to leave', () => {
     const keyed = methodBody(mainSource, 'onBuilderKey');
-    const ends  = keyed.indexOf('if (this.canvasDrag && isCanvasLeaveKey(e.code))');
+    const ends  = keyed.indexOf('if ((this.canvasDrag || this.gumballDrag) && isCanvasLeaveKey(e.code))');
     const leave = keyed.indexOf('leavesBuilder(this.builder');
 
     assert.ok(ends >= 0, 'the builder should end a drag on the leave key');
     assert.ok(ends < leave, 'ahead of the way out');
-    assert.match(keyed.slice(ends), /^if \(this\.canvasDrag && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*return;/);
+    assert.match(keyed.slice(ends),
+        /^if \(\(this\.canvasDrag \|\| this\.gumballDrag\) && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*return;/,
+        'the view\'s drag and a handle\'s alike');
 });
 
 test('a held key moves the view by the frame, and leaving lets go of it', () => {
@@ -3739,7 +3742,7 @@ test('an edit in hand redraws the canvas from what it holds, and is settled from
         /this\.terrain\.setEnvironment\(id, \{ runway: false, elements: canvasElements\(getEnvironment\(id\), this\.builder\) \}\)/);
 
     const apply = methodBody(mainSource, 'applyDockValue');
-    assert.match(apply, /reviseDraft\(this\.builder, \{ config: shown\.holder\.config \}\);\s*this\.redrawCanvas\(\);/,
+    assert.match(apply, /else if \(kind === DOCK_DRAFT\) \{\s*reviseDraft\(this\.builder, \{ config: holder\.config \}\);\s*this\.redrawCanvas\(\);/,
         'a value moved on an edit is the ground moving under it');
 
     const settle = methodBody(mainSource, 'onDockAction');
@@ -3807,7 +3810,7 @@ test('an open confirm takes every key before anything on the canvas reads one', 
 test('a confirm opens on YES with the focus, and a press off it calls it off', () => {
     const opened = methodBody(mainSource, 'confirmOpened');
     assert.match(opened, /resetSelection\(this\.confirmState\);/);
-    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view behind it');
+    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view, or a handle, behind it');
     assert.match(opened, /this\.overlays\.confirmPanel\.focus\(\{ preventScroll: true \}\);/,
         'so Enter answers it rather than pressing the tile last clicked');
 
@@ -3823,13 +3826,13 @@ test('an answer leaves, keeping the built world on YES, or settles the edit and 
     const answer = methodBody(mainSource, 'answerBuildConfirm');
     assert.match(answer, /const answered = answerConfirm\(this\.builder, answer\);/);
     assert.match(answer,
-        /if \(answered\.leave\) \{\s*const changed = answered\.keep && this\.saveBuiltWorld\(answered\.environment, answered\.placements\);\s*this\.leaveBuilder\(changed\);/);
+        /if \(answered\.leave\) \{\s*const changed = answered\.keep && this\.saveBuiltWorld\(answered\.environment, answered\.placements, answered\.world\);\s*this\.leaveBuilder\(changed\);/);
     assert.match(answer, /else if \(answered\.settled\) \{\s*this\.draftHolder = null;\s*this\.redrawCanvas\(\);/);
 
     const save = methodBody(mainSource, 'saveBuiltWorld');
     assert.match(save, /chooseSetting\(this\.settings, environment\);/, 'the canvas\'s environment becomes the one flown');
-    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements,\s*currentEnvironment\(this\.settings\)\);/,
-        'with what was built held where an edited world already lives, under the world the settings now hold');
+    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements,\s*currentEnvironment\(this\.settings\), world\);/,
+        'with what was built held where an edited world already lives, under the world the settings now hold, over the world\'s own rows as the canvas left them');
     assert.ok(save.indexOf('chooseSetting(') < save.indexOf('keepBuiltWorld('),
         'which is read after the canvas\'s world is chosen there');
     assert.match(save, /return this\.flightWorldKey\(\) !== before;/, 'and says whether the flight\'s world changed');
@@ -3974,5 +3977,115 @@ test('a free flight is drawn on the world a build was kept on', () => {
 test('a value changed on the edit in hand redraws the palette, so the accept tile says what it will ask', () => {
     const apply = methodBody(mainSource, 'applyDockValue');
     assert.match(apply,
-        /reviseDraft\(this\.builder, \{ config: shown\.holder\.config \}\);\s*this\.redrawCanvas\(\);[\s\S]*?this\.syncOverlays\(\);\s*return;/);
+        /reviseDraft\(this\.builder, \{ config: holder\.config \}\);\s*this\.redrawCanvas\(\);[\s\S]*?this\.syncOverlays\(\);\s*return;/);
+});
+
+// --- The gumball, and Select showing what is selected ------------------------------
+
+/**
+ * A press on a handle is the edit in hand's, whichever tool is live, so it is
+ * asked before the press can become an orbit, a pick or a drop - with Mountain
+ * live, a press on the gumball must drag the handle rather than put the
+ * mountain down under it.
+ */
+test('a press on a gumball handle drags it before anything else can take the press', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    const hit = press.indexOf('gumballHit(this.gumball, e.clientX, e.clientY)');
+    assert.ok(hit >= 0 && hit < press.indexOf('cameraGesture(e, tool)'), 'before the camera');
+    assert.ok(hit < press.indexOf('this.dropAt(e)'), 'and before a drop');
+    assert.match(press,
+        /const handle = e\.button === 0 \? gumballHit\(this\.gumball, e\.clientX, e\.clientY\) : null;\s*if \(handle != null\) \{\s*e\.preventDefault\(\);\s*const pressed = pressHandle\(handle, e\);\s*if \(pressed\) this\.beginGumballDrag\(e, pressed\);\s*return;\s*\}/,
+        'any main-button press on a handle is the gumball\'s, and one refused - ctrl on the centre - does nothing');
+
+    const begin = methodBody(mainSource, 'beginGumballDrag');
+    assert.match(begin, /grab: structuredClone\(draft\),/, 'from the edit as it stood at the press');
+    assert.match(begin, /setPointerCapture\(e\.pointerId\)/);
+});
+
+test('a handle dragged writes the drag as a whole, through the holder the dock steps', () => {
+    assert.match(methodBody(mainSource, 'onCanvasDrag'),
+        /if \(this\.gumballDrag && e\.pointerId === this\.gumballDrag\.pointer\) \{\s*this\.dragGumball\(e\);\s*return;/);
+
+    const drag = methodBody(mainSource, 'dragGumball');
+    assert.match(drag, /dragHandle\(drag\.grab, drag\.handle, \{/, 'worked out from the grab');
+    assert.match(drag, /along: alongAxis\(drag\.layout, drag\.handle, drag\.start, now\)/);
+    assert.match(drag, /turn: sweepAround\(drag\.layout\.centre, drag\.start, now\)/);
+
+    const write = methodBody(mainSource, 'writeGumball');
+    assert.match(write, /holder\.config\[name\] = structuredClone\(value\)/, 'a declared range into the holder');
+    assert.match(write, /reviseDraft\(this\.builder, \{\s*config: \{ \.\.\.\(holder\?\.config \?\? \{\}\), \.\.\.written \},/,
+        'and from it into the edit, the dock\'s own door');
+    assert.match(write, /this\.groundStale = true;\s*this\.syncOverlays\(\);/, 'the dock\'s figures following at once');
+});
+
+test('the ground under a drag catches up at a pace, and once more when it ends', () => {
+    assert.match(mainSource, /const GROUND_REDRAW_MS = \d+;/);
+    assert.match(methodBody(mainSource, 'trackCanvasCamera'),
+        /if \(this\.groundStale && performance\.now\(\) - this\.groundDrawnAt >= GROUND_REDRAW_MS\) this\.redrawCanvas\(\);/);
+    assert.match(methodBody(mainSource, 'redrawCanvas'), /this\.groundStale = false;\s*this\.groundDrawnAt = performance\.now\(\);/);
+
+    assert.match(methodBody(mainSource, 'onCanvasRelease'),
+        /if \(this\.gumballDrag && e\.pointerId === this\.gumballDrag\.pointer\) \{\s*this\.endGumballDrag\(\);\s*return;/);
+    assert.match(methodBody(mainSource, 'endGumballDrag'), /if \(redraw && this\.groundStale\) this\.redrawCanvas\(\);/);
+    assert.match(methodBody(mainSource, 'leaveBuilder'), /this\.endGumballDrag\(false\);/,
+        'and leaving drops a drag without drawing a canvas that is going');
+});
+
+test('the gumball is drawn on the edit in hand, lying in the scene, with only its bound handles', () => {
+    const draw = methodBody(mainSource, 'drawBuildOverlay');
+    assert.match(draw, /this\.gumball = chosen \? this\.gumballFor\(chosen, width, height\) : null;/,
+        'on whatever is in hand, picked or dropped');
+    assert.match(draw, /strokeGumball\(ctx, this\.gumball, this\.gumballDrag\?\.handle \?\? this\.gumballHover\)/);
+
+    const laid = methodBody(mainSource, 'gumballFor');
+    assert.match(laid, /const handles = boundHandles\(placement\);/);
+    assert.match(laid, /for \(const \[name, direction\] of Object\.entries\(GUMBALL_AXES\)\)/, 'its axes projected from the camera');
+    assert.match(laid, /return gumballLayout\(middle, axes, handles\);/);
+});
+
+test('a handle under the pointer is lit and comes before what is on the ground under it', () => {
+    const hover = methodBody(mainSource, 'trackHover');
+    assert.match(hover, /const handle = looking \? gumballHit\(this\.gumball, pointer\.x, pointer\.y\) : null;/);
+    assert.match(hover, /if \(looking && handle == null && buildModeTool/, 'a placement is looked for only off the gumball');
+
+    const cursor = methodBody(mainSource, 'canvasCursor');
+    assert.match(cursor, /if \(this\.gumballDrag != null\) return 'grabbing';\s*if \(this\.gumballHover != null\) return 'grab';/);
+});
+
+test('Select\'s panel draws each section\'s rows against its own holder, and folds the world\'s elements', () => {
+    assert.match(methodBody(mainSource, 'syncDock'), /open: \[\.\.\.this\.worldOpen\]/);
+
+    const holder = methodBody(mainSource, 'dockHolder');
+    assert.match(holder, /if \(!entry\.section\) return shown\.holder;/);
+    assert.match(holder, /shown\.sections\?\.find\(section => section\.id === entry\.section\)\?\.holder/);
+    assert.match(methodBody(mainSource, 'onDockStep'), /const holder = this\.dockHolder\(entry\);/);
+
+    const apply = methodBody(mainSource, 'applyDockValue');
+    assert.match(apply, /if \(kind === DOCK_WORLD\) \{\s*this\.redrawCanvas\(\);/, 'an element of the world stepped is the ground drawn again');
+
+    assert.match(methodBody(mainSource, 'onDockFold'), /this\.worldOpen\.(add|delete)\(section\.index\)/);
+    assert.match(methodBody(mainSource, 'showCanvas'), /this\.worldOpen\.clear\(\);/, 'every canvas opens with them folded');
+});
+
+test('the dock draws a heading for each section, and a folding one is a button that says which way it is', () => {
+    assert.match(panelViewSource, /const heading = document\.createElement\(section\.folds \? 'button' : 'h4'\);/);
+    assert.match(panelViewSource, /heading\.setAttribute\('aria-expanded', String\(Boolean\(section\.open\)\)\);/);
+    assert.match(panelViewSource, /if \(button\.dataset\.section\) \{\s*this\.handlers\.onFold\?\.\(button\.dataset\.section\);/);
+    assert.match(mainSource, /onFold: +\(id\) => this\.onDockFold\(id\)/);
+
+    const rule = indexHtml.match(/button\.dock-section \{[^}]*\}/)?.[0] ?? '';
+    assert.match(rule, /min-height: 30px;/, 'tall enough for a fingertip');
+});
+
+/**
+ * Found in Chromium: a press on the centre that wobbled three pixels moved the
+ * picked mountain, which made the pick a changed one, so the next click on
+ * bare ground asked ACCEPT EDITS about an edit nobody meant. A handle keeps to
+ * the rule a click keeps to.
+ */
+test('a handle writes nothing until its press has travelled further than a click may', () => {
+    const drag = methodBody(mainSource, 'dragGumball');
+    assert.match(drag, /if \(!drag\.travelled\) \{\s*if \(!travelledPast\(drag\.start, now, drag\.type\)\) return;\s*drag\.travelled = true;\s*\}/);
+    assert.ok(drag.indexOf('travelledPast(') < drag.indexOf('dragHandle('), 'before anything is worked out');
+    assert.match(methodBody(mainSource, 'beginGumballDrag'), /type: e\.pointerType,\s*travelled: false/);
 });

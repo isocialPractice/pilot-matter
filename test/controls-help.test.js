@@ -262,6 +262,7 @@ test('the builder list reads as the input and then what it does', () => {
         'Home - Reframe',
         'Click (Select) - Pick a Built Element',
         'Click (Mountain) - Drop a Mountain',
+        'Drag a Handle - Move or Shape What Is in Hand',
         'Esc - Accept Edits or Save and Exit',
         'Enter - Answer a Question',
         'H - Collapse List',

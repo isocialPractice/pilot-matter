@@ -133,9 +133,10 @@
 │   ├── build-camera.js # Pure orbit camera over a canvas: the hold, every gesture, and the air cleared over it
 │   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground
 │   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach, and whether a press was a click
-│   ├── build-overlay.js # Pure outlines: a placement's reach traced as a contour, projected onto the screen and stroked over the canvas
-│   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows, and what the canvas is drawn from
-│   ├── panel-view.js   # The one renderer the dock is drawn with: rows, the slides, the answers, and what was done to them
+│   ├── build-overlay.js # Pure outlines and gumball: a placement's reach traced as a contour, projected onto the screen and stroked over the canvas, and the gumball drawn in the art's colours
+│   ├── gumball.js      # Pure gumball: the two handle sets the art declares, what each handle is bound to, what a drag writes, and where each handle lies on the screen
+│   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows - Select's camera with the pick or the world's own elements beneath it - and what the canvas is drawn from
+│   ├── panel-view.js   # The one renderer the dock is drawn with: rows, sections that fold, the slides, the answers, and what was done to them
 │   ├── typed-value.js  # Pure keypad both number-holding panels read a typed figure through
 │   ├── loading.js      # Pure start-up progress, and the screen it is drawn on
 │   ├── audio.js        # Pure engine and wind mix, and the graph it is played through

@@ -109,6 +109,12 @@ export function createBuildState() {
         // built world, and it goes to `buildEnvironment` through the same door
         // a preset does.
         placements: [],
+        // The environment's own elements, as the rows the element editor holds
+        // them in - a type, its configuration, and the colours its gradients
+        // are measured against - which Select's panel steps across the whole
+        // world. Held by the session so a change to them is the canvas's until
+        // it is kept, and dropped with the rest of it when it is not.
+        world: [],
         // The edit in hand, and null while nothing is pending: a placement
         // being drawn or changed, the index of the committed placement it
         // replaces, or null for one drawn on bare ground, and the tool that
@@ -135,7 +141,7 @@ export function createBuildState() {
  *
  * On its picker the first time, and straight onto the built world every time
  * after that. `built` is the world an earlier session kept - `{ environment,
- * placements }` - and with one the session opens on its canvas with every
+ * placements, world }` - and with one the session opens on its canvas with every
  * placement it had already committed, each still one that can be picked up and
  * changed: a pilot who comes back to their world wants their world, not a
  * choice of six and a blank canvas. With none, which is a world nothing has
@@ -152,7 +158,7 @@ export function openBuildMode(state, from = BUILD_FROM_TITLE, built = null) {
     state.tool = null;
     state.confirm = null;
 
-    if (built != null) beginCanvas(state, built.environment, built.placements);
+    if (built != null) beginCanvas(state, built.environment, built.placements, built.world);
     return state;
 }
 
@@ -264,9 +270,9 @@ export function buildConfirm(state) {
  * is still the one it was, and the canvas is still open.
  *
  * Returns what the caller has to do: `{ leave: true, keep, environment,
- * placements }` for the way out - the world to keep, read before the session
- * closes - `{ settled, tool, picked }` for an edit settled, `{ stay: true }`
- * for a confirm called off, or null when nothing was asked.
+ * placements, world }` for the way out - the world to keep, read before the
+ * session closes - `{ settled, tool, picked }` for an edit settled,
+ * `{ stay: true }` for a confirm called off, or null when nothing was asked.
  */
 export function answerConfirm(state, answer) {
     const asked = state?.confirm;
@@ -280,7 +286,8 @@ export function answerConfirm(state, answer) {
             leave: true,
             keep: answer === CONFIRM_YES,
             environment: state.environment,
-            placements: committedPlacements(state)
+            placements: committedPlacements(state),
+            world: worldRows(state)
         };
     }
 
@@ -603,6 +610,22 @@ export function builtPlacements(state) {
     return shown;
 }
 
+/**
+ * The environment's own elements as the session holds them, copied: the rows
+ * Select's panel steps, which the way out hands back to be kept.
+ */
+export function worldRows(state) {
+    return (state?.world ?? []).map(own);
+}
+
+/**
+ * The environment's own elements as placements - a type and a configuration
+ * each - which is what the canvas is drawn from beneath what is built.
+ */
+export function worldPlacements(state) {
+    return (state?.world ?? []).map(row => ({ type: row.type, config: own(row.config ?? {}) }));
+}
+
 /** True for something shaped like a placement: a type, and a config if it has one. */
 function isPlacement(placement) {
     return placement != null
@@ -646,10 +669,14 @@ export function buildModeEnvironment(state) {
  * did not show the earlier work quietly replacing it. Anything in it that is
  * not a placement is left out.
  *
+ * `world` is the environment's own elements as the rows the element editor
+ * holds - its preset, or the preset as it was changed and kept - which the
+ * canvas is drawn from beneath what is built, and Select's panel changes.
+ *
  * Refused for a session that is not open, so a canvas can never be begun from
  * under a screen that is not the picker.
  */
-export function beginCanvas(state, environmentId, kept = []) {
+export function beginCanvas(state, environmentId, kept = [], world = []) {
     if (!buildModePicking(state)) return false;
     if (typeof environmentId !== 'string' || environmentId === '') return false;
 
@@ -658,6 +685,7 @@ export function beginCanvas(state, environmentId, kept = []) {
     // Select is the navigation state, so a canvas opens on looking at it.
     state.tool = SELECT_TOOL;
     state.placements = (Array.isArray(kept) ? kept : []).filter(isPlacement).map(own);
+    state.world = (Array.isArray(world) ? world : []).filter(isPlacement).map(own);
     state.draft = null;
     state.confirm = null;
     // A canvas's panels start from the elements' defaults, and its seeds

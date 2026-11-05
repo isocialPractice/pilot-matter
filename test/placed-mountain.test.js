@@ -295,7 +295,12 @@ test('the builder goes back to the world a build was kept on, and to nothing bef
     assert.equal(builtWorld(editor), null, 'nothing kept, so the builder opens on its picker');
 
     keepBuiltWorld(editor, 'lakeside', false, KEPT);
-    assert.deepEqual(builtWorld(editor), { environment: 'lakeside', placements: KEPT });
+    const kept = builtWorld(editor);
+    assert.equal(kept.environment, 'lakeside');
+    assert.deepEqual(kept.placements, KEPT);
+    assert.deepEqual(kept.world.map(row => row.type).sort(),
+        environmentElements(getEnvironment('lakeside'), false).map(row => row.type).sort(),
+        'with the rows of the world itself, which the canvas is drawn from beneath them');
     builtWorld(editor).placements[0].config.count = 99;
     assert.equal(builtWorld(editor).placements[0].config.count, 1, 'handed out as copies');
 
@@ -323,7 +328,8 @@ test('a build kept on Blank Canvas is flown on it, and kept until the settings c
     keepBuiltWorld(editor, 'blank-canvas', false, KEPT, 'highlands');
 
     assert.equal(flownEnvironment(editor, 'highlands'), 'blank-canvas', 'its own flat ground, not the world the settings hold');
-    assert.deepEqual(builtWorld(editor), { environment: 'blank-canvas', placements: KEPT });
+    assert.equal(builtWorld(editor).environment, 'blank-canvas');
+    assert.deepEqual(builtWorld(editor).placements, KEPT);
 
     assert.equal(setEditorWorld(editor, 'highlands', false), false, 'the weather or the units applied keep it');
     assert.equal(setEditorWorld(editor, 'highlands', true), true, 'and a strip turned on keeps it too');

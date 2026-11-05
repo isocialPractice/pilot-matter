@@ -8,13 +8,21 @@
  * written out, so a gesture is read back and a typed value is written. A tool
  * draws no panel of its own; it is pointed at.
  *
+ * Select's panel is the camera and then what is being looked at, in sections
+ * beneath it: the placement picked, with the accept and cancel that settle it,
+ * or with nothing picked the environment's own elements - the rows the element
+ * editor holds, changed across the whole world - each folded under its own
+ * heading until it is opened. One editor with two scopes, so a committed batch
+ * and the world it stands on are changed the same way.
+ *
  * Pure module with no DOM or Three.js dependency, so what the dock shows for a
  * session can be unit tested in Node and the drawing of it is
  * `js/panel-view.js`'s job.
  */
 
 import {
-    buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements
+    buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
+    pickedIndex, worldPlacements
 } from './build-mode.js';
 import { BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues } from './build-tools.js';
 import { cameraFieldRanges, readCameraFields, CAMERA_NUDGES } from './build-camera.js';
@@ -25,6 +33,17 @@ import { environmentElements } from './environment/presets.js';
 /** What the dock is showing: the camera, or an edit in hand. */
 export const DOCK_SELECT = 'select';
 export const DOCK_DRAFT  = 'draft';
+
+/** A section of Select's panel holding one of the environment's own elements. */
+export const DOCK_WORLD  = 'world';
+
+/** The id of the section holding the placement picked with Select. */
+export const PICK_SECTION = 'pick';
+
+/** The id of the section holding the environment's own element at `index`. */
+export function worldSection(index) {
+    return `world-${index}`;
+}
 
 /** The two answers an edit in hand is settled by, pinned under its rows. */
 export const DOCK_ACCEPT = Object.freeze({ id: 'accept', label: 'ACCEPT' });
@@ -98,11 +117,23 @@ export function panelRanges(placement) {
  * `fov`. A tool with no panel yet shows nothing. Off a canvas there is no dock.
  *
  * `context` is what a range's `ctx` gate reads - whether a selection is live.
+ *
+ * With Select live the camera is the dock's first part and `sections` follow
+ * it, each `{ id, kind, heading, holder, rows, open, folds }`: the placement
+ * picked, under `SELECTED` and its element's name, or with nothing picked one
+ * section for each of the environment's own elements, folded shut unless its
+ * index is in `open`. A section's rows each carry the section's id, and its
+ * holder is what a row in it writes: the edit in hand's holder for the pick,
+ * and the session's own row for an element of the world - so a value stepped
+ * there is the world changed, and the canvas is drawn again from it.
  */
-export function dockContent(state, { camera = null, fov, holder = null, context = {} } = {}) {
+export function dockContent(state, { camera = null, fov, holder = null, context = {}, open = [] } = {}) {
     if (!buildModeDrawing(state)) return null;
 
-    if (draftPending(state)) {
+    const select = buildModeTool(state) === SELECT_TOOL && camera != null;
+    const picked = pickedIndex(state) != null;
+
+    if (draftPending(state) && !(select && picked)) {
         const draft = buildDraft(state);
         const held  = holder ?? draftHolderFor(draft);
         if (held == null) return null;
@@ -115,33 +146,69 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
             holder: held,
             rows: panelRows(ranges, held, context),
             nudges: [],
-            actions: [DOCK_ACCEPT, DOCK_CANCEL]
+            actions: [DOCK_ACCEPT, DOCK_CANCEL],
+            sections: []
         };
     }
 
-    if (buildModeTool(state) === SELECT_TOOL && camera != null) {
-        const ranges = cameraFieldRanges(camera);
-        const held   = { config: readCameraFields(camera, fov) };
-        return {
-            kind: DOCK_SELECT,
-            heading: SELECT_HEADING,
-            ranges,
-            holder: held,
-            rows: panelRows(ranges, held, context),
-            nudges: CAMERA_NUDGES,
-            actions: []
-        };
+    if (!select) return null;
+
+    const ranges = cameraFieldRanges(camera);
+    const held   = { config: readCameraFields(camera, fov) };
+    const content = {
+        kind: DOCK_SELECT,
+        heading: SELECT_HEADING,
+        ranges,
+        holder: held,
+        rows: panelRows(ranges, held, context),
+        nudges: CAMERA_NUDGES,
+        actions: [],
+        sections: []
+    };
+
+    if (picked) {
+        const draft = buildDraft(state);
+        const pick  = holder ?? draftHolderFor(draft);
+        if (pick != null) {
+            content.sections.push(dockSection(
+                PICK_SECTION, DOCK_DRAFT, `SELECTED ${label(draft.type)}`, panelRanges(draft), pick, context
+            ));
+            content.actions = [DOCK_ACCEPT, DOCK_CANCEL];
+        }
+        return content;
     }
 
-    return null;
+    (state.world ?? []).forEach((row, index) => {
+        if (!isElementId(row?.type)) return;
+        const section = dockSection(
+            worldSection(index), DOCK_WORLD, `WORLD: ${row.label ?? label(row.type)}`,
+            getElement(row.type).ranges, row, context, open.includes(index)
+        );
+        section.folds = true;
+        section.index = index;
+        content.sections.push(section);
+    });
+
+    return content;
+}
+
+/** One section of the dock: a heading, the holder its rows write, and the rows - none while it is folded. */
+function dockSection(id, kind, heading, ranges, holder, context, open = true) {
+    return {
+        id, kind, heading, holder, open, folds: false,
+        rows: open ? panelRows(ranges, holder, context).map(entry => ({ ...entry, section: id })) : []
+    };
 }
 
 /**
- * The placements a canvas is drawn from: the environment's own, then what has
- * been built on it with the edit in hand shown where it stands - so what is on
- * the canvas is what accepting would keep, and a value moved on the panel is
- * the ground moving under it.
+ * The placements a canvas is drawn from: the environment's own - as the
+ * session holds them, so a row stepped on Select's panel is the world
+ * changing, and as its preset describes them for a session holding none -
+ * then what has been built on it with the edit in hand shown where it stands,
+ * so what is on the canvas is what accepting would keep, and a value moved on
+ * the panel is the ground moving under it.
  */
 export function canvasElements(environment, state) {
-    return [...environmentElements(environment, false), ...builtPlacements(state)];
+    const world = state?.world?.length > 0 ? worldPlacements(state) : environmentElements(environment, false);
+    return [...world, ...builtPlacements(state)];
 }

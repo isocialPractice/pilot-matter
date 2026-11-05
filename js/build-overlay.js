@@ -1,8 +1,9 @@
 /**
  * Build overlay - what the builder draws over the canvas rather than into it.
  *
- * Today that is two outlines: the placement under the pointer, drawn lightly,
- * and the one in hand, drawn firmly. Neither is a write into the ground. An
+ * Two outlines - the placement under the pointer, drawn lightly, and the one
+ * in hand, drawn firmly - and the gumball on the one in hand. None of it is a
+ * write into the ground. An
  * outline is traced once round the placement's reach, in the canvas's frame,
  * and each frame its points are stood on the ground and projected through the
  * camera onto a 2D canvas laid over the renderer - so hovering and picking
@@ -22,6 +23,7 @@
 
 import { placementReach, PICK_WEIGHT } from './build-select.js';
 import { canvasPickBounds } from './build-picking.js';
+import { AXIS_COLOURS } from './gumball.js';
 
 /**
  * How many cells across the canvas an outline is traced over. A canvas is a
@@ -173,6 +175,92 @@ export function strokeOutline(ctx, drawn, style) {
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
         }
+        ctx.stroke();
+    }
+}
+
+// --- The gumball -------------------------------------------------------------------
+
+/**
+ * Draws a gumball laid out by `gumballLayout` in `js/gumball.js`, in the art's
+ * own colours: the arcs and the dashed lines first, then the squares, the
+ * arrows, the ticks and the dots, and the white centre over everything. The
+ * handle under the pointer, `hovered`, is drawn over a white edge, which is
+ * what the art's hover states do to an arc.
+ */
+export function strokeGumball(ctx, layout, hovered = null, colours = AXIS_COLOURS) {
+    if (!layout?.handles?.length) return;
+
+    const order = ['turn', 'extent', 'arrow', 'stand', 'spread', 'centre'];
+    const handles = [...layout.handles].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+
+    for (const handle of handles) {
+        const colour = handle.axis ? colours[handle.axis] : '#ffffff';
+        const lit = handle.id === hovered;
+        ctx.setLineDash([]);
+        ctx.lineCap = 'round';
+
+        if (handle.kind === 'turn') {
+            if (lit) strokePath(ctx, handle.points, 6, GUMBALL_LIT);
+            strokePath(ctx, handle.points, lit ? 3 : 2, colour);
+        } else if (handle.kind === 'extent') {
+            ctx.setLineDash([2, 4]);
+            strokePath(ctx, [handle.from, handle.at], 1.5, colour);
+            ctx.setLineDash([]);
+            const size = handle.half * 2;
+            ctx.fillStyle = lit ? colour : '#ffffff';
+            ctx.fillRect(handle.at.x - handle.half, handle.at.y - handle.half, size, size);
+            ctx.lineWidth = lit ? 2.5 : 1.5;
+            ctx.strokeStyle = lit ? GUMBALL_LIT : colour;
+            ctx.strokeRect(handle.at.x - handle.half, handle.at.y - handle.half, size, size);
+        } else if (handle.kind === 'arrow') {
+            if (lit) strokePath(ctx, [handle.from, handle.to], 7, GUMBALL_LIT);
+            strokePath(ctx, [handle.from, handle.to], 3, colour);
+            fillHead(ctx, handle.from, handle.to, colour, lit);
+        } else if (handle.kind === 'stand') {
+            if (lit) strokePath(ctx, [handle.from, handle.to], 7, GUMBALL_LIT);
+            strokePath(ctx, [handle.from, handle.to], 3, colour);
+        } else if (handle.kind === 'spread' || handle.kind === 'centre') {
+            ctx.beginPath();
+            ctx.arc(handle.at.x, handle.at.y, handle.radius, 0, Math.PI * 2);
+            ctx.fillStyle = handle.kind === 'centre' ? '#ffffff' : colour;
+            ctx.fill();
+            ctx.lineWidth = lit ? 3 : 1.5;
+            ctx.strokeStyle = lit ? GUMBALL_LIT : handle.kind === 'centre' ? '#000000' : colour;
+            ctx.stroke();
+        }
+    }
+    ctx.setLineDash([]);
+}
+
+/** The edge a hovered handle is drawn over. */
+export const GUMBALL_LIT = '#ffffff';
+
+function strokePath(ctx, points, width, colour) {
+    ctx.lineWidth = width;
+    ctx.strokeStyle = colour;
+    ctx.beginPath();
+    points.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+    ctx.stroke();
+}
+
+/** An arrowhead at the end of a shaft, the shape the art draws: long and narrow. */
+function fillHead(ctx, from, to, colour, lit) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length, uy = dy / length;
+    const back = { x: to.x - ux * 13, y: to.y - uy * 13 };
+    ctx.beginPath();
+    ctx.moveTo(to.x + ux * 4, to.y + uy * 4);
+    ctx.lineTo(back.x - uy * 5, back.y + ux * 5);
+    ctx.lineTo(back.x + uy * 5, back.y - ux * 5);
+    ctx.closePath();
+    ctx.fillStyle = colour;
+    ctx.fill();
+    if (lit) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = GUMBALL_LIT;
         ctx.stroke();
     }
 }

@@ -27,8 +27,12 @@ import {
 import { paletteTools, dropsAtClick, ACCEPT_TOOL, SELECT_TOOL } from './build-tools.js';
 import { placementAt, travelledPast } from './build-select.js';
 import {
-    placementOutline, projectOutline, strokeOutline, HOVER_OUTLINE, CHOSEN_OUTLINE
+    placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE
 } from './build-overlay.js';
+import {
+    boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle,
+    alongAxis, sweepAround, GUMBALL_AXES
+} from './gumball.js';
 import {
     createPickerState, pickerEntries, choosePickerEntry,
     CARD_ENTRY, PICKER_STARTED, PICKER_LEFT
@@ -40,7 +44,7 @@ import {
     writeCameraField, nudgeBuildCamera, CAMERA_ORBIT, DEFAULT_FOV
 } from './build-camera.js';
 import {
-    dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_ACCEPT, DOCK_CANCEL
+    dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_ACCEPT, DOCK_CANCEL
 } from './build-panel.js';
 import { PanelView } from './panel-view.js';
 import {
@@ -106,7 +110,7 @@ import {
     typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
     setEditorClearance, isEditorCloseKey, keepBuiltWorld, keptPlacements, builtWorld,
-    flownEnvironment, EDITOR_BACK_ID
+    flownEnvironment, canvasWorld, EDITOR_BACK_ID
 } from './element-editor.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
@@ -149,6 +153,14 @@ const MISS_HOLD = 3;
 function sameStart(start, applied) {
     return applied != null && Object.keys(start).every(field => start[field] === applied[field]);
 }
+
+/**
+ * How often, in milliseconds, the ground under a gumball drag is drawn again.
+ * A canvas takes the better part of a frame to draw, so a drag writes the
+ * edit on every move and the ground catches up at this pace, and once more
+ * when the handle is let go.
+ */
+const GROUND_REDRAW_MS = 120;
 
 class FlightSimulator {
     constructor() {
@@ -308,6 +320,21 @@ class FlightSimulator {
         this.outlines      = new Map();
         this.overlayPoint  = new THREE.Vector3();
         this.overlayDrawn  = false;
+
+        // The gumball on the edit in hand as the last frame laid it out, which
+        // a press is hit-tested against; the handle under the pointer; the drag
+        // of a handle being made; and whether the ground is behind what that
+        // drag has written, with when it was last drawn - a drag writes the
+        // edit every move and the ground at most every `GROUND_REDRAW_MS`.
+        this.gumball      = null;
+        this.gumballHover = null;
+        this.gumballDrag  = null;
+        this.groundStale  = false;
+        this.groundDrawnAt = 0;
+
+        // Which of the world's own elements are open on Select's panel, by
+        // their place in the world, so a section stays open across frames.
+        this.worldOpen = new Set();
 
         // What the dock last drew, which a press on it is read against, and
         // the holder an edit in hand is stepped through - its configuration,
@@ -546,7 +573,8 @@ class FlightSimulator {
             onStep:   (entry, step) => this.onDockStep(entry, step),
             onType:   (entry, figure, field) => this.onDockType(entry, figure, field),
             onNudge:  (id, sign) => this.onDockNudge(id, sign),
-            onAction: (id) => this.onDockAction(id)
+            onAction: (id) => this.onDockAction(id),
+            onFold:   (id) => this.onDockFold(id)
         });
 
         // The confirm is worked with the mouse as every menu here is, and a
@@ -1756,6 +1784,9 @@ class FlightSimulator {
         this.canvasPointer = null;
         this.hovered = null;
         this.outlines.clear();
+        this.endGumballDrag(false);
+        this.gumball = null;
+        this.gumballHover = null;
 
         closeBuildMode(this.builder);
 
@@ -1776,7 +1807,7 @@ class FlightSimulator {
      * Returns true when the world a flight is drawn from is now a different
      * one, which a canvas kept exactly as the flight already had it is not.
      */
-    saveBuiltWorld(environment, placements) {
+    saveBuiltWorld(environment, placements, world = null) {
         const before = this.flightWorldKey();
 
         // Chosen in the settings first, so the editor is told which world the
@@ -1785,7 +1816,7 @@ class FlightSimulator {
         // another is chosen there.
         chooseSetting(this.settings, environment);
         keepBuiltWorld(this.editor, environment, runwayWanted(startSettings(this.settings)), placements,
-            currentEnvironment(this.settings));
+            currentEnvironment(this.settings), world);
         this.redrawEditor();
 
         return this.flightWorldKey() !== before;
@@ -1810,7 +1841,8 @@ class FlightSimulator {
      * committed, so saving again keeps that as well as what is added.
      */
     startCanvas(environmentId) {
-        if (!beginCanvas(this.builder, environmentId, keptPlacements(this.editor, environmentId))) return false;
+        if (!beginCanvas(this.builder, environmentId, keptPlacements(this.editor, environmentId),
+            canvasWorld(this.editor, environmentId))) return false;
         this.showCanvas(environmentId);
         return true;
     }
@@ -1821,6 +1853,7 @@ class FlightSimulator {
      * builder reopening onto its built world both come here.
      */
     showCanvas(environmentId) {
+        this.worldOpen.clear();
         this.terrain.setCanvas(true);
         this.terrain.setEnvironment(environmentId, {
             runway: false,
@@ -1930,6 +1963,11 @@ class FlightSimulator {
         // only when it moves, because the view moving under a still pointer
         // moves the ground under it too.
         this.trackHover();
+
+        // A gumball drag writes the edit on every move, and the ground is
+        // drawn from it here - not every frame, because a canvas takes the
+        // better part of a frame to draw, but often enough to watch it change.
+        if (this.groundStale && performance.now() - this.groundDrawnAt >= GROUND_REDRAW_MS) this.redrawCanvas();
     }
 
     /**
@@ -1945,22 +1983,22 @@ class FlightSimulator {
     trackHover() {
         const pointer  = this.canvasPointer;
         const drag     = this.canvasDrag;
-        const dragging = drag != null && (drag.travelled || !drag.picks);
-        const hovers   = pointer != null
-            && pointer.type !== 'touch'
-            && !dragging
-            && buildModeTool(this.builder) === SELECT_TOOL
-            && !confirmOpen(this.builder)
-            && this.builder.placements.length > 0;
+        const dragging = (drag != null && (drag.travelled || !drag.picks)) || this.gumballDrag != null;
+        const looking  = pointer != null && pointer.type !== 'touch' && !dragging && !confirmOpen(this.builder);
+
+        // A handle of the gumball under the pointer comes before anything
+        // under it on the ground: a press there drags the handle.
+        const handle = looking ? gumballHit(this.gumball, pointer.x, pointer.y) : null;
 
         let hovered = null;
-        if (hovers) {
+        if (looking && handle == null && buildModeTool(this.builder) === SELECT_TOOL && this.builder.placements.length > 0) {
             const point = this.pickCanvasPoint(pointer.x, pointer.y);
             if (point) hovered = placementAt(pickablePlacements(this.builder), point.x, point.z, this.terrain.size);
         }
 
-        if (hovered !== this.hovered) {
+        if (hovered !== this.hovered || handle !== this.gumballHover) {
             this.hovered = hovered;
+            this.gumballHover = handle;
             this.renderer.domElement.style.cursor = this.canvasCursor();
         }
     }
@@ -1971,6 +2009,8 @@ class FlightSimulator {
      */
     canvasCursor() {
         if (!buildModeDrawing(this.builder)) return '';
+        if (this.gumballDrag != null) return 'grabbing';
+        if (this.gumballHover != null) return 'grab';
         if (dropsAtClick(buildModeTool(this.builder))) return 'crosshair';
         return this.hovered != null ? 'pointer' : '';
     }
@@ -2019,6 +2059,46 @@ class FlightSimulator {
 
         if (hovered) strokeOutline(ctx, this.screenOutline(hovered, width, height), HOVER_OUTLINE);
         if (chosen) strokeOutline(ctx, this.screenOutline(chosen, width, height), CHOSEN_OUTLINE);
+
+        // The gumball on the edit in hand, laid out for this frame's camera and
+        // kept so a press can be hit-tested against what is on the screen.
+        this.gumball = chosen ? this.gumballFor(chosen, width, height) : null;
+        if (this.gumball) strokeGumball(ctx, this.gumball, this.gumballDrag?.handle ?? this.gumballHover);
+    }
+
+    /**
+     * A placement's gumball as it falls on a screen `width` by `height`: its
+     * centre stood on the ground under it and projected, and its three axes
+     * projected from there, so it is drawn lying in the scene - with only the
+     * handles bound to something the placement owns. Null for a placement
+     * with no centre, or one the camera cannot see the centre of.
+     */
+    gumballFor(placement, width, height) {
+        const centre = gumballCentre(placement);
+        const handles = boundHandles(placement);
+        if (centre == null || handles.length === 0) return null;
+
+        const y = this.terrain.getTerrainHeightAt(centre.x, centre.z);
+        const point = this.overlayPoint;
+        const onScreen = (x, h, z) => {
+            point.set(x, h, z).project(this.camera);
+            if (!(point.z >= -1 && point.z <= 1)) return null;
+            return { x: (point.x + 1) / 2 * width, y: (1 - point.y) / 2 * height };
+        };
+
+        const middle = onScreen(centre.x, y, centre.z);
+        if (middle == null) return null;
+
+        // A short step along each axis, scaled to how far off the camera is,
+        // gives the direction and the foreshortening the axis is drawn with.
+        const reach = Math.max(this.camera.position.distanceTo(point.set(centre.x, y, centre.z)) * 0.02, 1);
+        const axes = {};
+        for (const [name, direction] of Object.entries(GUMBALL_AXES)) {
+            const end = onScreen(centre.x + direction.x * reach, y + direction.y * reach, centre.z + direction.z * reach);
+            axes[name] = end ? { x: end.x - middle.x, y: end.y - middle.y } : { x: 0, y: 0 };
+        }
+
+        return gumballLayout(middle, axes, handles);
     }
 
     /** A placement's outline as it falls on a screen `width` by `height`. */
@@ -2105,7 +2185,18 @@ class FlightSimulator {
      * rather than orbiting.
      */
     onCanvasPress(e) {
-        if (!buildModeDrawing(this.builder) || this.canvasDrag) return;
+        if (!buildModeDrawing(this.builder) || this.canvasDrag || this.gumballDrag) return;
+
+        // A press on a handle of the gumball drags that handle, whichever tool
+        // is live: it is the edit in hand's, and comes before an orbit, a pick
+        // or a drop. `ctrl` and the centre is pressed and does nothing.
+        const handle = e.button === 0 ? gumballHit(this.gumball, e.clientX, e.clientY) : null;
+        if (handle != null) {
+            e.preventDefault();
+            const pressed = pressHandle(handle, e);
+            if (pressed) this.beginGumballDrag(e, pressed);
+            return;
+        }
 
         const tool    = buildModeTool(this.builder);
         const gesture = cameraGesture(e, tool);
@@ -2150,6 +2241,11 @@ class FlightSimulator {
         if (!buildModeDrawing(this.builder)) return;
         this.canvasPointer = { x: e.clientX, y: e.clientY, type: e.pointerType };
 
+        if (this.gumballDrag && e.pointerId === this.gumballDrag.pointer) {
+            this.dragGumball(e);
+            return;
+        }
+
         const drag = this.canvasDrag;
         if (!drag || e.pointerId !== drag.pointer) return;
 
@@ -2177,12 +2273,115 @@ class FlightSimulator {
      * picks what is under it; one cancelled or taken away picks nothing.
      */
     onCanvasRelease(e) {
+        if (this.gumballDrag && e.pointerId === this.gumballDrag.pointer) {
+            this.endGumballDrag();
+            return;
+        }
+
         const drag = this.canvasDrag;
         if (!drag || e.pointerId !== drag.pointer) return;
 
         const click = e.type === 'pointerup' && drag.picks && !drag.travelled;
         this.endCanvasDrag();
         if (click) this.pickAt(e.clientX, e.clientY);
+    }
+
+    /**
+     * A handle of the gumball pressed: the drag begins from the edit in hand
+     * as it stands, and from the ground under the press - or, pressed over the
+     * sky, from the gumball's own centre - so every move after it is worked
+     * out from the grab rather than from the move before.
+     */
+    beginGumballDrag(e, pressed) {
+        const draft = buildDraft(this.builder);
+        if (draft == null || this.gumball == null) return;
+
+        this.renderer.domElement.setPointerCapture(e.pointerId);
+        const centre = gumballCentre(draft);
+        this.gumballDrag = {
+            pointer: e.pointerId,
+            handle: pressed.handle,
+            uniform: pressed.uniform,
+            grab: structuredClone(draft),
+            start: { x: e.clientX, y: e.clientY },
+            ground: this.pickCanvasPoint(e.clientX, e.clientY) ?? (centre && { x: centre.x, z: centre.z }),
+            moved: { dx: 0, dz: 0 },
+            layout: this.gumball,
+            type: e.pointerType,
+            travelled: false
+        };
+        this.renderer.domElement.style.cursor = this.canvasCursor();
+    }
+
+    /**
+     * The pointer moving under a handle: what the drag as a whole writes on
+     * the placement as it was grabbed, through the holder the dock steps - so
+     * the dock's figures follow the drag and both are held to the same bounds.
+     * Over the sky the ground stays where it was last read.
+     *
+     * Nothing is written until the press has travelled further than a click
+     * may, the rule a click on the canvas is told from an orbit by: a press on
+     * the centre that wobbles as it lands - a finger's always does - is a
+     * click, and leaves the placement exactly as it was. Past that, the drag
+     * is read from the press, so nothing it travelled is lost.
+     */
+    dragGumball(e) {
+        const drag = this.gumballDrag;
+        const now  = { x: e.clientX, y: e.clientY };
+        if (!drag.travelled) {
+            if (!travelledPast(drag.start, now, drag.type)) return;
+            drag.travelled = true;
+        }
+
+        const point = this.pickCanvasPoint(now.x, now.y);
+        if (point && drag.ground) drag.moved = { dx: point.x - drag.ground.x, dz: point.z - drag.ground.z };
+
+        const changes = dragHandle(drag.grab, drag.handle, {
+            ground: drag.moved,
+            along: alongAxis(drag.layout, drag.handle, drag.start, now),
+            turn: sweepAround(drag.layout.centre, drag.start, now),
+            uniform: drag.uniform
+        }, { size: this.terrain.size });
+        if (changes) this.writeGumball(changes);
+    }
+
+    /**
+     * Writes what a handle moved into the edit in hand, by the door the dock's
+     * rows go through: a declared range into the holder and from there into
+     * the draft, the point and the footprint into the draft directly. The
+     * ground is left to the frame, which draws it while the drag goes on.
+     */
+    writeGumball(changes) {
+        const footprint = changes.footprint ?? null;
+        const holder = this.currentDraftHolder();
+        const written = {};
+        for (const [name, value] of Object.entries(changes.config ?? {})) {
+            if (name !== 'at' && holder?.config && name in holder.config) holder.config[name] = structuredClone(value);
+            else written[name] = value;
+        }
+
+        reviseDraft(this.builder, {
+            config: { ...(holder?.config ?? {}), ...written },
+            ...(footprint ? { footprint } : {})
+        });
+        this.groundStale = true;
+        this.syncOverlays();
+    }
+
+    /**
+     * The drag of a handle let go of, cancelled, or ended by `Escape`: the
+     * edit stays where the drag left it, and the ground is drawn from it.
+     */
+    endGumballDrag(redraw = true) {
+        const drag = this.gumballDrag;
+        if (!drag) return;
+
+        this.gumballDrag = null;
+        const surface = this.renderer.domElement;
+        if (surface.hasPointerCapture?.(drag.pointer)) surface.releasePointerCapture(drag.pointer);
+        if (redraw && this.groundStale) this.redrawCanvas();
+        if (!redraw) this.groundStale = false;
+        surface.style.cursor = this.canvasCursor();
     }
 
     /**
@@ -2240,7 +2439,8 @@ class FlightSimulator {
             ? dockContent(this.builder, {
                 camera: this.buildCamera,
                 fov: this.camera.fov,
-                holder: this.currentDraftHolder()
+                holder: this.currentDraftHolder(),
+                open: [...this.worldOpen]
             })
             : null;
         this.dockView.render(this.dockShown);
@@ -2264,9 +2464,27 @@ class FlightSimulator {
 
     /** A row of the dock stepped: one press along what its range allows. */
     onDockStep(entry, step) {
+        const holder = this.dockHolder(entry);
+        if (!holder || !stepRow(holder, entry.name, entry.row, step)) return;
+        this.applyDockValue(entry);
+    }
+
+    /** The holder a row of the dock writes: the first part's, or its section's. */
+    dockHolder(entry) {
         const shown = this.dockShown;
-        if (!shown || !stepRow(shown.holder, entry.name, entry.row, step)) return;
-        this.applyDockValue(entry.name);
+        if (!shown) return null;
+        if (!entry.section) return shown.holder;
+        return shown.sections?.find(section => section.id === entry.section)?.holder ?? null;
+    }
+
+    /** A folding section's heading pressed: an element of the world opened, or shut again. */
+    onDockFold(id) {
+        const section = this.dockShown?.sections?.find(each => each.id === id);
+        if (!section?.folds) return;
+
+        if (this.worldOpen.has(section.index)) this.worldOpen.delete(section.index);
+        else this.worldOpen.add(section.index);
+        this.syncDock();
     }
 
     /**
@@ -2275,8 +2493,8 @@ class FlightSimulator {
      * what was typed so it can be put right.
      */
     onDockType(entry, figure, field) {
-        const shown = this.dockShown;
-        if (!shown) return;
+        const holder = this.dockHolder(entry);
+        if (!holder) return;
 
         const value = typedRowValue(entry.row, figure);
         const range = entry.row.range;
@@ -2287,28 +2505,39 @@ class FlightSimulator {
         }
 
         field.setCustomValidity('');
-        writeRowValue(shown.holder, entry.name, entry.row, Number(value.toFixed(stepPlaces(rangeStep(range)))));
+        writeRowValue(holder, entry.name, entry.row, Number(value.toFixed(stepPlaces(rangeStep(range)))));
         field.blur();
-        this.applyDockValue(entry.name);
+        this.applyDockValue(entry);
     }
 
     /**
-     * Carries a value the dock's holder now holds to what it stands for: the
-     * camera for Select's panel, the edit in hand - and the ground drawn from
-     * it - for an edit's.
+     * Carries a value a row of the dock now holds to what it stands for: the
+     * camera for Select's own rows, the edit in hand - and the ground drawn
+     * from it - for an edit's or a pick's, and the ground again for one of the
+     * world's own elements, whose row is the session's own.
      */
-    applyDockValue(name) {
-        const shown = this.dockShown;
+    applyDockValue(entry) {
+        const shown   = this.dockShown;
+        const section = entry.section ? shown.sections?.find(each => each.id === entry.section) : null;
+        const kind    = section ? section.kind : shown.kind;
+        const holder  = section ? section.holder : shown.holder;
+        const name    = entry.name;
 
-        if (shown.kind === DOCK_SELECT) {
-            const { state, fov } = writeCameraField(this.buildCamera, this.camera.fov, name, shown.holder.config[name]);
+        if (kind === DOCK_WORLD) {
+            this.redrawCanvas();
+            this.syncDock();
+            return;
+        }
+
+        if (kind === DOCK_SELECT) {
+            const { state, fov } = writeCameraField(this.buildCamera, this.camera.fov, name, holder.config[name]);
             this.buildCamera = state;
             if (fov !== this.camera.fov) {
                 this.camera.fov = fov;
                 this.camera.updateProjectionMatrix();
             }
-        } else if (shown.kind === DOCK_DRAFT) {
-            reviseDraft(this.builder, { config: shown.holder.config });
+        } else if (kind === DOCK_DRAFT) {
+            reviseDraft(this.builder, { config: holder.config });
             this.redrawCanvas();
             // A picked placement changed, or changed back, turns the accept
             // tile's question from saving to accepting or back again, so the
@@ -2357,6 +2586,8 @@ class FlightSimulator {
 
         this.terrain.setEnvironment(id, { runway: false, elements: canvasElements(getEnvironment(id), this.builder) });
         this.canvasGround = this.readCanvasGround();
+        this.groundStale = false;
+        this.groundDrawnAt = performance.now();
     }
 
     onBuilderKey(e) {
@@ -2380,8 +2611,9 @@ class FlightSimulator {
             // Escape steps out of the innermost thing first: a drag being made
             // ends where it is, and only a press with nothing in progress asks
             // to leave.
-            if (this.canvasDrag && isCanvasLeaveKey(e.code)) {
+            if ((this.canvasDrag || this.gumballDrag) && isCanvasLeaveKey(e.code)) {
                 this.endCanvasDrag();
+                this.endGumballDrag();
                 return;
             }
 
@@ -2473,6 +2705,7 @@ class FlightSimulator {
     confirmOpened() {
         resetSelection(this.confirmState);
         this.endCanvasDrag();
+        this.endGumballDrag();
         this.buildKeys.clear();
         this.syncOverlays();
         this.overlays.confirmPanel.focus({ preventScroll: true });
@@ -2526,7 +2759,7 @@ class FlightSimulator {
         this.overlays.confirmPanel.blur();
 
         if (answered.leave) {
-            const changed = answered.keep && this.saveBuiltWorld(answered.environment, answered.placements);
+            const changed = answered.keep && this.saveBuiltWorld(answered.environment, answered.placements, answered.world);
             this.leaveBuilder(changed);
         } else if (answered.settled) {
             this.draftHolder = null;

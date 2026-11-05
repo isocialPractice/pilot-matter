@@ -4183,3 +4183,37 @@ still be found by name.
     `gated` kind, whose bounds stay settable while its switch is off, is left as
     it was. `color` is left for **Free paint**, the first thing that needs it.
   - From: Interactive Build Mode
+- [x] **Panel conformance**: a test walking every tool and every range it
+  declares, so a kind with no renderer fails the suite on the commit that
+  declares it rather than drawing an empty row later
+  - **Settled**: `test/properties-panel.test.js` walks every element, the base
+    ground and every tool's element - the twelve now name theirs where the
+    registry has one - and holds each row to moving and reading as something.
+    A kind the panel cannot draw draws no rows, so declaring one without a
+    renderer fails the walk. The plan pinned the mountain to the artwork's six
+    rows; it now draws sixteen, so the pin is that those six lead in the
+    artwork's order, and which of the other ten Build Mountains shows is
+    **Placed mountains**'s to decide.
+  - From: Interactive Build Mode
+- [x] **Tool controls panel**: the shared panel docked on the right, pointed at
+  one draft placement, with its accept and its cancel, and the split that sends
+  each value to the config or to the footprint
+  - **Settled**: `js/build-panel.js` decides what the dock shows and
+    `js/panel-view.js` draws it. With an edit in hand it is that edit's rows,
+    headed as its tool's panel, with `ACCEPT` and `CANCEL`; a value moved on it
+    revises the edit and draws the canvas again from `canvasElements`, so the
+    ground moves with the panel. `toolPlacement` in `js/build-tools.js` is the
+    split, routing a tool's `shapes` to the footprint. Confirmed in Chromium
+    with an edit begun through `build-mode.js`, since no tool begins one yet.
+  - From: Interactive Build Mode
+- [x] **Select panel**: the camera written out as the fields the tour shows -
+  camera, target, rotate, zoom, pan, field of view and move - reading back what
+  a gesture just did and writing what is typed into it
+  - **Settled**: `SELECTION MODE`, ten fields declared with the range helpers
+    and four slide rows, read back every frame and written through
+    `writeCameraField`; writing where the camera stands keeps the target and
+    works the orbit out again. The field of view is the renderer camera's and
+    goes back to the flight's on leaving. `PAN X` and `MOVE RIGHT` both slide
+    across the screen - the tour lists both, and the two differ only in that
+    `PAN` slides by a share of the screen and `MOVE` by a share of the distance.
+  - From: Interactive Build Mode

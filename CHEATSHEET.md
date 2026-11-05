@@ -241,13 +241,20 @@ back.
 | `Home` | Back to the view the canvas opened on |
 | Click, or a finger, in Select | Pick the built placement under it, keep the one picked, or let go of it on bare ground |
 | Click, or a finger, in Mountain | Drop a mountain there, or put the one in hand down there instead |
+| Drag a gumball handle | Move, slide, raise or spread what is in hand, whatever tool is live |
+| `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
 | `H` | Collapse the control list, and open it again |
 
 Down the right is the dock: `SELECTION MODE`, the camera written out as
 fields to read and type into, or the edit in hand with `ACCEPT` and `CANCEL`
-under it. Only its fields scroll, and the wheel over it scrolls them.
+under it. Only its fields scroll, and the wheel over it scrolls them. In
+Select the camera stays on top: beneath it is the placement picked, under
+`SELECTED` and its name, or with nothing picked each of the world's own
+elements under `WORLD:`, folded until its heading is pressed. A value changed
+there changes every one of that element across the world, and `YES` on
+leaving keeps it.
 
 The two questions open on `YES`; the arrows cross to `NO`, and `Esc` or a press
 off the panel calls the question off. `YES` on `ACCEPT EDITS` keeps the edit and
@@ -260,11 +267,19 @@ picked, or dropped and in hand, in blue. A press that travels more than a few
 pixels orbits and picks nothing. A pick changed on the dock asks `ACCEPT EDITS`
 before it is let go; one left as it was asks nothing.
 
+What is in hand carries the gumball, in the art's colours: red east, green
+north, blue up. The white centre moves it over the ground, the red and green
+arrows slide it along one axis, the blue arrow makes a mountain taller rather
+than lifting it, the dot on each axis spreads it and the tick stands it taller
+or lower. A handle moves nothing until it has been dragged further than a
+click, and holds to the same bounds the dock's rows do.
+
 ## Element editor
 
 The world being flown as the elements it was assembled from. Enter opens an
 element onto its ranges; `A`/`D` step the range under the cursor. `L` opens the
-builder now, so the panel has no key of its own until the builder carries it.
+builder, which carries these rows now: in Select with nothing picked, each
+element is a `WORLD:` section on the dock.
 
 | Row | Reads |
 |-----|-------|

@@ -221,14 +221,27 @@ export function setEditorWorld(state, environmentId, runway = false) {
  * canvas's own for a world they offer - the caller chooses it there first -
  * and the one they held before for a canvas they do not. The build is kept
  * until the settings choose another.
+ *
+ * `world` is the environment's own rows as the canvas left them - Select's
+ * panel steps them across the whole world - and they become the editor's rows,
+ * with the strip's row after them when the start wants one. Without them the
+ * rows are the preset's again.
  */
-export function keepBuiltWorld(state, environmentId, runway = false, placements = [], chosen = environmentId) {
+export function keepBuiltWorld(
+    state, environmentId, runway = false, placements = [], chosen = environmentId, world = null
+) {
     const wanted = getEnvironment(environmentId).id;
 
     state.environmentId = wanted;
     state.chosen = getEnvironment(chosen).id;
     state.runway = runway === true;
-    state.elements = editorElements(getEnvironment(wanted), state.runway);
+    state.elements = Array.isArray(world)
+        ? [
+            ...world.filter(row => row?.type !== 'runway' && ELEMENTS_BY_ID.has(row?.type))
+                .map(row => ({ ...structuredClone(row), open: false })),
+            ...editorElements(getEnvironment(wanted), state.runway).filter(row => row.type === 'runway')
+        ]
+        : editorElements(getEnvironment(wanted), state.runway);
     state.built = (Array.isArray(placements) ? placements : []).map(placement => structuredClone(placement));
     state.typing = null;
     syncEditorEntries(state);
@@ -245,13 +258,34 @@ export function keptPlacements(state, environmentId) {
 }
 
 /**
- * The built world the builder goes back to - the canvas a build was kept on
- * and every placement kept on it, as copies - or null while nothing built is
- * kept, which is when the builder opens on its picker instead.
+ * The built world the builder goes back to - the canvas a build was kept on,
+ * every placement kept on it, and its own rows as they were kept, as copies -
+ * or null while nothing built is kept, which is when the builder opens on its
+ * picker instead.
  */
 export function builtWorld(state) {
     if (state?.environmentId == null || !(state.built?.length > 0)) return null;
-    return { environment: state.environmentId, placements: keptPlacements(state, state.environmentId) };
+    return {
+        environment: state.environmentId,
+        placements: keptPlacements(state, state.environmentId),
+        world: canvasWorld(state, state.environmentId)
+    };
+}
+
+/**
+ * The environment's own rows a canvas on it opens with, as copies: the rows
+ * the editor is holding when it is on that world - the preset as it was last
+ * changed and kept - and the preset's own otherwise. The strip is not among
+ * them: a canvas is drawn without one, and the flight lays its own.
+ */
+export function canvasWorld(state, environmentId) {
+    const wanted = getEnvironment(environmentId).id;
+    const rows = state?.environmentId === wanted
+        ? state.elements
+        : editorElements(getEnvironment(wanted), false);
+    return rows
+        .filter(row => row.type !== 'runway')
+        .map(row => ({ ...structuredClone(row), open: false }));
 }
 
 /**

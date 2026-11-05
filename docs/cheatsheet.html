@@ -294,6 +294,8 @@
         <tr><td><kbd>Home</kbd></td><td>Back to the view the canvas opened on</td></tr>
         <tr><td>Click, or a finger, in Select</td><td>Pick the built placement under it, keep the one picked, or let go of it on bare ground</td></tr>
         <tr><td>Click, or a finger, in Mountain</td><td>Drop a mountain there, or put the one in hand down there instead</td></tr>
+        <tr><td>Drag a gumball handle</td><td>Move, slide, raise or spread what is in hand, whatever tool is live</td></tr>
+        <tr><td><kbd>Shift</kbd> and a dot or a tick</td><td>Stretch a mountain's height and spread together</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>End a drag being made, or ask <code>ACCEPT EDITS</code> with an edit in hand and <code>SAVE AND EXIT MODE</code> without</td></tr>
         <tr><td><kbd>Enter</kbd></td><td>Answer the question asked, on the button under the cursor</td></tr>
         <tr><td><kbd>H</kbd></td><td>Collapse the control list, and open it again</td></tr>
@@ -301,15 +303,17 @@
 </table>
 </div>
 
-<p>Down the right is the dock: <code>SELECTION MODE</code>, the camera written out as fields to read and type into, or the edit in hand with <code>ACCEPT</code> and <code>CANCEL</code> under it. Only its fields scroll, and the wheel over it scrolls them.</p>
+<p>Down the right is the dock: <code>SELECTION MODE</code>, the camera written out as fields to read and type into, or the edit in hand with <code>ACCEPT</code> and <code>CANCEL</code> under it. Only its fields scroll, and the wheel over it scrolls them. In Select the camera stays on top: beneath it is the placement picked, under <code>SELECTED</code> and its name, or with nothing picked each of the world's own elements under <code>WORLD:</code>, folded until its heading is pressed. A value changed there changes every one of that element across the world, and <code>YES</code> on leaving keeps it.</p>
 
 <p>The two questions open on <code>YES</code>; the arrows cross to <code>NO</code>, and <kbd>Esc</kbd> or a press off the panel calls the question off. <code>YES</code> on <code>ACCEPT EDITS</code> keeps the edit and stays, so keeping work never doubles as leaving; <code>YES</code> on <code>SAVE AND EXIT MODE</code> keeps what was built as the world flown and leaves. Choosing another tool with an edit in hand asks <code>ACCEPT EDITS</code> first.</p>
 
 <p>In Select, the placement under the pointer is outlined in white and the one picked, or dropped and in hand, in blue. A press that travels more than a few pixels orbits and picks nothing. A pick changed on the dock asks <code>ACCEPT EDITS</code> before it is let go; one left as it was asks nothing.</p>
 
+<p>What is in hand carries the gumball, in the art's colours: red east, green north, blue up. The white centre moves it over the ground, the red and green arrows slide it along one axis, the blue arrow makes a mountain taller rather than lifting it, the dot on each axis spreads it and the tick stands it taller or lower. A handle moves nothing until it has been dragged further than a click, and holds to the same bounds the dock's rows do.</p>
+
 <h2 id="element-editor-cheat">Element editor</h2>
 
-<p>The world being flown as the elements it was assembled from. <kbd>Enter</kbd> opens an element onto its ranges; <kbd>A</kbd>/<kbd>D</kbd> step the range under the cursor. <kbd>L</kbd> opens the builder now, so the panel has no key of its own until the builder carries it.</p>
+<p>The world being flown as the elements it was assembled from. <kbd>Enter</kbd> opens an element onto its ranges; <kbd>A</kbd>/<kbd>D</kbd> step the range under the cursor. <kbd>L</kbd> opens the builder, which carries these rows now: in Select with nothing picked, each element is a <code>WORLD:</code> section on the dock.</p>
 
 <div class="table-wrap">
 <table>

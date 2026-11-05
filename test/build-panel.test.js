@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_ACCEPT, DOCK_CANCEL, SELECT_HEADING
+    dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_ACCEPT, DOCK_CANCEL, SELECT_HEADING,
+    DOCK_WORLD, PICK_SECTION, worldSection
 } from '../js/build-panel.js';
 import {
-    createBuildState, openBuildMode, beginCanvas, startDraft, acceptDraft, BUILD_FROM_TITLE
+    createBuildState, openBuildMode, beginCanvas, startDraft, acceptDraft, BUILD_FROM_TITLE,
+    selectPlacement, chooseBuildTool, dropDraft, requestLeave, answerConfirm, worldRows, CONFIRM_YES
 } from '../js/build-mode.js';
+import {
+    createEditorState, canvasWorld, keepBuiltWorld, editorPlacements, builtWorld
+} from '../js/element-editor.js';
 import {
     createBuildCamera, orbitBuildCamera, zoomBuildCamera, buildCameraPosition, readCameraFields,
     writeCameraField, cameraFieldRanges, nudgeBuildCamera, wrapDegrees, CAMERA_NUDGES,
@@ -15,7 +20,7 @@ import { BUILD_TOOLS, toolForElement, toolPlacement } from '../js/build-tools.js
 import { rangeRows, stepRow, rowValue } from '../js/properties-panel.js';
 import { rowKey, fieldFigure } from '../js/panel-view.js';
 import { getElement } from '../js/environment/elements.js';
-import { getEnvironment } from '../js/environment/presets.js';
+import { getEnvironment, buildEnvironment, environmentElements } from '../js/environment/presets.js';
 import { DEFAULT_SIZE } from '../js/environment/elements.js';
 
 function onCanvas() {
@@ -236,4 +241,125 @@ test('a typed field shows a row in the units the row reads in', () => {
     const [level] = rangeRows('level', getElement('water').ranges.level);
     assert.equal(fieldFigure(level, 312.0000001), 312, 'a number to the places its step moves in');
     assert.equal(rowKey({ name: 'level', row: level }), 'level:value');
+});
+
+// --- Select shows what is selected ---------------------------------------------------
+
+/** A canvas on Highlands opened the way the builder opens one: with the world's own rows. */
+function onWorld(environment = 'highlands', kept = []) {
+    const state = createBuildState();
+    openBuildMode(state, BUILD_FROM_TITLE);
+    beginCanvas(state, environment, kept, canvasWorld(createEditorState(environment), environment));
+    return state;
+}
+
+const DROPPED = { type: 'mountain', config: { count: 1, height: [300, 500], at: [100, 200] }, seed: 7 };
+
+test('with nothing picked, Select\'s panel is the camera and then each of the world\'s own elements, folded', () => {
+    const state = onWorld();
+    const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV });
+
+    assert.equal(shown.kind, DOCK_SELECT, 'the camera is still its first part');
+    assert.equal(shown.rows[0].row.label, 'CAMERA X');
+    assert.deepEqual(shown.sections.map(section => section.heading),
+        state.world.map(row => `WORLD: ${row.label}`), 'one section an element, in the world\'s own order');
+    assert.ok(shown.sections.every(section => section.kind === DOCK_WORLD && section.folds && !section.open));
+    assert.ok(shown.sections.every(section => section.rows.length === 0), 'folded, they draw no rows');
+    assert.deepEqual(shown.actions, [], 'and there is nothing to accept');
+});
+
+test('an element of the world opened draws its ranges, written to the session\'s own row', () => {
+    const state = onWorld();
+    const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV, open: [0] });
+    const opened = shown.sections[0];
+
+    assert.equal(opened.id, worldSection(0));
+    assert.equal(opened.holder, state.world[0], 'its holder is the row the session holds, not a copy of it');
+    assert.deepEqual(opened.rows.map(entry => entry.name).filter((name, i, all) => all.indexOf(name) === i),
+        Object.keys(getElement(state.world[0].type).ranges));
+    assert.ok(opened.rows.every(entry => entry.section === opened.id));
+    assert.ok(shown.sections.slice(1).every(section => section.rows.length === 0), 'and only it');
+});
+
+test('a row stepped on an element of the world changes the ground the canvas is drawn from', () => {
+    const state = onWorld();
+    const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV, open: [0] });
+    const mountains = shown.sections[0];
+    const entry = mountains.rows.find(each => each.name === 'height' && each.row.part === 'max');
+
+    const before = structuredClone(canvasElements(getEnvironment('highlands'), state)[0].config.height);
+    assert.equal(stepRow(mountains.holder, entry.name, entry.row, 1), true);
+    const after = canvasElements(getEnvironment('highlands'), state)[0].config.height;
+    assert.ok(after[1] > before[1], 'the world\'s mountains reach higher');
+    assert.deepEqual(worldRows(state)[0].config.height, after, 'and it is the session\'s row that holds it');
+});
+
+test('with a placement picked, Select\'s panel is the camera and then the pick, with its accept and cancel', () => {
+    const state = onWorld('highlands', [DROPPED]);
+    selectPlacement(state, 0);
+    const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV, open: [0] });
+
+    assert.equal(shown.kind, DOCK_SELECT);
+    assert.equal(shown.heading, 'SELECTION MODE', 'the camera fields stay on top');
+    assert.deepEqual(shown.sections.map(section => [section.id, section.kind, section.heading]),
+        [[PICK_SECTION, DOCK_DRAFT, 'SELECTED MOUNTAIN']], 'the world\'s elements give way to what is picked');
+    assert.ok(shown.sections[0].rows.some(entry => entry.name === 'height'));
+    assert.ok(!shown.sections[0].rows.some(entry => entry.name === 'count'), 'less the count its click settled');
+    assert.deepEqual(shown.actions, [DOCK_ACCEPT, DOCK_CANCEL]);
+});
+
+test('another tool\'s edit in hand is still the whole dock', () => {
+    const state = onWorld();
+    chooseBuildTool(state, 'mountain');
+    dropDraft(state, { x: 0, z: 0 });
+    const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV });
+    assert.equal(shown.kind, DOCK_DRAFT);
+    assert.equal(shown.heading, 'BUILD MOUNTAINS');
+    assert.deepEqual(shown.sections, []);
+});
+
+test('a row in a section is keyed by its section, so two elements of a kind are two rows', () => {
+    const plain = { name: 'height', row: { part: 'max' } };
+    assert.equal(rowKey(plain), 'height:max', 'the first part keeps the key it always had');
+    assert.equal(rowKey({ ...plain, section: worldSection(0) }), 'world-0/height:max');
+    assert.notEqual(rowKey({ ...plain, section: worldSection(0) }), rowKey({ ...plain, section: worldSection(3) }));
+});
+
+/**
+ * The world's own rows are the preset with its configuration filled in, so
+ * a canvas drawn from them is the canvas drawn from the preset - nothing about
+ * the ground moves for being opened this way.
+ */
+test('a canvas drawn from the world\'s own rows is the ground the preset draws', () => {
+    for (const id of ['highlands', 'lakeside', 'blank-canvas']) {
+        const environment = getEnvironment(id);
+        const withRows = buildEnvironment(environment, { elements: canvasElements(environment, onWorld(id)) });
+        const preset = buildEnvironment(environment, { elements: canvasElements(environment, onCanvas()) });
+        assert.deepEqual(Array.from(withRows.height), Array.from(preset.height), `${id}: the same heights`);
+        assert.deepEqual(Array.from(withRows.color), Array.from(preset.color), `${id}: and the same colours`);
+    }
+});
+
+test('the world\'s rows as changed go out with the way out, and come back with the built world', () => {
+    const state = onWorld('lakeside', [DROPPED]);
+    state.world[0].config.height = [200, 260];
+    requestLeave(state);
+    const left = answerConfirm(state, CONFIRM_YES);
+    assert.deepEqual(left.world[0].config.height, [200, 260], 'handed back with what was built');
+
+    const editor = createEditorState('lakeside');
+    keepBuiltWorld(editor, 'lakeside', false, left.placements, 'lakeside', left.world);
+    assert.deepEqual(editorPlacements(editor)[0].config.height, [200, 260], 'which the flight is drawn from');
+    assert.deepEqual(canvasWorld(editor, 'lakeside')[0].config.height, [200, 260], 'and the next canvas opens with');
+
+    const back = createBuildState();
+    openBuildMode(back, BUILD_FROM_TITLE, builtWorld(editor));
+    assert.deepEqual(back.world[0].config.height, [200, 260], 'straight onto the built world too');
+
+    keepBuiltWorld(editor, 'lakeside', true, left.placements, 'lakeside', left.world);
+    assert.equal(editorPlacements(editor).filter(row => row.type === 'runway').length, 1, 'with the strip after them when the start wants one');
+    assert.ok(!canvasWorld(editor, 'lakeside').some(row => row.type === 'runway'), 'which a canvas never draws');
+    assert.deepEqual(canvasWorld(editor, 'highlands').map(row => row.type).sort(),
+        environmentElements(getEnvironment('highlands'), false).map(row => row.type).sort(),
+        'and another world opens on its own preset');
 });

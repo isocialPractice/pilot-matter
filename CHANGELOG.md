@@ -5,6 +5,98 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.44.0] - 2026-11-04
+
+Select finished: the edit in hand carries the gumball the artwork draws, every
+handle of it writing one declared value through the same door the dock's rows
+do, and Select's panel keeps the camera on top with what it is looking at
+beneath it - the placement picked, or the world's own elements, which brings
+the element editor's rows onto the builder.
+
+### Added
+
+- **The gumball.** A mountain dropped, or a placement picked with Select,
+  carries the gumball at its centre: the widget the artwork declares in two
+  sets - Heights for an element that stands to a height, Flat for one that
+  lies on the ground - drawn on the layer over the canvas with its three axes
+  projected from the camera, so it lies in the scene and an axis pointing at
+  the camera is short. It is drawn in the art's own colours. The art was drawn
+  with blue up; it is translated once into the simulator's own compass, so red
+  is east, green north and blue up. The handle under the pointer is lit, and
+  the pointer is a hand ready to grab it.
+- **Gumball bindings.** Every handle the art names is bound to one value the
+  placement owns, and one bound to nothing is not drawn. The white centre moves
+  the placement over the ground, on both gumballs; the red and green arrows
+  slide it along their axes and nowhere else; on a mountain the blue arrow
+  makes it taller - a mountain lifted would float, so lifting one raises its
+  height range whole - the dot on each axis spreads it, which is its radius,
+  and the tick stands it taller or lower, which is its height. With `shift`
+  held at the press a dot or a tick stretches both together; `ctrl` and a
+  press on the centre does nothing. A drag is worked out as a whole from where
+  it was grabbed, written through the same holder the dock's rows are stepped
+  through, and held to the same bounds and the same precision, so the dock's
+  figures follow the drag and a value dragged is a value that could have been
+  typed. The ground catches up as the drag goes on and once more when it ends.
+  A press on a handle is the gumball's whatever tool is live, so a mountain just
+  dropped can be dragged taller without changing tools, and a handle moves
+  nothing until it has been dragged further than a click may travel. `Esc`
+  during a drag ends it where it is. A region drawn with a footprint, when the
+  tools that draw one arrive, adds the squares that stretch it along an axis
+  and the arc that turns it, bound and held in Node already.
+- **Select shows what is selected.** Select's panel keeps the camera on top and
+  carries beneath it what is being looked at: the placement picked, under
+  `SELECTED` and its element's name, with `ACCEPT` and `CANCEL` at the foot -
+  or with nothing picked each of the environment's own elements under
+  `WORLD:`, folded until its heading is pressed. Those are the element
+  editor's rows, moved onto the builder: a value changed on one changes that
+  element across the whole world, the ground drawn again as it moves. `YES` on
+  leaving keeps them with what was built, as the world flown and the one the
+  builder comes back to; `NO` leaves them as they were. Opened on its preset's
+  rows, a canvas is exactly the ground the preset draws.
+- **The control list** carries `Drag a Handle - Move or Shape What Is in Hand`.
+
+### Changed
+
+- **A picked placement is drawn beneath the camera**, rather than in its
+  place, under `SELECTED` and its name.
+- **A row in a section of the dock is keyed by its section**, so two elements
+  of a kind are two rows: a picked mountain's `HEIGHT MAX` is `pick/height:max`
+  and the world's first element's `world-0/height:max`.
+
+Held in Node by the new `test/gumball.test.js` - every handle the art names,
+the two sets, the art's frame read through `bearingToDirection`, each binding,
+the vertical arrow raising rather than lifting, the centre moving on both
+gumballs, the ground arrows keeping to their axes, the canvas's wrap, the
+bounds and the precision a drag is held to matched against the panel's own
+rows, `shift` and `ctrl`, the layout, the hit test, and the reading along an
+axis - by `test/build-panel.test.js` for Select's sections, the world's rows
+written in place, their ground matching the preset's, and their way out and
+back; by `test/build-overlay.test.js` for the gumball drawn and lit; and by
+`test/page.test.js` for the wiring. Each rejected the defect it names when that
+was put back, forty in all: among them the Flat gumball carrying the dot and
+the tick, red drawn west, the art's blue taken as a ground axis, the vertical
+arrow lifting a mountain, a handle drawn though bound to nothing, a slide
+keeping the part of the drag off its axis, a raise or a scale let past its
+bounds, `shift` scaling one value, `ctrl` and the centre moving, an arrow
+taking a press meant for the dot on it, a square pulled outward shrinking, a
+pick replacing the camera, the world's rows written to a copy, the canvas drawn
+from the preset whatever they say, two sections' rows sharing one key, the way
+out dropping the world's rows, a press on a handle with Mountain live dropping
+a mountain, a drag worked out from the last move, a wobble moving a pick, and
+the ground never drawn under a drag. Settled in Chromium in 28 checks across a
+desktop and a phone, read off the dock's own fields and the overlay's own
+pixels: the gumball drawn in the art's three colours with only the bound
+handles, red to the left of a camera looking south, the blue arrow raising the
+height range by its pixels and the mountain standing taller where it stood, the
+dot spreading the radius by the factor its travel gives, `shift` and a tick
+shrinking both together, `ctrl` and the centre moving nothing, `Esc` ending a
+drag where it was, the centre carrying the mountain and the ground going with
+it, the green arrow sliding it north and south only, a pick carrying the
+gumball under `SELECTED MOUNTAIN` with the camera still on top, a world
+element opened and raised to raise every mountain the world has, `YES` keeping
+that, the builder coming back to it, `NO` leaving it, and a finger dragging the
+centre. Phase 9's 35 checks pass again over the new dock.
+
 ## [1.0.0-alpha.1.43.0] - 2026-11-04
 
 What was built can be reached again: Select picks up a placement by clicking

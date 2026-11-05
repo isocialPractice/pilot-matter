@@ -15,14 +15,28 @@
  *
  * The heading and the answers sit outside the part that scrolls, so a long
  * panel scrolls its fields and the accept and cancel are never below the fold.
+ *
+ * Beneath its first part the dock may hold sections, each under a heading of
+ * its own - Select's panel is the camera and then what is being looked at. A
+ * section that folds has a heading that is a button, opening and shutting it.
  */
 
 import { isTypedRow, rangeStep, stepPlaces } from './properties-panel.js';
 import { OPTION_LEFT_MARK, OPTION_RIGHT_MARK } from './settings.js';
 
-/** The key a row is found by: its range's name and which part of the range it is. */
+/**
+ * The key a row is found by: its range's name and which part of the range it
+ * is, and for a row in a section the section it is in - two sections can hold
+ * an element of the same kind, and each `HEIGHT MIN` has to be its own.
+ */
 export function rowKey(entry) {
-    return `${entry.name}:${entry.row.part}`;
+    const key = `${entry.name}:${entry.row.part}`;
+    return entry.section ? `${entry.section}/${key}` : key;
+}
+
+/** Every row the dock shows, its first part's and then each section's, in the order they are drawn. */
+export function dockRows(content) {
+    return [...(content?.rows ?? []), ...(content?.sections ?? []).flatMap(section => section.rows ?? [])];
 }
 
 /** The figure a typed field shows for a row, in the units the row reads in. */
@@ -42,6 +56,10 @@ function shapeOf(content) {
         content.kind, content.heading,
         ...content.rows.map(rowKey),
         ...(content.nudges ?? []).map(nudge => `nudge:${nudge.id}`),
+        ...(content.sections ?? []).flatMap(section => [
+            `section:${section.id}:${section.heading}:${section.open ? 'open' : 'shut'}`,
+            ...(section.rows ?? []).map(rowKey)
+        ]),
         ...(content.actions ?? []).map(action => `action:${action.id}`)
     ].join('|');
 }
@@ -51,7 +69,8 @@ export class PanelView {
      * `root` holds three parts, found by `data-dock`: the heading, the fields
      * that scroll, and the answers. `handlers` are told what was done:
      * `onStep(entry, step)`, `onType(entry, figure, field)`,
-     * `onNudge(id, sign)` and `onAction(id)`.
+     * `onNudge(id, sign)`, `onAction(id)` and `onFold(id)` for a section's
+     * heading pressed.
      */
     constructor(root, handlers = {}) {
         this.root     = root;
@@ -91,35 +110,7 @@ export class PanelView {
         this.answers.replaceChildren();
         this.drawn.clear();
 
-        for (const entry of content.rows) {
-            const key  = rowKey(entry);
-            const line = document.createElement('div');
-            line.className = 'dock-row';
-            line.dataset.row = key;
-
-            const name = document.createElement('span');
-            name.className = 'dock-label';
-            name.textContent = entry.row.label;
-
-            const down = stepButton(-1, `${entry.row.label} down`);
-            const up   = stepButton(1, `${entry.row.label} up`);
-
-            let reading;
-            if (typed(entry.row)) {
-                reading = document.createElement('input');
-                reading.type = 'number';
-                reading.inputMode = 'decimal';
-                reading.className = 'dock-value';
-                reading.setAttribute('aria-label', entry.row.label);
-            } else {
-                reading = document.createElement('span');
-                reading.className = 'dock-value';
-            }
-
-            line.append(name, down, reading, up);
-            this.fields.append(line);
-            this.drawn.set(key, { line, reading, down, up });
-        }
+        for (const entry of content.rows) this.drawRow(entry);
 
         for (const nudge of content.nudges ?? []) {
             const line = document.createElement('div');
@@ -134,6 +125,19 @@ export class PanelView {
             this.fields.append(line);
         }
 
+        for (const section of content.sections ?? []) {
+            const heading = document.createElement(section.folds ? 'button' : 'h4');
+            heading.className = 'dock-section';
+            heading.dataset.section = section.id;
+            heading.textContent = section.heading;
+            if (section.folds) {
+                heading.type = 'button';
+                heading.setAttribute('aria-expanded', String(Boolean(section.open)));
+            }
+            this.fields.append(heading);
+            for (const entry of section.rows ?? []) this.drawRow(entry);
+        }
+
         for (const action of content.actions ?? []) {
             const answer = document.createElement('button');
             answer.type = 'button';
@@ -145,9 +149,40 @@ export class PanelView {
         this.answers.style.display = (content.actions ?? []).length ? 'flex' : 'none';
     }
 
+    /** Draws one row: its label, the two steps either side of its reading, and the reading itself. */
+    drawRow(entry) {
+        const key  = rowKey(entry);
+        const line = document.createElement('div');
+        line.className = 'dock-row';
+        line.dataset.row = key;
+
+        const name = document.createElement('span');
+        name.className = 'dock-label';
+        name.textContent = entry.row.label;
+
+        const down = stepButton(-1, `${entry.row.label} down`);
+        const up   = stepButton(1, `${entry.row.label} up`);
+
+        let reading;
+        if (typed(entry.row)) {
+            reading = document.createElement('input');
+            reading.type = 'number';
+            reading.inputMode = 'decimal';
+            reading.className = 'dock-value';
+            reading.setAttribute('aria-label', entry.row.label);
+        } else {
+            reading = document.createElement('span');
+            reading.className = 'dock-value';
+        }
+
+        line.append(name, down, reading, up);
+        this.fields.append(line);
+        this.drawn.set(key, { line, reading, down, up });
+    }
+
     /** Writes every reading, leaving alone the one being typed into. */
     update(content) {
-        for (const entry of content.rows) {
+        for (const entry of dockRows(content)) {
             const drawn = this.drawn.get(rowKey(entry));
             if (!drawn) continue;
 
@@ -181,6 +216,11 @@ export class PanelView {
             return;
         }
 
+        if (button.dataset.section) {
+            this.handlers.onFold?.(button.dataset.section);
+            return;
+        }
+
         const step = Number(button.dataset.step);
         if (!step) return;
 
@@ -203,7 +243,7 @@ export class PanelView {
     }
 
     entryFor(key) {
-        return this.content?.rows.find(entry => rowKey(entry) === key) ?? null;
+        return dockRows(this.content).find(entry => rowKey(entry) === key) ?? null;
     }
 }
 
