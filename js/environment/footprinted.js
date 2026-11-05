@@ -19,9 +19,9 @@
  */
 
 import {
-    applyElement, cloneField, fieldX, fieldZ, readColor, mixColor, createRandom, getElement
+    applyElement, cloneField, fieldX, fieldZ, readColor, mixColor, createRandom, getElement, waterRecord
 } from './elements.js';
-import { footprintSampler } from './footprints.js';
+import { footprintSampler, featherFor, PLACED_KIND, COMBINE_KIND } from './footprints.js';
 
 /**
  * Draws one placement onto a field, through its footprint when it has one.
@@ -48,12 +48,11 @@ import { footprintSampler } from './footprints.js';
  * - **A strip the element cut** is recorded on the field as well as in it,
  *   because the flight model finds a runway by asking for one by name. Every
  *   strip the copy gained is added to the field's.
- * - **The water's level is not moved.** A drawn body is water where it was
- *   drawn and nowhere else, and the level a renderer animates is the sea's,
- *   reaching every vertex under it across the whole tile. Raising it to a body
- *   drawn on a hill would flood the tile below that line. The body's own ground
- *   and colour come across; giving it a surface of its own is the per-vertex
- *   water line, which arrives with drawn water.
+ * - **The water's line comes across, and its level does not.** A drawn body is
+ *   water where it was drawn and nowhere else: its line is carried back
+ *   wherever the region reaches, and a renderer finds it there. The level is
+ *   the sea's, one height for the whole tile, and raising it to a body drawn on
+ *   a hill would lift every strip on the tile clear of a pond far above it.
  *
  * A placement carrying a `seed` draws from a stream of its own rather than from
  * `random` - see `placementRandom`.
@@ -105,8 +104,216 @@ export function applyFootprintedElement(field, placement, random = createRandom(
     }
 
     field.runways.push(...draft.runways.slice(strips));
+    carryWaterLine(field, draft, weights);
 
     return result;
+}
+
+/**
+ * The water line the element left on its copy, carried back wherever the
+ * region reaches - and only there, so water drawn through a footprint is water
+ * where it was drawn and nowhere else on the tile. The sea's level is never
+ * carried: it is one height for the whole tile, and a drawn body raising it
+ * would flood every vertex below its line.
+ *
+ * Across the feather the ground eases from where it was toward the line, so
+ * the shore needs nothing of its own: only the vertices that reach the line
+ * are wet.
+ */
+function carryWaterLine(field, draft, weights) {
+    const drawn = draft.water?.line;
+    if (drawn == null) return;
+
+    const line = waterRecord(field).line;
+    for (let i = 0; i < field.count; i++) {
+        if (weights[i] > 0) line[i] = drawn[i];
+    }
+}
+
+/** How far under the lowest bank drawn water rests, so it shows at the bank it is held by rather than lying level with it. */
+export const WATER_SINK = 1.5;
+
+/** How far under a stroke's lowest ground drawn snow's line is put, so nothing in the stroke is turned away for lying low. */
+export const SNOW_UNDER = 1;
+
+/**
+ * The ways a footprint's strokes went, in the canvas's frame, each with half
+ * its stamp's width and half its depth in the same units: what drawn water and
+ * drawn snow measure across. Strokes set down in a frame are set down with it,
+ * their widths stretched by it; a combination's strokes are both parts' but
+ * what a cut takes away. A footprint with no strokes in it has none.
+ */
+export function strokeWays(footprint) {
+    const ways = [];
+
+    const walk = (fp, place, scale) => {
+        if (fp == null || typeof fp !== 'object') return;
+
+        if (fp.kind === 'stroke') {
+            const width = Number(fp.stamp?.width), depth = Number(fp.stamp?.depth);
+            if (!(width > 0) || !(depth > 0)) return;
+            const points = (Array.isArray(fp.points) ? fp.points : [])
+                .filter(point => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+                .map(([x, z]) => place(x, z));
+            if (points.length > 0) ways.push({ points, half: width / 2 * scale, end: depth / 2 * scale });
+            return;
+        }
+
+        if (fp.kind === PLACED_KIND) {
+            const x = Number(fp.x), z = Number(fp.z), angle = Number(fp.angle) || 0;
+            const sx = fp.scaleX ?? 1, sz = fp.scaleZ ?? 1;
+            if (!Number.isFinite(x) || !Number.isFinite(z) || !(sx > 0) || !(sz > 0)) return;
+            const cos = Math.cos(angle), sin = Math.sin(angle);
+            walk(fp.of, (u, v) => place(x + u * sx * cos - v * sz * sin, z + u * sx * sin + v * sz * cos), scale * Math.sqrt(sx * sz));
+            return;
+        }
+
+        if (fp.kind === COMBINE_KIND) {
+            walk(fp.a, place, scale);
+            if (fp.op !== 'subtract') walk(fp.b, place, scale);
+        }
+    };
+
+    walk(footprint, (x, z) => [x, z], 1);
+    return ways;
+}
+
+/** A way walked again at even steps of `spacing`, first point and last kept. */
+function resample(points, spacing) {
+    if (points.length < 2) return points.map(point => [...point]);
+    const out = [[...points[0]]];
+    for (let i = 1; i < points.length; i++) {
+        const [ax, az] = points[i - 1], [bx, bz] = points[i];
+        const length = Math.hypot(bx - ax, bz - az);
+        const steps = Math.max(1, Math.ceil(length / spacing));
+        for (let k = 1; k <= steps; k++) out.push([ax + (bx - ax) * k / steps, az + (bz - az) * k / steps]);
+    }
+    return out;
+}
+
+/**
+ * Where across a drawn stroke each vertex of the tile lies, and how low its
+ * banks are there: the measure drawn water and drawn snow are laid by.
+ *
+ * Each way is walked at half a cell's spacing, and at every step the lowest
+ * ground within half the stroke's width is found - the lowest bank of the
+ * stroke's cross-section there. Every vertex then takes the bank of the point
+ * of the way it lies across from, read between the two steps either side of
+ * it: so every vertex across a stroke sees the same lowest bank and water lies
+ * level across it, along it the line runs on between steps with no step of its
+ * own for the swell to show, and it follows the ground down - a stroke down a
+ * slope is a stream, not a trench cut to the level of its lowest end. A pass
+ * smoothing the banks along the way as well was measured and dropped: read
+ * between steps half a cell apart, the line came out no more even for it.
+ * `inward` is how far in from the stroke's edge a vertex is, 1 on its middle
+ * and 0 at either side.
+ *
+ * Only this tile's own vertices are searched: at an edge the lowest bank is
+ * looked for among them, and the ground running on across the seam is the
+ * next tile's to find. A stroke over the seam is measured at each of its
+ * repeats that reaches the tile.
+ *
+ * A footprint with no strokes - a disc of water, a box - is a pond: one bank,
+ * the lowest ground it reaches, and `inward` its weight.
+ */
+export function bankMeasure(field, weights, footprint) {
+    const count = field.count;
+    const bank   = new Float32Array(count).fill(NaN);
+    const inward = new Float32Array(count);
+
+    const ways = strokeWays(footprint);
+    if (ways.length === 0) {
+        const low = FOOTPRINT_SETTLERS.relief({ field, weights })?.[0];
+        if (low == null) return { bank, inward };
+        for (let i = 0; i < count; i++) {
+            if (weights[i] > 0) { bank[i] = low; inward[i] = weights[i]; }
+        }
+        return { bank, inward };
+    }
+
+    const { size, step, stride } = field;
+    const half = size / 2;
+    const nearest = new Float32Array(count).fill(Infinity);
+    const owner   = new Int32Array(count).fill(-1);
+    const at      = new Int32Array(count);
+    const walked  = [];
+    const feather = featherFor(step);
+
+    // The cells of the tile within `radius` of a point in the canvas's frame,
+    // each with how far off it is.
+    const around = (x, z, radius, visit) => {
+        const c0 = Math.max(0, Math.ceil((x - radius + half) / step));
+        const c1 = Math.min(stride - 1, Math.floor((x + radius + half) / step));
+        const r0 = Math.max(0, Math.ceil((z - radius + half) / step));
+        const r1 = Math.min(stride - 1, Math.floor((z + radius + half) / step));
+        for (let row = r0; row <= r1; row++) {
+            const dz = -half + row * step - z;
+            for (let col = c0; col <= c1; col++) {
+                const away = Math.hypot(-half + col * step - x, dz);
+                if (away <= radius) visit(row * stride + col, away);
+            }
+        }
+    };
+
+    for (const way of ways) {
+        const reach = Math.max(way.half, way.end) + feather;
+        const xs = way.points.map(point => point[0]), zs = way.points.map(point => point[1]);
+        const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+
+        for (const [i, j] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+            const sx = i * size, sz = j * size;
+            if (maxX + sx + reach < -half || minX + sx - reach > half || maxZ + sz + reach < -half || minZ + sz - reach > half) continue;
+
+            const samples = resample(way.points.map(([x, z]) => [x + sx, z + sz]), step / 2);
+            // NaN for a step whose cross-section finds none of this tile's ground.
+            const lows = samples.map(([x, z]) => {
+                let low = Infinity;
+                around(x, z, way.half, index => { if (field.height[index] < low) low = field.height[index]; });
+                return Number.isFinite(low) ? low : NaN;
+            });
+
+            const id = walked.push({ samples, lows, half: way.half }) - 1;
+            samples.forEach(([x, z], k) => {
+                around(x, z, reach, (index, away) => {
+                    if (away >= nearest[index]) return;
+                    nearest[index] = away;
+                    owner[index] = id;
+                    at[index] = k;
+                });
+            });
+        }
+    }
+
+    // Each vertex read off the way at the point it lies across from, between
+    // the two steps either side of that point, rather than off the nearer step:
+    // so every vertex across a stroke at the same place along it is given the
+    // same bank, whichever step a tie happened to fall to, and the line runs
+    // on smoothly along the way rather than in steps half a cell long.
+    for (let index = 0; index < count; index++) {
+        const id = owner[index];
+        if (id < 0) continue;
+
+        const { samples, lows, half: across } = walked[id];
+        const k = at[index];
+        const x = -half + (index % stride) * step, z = -half + Math.floor(index / stride) * step;
+        const [px, pz] = samples[k];
+
+        let other = k, t = 0;
+        for (const next of [k + 1, k - 1]) {
+            if (next < 0 || next >= samples.length) continue;
+            const dx = samples[next][0] - px, dz = samples[next][1] - pz;
+            const lengthSq = dx * dx + dz * dz;
+            const share = lengthSq > 0 ? ((x - px) * dx + (z - pz) * dz) / lengthSq : 0;
+            if (share > 0) { other = next; t = Math.min(share, 1); break; }
+        }
+
+        const onX = px + (samples[other][0] - px) * t, onZ = pz + (samples[other][1] - pz) * t;
+        const a = lows[k], b = lows[other];
+        bank[index] = Number.isFinite(a) && Number.isFinite(b) ? a + (b - a) * t : Number.isFinite(a) ? a : b;
+        inward[index] = Math.min(Math.max(1 - Math.hypot(x - onX, z - onZ) / across, 0), 1);
+    }
+
+    return { bank, inward };
 }
 
 /**
@@ -125,9 +332,22 @@ export function applyFootprintedElement(field, placement, random = createRandom(
  *   and runs the colour from its low ground to its high, so both ends show on
  *   any slope. Null where the region reaches no vertex, which leaves the
  *   declared value standing for a stroke that draws nothing here anyway.
+ * - `lowest` - just under the lowest ground the region reaches, which is drawn
+ *   snow's line: a gate rather than a grade, so nothing in the stroke is
+ *   turned away for being low. Left at its default of 300, snow drawn on
+ *   ground below that - most of a canvas - would settle nowhere.
+ * - `waterLine` - drawn water's line at every vertex the region reaches, and
+ *   how far in from the bank each is, for `drawn`. Water cannot stand higher
+ *   than the lowest ground beside it, or it runs out there, so the line is the
+ *   lowest bank of the stroke's cross-section - see `bankMeasure` - a little
+ *   under it, and never above the ground at the vertex: the ground under the
+ *   stroke is only ever cut to it, so drawn water is a cut into the ground
+ *   rather than a sheet propped over it. NaN where the region does not reach.
+ * - `inward` - how far in from the stroke's edge every vertex is, for drawn
+ *   snow's depth.
  */
 export const FOOTPRINT_SETTLERS = Object.freeze({
-    relief(field, weights) {
+    relief({ field, weights }) {
         let low = Infinity, high = -Infinity;
         for (let i = 0; i < field.count; i++) {
             if (!(weights[i] > 0)) continue;
@@ -136,6 +356,25 @@ export const FOOTPRINT_SETTLERS = Object.freeze({
             if (h > high) high = h;
         }
         return low <= high ? [low, high] : null;
+    },
+
+    lowest(context) {
+        const relief = FOOTPRINT_SETTLERS.relief(context);
+        return relief == null ? null : relief[0] - SNOW_UNDER;
+    },
+
+    waterLine(context) {
+        const { field, weights } = context;
+        const { bank, inward } = context.measure();
+        const line = new Float32Array(field.count).fill(NaN);
+        for (let i = 0; i < field.count; i++) {
+            if (weights[i] > 0 && Number.isFinite(bank[i])) line[i] = Math.min(bank[i], field.height[i]) - WATER_SINK;
+        }
+        return { line, inward };
+    },
+
+    inward(context) {
+        return { inward: context.measure().inward };
     }
 });
 
@@ -157,9 +396,17 @@ export function settleFromFootprint(field, placement, weights) {
     const settles = getElement(placement.type)?.footprintSettles;
     if (settles == null) return placement;
 
+    // What a settler is handed: the ground, the region's weights, and the
+    // measure across its strokes, worked out once however many ask for it.
+    let measured = null;
+    const context = {
+        field, weights, placement,
+        measure: () => (measured ??= bankMeasure(field, weights, placement.footprint))
+    };
+
     const config = { ...(placement.config ?? {}) };
     for (const [name, how] of Object.entries(settles)) {
-        const value = FOOTPRINT_SETTLERS[how]?.(field, weights);
+        const value = FOOTPRINT_SETTLERS[how]?.(context);
         if (value != null) config[name] = value;
     }
     return { ...placement, config };

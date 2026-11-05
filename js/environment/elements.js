@@ -78,8 +78,13 @@ export function createField({
         height: new Float32Array(count),
         color: new Float32Array(count * 3),
         runways: [],
-        // The level whatever water was laid settled at, for a renderer that
-        // wants to move the surface rather than draw it as painted ground.
+        // The water laid on it, for a renderer that wants to move the surface
+        // rather than draw it as painted ground: `{ level, line }`. `level` is
+        // the sea's, one height for the whole field, or null where there is
+        // no sea. `line` is one height a vertex - the line the water at that
+        // vertex rests at: the sea's level wherever the sea reaches, a drawn
+        // body's own line where one was drawn, and NaN where it is dry - so a
+        // vertex is wet where it lies at or under its own line.
         water: null,
         // Which vertices the last join moved, as a flag each, for a renderer
         // lighting the strip of a tile that moved rather than the whole plane
@@ -104,7 +109,7 @@ export function cloneField(field) {
         height:  new Float32Array(field.height),
         color:   new Float32Array(field.color),
         runways: [...field.runways],
-        water:   field.water ? { ...field.water } : null,
+        water:   field.water ? { ...field.water, line: field.water.line ? new Float32Array(field.water.line) : null } : null,
         seam:    field.seam?.slice ? field.seam.slice() : field.seam ?? null
     };
 }
@@ -372,7 +377,22 @@ export function resolveConfig(element, overrides = {}) {
 
     const at = resolvePoint(given.at);
     if (at) config.at = at;
+
+    // What a footprint settled at each vertex of the tile being drawn - a drawn
+    // body of water's line, and how far in from its bank each vertex is. Not a
+    // range, and carried like `at`: no panel sets it and no preset carries
+    // one, and a generator that reads it checks it is the field's own size.
+    if (given.drawn != null && typeof given.drawn === 'object') config.drawn = given.drawn;
     return config;
+}
+
+/**
+ * One of the arrays a footprint settled for a generator, by name, or null for
+ * one it did not settle or that is not one value a vertex of this field.
+ */
+export function drawnValues(config, name, field) {
+    const values = config?.drawn?.[name];
+    return values != null && typeof values.length === 'number' && values.length === field.count ? values : null;
 }
 
 /**
@@ -887,19 +907,34 @@ const water = {
         // pools with ground between them below - a marsh.
         density: scalar(0, 1, 1)
     },
+    // Drawn through a footprint of its own, water rests at a line the ground
+    // under the stroke settles - see `waterLine` in `footprinted.js` - and
+    // not at the sea's level, which it never moves; and it is always a sheet.
+    footprintSettles: Object.freeze({ drawn: 'waterLine' }),
+    footprintIgnores: Object.freeze(['level', 'flatten']),
 
     generate(field, config) {
+        const drawn = drawnValues(config, 'line', field);
+        if (drawn) return drawWater(field, config, drawn, drawnValues(config, 'inward', field));
+
         const { level, flatten, color, density } = config;
         let covered = 0;
 
         // The surface is left on the field rather than only in the heights, so
         // a renderer can move the water it is drawing without having to work
-        // out from the ground alone which of it was water.
-        field.water = { level: Math.max(level, field.water?.level ?? -Infinity) };
+        // out from the ground alone which of it was water. The sea writes its
+        // level into the line everywhere it reaches - which is every vertex
+        // but the ground its density left dry - so ground cut below the level
+        // after the sea went in is water, as it has always been.
+        const record = waterRecord(field);
+        record.level = Math.max(level, Number.isFinite(record.level) ? record.level : -Infinity);
 
         for (let i = 0; i < field.count; i++) {
             const h = field.height[i];
-            if (h >= level) continue;
+            if (h >= level) {
+                raiseLine(record.line, i, level);
+                continue;
+            }
 
             const cover = coverAt(field, i, density);
             if (cover <= 0) continue;
@@ -909,12 +944,60 @@ const water = {
             const depth = level <= 0 ? 0 : (level - h) / level;
             layColor(field, i, blend(color, depth), cover);
             field.height[i] = h + (level - h) * flatten * cover;
+            raiseLine(record.line, i, level);
             covered++;
         }
 
         return covered;
     }
 };
+
+/**
+ * A field's water record with its line, made where it has none: dry - no sea,
+ * and no line anywhere - for a field with no water, and the sea's level
+ * everywhere for a record that carries a level and no line.
+ */
+export function waterRecord(field) {
+    field.water ??= { level: null, line: null };
+    field.water.line ??= new Float32Array(field.count).fill(Number.isFinite(field.water.level) ? field.water.level : NaN);
+    return field.water;
+}
+
+/** A vertex's line raised to `height`, or set to it where the vertex was dry. */
+function raiseLine(line, index, height) {
+    line[index] = Number.isFinite(line[index]) ? Math.max(line[index], height) : height;
+}
+
+/**
+ * Water drawn where a stroke went: cut into the ground to the line the ground
+ * under the stroke settled at each vertex, never raised to it, so it lies in
+ * the ground as water does rather than as a sheet propped over it; coloured by
+ * how far in from its bank a vertex is, pale at the shore and dark in the
+ * middle, across its own width; and written into the field's line where it
+ * was drawn and nowhere else, leaving the sea's level as it was. Below full
+ * density it is pools: where the noise says dry there is no line, and the
+ * ground is not cut.
+ */
+function drawWater(field, { color, density }, line, inward) {
+    const record = waterRecord(field);
+    let covered = 0;
+
+    for (let i = 0; i < field.count; i++) {
+        const at = line[i];
+        if (!Number.isFinite(at)) continue;
+
+        const cover = coverAt(field, i, density);
+        if (cover <= 0) continue;
+
+        const h = field.height[i];
+        field.height[i] = h + (Math.min(at, h) - h) * cover;
+        layColor(field, i, blend(color, inward ? inward[i] : 1), cover);
+        raiseLine(record.line, i, at);
+        covered++;
+    }
+
+    return covered;
+}
 
 const river = {
     id: 'river',
@@ -1097,16 +1180,24 @@ const snow = {
         // it lies wherever it does: every point at 1, drifts below.
         density:  scalar(0, 1, 1)
     },
+    // Drawn through a footprint of its own, snow's line is put just under the
+    // stroke's lowest ground, so nothing in it is turned away for lying low,
+    // and how deep it lies comes from how far in from the stroke's edge a
+    // vertex is rather than from how far above the line: thin and shadowed at
+    // the edge, white in the middle, on any ground.
+    footprintSettles: Object.freeze({ line: 'lowest', drawn: 'inward' }),
 
     generate(field, config) {
         const band = Math.max(1, config.line * 0.35);
+        const inward = drawnValues(config, 'inward', field);
         let settled = 0;
 
         for (let i = 0; i < field.count; i++) {
             const above = (field.height[i] - config.line) / band;
             if (above <= 0) continue;
 
-            const depth = smoothstep(Math.min(above, 1)) * config.coverage;
+            const deep  = inward ? inward[i] : smoothstep(Math.min(above, 1));
+            const depth = deep * config.coverage;
             const grip  = config.slope <= 0 ? 0 : 1 - smoothstep(slopeAt(field, i) / config.slope);
             const held  = depth * grip * coverAt(field, i, config.density);
             if (held <= 0) continue;
@@ -1169,11 +1260,32 @@ export const RUNWAY_FREEBOARD = 2;
  * What it was moved clear of is carried on the strip, because a panel that let
  * an element onto the runway has to be able to say which one.
  */
-export function clearRunwayGround(field, elevation) {
-    const level = field.water?.level;
-    if (!Number.isFinite(level) || elevation > level) return { elevation, cleared: [] };
+export function clearRunwayGround(field, elevation, strip = null) {
+    const line = waterUnder(field, strip);
+    if (!Number.isFinite(line) || elevation > line) return { elevation, cleared: [] };
 
-    return { elevation: level + RUNWAY_FREEBOARD, cleared: ['water'] };
+    return { elevation: line + RUNWAY_FREEBOARD, cleared: ['water'] };
+}
+
+/**
+ * The highest water a strip would lie in: the sea's level, and - given where
+ * the strip lies - the highest line of any water drawn under it, so a strip
+ * laid across a pond drawn on a hill is lifted clear of the pond rather than
+ * of a sea a long way below it. -Infinity where there is no water at all.
+ */
+function waterUnder(field, strip) {
+    const record = field.water;
+    let highest = Number.isFinite(record?.level) ? record.level : -Infinity;
+    const line = record?.line;
+    if (line == null || strip == null) return highest;
+
+    // A strip handed in by its bearing alone is given the axis it runs along.
+    const laid = Number.isFinite(strip.alongX) ? strip : { ...strip, ...runwayDirection(Number(strip.heading) || 0) };
+    for (let i = 0; i < field.count; i++) {
+        if (!(line[i] > highest)) continue;
+        if (isOnRunway(laid, fieldX(field, i), fieldZ(field, i))) highest = line[i];
+    }
+    return highest;
 }
 
 const runway = {
@@ -1212,7 +1324,7 @@ const runway = {
         // which is which. The number is the order they were laid in, which is
         // the order the placements ask for them.
         const index = field.runways.length;
-        const strip = { ...site, ...clearRunwayGround(field, site.elevation), length, width, index };
+        const strip = { ...site, ...clearRunwayGround(field, site.elevation, { ...site, length, width }), length, width, index };
         gradeRunway(field, strip, config);
         field.runways.push(strip);
         return strip;
@@ -1524,12 +1636,17 @@ export function seamBand(field) {
  * it were water. A world with no water in it has no surface at all.
  */
 export function waterSurface(field) {
-    const level = field.water?.level;
-    if (!Number.isFinite(level)) return null;
+    const level = Number.isFinite(field.water?.level) ? field.water.level : null;
+    const line  = field.water?.line ?? null;
+
+    // A tile with drawn water and no sea has a line and no level, so the line
+    // is looked for before a tile is called dry. A line of NaN is under
+    // nothing, so a vertex is wet only where some water reached it.
+    if (line == null && level == null) return null;
 
     const found = [];
     for (let i = 0; i < field.count; i++) {
-        if (field.height[i] <= level) found.push(i);
+        if (field.height[i] <= (line ? line[i] : level)) found.push(i);
     }
     if (found.length === 0) return null;
 

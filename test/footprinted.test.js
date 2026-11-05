@@ -22,6 +22,13 @@ function ground({ originX = 0, originZ = 0 } = {}) {
  * Water raised over everything, which changes every vertex it is drawn over -
  * the ground under it is lifted to its level and painted - so where it reached
  * and where it did not can both be read off the field.
+ *
+ * Drawn through a region as a `clip`. The compositor weighs a clip exactly as
+ * it weighs a footprint of the placement's own, and a clip settles nothing -
+ * where water through a footprint of its own is drawn water, resting at the
+ * line the ground under it settles rather than at its level, which
+ * `test/drawn-water.test.js` holds. So the sea through a clip is the element
+ * drawn whole and blended back, which is what these tests read.
  */
 const FLOOD = { type: 'water', config: { level: 600, flatten: 1 } };
 
@@ -52,7 +59,7 @@ test('inside the footprint is the whole element, outside is the ground as it was
     const drawn  = ground();
 
     applyElement(whole, FLOOD, createRandom(3));
-    applyFootprintedElement(drawn, { ...FLOOD, footprint }, createRandom(3));
+    applyFootprintedElement(drawn, { ...FLOOD, clip: footprint }, createRandom(3));
 
     let inside = 0, outside = 0, between = 0;
     for (let i = 0; i < drawn.count; i++) {
@@ -86,7 +93,7 @@ test('the feather is a blend in proportion to the weight', () => {
     const drawn  = ground();
 
     applyElement(whole, FLOOD, createRandom(5));
-    applyFootprintedElement(drawn, { ...FLOOD, footprint }, createRandom(5));
+    applyFootprintedElement(drawn, { ...FLOOD, clip: footprint }, createRandom(5));
 
     for (let i = 0; i < drawn.count; i++) {
         const weight = footprintWeight(footprint, fieldX(drawn, i), fieldZ(drawn, i), SIZE);
@@ -125,19 +132,25 @@ test('a footprint nobody can read draws nothing', () => {
 });
 
 /**
- * The sea's level is what a renderer animates, across every vertex under it on
- * the whole tile. A drawn body raising it would flood the tile below its line,
- * so a footprinted water placement leaves the level as it found it.
+ * The sea's level is what a strip is cleared of across the whole tile. A drawn
+ * body raising it would lift every strip on the tile to a pond on a hill, so a
+ * footprinted water placement leaves the level as it found it - and its own
+ * line goes where it was drawn and nowhere else.
  */
 test('drawn water leaves the sea\'s level where it was', () => {
     const sea = ground();
     applyElement(sea, { type: 'water', config: { level: 4 } }, createRandom(1));
-    applyFootprintedElement(sea, { type: 'water', config: { level: 300 }, footprint: { kind: 'disc', radius: 600 } }, createRandom(1));
-    assert.deepEqual(sea.water, { level: 4 }, 'the sea is still at 4');
+    const footprint = { kind: 'disc', radius: 600 };
+    applyFootprintedElement(sea, { type: 'water', config: { level: 300 }, footprint }, createRandom(1));
+    assert.equal(sea.water.level, 4, 'the sea is still at 4');
 
     const dry = ground();
-    applyFootprintedElement(dry, { type: 'water', config: { level: 300 }, footprint: { kind: 'disc', radius: 600 } }, createRandom(1));
-    assert.equal(dry.water, null, 'and a tile with no sea is not given one by a drawn body');
+    applyFootprintedElement(dry, { type: 'water', config: { level: 300 }, footprint }, createRandom(1));
+    assert.equal(dry.water.level, null, 'and a tile with no sea is not given one by a drawn body');
+    for (let i = 0; i < dry.count; i++) {
+        const reached = footprintWeight(footprint, fieldX(dry, i), fieldZ(dry, i), SIZE) > 0;
+        assert.equal(Number.isFinite(dry.water.line[i]), reached, `vertex ${i}: a line where it was drawn and nowhere else`);
+    }
 });
 
 test('a strip cut inside a footprint is recorded on the field it was cut into', () => {
@@ -197,7 +210,7 @@ test('a world built from a footprinted placement draws it only where it reaches'
     const footprint = { kind: 'rect', x: -800, z: 600, width: 1400, depth: 900, angle: 0.4, corner: 200, feather: 0 };
 
     const bare  = buildEnvironment(blank, { size: SIZE, segments: SEGMENTS, elements: [] });
-    const built = buildEnvironment(blank, { size: SIZE, segments: SEGMENTS, elements: [{ ...FLOOD, footprint }] });
+    const built = buildEnvironment(blank, { size: SIZE, segments: SEGMENTS, elements: [{ ...FLOOD, clip: footprint }] });
 
     let raised = 0;
     for (let i = 0; i < built.count; i++) {

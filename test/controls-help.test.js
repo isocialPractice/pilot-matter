@@ -267,7 +267,7 @@ test('the builder list reads as the input and then what it does', () => {
         'Drag (Lasso), then Shift - Keep It Square or Round',
         'Click (Lasso) - Place a Point, Double Click to Close',
         'Click (Mountain) - Drop a Mountain',
-        'Drag (Grass/Sand) - Lay a Stroke',
+        'Drag (Grass/Sand/Water/Snow) - Lay a Stroke',
         'Drag a Handle - Move or Shape What Is in Hand',
         'Esc - Accept Edits or Save and Exit',
         'Enter - Answer a Question',

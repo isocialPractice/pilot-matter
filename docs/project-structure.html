@@ -152,9 +152,9 @@
 │   ├── weather-math.js # Pure conditions, cloud drift, rain field, and strike timing
 │   ├── mountains.js    # Pure mountain density formula (~10% coverage)
 │   ├── environment/
-│   │   ├── elements.js # Pure element registry, the field, every generator, and the clumps a ground cover's density breaks it into
+│   │   ├── elements.js # Pure element registry, the field and the water line it carries, every generator - drawn water and drawn snow among them - and the clumps a ground cover's density breaks it into
 │   │   ├── footprints.js # Pure region on a placement: the seven kinds a pointer draws, regular figures and curves among them, two regions combined into one, a region set down in a frame of its own, and how much of one covers a point, repeating across the canvas's edges
-│   │   ├── footprinted.js # Pure compositing of an element drawn on a copy of the field back through its footprint and the selection it was clipped to, what a footprint settles from the ground under it - a ground cover's band - and the stream a seeded placement draws from
+│   │   ├── footprinted.js # Pure compositing of an element drawn on a copy of the field back through its footprint and the selection it was clipped to, what a footprint settles from the ground under it - a ground cover's band, drawn water's line at the lowest bank across its strokes, drawn snow's line and depth - the drawn line carried back, and the stream a seeded placement draws from
 │   │   └── presets.js  # Pure assembled environments, and the builder
 │   ├── api/
 │   │   ├── index.js    # The public entry point, re-exporting both halves

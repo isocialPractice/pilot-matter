@@ -5,6 +5,77 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.49.0] - 2026-11-05
+
+Water and snow drawn where a stroke goes: the water line kept a vertex at a
+time beside the sea's level, drawn water lying in the ground at its stroke's
+lowest bank, and drawn snow settling on any ground.
+
+### Added
+
+- **Water drawn above the sea.** A field's water is now `level` - the sea's,
+  one height, or `null` where there is none - and `line`, one height a vertex:
+  where the water at that vertex rests, `NaN` where it is dry. The sea writes
+  its level into the line everywhere it reaches, so every preset's water is
+  the water it was; drawn water writes its own line where it was drawn and
+  nowhere else, and never moves the sea's level. The renderer finds water
+  where the ground lies at or under its own line, so a pond drawn on a hill
+  swells and glints with the sea while the valley beside it stays dry, and a
+  strip is lifted clear of the highest water actually under it.
+- **Drawn water lies in the ground.** Water drawn through a footprint rests at
+  the lowest bank of its stroke's cross-section, a little under it, read
+  between the stroke's steps so it runs on without a step of its own, and
+  never above the ground it sits on: level across the
+  stroke, following the ground down along it - a stream down a slope, not a
+  trench cut to its lowest end - and cut into the ground rather than propped
+  over it. A region with no stroke through it is a pond at its lowest ground.
+  It is coloured pale at its banks and dark in its middle, across its own
+  width, and below full density it is pools. The line is worked out on each
+  tile from that tile's own ground; where a stroke crosses a seam, the line
+  either side steps by less than the swell is high. Its level and flatten are
+  neither read nor shown.
+- **Drawn snow settles where it is drawn.** Snow drawn through a footprint has
+  its line put just under the stroke's lowest ground on each tile, so it lies
+  on low ground as well as high, and its depth runs in from the stroke's edge:
+  thin and blue-grey there, white down the middle. Steep faces stay bare.
+- **Water and Snow** join the palette as the cover tool, starting whole, and
+  the control list reads `Drag (Grass/Sand/Water/Snow) - Lay a Stroke`.
+
+### Changed
+
+- The compositor's own tests flood a region with the sea drawn through it as a
+  `clip` rather than as a footprint of its own: water through a footprint of
+  its own is drawn water now, resting at its own line, and a clip is weighed
+  the same way and settles nothing.
+
+Held in Node by the new `test/drawn-water.test.js` - the sea's level written
+into the line, part density leaving dry ground out of it, a line looked for
+before a tile is called dry, a copy's line its own, drawn water where it was
+drawn and the valley beside it dry, a strip lifted clear of drawn water and a
+searched-for one laid over it, a sea recorded by its level alone, two seas, the
+line level across a stroke and following the ground along it, the ground only
+ever cut, a pond, the bank pale and the middle dark, the line per tile and
+across a seam, pools, the ways read through frames and cuts, and drawn snow on
+low ground deeper in its middle - with `test/footprinted.test.js`,
+`test/environment-tiles.test.js`, `test/build-panel.test.js`,
+`test/build-tools.test.js`, `test/cover.test.js` and
+`test/controls-help.test.js`. Each rejected the defect it names when that was
+put back, thirty-four in all: among them a drawn line not carried to the
+generator or left on the copy, the sea writing no line, a dry vertex never
+given one, drawn water cutting nothing or dark from bank to bank, the surface
+read off the level alone, a strip cleared of the sea alone, the bank looked for
+a quarter of the way across, a vertex taking the nearer step rather than the
+point across from it, a stroke over the seam measured where it was drawn alone,
+a pond resting above its lowest ground, drawn water standing over its ground,
+and a drawn batch showing the level it does not read. The pass smoothing each stroke's banks along it, which the plan asked for, was measured against reading every vertex between the two steps either side of it and dropped with its own defect: it left the line no more even. Settled in
+Chromium in 15 checks across a desktop and a phone: Water and Snow on the
+palette and the list, a stroke of water found by the renderer where it was
+drawn, the sea's level left where it was, every point of the way under its own
+line, the line following the ground down, nothing raised and the stroke's
+ground lowered, pools at part density, snow white on ground far under 300 and
+deeper in its middle, both kept into the flight and the stream swelling there
+with the sea, and a finger laying a stroke of water.
+
 ## [1.0.0-alpha.1.48.0] - 2026-11-04
 
 The cover tool: grass and sand laid by dragging a stamp along the ground, each

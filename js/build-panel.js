@@ -119,10 +119,14 @@ export function panelRanges(placement) {
     const ranges = { ...element.ranges };
 
     // A range a footprint settles - a ground cover's band, which is the
-    // ground's own relief under the stroke - is worked out on every tile it is
-    // drawn on, so a figure for it here would be one the drawing ignores.
+    // ground's own relief under the stroke, or drawn snow's line - is worked
+    // out on every tile it is drawn on, and one a body drawn through a
+    // footprint does not read - drawn water's level and flatten - is not
+    // read at all, so a figure for either here would be one the drawing
+    // ignores.
     if (placement.footprint != null) {
         for (const name of Object.keys(element.footprintSettles ?? {})) delete ranges[name];
+        for (const name of element.footprintIgnores ?? []) delete ranges[name];
     }
 
     if (placement.config?.at == null) return ranges;

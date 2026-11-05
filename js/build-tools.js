@@ -109,13 +109,12 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * The tools that work today. A tool is added here in the commit that makes it
  * work, and not before, so the palette never offers one that does nothing.
  *
- * Grass and sand are the cover tool working. Water and snow are the same tool,
- * declared and ready, but drawn they would show nothing on most of a canvas:
- * water fills only what is under the sea's one level, and snow settles only
- * above its line, both a few units off the ground a stroke is usually drawn
- * on. They join when their elements are drawn where a stroke was drawn.
+ * Grass, sand, water and snow are the cover tool, each drawn where its stroke
+ * went: a cover's band, drawn water's line and drawn snow's line are all
+ * worked out from the ground under the stroke rather than held at a height a
+ * stroke would usually miss.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {

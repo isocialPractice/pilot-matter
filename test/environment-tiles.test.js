@@ -909,8 +909,11 @@ function coveredAt(field, height) {
  * middle of it.
  */
 test('a footprinted placement lands at the same canvas coordinate on every tile', () => {
+    // The sea through a region, as a clip - weighed as a footprint is, and
+    // settling nothing, so it fills the same vertices to the same height on
+    // every tile whatever the ground under them.
     const flood = { type: 'water', config: { level: 600, flatten: 1 },
-        footprint: { kind: 'disc', x: 800, z: -600, radius: 500, feather: 0 } };
+        clip: { kind: 'disc', x: 800, z: -600, radius: 500, feather: 0 } };
 
     const home = coveredAt(builtTile(0, 0, [flood]), 600);
     assert.ok(home.length > 0, 'the placement should cover something on the home tile');
@@ -928,7 +931,7 @@ test('a footprinted placement lands at the same canvas coordinate on every tile'
  */
 test('a footprint over the canvas edge is continuous across the seam between tiles', () => {
     const flood = { type: 'water', config: { level: 600, flatten: 1 },
-        footprint: { kind: 'disc', x: SIZE / 2, z: 200, radius: 900, feather: 300 } };
+        clip: { kind: 'disc', x: SIZE / 2, z: 200, radius: 900, feather: 300 } };
 
     const east = builtTile(0, 0, [flood]);
     const west = builtTile(1, 0, [flood]);
@@ -946,7 +949,7 @@ test('a footprint over the canvas edge is continuous across the seam between til
 
     // And the far side of the seam is raised at all only because the region
     // carries across: the next tile's west edge is outside the disc as drawn.
-    assert.equal(footprintWeight(flood.footprint, -SIZE / 2, 200), 0,
+    assert.equal(footprintWeight(flood.clip, -SIZE / 2, 200), 0,
         'with no wrap the next tile would have had nothing at its west edge');
 });
 
@@ -970,7 +973,7 @@ test('anything worked out from the ground is worked out on the tile it is drawn 
     const bares = places.map(([x, z]) => builtTile(x, z, [], relief));
     const heights = bares.flatMap(bare => [...bare.height].filter((_, i) => covered(bare, i))).sort((a, b) => a - b);
     const level = heights[Math.floor(heights.length / 2)];
-    const pool = { type: 'water', config: { level, flatten: 1 }, footprint };
+    const pool = { type: 'water', config: { level, flatten: 1 }, clip: footprint };
 
     const filled = [];
     places.forEach(([x, z], at) => {

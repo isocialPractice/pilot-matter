@@ -69,9 +69,16 @@ test('with an edit in hand the dock is that edit, headed as its tool\'s panel, w
 
     assert.equal(shown.kind, DOCK_DRAFT);
     assert.equal(shown.heading, 'BUILD WATER');
-    assert.deepEqual(shown.rows.map(entry => entry.row.label), ['LEVEL', 'COLOR LIGHT', 'COLOR DARK', 'FLATTEN', 'DENSITY']);
+    assert.deepEqual(shown.rows.map(entry => entry.row.label), ['COLOR LIGHT', 'COLOR DARK', 'DENSITY'],
+        'drawn water rests at its own line and is always a sheet, so its level and flatten are not its panel\'s');
     assert.deepEqual(shown.actions, [DOCK_ACCEPT, DOCK_CANCEL]);
-    assert.equal(shown.rows.find(entry => entry.name === 'level').value, 300, 'reading what the edit holds');
+    assert.equal(shown.rows.find(entry => entry.name === 'density').value, 1, 'reading what the edit holds');
+
+    const sea = onCanvas();
+    startDraft(sea, { type: 'water', config: { level: 300 } });
+    assert.deepEqual(dockContent(sea, {}).rows.map(entry => entry.row.label), ['LEVEL', 'COLOR LIGHT', 'COLOR DARK', 'FLATTEN', 'DENSITY'],
+        'where a sea, with no footprint, shows every range it reads');
+    assert.equal(dockContent(sea, {}).rows.find(entry => entry.name === 'level').value, 300);
 });
 
 test('an edit of an element no tool places yet is headed by the element', () => {

@@ -11,30 +11,26 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Water drawn above the sea**: a water line kept per vertex beside the
-  sea's one level, so water drawn on high ground is water where it was drawn and
-  nowhere else on the tile, and a runway is lifted clear of the water actually
-  under it
-  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
-    is declared for water, starting whole, and `footprintSettles` in
-    `js/environment/footprinted.js` is where a value worked out from the
-    ground under a stroke goes - the band is the first; the line is the next.
-    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
-    part density is pools under its level, which `waterSurface` still reads
-    as one sheet.
+- [ ] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
+  panel row by ten points or ten steps, in every panel including the element
+  editor's
   - From: Interactive Build Mode
-- [ ] **Drawn water lies in the ground**: the line set at the lowest bank within
-  the stroke's half-width and the ground cut down to it, with the colour running
-  from the bank to the middle, so a stroke drawn downhill is a stream and its
-  dark end shows wherever it rests
+- [ ] **Placed runway**: a strip inserted where it was asked for rather than
+  where the site search found room, graded to the ground under it on each tile
+  and lifted clear of any water, with width, length and a rotation about its
+  own centre
   - From: Interactive Build Mode
-- [ ] **Drawn snow settles where it is drawn**: the snow line put under the
-  stroke's lowest ground on each tile, and the depth running from a thin,
-  shadowed edge to white in the middle, so snow drawn on low ground shows and
-  both colour ends show on any ground
-  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
-    is declared for snow, starting whole, and the snow line is the next
-    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
+- [ ] **Runway templates**: basic and commercial runways and airports as groups
+  of placements the registry already has, copied into the placement when it is
+  inserted so a template improved later leaves built worlds as they were
+  - From: Interactive Build Mode
+- [ ] **Insert a template**: a card chosen on the panel, its outline carried
+  over the ground and written only on the click, arriving lined up with the
+  view to the nearest ten degrees, then turned and sized on the panel or by the
+  gumball
+  - From: Interactive Build Mode
+- [ ] **The strip a flight starts on**: a placed strip outranking a searched
+  one, so a flight reset onto a runway opens on the strip the pilot built
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -104,28 +100,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Water drawn above the sea**: a water line kept per vertex beside the
-  sea's one level, so water drawn on high ground is water where it was drawn and
-  nowhere else on the tile, and a runway is lifted clear of the water actually
-  under it
-  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
-    is declared for water, starting whole, and `footprintSettles` in
-    `js/environment/footprinted.js` is where a value worked out from the
-    ground under a stroke goes - the band is the first; the line is the next.
-    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
-    part density is pools under its level, which `waterSurface` still reads
-    as one sheet.
-- [ ] **Drawn water lies in the ground**: the line set at the lowest bank within
-  the stroke's half-width and the ground cut down to it, with the colour running
-  from the bank to the middle, so a stroke drawn downhill is a stream and its
-  dark end shows wherever it rests
-- [ ] **Drawn snow settles where it is drawn**: the snow line put under the
-  stroke's lowest ground on each tile, and the depth running from a thin,
-  shadowed edge to white in the middle, so snow drawn on low ground shows and
-  both colour ends show on any ground
-  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
-    is declared for snow, starting whole, and the snow line is the next
-    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
 - [ ] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
   panel row by ten points or ten steps, in every panel including the element
   editor's
@@ -179,6 +153,10 @@ the order the work unblocks itself in.
 - [ ] **Erasing water and runways**: the sea held per vertex so a hole erased in
   a lake is dry ground, and a strip erased whole and only when it is the target
   named
+  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
+    one height a vertex beside the sea's level, and `waterSurface` reads a
+    vertex as wet only where it lies under its own line - so a hole erased in a
+    lake is the line set to `NaN` there.
 - [ ] **Shape vocabulary**: the shape tools built once over the seven footprint
   kinds, with each mode declaring the subset it offers, so Lasso's ten and
   Extrude's seven are one implementation
@@ -221,6 +199,11 @@ the order the work unblocks itself in.
     off a range the element's `footprintSettles` names for a placement with a
     footprint, and the cover tool's own panel carries only density, the stamp
     and the colours. What is left is drawn water's level.
+  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
+    with a footprint shows neither what its element's `footprintSettles`
+    works out nor what its `footprintIgnores` - drawn water's level and
+    flatten - beside the count and the band. Its run is checking nothing else
+    is shown and ignored, and settling it.
 - [ ] **Builder settings**: a settings screen for the builder's own
   preferences, declared and stored the way the game's two settings screens are,
   with a reset to defaults, and read by nothing that generates ground, so a
@@ -309,44 +292,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 340 earlier items in `TODO-archive.md`, newest last.
+> 343 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
-  two input gestures - a drag for the shapes and a click per vertex for the
-  polylines and curves - rather than ten handlers
-  - **Settled**: `LASSO_TOOLS` gives each of the ten its kind and its gesture,
-    as the plan's table has them, and `lassoFootprint` turns a gesture's ground
-    points into the region: Free a ring of what the drag gathered, Rectangle
-    and Round Rect. a box square to the canvas, Ellipse the box's ellipse, and
-    Polyline a ring a click, closed by its first point or a double click
-    through `clickVertex`. Two handlers in `js/main.js`, `lassoPress` and
-    `dragLasso`. A drag must travel past a click - found in Chromium, where a
-    slip three pixels wide spanned a region at that zoom - and the second press
-    of a closing double click starts nothing. Triangle, Star and Polygon are a
-    `polygon` and the curved two a `path`, which `Parametric shapes` and
-    `Curved selections` bring.
-  - From: Interactive Build Mode
-- [x] **The active selection**: session state drawn as a dashed outline lying on
-  the ground, surviving a tool change and cleared only by deselect
-  - **Settled**: `selection` on the session, set by `setSelection` - a new
-    shape replacing the last - and dropped by `deselect` alone, not by a tool
-    change; a new canvas starts with none. It is no edit: it asks nothing and
-    nothing keeps it. `footprintLoop` traces its edge from what it is, stood on
-    the ground every 120 units and carried across the seams by `canvasPieces`,
-    drawn as `SELECTION_OUTLINE`, a dashed white line, whatever tool is live;
-    a shape being drawn is drawn solid as it would come out.
-  - From: Interactive Build Mode
-- [x] **Clipping to a selection**: the product of the tool's weight and the
-  lasso's, so a clipped edge keeps both feathers and a tool that does not mind
-  the lasso costs nothing
-  - **Settled**: a placement may carry a `clip`, a footprint that
-    `applyFootprintedElement` multiplies with its own; `dropDraft` gives a tool
-    that minds the lasso the selection as it stands, and refuses a click
-    outside it. A placement with no clip is drawn as before. `placementReach`
-    multiplies the clip in too, so a clipped mountain is picked where it
-    stands. Confirmed in Chromium on the canvas and in the flight it was kept
-    for.
-  - From: Interactive Build Mode
 - [x] **Parametric shapes**: a regular figure held as its centre, radius, sides
   and star ratio, so changing the number of sides reshapes what was drawn
   instead of asking for it again
@@ -445,4 +392,59 @@ how the simulator got here rather than as a list still to be worked.
     drawn, through `settleFromFootprint`, the generator left a whole-field
     function. A clip alone settles nothing, and a batch picked again shows no
     band on its panel.
+  - From: Interactive Build Mode
+- [x] **Water drawn above the sea**: a water line kept per vertex beside the
+  sea's one level, so water drawn on high ground is water where it was drawn and
+  nowhere else on the tile, and a runway is lifted clear of the water actually
+  under it
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for water, starting whole, and `footprintSettles` in
+    `js/environment/footprinted.js` is where a value worked out from the
+    ground under a stroke goes - the band is the first; the line is the next.
+    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
+    part density is pools under its level, which `waterSurface` still reads
+    as one sheet.
+  - **Settled**: `field.water` is `{ level, line }`: `level` the sea's, null
+    where there is none, and `line` one height a vertex. The sea writes its
+    level into the line everywhere its density reaches, so every preset's
+    surface is the one it was; drawn water writes its own line where it was
+    drawn, carried back by the compositor, and never moves the level.
+    `waterSurface` reads a vertex as wet where it lies at or under its own
+    line, looking for a line before calling a tile dry, and
+    `clearRunwayGround` takes the highest line under the strip as well as the
+    sea's level. Water joins the palette.
+  - From: Interactive Build Mode
+- [x] **Drawn water lies in the ground**: the line set at the lowest bank within
+  the stroke's half-width and the ground cut down to it, with the colour running
+  from the bank to the middle, so a stroke drawn downhill is a stream and its
+  dark end shows wherever it rests
+  - **Settled**: water declares `footprintSettles: { drawn: 'waterLine' }`
+    and `footprintIgnores` its level and flatten. `bankMeasure` in
+    `js/environment/footprinted.js` walks each stroke at half a cell's
+    spacing, finds the lowest ground within half its width at each step, and
+    gives every vertex the bank of the point it lies across from, read
+    between the steps either side - so the line is level across a stroke and
+    follows the ground down along one, measured on each tile's own vertices
+    and at each repeat of a stroke over the seam, where the step is held under
+    the swell. The plan's smoothing pass was measured and dropped: read
+    between steps half a cell apart, the line came out no more even for it.
+    The line is 1.5 under the bank and never over the ground; the
+    ground is cut to it, the colour runs pale at the bank to dark in the
+    middle, and a region with no stroke is a pond at its lowest ground. The
+    line and how far in each vertex is travel as `drawn`, carried beside the
+    ranges like `at`.
+  - From: Interactive Build Mode
+- [x] **Drawn snow settles where it is drawn**: the snow line put under the
+  stroke's lowest ground on each tile, and the depth running from a thin,
+  shadowed edge to white in the middle, so snow drawn on low ground shows and
+  both colour ends show on any ground
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for snow, starting whole, and the snow line is the next
+    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
+  - **Settled**: snow declares `footprintSettles: { line: 'lowest', drawn:
+    'inward' }`: its line is put a unit under the stroke's lowest ground on
+    each tile, and its depth is how far in from the stroke's edge a vertex is,
+    times its coverage, so it is thin and blue-grey at the edge and white down
+    the middle on any ground; `slope` still leaves steep faces bare. Snow
+    joins the palette.
   - From: Interactive Build Mode

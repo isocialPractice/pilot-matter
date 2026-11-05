@@ -248,7 +248,7 @@ back.
 | `Alt` and drag in Lasso | Cut the shape out of the selection |
 | Drag in Lasso, then `Shift` | Keep a box square or an ellipse round |
 | Click in Lasso, with Polyline or a curved tool | Place a point; click the first one again, or double click, to close the shape |
-| Drag, or a finger, in Grass or Sand | Lay a stroke of it with the stamp on the panel, which follows the pointer |
+| Drag, or a finger, in Grass, Sand, Water or Snow | Lay a stroke of it with the stamp on the panel, which follows the pointer |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
@@ -291,19 +291,24 @@ keeps only the ground inside both. A shape that leaves no ground selected drops
 the selection. `Shift` pressed once a drag is under way squares the box or
 rounds the ellipse instead, so the one key does both.
 
-Grass and Sand are one tool, each with its own panel from the moment it is
-chosen: `DENSITY`, the stamp - `BUILD HEIGHT`, `BUILD WIDTH` and
+Grass, Sand, Water and Snow are one tool, each with its own panel from the
+moment it is chosen: `DENSITY`, the stamp - `BUILD HEIGHT`, `BUILD WIDTH` and
 `CORNER RADIUS`, in screen pixels - and `COLOR LIGHT` and `COLOR DARK`. A drag
 lays the stamp swept whole along the way it went, laid at the size it is on
 the screen where it was pressed, and the strokes drawn before `ACCEPT` are one
 batch: `DENSITY` and the colours change all of it at once, and the stamp only
 the strokes still to come. At a density below 1 the stroke breaks into clumps
-with ground between them. A stroke lies on all the ground under it, whatever
-its height, shaded light on its low ground and dark on its high. The batch
-carries the gumball: the centre moves it, the squares stretch it and the arc
-turns it. With a selection live the batch is clipped to it, and a stroke that
-reaches none of it lays nothing. The next batch starts where the panel was
-left.
+with ground between them - pools, for water. Grass and sand lie on all the
+ground under a stroke, whatever its height, shaded light on its low ground and
+dark on its high. Water is cut into the ground at its stroke's lowest bank, so
+it lies level across the stroke and runs down with the ground along it - a
+stream down a slope, a pond in a hollow - pale at its banks and dark in its
+middle; the sea's level stays where it was. Snow settles on any ground the
+stroke crosses, thin and shadowed at its edges and white down its middle, and
+stays off faces too steep to hold it. The batch carries the gumball: the
+centre moves it, the squares stretch it and the arc turns it. With a selection
+live the batch is clipped to it, and a stroke that reaches none of it lays
+nothing. The next batch starts where the panel was left.
 
 What is in hand carries the gumball, in the art's colours: red east, green
 north, blue up. The white centre moves it over the ground, the red and green

@@ -4404,3 +4404,42 @@ still be found by name.
     read, so five of the ten are on the panel; the art's ten are declared in
     `js/lasso.js` and the rest join with their kinds.
   - From: Interactive Build Mode
+
+## Archived 11-05-26
+
+- [x] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
+  two input gestures - a drag for the shapes and a click per vertex for the
+  polylines and curves - rather than ten handlers
+  - **Settled**: `LASSO_TOOLS` gives each of the ten its kind and its gesture,
+    as the plan's table has them, and `lassoFootprint` turns a gesture's ground
+    points into the region: Free a ring of what the drag gathered, Rectangle
+    and Round Rect. a box square to the canvas, Ellipse the box's ellipse, and
+    Polyline a ring a click, closed by its first point or a double click
+    through `clickVertex`. Two handlers in `js/main.js`, `lassoPress` and
+    `dragLasso`. A drag must travel past a click - found in Chromium, where a
+    slip three pixels wide spanned a region at that zoom - and the second press
+    of a closing double click starts nothing. Triangle, Star and Polygon are a
+    `polygon` and the curved two a `path`, which `Parametric shapes` and
+    `Curved selections` bring.
+  - From: Interactive Build Mode
+- [x] **The active selection**: session state drawn as a dashed outline lying on
+  the ground, surviving a tool change and cleared only by deselect
+  - **Settled**: `selection` on the session, set by `setSelection` - a new
+    shape replacing the last - and dropped by `deselect` alone, not by a tool
+    change; a new canvas starts with none. It is no edit: it asks nothing and
+    nothing keeps it. `footprintLoop` traces its edge from what it is, stood on
+    the ground every 120 units and carried across the seams by `canvasPieces`,
+    drawn as `SELECTION_OUTLINE`, a dashed white line, whatever tool is live;
+    a shape being drawn is drawn solid as it would come out.
+  - From: Interactive Build Mode
+- [x] **Clipping to a selection**: the product of the tool's weight and the
+  lasso's, so a clipped edge keeps both feathers and a tool that does not mind
+  the lasso costs nothing
+  - **Settled**: a placement may carry a `clip`, a footprint that
+    `applyFootprintedElement` multiplies with its own; `dropDraft` gives a tool
+    that minds the lasso the selection as it stands, and refuses a click
+    outside it. A placement with no clip is drawn as before. `placementReach`
+    multiplies the clip in too, so a clipped mountain is picked where it
+    stands. Confirmed in Chromium on the canvas and in the flight it was kept
+    for.
+  - From: Interactive Build Mode

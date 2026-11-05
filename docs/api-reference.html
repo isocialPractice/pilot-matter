@@ -1081,7 +1081,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
         <tr><td><code>matchEdges(fields, options)</code></td><td>Settles an assembly wherever its fields meet</td></tr>
         <tr><td><code>matchWater(surfaces)</code></td><td>Settles an assembly's water wherever its tiles share a wet vertex</td></tr>
         <tr><td><code>SEAM_BLEND</code></td><td>How far a join is eased back into the ground, in vertices</td></tr>
-        <tr><td><code>waterSurface(field)</code></td><td>The water a world settled at, as the vertices under its level</td></tr>
+        <tr><td><code>waterSurface(field)</code></td><td>The water a world settled at, as the vertices at or under their own water line</td></tr>
     </tbody>
 </table>
 </div>
@@ -1138,6 +1138,15 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
     // Half the ground under the stroke, in clumps; the band is the stroke's.
     config: { density: 0.5 },
     footprint: { kind: 'stroke', points: [[-1000, 0], [1000, 200]], stamp: { width: 600, depth: 400, corner: 50 } }
+}</code></pre>
+
+<p><code>water</code> drawn with a footprint of its own is not the sea: it rests at a line of its own, worked out on each square from the ground under it - at each point of a stroke, a little under the lowest bank of the stroke's cross-section there, so it lies level across a stroke and follows the ground down along one - and the ground under it is cut down to that line, never raised. Its <code>level</code> and <code>flatten</code> are not read, and the sea's level is not moved. A footprint with no stroke in it, a disc or a box, rests at its lowest ground. It is coloured pale at its banks and dark across its middle, and a strip laid over it is lifted clear of it. <code>snow</code> drawn with a footprint of its own settles on any ground the footprint covers, its <code>line</code> put just under the lowest of it, and lies deeper the further in from the footprint's edge:</p>
+
+<pre><code>{
+    type: 'water',
+    // A stream down whatever ground the stroke crosses: no level to set.
+    config: {},
+    footprint: { kind: 'stroke', points: [[-2000, -1500], [0, 0], [1500, 2500]], stamp: { width: 700, depth: 400, corner: 100 } }
 }</code></pre>
 
 <p>A placement may carry a <code>seed</code>, any finite number, and then draws from a random stream of its own rather than the world's. A world's placements otherwise share one stream in the order they are applied, which is what makes a description the same world every time - and also means a placement added among them moves every draw after it. Seeded, it takes nothing the others were going to draw, so they stay where they were, and it draws the same values on every tile.</p>
@@ -1252,7 +1261,7 @@ const ground = sampleHeight(field, 120, -400);</code></pre>
         <tr><td><code>height</code></td><td>A <code>Float32Array</code> of one height per vertex</td></tr>
         <tr><td><code>color</code></td><td>A <code>Float32Array</code> of three components per vertex</td></tr>
         <tr><td><code>runways</code></td><td>The strips cut into it, which a flight model has to be able to ask about by name</td></tr>
-        <tr><td><code>water</code></td><td>The level whatever water was laid settled at, or <code>null</code> for a dry world</td></tr>
+        <tr><td><code>water</code></td><td>The water laid on it, or <code>null</code> for a dry world: <code>level</code>, the sea's one height, or <code>null</code> where there is no sea, and <code>line</code>, a <code>Float32Array</code> of one height per vertex - the line the water at that vertex rests at, <code>NaN</code> where it is dry</td></tr>
     </tbody>
 </table>
 </div>
@@ -1312,7 +1321,7 @@ renderer.setAnimationLoop(() =&gt; {
 
 <h2 id="the-water">The water</h2>
 
-<p>Water is the one part of the ground that moves and the one part that shines. The surface a world settled at is read off the finished field - the vertices lying at or under the level the water was laid at - and moved from there, so ground the water no longer has, a strip graded over a shallow or a town levelled onto a shore, is not still being moved as though it were.</p>
+<p>Water is the one part of the ground that moves and the one part that shines. The surface a world settled at is read off the finished field - the vertices lying at or under their own water line: the sea's level wherever the sea reaches, and a drawn body's own line where one was drawn - and moved from there, so ground the water no longer has, a strip graded over a shallow or a town levelled onto a shore, is not still being moved as though it were, and a valley beside a pond drawn on a hill is not water for lying under the pond.</p>
 
 <div class="table-wrap">
 <table>

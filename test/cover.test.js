@@ -217,7 +217,7 @@ test('only a footprint of its own settles anything', () => {
     assert.equal(settleFromFootprint(field, preset, all), preset);
     const drawnHill = { type: 'mountain', config: {}, footprint: STROKE };
     assert.equal(settleFromFootprint(field, drawnHill, all), drawnHill, 'nor an element that declares nothing settled');
-    assert.equal(FOOTPRINT_SETTLERS.relief(field, new Float32Array(field.count)), null, 'and a region on no vertex settles nothing');
+    assert.equal(FOOTPRINT_SETTLERS.relief({ field, weights: new Float32Array(field.count) }), null, 'and a region on no vertex settles nothing');
     assert.deepEqual(getElement('grass').footprintSettles, { band: 'relief' });
     assert.deepEqual(getElement('sand').footprintSettles, { band: 'relief' });
 });
@@ -322,13 +322,12 @@ test('each stroke joins the batch: one frame round one union while the frame is 
 
 // --- The cover tool -------------------------------------------------------------------------
 
-test('the cover tool is declared once for each of the four covers, and is on the palette for grass and sand', () => {
+test('the cover tool is declared once for each of the four covers, and is on the palette for all four', () => {
     const covers = BUILD_TOOLS.filter(tool => isCoverTool(tool.id));
     assert.deepEqual(covers.map(tool => [tool.id, tool.element, tool.starts.density]), [
         ['grass', 'grass', 0.5], ['sand', 'sand', 0.5], ['water', 'water', 1], ['snow', 'snow', 1]
     ]);
-    assert.ok(isBuiltTool('grass') && isBuiltTool('sand'));
-    assert.ok(!isBuiltTool('water') && !isBuiltTool('snow'), 'water and snow wait to be drawn where they were drawn');
+    assert.ok(['grass', 'sand', 'water', 'snow'].every(id => isBuiltTool(id)), 'each drawn where its stroke goes');
     assert.ok(covers.every(tool => tool.mindsLasso));
     assert.equal(isCoverTool('mountain'), false);
     assert.deepEqual(toolBrush(buildTool('grass')), COVER_BRUSH);

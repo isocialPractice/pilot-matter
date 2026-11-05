@@ -1239,7 +1239,7 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now
 | `matchEdges(fields, options)` | Settles an assembly wherever its fields meet |
 | `matchWater(surfaces)` | Settles an assembly's water wherever its tiles share a wet vertex |
 | `SEAM_BLEND` | How far a join is eased back into the ground, in vertices |
-| `waterSurface(field)` | The water a world settled at, as the vertices under its level |
+| `waterSurface(field)` | The water a world settled at, as the vertices at or under their own water line |
 
 The five worlds a host can ask for by name:
 
@@ -1331,6 +1331,27 @@ preset is drawn:
     // Half the ground under the stroke, in clumps; the band is the stroke's.
     config: { density: 0.5 },
     footprint: { kind: 'stroke', points: [[-1000, 0], [1000, 200]], stamp: { width: 600, depth: 400, corner: 50 } }
+}
+```
+
+`water` drawn with a footprint of its own is not the sea: it rests at a line of
+its own, worked out on each square from the ground under it - at each point of
+a stroke, a little under the lowest bank of the stroke's cross-section there, so
+it lies level across a stroke and follows the ground down along one - and the
+ground under it is cut down to that line, never raised. Its `level` and
+`flatten` are not read, and the sea's level is not moved. A footprint with no
+stroke in it, a disc or a box, rests at its lowest ground. It is coloured pale
+at its banks and dark across its middle, and a strip laid over it is lifted
+clear of it. `snow` drawn with a footprint of its own settles on any ground the
+footprint covers, its `line` put just under the lowest of it, and lies deeper
+the further in from the footprint's edge:
+
+```js
+{
+    type: 'water',
+    // A stream down whatever ground the stroke crosses: no level to set.
+    config: {},
+    footprint: { kind: 'stroke', points: [[-2000, -1500], [0, 0], [1500, 2500]], stamp: { width: 700, depth: 400, corner: 100 } }
 }
 ```
 
@@ -1506,7 +1527,7 @@ const ground = sampleHeight(field, 120, -400);
 | `height` | A `Float32Array` of one height per vertex |
 | `color` | A `Float32Array` of three components per vertex |
 | `runways` | The strips cut into it, which a flight model has to be able to ask about by name |
-| `water` | The level whatever water was laid settled at, or `null` for a dry world |
+| `water` | The water laid on it, or `null` for a dry world: `level`, the sea's one height, or `null` where there is no sea, and `line`, a `Float32Array` of one height per vertex - the line the water at that vertex rests at, `NaN` where it is dry |
 
 ## The day
 
@@ -1567,9 +1588,11 @@ a paused world paused.
 
 Water is the one part of the ground that moves and the one part that shines. The
 surface a world settled at is read off the finished field - the vertices lying at
-or under the level the water was laid at - and moved from there, so ground the
+or under their own water line: the sea's level wherever the sea reaches, and a
+drawn body's own line where one was drawn - and moved from there, so ground the
 water no longer has, a strip graded over a shallow or a town levelled onto a
-shore, is not still being moved as though it were.
+shore, is not still being moved as though it were, and a valley beside a pond
+drawn on a hill is not water for lying under the pond.
 
 | Export | Is |
 |--------|-----|
