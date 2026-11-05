@@ -20,6 +20,7 @@ import { cardThumbnail } from '../js/build-picker.js';
 import { BUILDER_ENVIRONMENTS } from '../js/environment/presets.js';
 import { PALETTE_FOLD_MARK } from '../js/build-palette.js';
 import { BUILDER_ASSETS, TARGET } from '../tools/sync-builder-assets.mjs';
+import { LASSO_ART } from '../js/lasso.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = path => readFileSync(join(ROOT, path), 'utf8');
@@ -83,6 +84,8 @@ test('the copy step\'s list and the repository agree', () => {
         assert.ok(targets.includes(cardThumbnail(environment.id)), `${environment.id}'s thumbnail is on the list`);
     }
     assert.ok(targets.includes(PALETTE_FOLD_MARK));
+    assert.ok(targets.includes(LASSO_ART), 'and the panel the lasso cuts its tools\' icons from');
+    assert.ok(tracked.has(LASSO_ART));
     assert.equal(new Set(Object.values(BUILDER_ASSETS)).size, targets.length, 'and no source is copied twice');
 });
 

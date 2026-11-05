@@ -264,3 +264,162 @@ function fillHead(ctx, from, to, colour, lit) {
         ctx.stroke();
     }
 }
+
+// --- A region's own edge: the selection, and a shape being drawn --------------
+
+/**
+ * How far apart, in world units, the points of a region's edge are stood on
+ * the ground: near enough that a side of a box crossing a hill goes over it
+ * rather than through it.
+ */
+export const PATH_STEP = 120;
+
+/** The selection: a dashed white line lying on the ground, which is how the artwork marks one. */
+export const SELECTION_OUTLINE = Object.freeze({
+    width: 2,
+    colour: '#ffffff',
+    dash: Object.freeze([10, 7]),
+    under: Object.freeze({ width: 4, colour: 'rgba(6, 29, 67, 0.5)' })
+});
+
+/** A shape as it is being drawn, before it is let go of: a solid line in the lasso art's blue. */
+export const DRAWING_OUTLINE = Object.freeze({
+    width: 2,
+    colour: '#87ceeb',
+    under: Object.freeze({ width: 4, colour: 'rgba(6, 29, 67, 0.5)' })
+});
+
+/**
+ * A region's edge as one closed loop of `[x, z]` points in the canvas's frame,
+ * traced from what it is rather than contoured from its weight: the corners of
+ * a ring, a box's sides with its corners rounded, an ellipse or a disc sampled
+ * round. Its weight is zero exactly here, which is where a drop inside it stops
+ * being allowed. Empty for a footprint that is not a region.
+ */
+export function footprintLoop(footprint) {
+    if (footprint == null) return [];
+    const turn = (x, z, angle = 0) => [x * Math.cos(angle) - z * Math.sin(angle), x * Math.sin(angle) + z * Math.cos(angle)];
+    const around = (count, at) => Array.from({ length: count }, (_, i) => at((i / count) * Math.PI * 2));
+
+    switch (footprint.kind) {
+        case 'ring': {
+            const points = (footprint.points ?? []).filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+            return points.length >= 3 ? points.map(([x, z]) => [x, z]) : [];
+        }
+        case 'disc': {
+            const { x = 0, z = 0, radius = 0 } = footprint;
+            return radius > 0 ? around(64, t => [x + Math.cos(t) * radius, z + Math.sin(t) * radius]) : [];
+        }
+        case 'ellipse': {
+            const { x = 0, z = 0, radiusX = 0, radiusZ = 0, angle = 0 } = footprint;
+            if (!(radiusX > 0) || !(radiusZ > 0)) return [];
+            return around(72, t => {
+                const [dx, dz] = turn(Math.cos(t) * radiusX, Math.sin(t) * radiusZ, angle);
+                return [x + dx, z + dz];
+            });
+        }
+        case 'rect': {
+            const { x = 0, z = 0, width = 0, depth = 0, angle = 0 } = footprint;
+            if (!(width > 0) || !(depth > 0)) return [];
+            const hx = width / 2, hz = depth / 2;
+            const corner = Math.min(Math.max(Number(footprint.corner) || 0, 0), hx, hz);
+            const loop = [];
+            // Each corner's arc, from its centre inset by the corner's radius;
+            // a corner of nothing is the corner itself.
+            const corners = [[hx, hz, 0], [-hx, hz, Math.PI / 2], [-hx, -hz, Math.PI], [hx, -hz, Math.PI * 1.5]];
+            for (const [cx, cz, from] of corners) {
+                const ox = cx - Math.sign(cx) * corner;
+                const oz = cz - Math.sign(cz) * corner;
+                const steps = corner > 0 ? 8 : 0;
+                for (let i = 0; i <= steps; i++) {
+                    const t = from + (i / Math.max(steps, 1)) * (Math.PI / 2);
+                    const [dx, dz] = turn(ox + Math.cos(t) * corner, oz + Math.sin(t) * corner, angle);
+                    loop.push([x + dx, z + dz]);
+                }
+            }
+            return loop;
+        }
+        default:
+            return [];
+    }
+}
+
+/**
+ * A run of points with more put in between, so no two that follow each other
+ * are further apart than `step` - which is what lets the run be stood on the
+ * ground point by point and lie over a hill rather than cut through it.
+ * `closed` runs on from the last point back to the first.
+ */
+export function subdividePath(points, step = PATH_STEP, closed = false) {
+    const out = [];
+    const count = points?.length ?? 0;
+    const legs = closed ? count : count - 1;
+    for (let i = 0; i < legs; i++) {
+        const [x1, z1] = points[i];
+        const [x2, z2] = points[(i + 1) % count];
+        const pieces = Math.max(1, Math.ceil(Math.hypot(x2 - x1, z2 - z1) / step));
+        for (let j = 0; j < pieces; j++) out.push([x1 + (x2 - x1) * j / pieces, z1 + (z2 - z1) * j / pieces]);
+    }
+    if (count > 0) out.push(closed ? [...points[0]] : [...points[count - 1]]);
+    return out;
+}
+
+/**
+ * The pieces of a run that lie on a canvas `size` wide, wherever it repeats:
+ * the run itself and its eight neighbours a canvas width away, each cut where
+ * it leaves the square - so a region drawn over an edge is drawn carrying on
+ * across the opposite one, as the ground it reaches does.
+ */
+export function canvasPieces(points, size = 0) {
+    if (!(size > 0) || !points?.length) return points?.length ? [points] : [];
+    const half = size / 2;
+    const inside = ([x, z]) => x >= -half && x <= half && z >= -half && z <= half;
+    const pieces = [];
+
+    for (const i of [-1, 0, 1]) {
+        for (const j of [-1, 0, 1]) {
+            let run = [];
+            for (const [x, z] of points) {
+                const shifted = [x + i * size, z + j * size];
+                if (inside(shifted)) run.push(shifted);
+                else if (run.length) { if (run.length > 1) pieces.push(run); run = []; }
+            }
+            if (run.length > 1) pieces.push(run);
+        }
+    }
+    return pieces;
+}
+
+/**
+ * A run of canvas points as it falls on the screen: each stood on the ground
+ * and projected, and broken wherever one is out of view - `project` answers
+ * null for those - so a line is never drawn to somewhere it is not.
+ */
+export function projectPath(points, heightAt, project) {
+    const paths = [];
+    let run = [];
+    for (const [x, z] of points ?? []) {
+        const at = project(x, heightAt(x, z), z);
+        if (at) run.push(at);
+        else if (run.length) { if (run.length > 1) paths.push(run); run = []; }
+    }
+    if (run.length > 1) paths.push(run);
+    return paths;
+}
+
+/** Strokes screen paths in a style: its under-stroke, then itself, dashed where the style says. */
+export function strokePaths(ctx, paths, style) {
+    if (!paths?.length || style == null) return;
+    for (const pass of [style.under, style]) {
+        if (pass == null) continue;
+        ctx.setLineDash?.(pass === style && style.dash ? [...style.dash] : []);
+        ctx.lineWidth = pass.width;
+        ctx.strokeStyle = pass.colour;
+        ctx.beginPath();
+        for (const path of paths) {
+            path.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+        }
+        ctx.stroke();
+    }
+    ctx.setLineDash?.([]);
+}

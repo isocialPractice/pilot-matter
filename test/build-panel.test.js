@@ -82,7 +82,7 @@ test('an edit of an element no tool places yet is headed by the element', () => 
 
 test('a live tool with no panel yet shows nothing', () => {
     const state = onCanvas();
-    state.tool = 'lasso';
+    state.tool = 'grass';
     assert.equal(dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE) }), null);
 });
 

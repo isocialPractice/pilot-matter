@@ -22,9 +22,13 @@
 
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
-    pickedIndex, worldPlacements
+    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues
 } from './build-mode.js';
+import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import { BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues } from './build-tools.js';
+
+/** The palette's lasso tile, whose panel is its own ten tools rather than an element's ranges. */
+const LASSO_TOOL = 'lasso';
 import { cameraFieldRanges, readCameraFields, CAMERA_NUDGES } from './build-camera.js';
 import { panelRows, label } from './properties-panel.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
@@ -36,6 +40,12 @@ export const DOCK_DRAFT  = 'draft';
 
 /** A section of Select's panel holding one of the environment's own elements. */
 export const DOCK_WORLD  = 'world';
+
+/** What the dock shows with the lasso live: its tools, and the chosen one's fields. */
+export const DOCK_LASSO = 'lasso';
+
+/** The answer that drops the selection, there only while something is selected. */
+export const DOCK_DESELECT = Object.freeze({ id: 'deselect', label: 'DESELECT' });
 
 /** The id of the section holding the placement picked with Select. */
 export const PICK_SECTION = 'pick';
@@ -151,6 +161,8 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
         };
     }
 
+    if (buildModeTool(state) === LASSO_TOOL) return lassoContent(state, context);
+
     if (!select) return null;
 
     const ranges = cameraFieldRanges(camera);
@@ -190,6 +202,34 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
     });
 
     return content;
+}
+
+/**
+ * The lasso's panel: its tools in the rows the artwork groups them into - the
+ * ones that are built - with the chosen one lit, that tool's own fields under
+ * them, and `DESELECT` while a region is selected and not otherwise.
+ */
+function lassoContent(state, context) {
+    const chosen = buildLassoTool(state);
+    const ranges = lassoTool(chosen)?.ranges ?? {};
+    const holder = { config: lassoValues(state) };
+    return {
+        kind: DOCK_LASSO,
+        heading: LASSO_HEADING,
+        shapes: lassoRows().map(({ row, tools }) => ({
+            row,
+            tools: tools.map(tool => ({
+                id: tool.id, label: tool.label, name: lassoToolName(tool.id),
+                art: lassoToolArt(tool.id), live: tool.id === chosen
+            }))
+        })),
+        ranges,
+        holder,
+        rows: panelRows(ranges, holder, context),
+        nudges: [],
+        actions: selectionLive(state) ? [DOCK_DESELECT] : [],
+        sections: []
+    };
 }
 
 /** One section of the dock: a heading, the holder its rows write, and the rows - none while it is folded. */

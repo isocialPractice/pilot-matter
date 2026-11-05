@@ -5,6 +5,82 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.46.0] - 2026-11-04
+
+The lasso: a selection drawn on the ground, kept across tools until it is
+dropped, and a mountain dropped inside it cut at its edge.
+
+### Added
+
+- **Lasso mode.** `LASSO` joins the palette, and with it live the dock is
+  headed `LASSO SELECT TOOLS` and holds the lasso's own tools in the rows the
+  artwork groups them into - each its icon, cut from the art's panel, over its
+  name - with the chosen one ringed, its own fields under them, and `DESELECT`,
+  drawn as the art's pale blue pill, while something is selected and not
+  otherwise. The art declares ten tools; a tool is drawn once the kind of
+  region it draws can be drawn, so five are on the panel today - Free,
+  Rectangle, Ellipse, Round Rect. and Polyline Select - and Triangle, Star,
+  Polygon and the two curved tools join with the regular figures and the
+  curves they draw.
+- **Lasso shapes.** Every lasso tool is one of two gestures. A drag: Free
+  Select gathers the ground the pointer is drawn round into a ring, Rectangle
+  and Round Rect. Select span a box from where the drag began to where it is
+  let go, square to the canvas, the second with its corners rounded by its
+  `CORNER`, and Ellipse Select fills that box. A click per vertex: Polyline
+  Select places a point a click and closes when its first point is clicked
+  again or its last is double clicked. A shape is outlined on the ground as it
+  would come out while it is drawn; `Esc`, a tool change or a question lets go
+  of it. A drag that never travelled past a click, a ring of fewer than three
+  points or of no area, and a stray double click make no selection.
+- **The active selection.** What the lasso draws is the selection - not a
+  placement, and kept by nothing, but session state that outlives the tool
+  that drew it. It lies on the ground as a dashed white line, followed over
+  the hills and carried across the canvas's seams, whatever tool is live; a new
+  shape replaces it, and only `DESELECT` drops it. Being no edit, it asks
+  nothing as it is drawn or dropped, and leaving with one asks only whether to
+  save.
+- **Clipping to a selection.** A mountain dropped while a selection is live
+  carries the selection as it stood, as a `clip`, and is drawn at its own
+  height times the selection's weight: whole inside, cut away outside, and
+  eased down across the selection's feathered edge. A click outside the
+  selection drops nothing, since all of it would be cut away, and Select finds
+  a clipped mountain only where it stands. A placement may carry a `clip` of
+  any footprint kind - see the API reference - and one without is drawn as
+  before.
+- **The control list** carries `Drag (Lasso) - Draw a Selection` and
+  `Click (Lasso) - Place a Point, Double Click to Close`.
+
+Held in Node by the new `test/lasso.test.js` - the ten tools in the art's rows,
+the plan's table of kinds and gestures, which are built, each icon's box on
+the art, every gesture's region and every way it is refused, and the closing
+rules of a click per vertex - and the new `test/selection.test.js` - the
+selection replaced, kept across tools, dropped only by a deselect, asking
+nothing, the lasso's tools and fields, the clip attached and copied, a drop
+outside refused, the clipped ground equal to the mountain's rise times the
+selection's weight at every vertex, a clip and a footprint weighing together,
+the clipped reach, the traced edge weighing nothing, its subdivision and its
+seams, and the lasso's panel - with `test/page.test.js` for the wiring. Each
+rejected the defect it names when that was put back, forty-one in all: among
+them a tool drawn before its kind can be read, a ring keeping points on one
+another or of no area, a box sitting on its press, a rounded box rounding past
+half its side, an ellipse twice its box, two points closing a shape, a point
+clicked again placed again, a tool change dropping the selection, a drop
+outside allowed, a mountain not clipped, a selection asking `ACCEPT EDITS`, a
+clip ignored or replacing the footprint, a clipped mountain picked where it
+was cut away, an edge not stood on the ground or not carried across the seam,
+the selection drawn solid or only with the lasso live, a slip making a
+selection, a closing double click starting a shape, and `Esc` or a tool change
+keeping a shape half drawn. Settled in Chromium in 22 checks across a desktop
+and a phone: the lasso's mark and its five icons loading, a box, an ellipse, a
+free ring and a polyline closed both ways each making the selection, a slip
+making none, `Esc` letting go of a polyline, a rounded box taking its corner,
+the selection dashed on the ground and kept into Mountain, a click outside it
+dropping nothing, a mountain inside it standing 1199 above the ground within
+and nothing beyond, Select picking it only where it stands, `Esc` asking only
+to save, `DESELECT` dropping it and its line, the flight kept with the clip -
+equal to the canvas but where its runway grades the ground - and a finger
+dragging a box.
+
 ## [1.0.0-alpha.1.45.0] - 2026-11-04
 
 The builder in its own art: the marks, the folded palette's tab and the

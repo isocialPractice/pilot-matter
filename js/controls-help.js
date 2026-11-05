@@ -95,8 +95,9 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  * four controls of two keys each, and reads `W/A/S/D or ↑/←/↓/→`.
  *
  * A row's `click` is the tool whose own click on the ground the row is, listed
- * while that tool is built. A row with `handle` is a drag of the gumball on
- * the edit in hand, which every tool answers to. An input one tool answers to and the rest do not
+ * while that tool is built, and its `drag` the tool's own drag on the ground. A
+ * row with `handle` is a drag of the gumball on the edit in hand, which every
+ * tool answers to. An input one tool answers to and the rest do not
  * is named with that tool, so a drag that orbits in Select and does nothing
  * with Mountain live says so on the line rather than leaving it to be found.
  *
@@ -115,6 +116,10 @@ export const BUILD_HELP_ROWS = Object.freeze([
     },
     { id: 'reframe', label: 'Reframe',           keys: [REFRAME_KEYS] },
     { id: 'pick',    label: 'Pick a Built Element', click: SELECT_TOOL },
+    ...(isBuiltTool('lasso') ? [
+        { id: 'lasso-draw',  label: 'Draw a Selection', drag: 'lasso' },
+        { id: 'lasso-point', label: 'Place a Point, Double Click to Close', click: 'lasso' }
+    ] : []),
     ...(isBuiltTool('mountain') ? [{ id: 'drop', label: 'Drop a Mountain', click: 'mountain' }] : []),
     { id: 'handle',  label: 'Move or Shape What Is in Hand', handle: true },
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
@@ -158,6 +163,7 @@ export function buildHelpLines() {
         const input = row.keys ? keysText(row.keys)
             : row.presses ? pressText(row.presses)
             : row.click ? `Click${forTools([row.click])}`
+            : row.drag ? `Drag${forTools([row.drag])}`
             : row.handle ? 'Drag a Handle'
             : 'Wheel';
         return { id: row.id, text: `${input} - ${row.label}` };

@@ -31,9 +31,10 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is Select, Mountain and the way out, and nothing else', () => {
-    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'mountain', ACCEPT_TOOL]);
+test('today the palette is Select, Lasso, Mountain and the way out, and nothing else', () => {
+    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', ACCEPT_TOOL]);
     assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');
+    assert.equal(isChoosableTool('lasso'), true, 'and so is the lasso, which draws the selection');
 });
 
 // --- Mountain drops at a click --------------------------------------------------
@@ -89,7 +90,7 @@ test('the way out is drawn but is never the tool a canvas is worked with', () =>
     assert.equal(isBuiltTool(ACCEPT_TOOL), true);
     assert.equal(isChoosableTool(ACCEPT_TOOL), false);
     assert.equal(isChoosableTool(SELECT_TOOL), true);
-    assert.equal(isChoosableTool('lasso'), false, 'and an unbuilt tool cannot be chosen either');
+    assert.equal(isChoosableTool('grass'), false, 'and an unbuilt tool cannot be chosen either');
 });
 
 test('the declarations cannot be rewritten by whoever reads them', () => {

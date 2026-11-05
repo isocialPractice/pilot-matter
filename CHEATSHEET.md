@@ -243,6 +243,8 @@ back.
 | Click, or a finger, in Mountain | Drop a mountain there, or put the one in hand down there instead |
 | Drag a gumball handle | Move, slide, raise or spread what is in hand, whatever tool is live |
 | The chevrons atop the palette | Fold the tools away to a tab, and bring them back; kept for the next canvas |
+| Drag, or a finger, in Lasso | Draw a selection with the chosen lasso tool - Free, Rectangle, Ellipse or Round Rect. |
+| Click in Lasso, with Polyline | Place a point; click the first one again, or double click, to close the shape |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
@@ -267,6 +269,12 @@ In Select, the placement under the pointer is outlined in white and the one
 picked, or dropped and in hand, in blue. A press that travels more than a few
 pixels orbits and picks nothing. A pick changed on the dock asks `ACCEPT EDITS`
 before it is let go; one left as it was asks nothing.
+
+The lasso's panel is its tools in the art's rows, and `DESELECT` while
+something is selected. The selection is a dashed white line on the ground that
+stays across tool changes until `DESELECT` drops it. A mountain dropped inside
+it is cut at its edge, and a click outside it drops nothing. A selection is not
+an edit, so leaving with one asks only whether to save.
 
 What is in hand carries the gumball, in the art's colours: red east, green
 north, blue up. The white centre moves it over the ground, the red and green

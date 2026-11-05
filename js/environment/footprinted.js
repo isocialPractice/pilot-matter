@@ -58,13 +58,22 @@ import { footprintSampler } from './footprints.js';
  * A placement carrying a `seed` draws from a stream of its own rather than from
  * `random` - see `placementRandom`.
  *
+ * A placement carrying a `clip` - the selection a tool that minds the lasso was
+ * drawn inside - is weighed by it as well: its footprint's weight times the
+ * clip's, or the clip's alone for a placement with no footprint of its own. An
+ * intersection by multiplying two weights, so a clipped edge stays soft
+ * wherever either region's edge was soft, and a placement with no clip costs
+ * nothing for the clips other placements carry.
+ *
  * Returns whatever the element's generator counted, as `applyElement` does.
  */
 export function applyFootprintedElement(field, placement, random = createRandom()) {
     random = placementRandom(placement, random);
-    if (placement?.footprint == null) return applyElement(field, placement, random);
+    if (placement?.footprint == null && placement?.clip == null) return applyElement(field, placement, random);
 
-    const weigh = footprintSampler(placement.footprint, field.size);
+    const region = placement.footprint != null ? footprintSampler(placement.footprint, field.size) : null;
+    const clip   = placement.clip != null ? footprintSampler(placement.clip, field.size) : null;
+    const weigh  = (x, z) => (region ? region(x, z) : 1) * (clip ? clip(x, z) : 1);
     const draft = cloneField(field);
     const strips = field.runways.length;
 

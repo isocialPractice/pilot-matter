@@ -3602,8 +3602,8 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*return;\s*\}/,
-        'and a plain press of the main button is a tool\'s that drops at a click');
+    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && !e\.shiftKey && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);\s*return;\s*\}/,
+        'and a plain press of the main button is a tool\'s that drops at a click, or the lasso\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
 
@@ -3620,14 +3620,14 @@ test('a finger on a canvas is a gesture and not a scroll, and only on a canvas',
 // where it is rather than the builder being left from under it.
 test('Escape ends a drag before it asks to leave', () => {
     const keyed = methodBody(mainSource, 'onBuilderKey');
-    const ends  = keyed.indexOf('if ((this.canvasDrag || this.gumballDrag) && isCanvasLeaveKey(e.code))');
+    const ends  = keyed.indexOf('if ((this.canvasDrag || this.gumballDrag || this.lassoDrawing) && isCanvasLeaveKey(e.code))');
     const leave = keyed.indexOf('leavesBuilder(this.builder');
 
     assert.ok(ends >= 0, 'the builder should end a drag on the leave key');
     assert.ok(ends < leave, 'ahead of the way out');
     assert.match(keyed.slice(ends),
-        /^if \(\(this\.canvasDrag \|\| this\.gumballDrag\) && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*return;/,
-        'the view\'s drag and a handle\'s alike');
+        /^if \(\(this\.canvasDrag \|\| this\.gumballDrag \|\| this\.lassoDrawing\) && isCanvasLeaveKey\(e\.code\)\) \{\s*this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelLasso\(\);\s*return;/,
+        'the view\'s drag, a handle\'s and a shape half drawn alike');
 });
 
 test('a held key moves the view by the frame, and leaving lets go of it', () => {
@@ -3813,7 +3813,7 @@ test('an open confirm takes every key before anything on the canvas reads one', 
 test('a confirm opens on YES with the focus, and a press off it calls it off', () => {
     const opened = methodBody(mainSource, 'confirmOpened');
     assert.match(opened, /resetSelection\(this\.confirmState\);/);
-    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view, or a handle, behind it');
+    assert.match(opened, /this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelLasso\(\);\s*this\.buildKeys\.clear\(\);/, 'with nothing still moving the view, a handle or a shape, behind it');
     assert.match(opened, /this\.overlays\.confirmPanel\.focus\(\{ preventScroll: true \}\);/,
         'so Enter answers it rather than pressing the tile last clicked');
 
@@ -3843,14 +3843,15 @@ test('an answer leaves, keeping the built world on YES, or settles the edit and 
 
 test('a click with a tool that drops picks the ground and drops there', () => {
     const drop = methodBody(mainSource, 'dropAt');
-    assert.match(drop, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);\s*if \(!point \|\| !dropDraft\(this\.builder, point\)\) return;/);
+    assert.match(drop, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);\s*if \(!point \|\| !dropDraft\(this\.builder, point, \{ size: this\.terrain\.size \}\)\) return;/,
+        'with the canvas\'s width, which a selection it is clipped to repeats at');
     assert.match(drop, /this\.redrawCanvas\(\);\s*this\.syncOverlays\(\);/, 'and the ground is drawn with it');
     assert.match(methodBody(mainSource, 'syncOverlays'),
         /this\.renderer\.domElement\.style\.cursor = canvas \? this\.canvasCursor\(\) : '';/,
         'over ground marked as somewhere to click');
     assert.match(methodBody(mainSource, 'canvasCursor'),
-        /if \(dropsAtClick\(buildModeTool\(this\.builder\)\)\) return 'crosshair';/,
-        'which is a crosshair for a tool that drops');
+        /const tool = buildModeTool\(this\.builder\);\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL\) return 'crosshair';/,
+        'which is a crosshair for a tool that drops, and for the lasso, which draws on it');
 });
 
 // --- Picking a built element, and the outline over it ---------------------------
@@ -4172,4 +4173,93 @@ test('on a narrow screen the control list lies beside the palette, clear of ever
     assert.ok(beside, 'the narrow screen\'s rule puts the list up at the top, beside the palette');
     assert.ok(px(beside.body, 'left') > right, `starting past the palette's right edge at ${right}: ${px(beside.body, 'left')}`);
     assert.match(beside.body, /overflow-y:\s*auto;/, 'and scrolling rather than running down into the dock');
+});
+
+// --- The lasso, the selection and the clip -------------------------------------------
+
+test('a drag with the lasso draws a shape, and only letting go of it makes the selection', () => {
+    const press = methodBody(mainSource, 'lassoPress');
+    assert.match(press, /const ground = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);/);
+    assert.match(press, /if \(ground == null\) return;\s*this\.renderer\.domElement\.setPointerCapture\(e\.pointerId\);/,
+        'a drag begun over the sky begins nothing, and one begun on the ground keeps the pointer');
+
+    const drag = methodBody(mainSource, 'dragLasso');
+    assert.match(drag, /if \(Math\.hypot\(screen\.x - drawing\.last\.x, screen\.y - drawing\.last\.y\) < LASSO_SAMPLE_PIXELS\) return;/,
+        'a free shape gathers a point every few pixels it travels');
+    assert.match(drag, /drawing\.points = \[drawing\.points\[0\], ground\];/, 'a box spans from the press to the pointer');
+
+    const release = methodBody(mainSource, 'onCanvasRelease');
+    assert.match(release, /if \(e\.type === 'pointerup' && drawn\.travelled\) this\.finishLasso\(drawn\.tool, drawn\.points\);/,
+        'cancelled or taken away, a drag makes no selection - and nor does one that never travelled past a click');
+
+    // Found in Chromium: with the camera far off, a three-pixel slip spans
+    // more ground than the least region measures, so a box was selected by
+    // it. A drag keeps the rule every press keeps, in screen pixels.
+    assert.match(drag, /if \(!drawing\.travelled\) \{\s*if \(!travelledPast\(drawing\.start, screen, drawing\.type\)\) return;\s*drawing\.travelled = true;\s*\}/,
+        'a drag gathers nothing until it has travelled further than a click may');
+    assert.ok(drag.indexOf('travelledPast(') < drag.indexOf('this.pickCanvasPoint('), 'before the ground is even read');
+
+    const finish = methodBody(mainSource, 'finishLasso');
+    assert.match(finish, /const footprint = lassoFootprint\(tool, points, lassoValues\(this\.builder\)\);\s*if \(footprint\) setSelection\(this\.builder, footprint\);/);
+});
+
+test('a click-per-vertex tool places a point a click, and closes on the first or the last again', () => {
+    const press = methodBody(mainSource, 'lassoPress');
+    assert.match(press, /const shape = clickVertex\(drawing, ground, screen\);\s*if \(shape\.closed\) \{\s*this\.cancelLasso\(\);\s*this\.lassoClosed = [^;]+;\s*this\.finishLasso\(tool\.id, shape\.points\);/);
+    assert.match(press, /const drawing = this\.lassoDrawing\?\.tool === tool\.id \? this\.lassoDrawing : null;/,
+        'a shape half drawn with another tool is not carried on with this one');
+});
+
+test('a shape half drawn is let go by Escape, a tool change, a question and leaving', () => {
+    assert.match(methodBody(mainSource, 'onBuilderKey'), /this\.cancelLasso\(\);\s*return;/);
+    assert.match(methodBody(mainSource, 'onPaletteClick'), /if \(buildModeTool\(this\.builder\) !== LASSO_PALETTE_TOOL\) this\.cancelLasso\(\);/);
+    assert.match(methodBody(mainSource, 'confirmOpened'), /this\.cancelLasso\(\);/);
+    assert.match(methodBody(mainSource, 'leaveBuilder'), /this\.cancelLasso\(\);/);
+    assert.match(methodBody(mainSource, 'onDockShape'), /if \(!chooseLassoTool\(this\.builder, id\)\) return;\s*this\.cancelLasso\(\);/);
+});
+
+test('the selection is drawn dashed on the ground whatever tool is live, and the shape being drawn solid', () => {
+    const draw = methodBody(mainSource, 'drawBuildOverlay');
+    assert.match(draw, /if \(selection\) strokePaths\(ctx, this\.screenRegion\(footprintLoop\(selection\), true, width, height\), SELECTION_OUTLINE\);/);
+    assert.match(draw, /if \(drawing\) strokePaths\(ctx, this\.screenRegion\(drawing\.points, drawing\.closed, width, height\), DRAWING_OUTLINE\);/);
+    assert.ok(draw.indexOf('SELECTION_OUTLINE') < draw.indexOf('HOVER_OUTLINE'), 'under the outlines and the gumball');
+
+    const region = methodBody(mainSource, 'screenRegion');
+    assert.match(region, /canvasPieces\(subdividePath\(points, PATH_STEP, closed\), this\.terrain\.size\)/,
+        'stood on the ground every few metres, and carried across the seams');
+    assert.match(region, /this\.terrain\.getTerrainHeightAt\(x, z\)/);
+});
+
+test('the lasso\'s panel picks its tool, keeps its fields, and drops the selection', () => {
+    assert.match(mainSource, /onShape: +\(id\) => this\.onDockShape\(id\)/);
+    assert.match(methodBody(mainSource, 'applyDockValue'), /if \(kind === DOCK_LASSO\) \{\s*setLassoValues\(this\.builder, holder\.config\);/);
+    assert.match(methodBody(mainSource, 'onDockAction'), /if \(id === DOCK_DESELECT\.id\) \{\s*if \(deselect\(this\.builder\)\) this\.syncOverlays\(\);\s*return;/);
+    assert.match(panelViewSource, /if \(button\.dataset\.shape\) \{\s*this\.handlers\.onShape\?\.\(button\.dataset\.shape\);/);
+    assert.match(panelViewSource, /mark\.src = tool\.art;\s*mark\.alt = '';/, 'each tile its icon cut from the art, its name beside it');
+});
+
+test('a press with the lasso draws, never orbits, and the cursor says so', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /else if \(e\.button === 0 && !e\.shiftKey && tool === LASSO_PALETTE_TOOL\) this\.lassoPress\(e\);/);
+    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL\) return 'crosshair';/);
+});
+
+test('the lasso\'s tiles and its deselect are drawn as the artwork draws them', () => {
+    assert.ok(styled(indexHtml, '.dock-action[data-action="deselect"]', /background:\s*#87ceeb;/), 'a pale blue pill');
+    assert.ok(styled(indexHtml, '.dock-shape', /background:\s*#061d43;/), 'tiles on the art\'s navy');
+    assert.ok(styled(indexHtml, '.dock-shape[aria-pressed="true"]', /box-shadow:\s*0 0 0 3px #90c090;/), 'the chosen one ringed in its green');
+    assert.ok(styled(indexHtml, '.dock-shape img', /object-fit:\s*contain;/), 'each icon kept to its own box');
+});
+
+/**
+ * Found in Chromium: the double click that closes a click-per-vertex shape is
+ * two presses, and the second, landing after the shape was closed, began the
+ * next one. It is swallowed as the rest of the same double click.
+ */
+test('the second press of the double click that closed a shape starts nothing', () => {
+    const press = methodBody(mainSource, 'lassoPress');
+    assert.ok(press.indexOf('const closed = this.lassoClosed;') < press.indexOf('clickVertex('), 'asked before a point is placed');
+    assert.match(press, /closed && performance\.now\(\) - closed\.time < DOUBLE_CLICK_MS\s*&& Math\.hypot\(screen\.x - closed\.x, screen\.y - closed\.y\) <= CLOSE_PIXELS\) return;/);
+    assert.match(press, /this\.lassoClosed = \{ \.\.\.screen, time: performance\.now\(\) \};/, 'remembered as the shape closes');
+    assert.match(mainSource, /const DOUBLE_CLICK_MS = \d+;/);
 });

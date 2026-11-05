@@ -1323,6 +1323,23 @@ a range: it has no bounds and no row on a panel, and no preset uses it.
 }
 ```
 
+A placement may also carry a `clip`: a second footprint, of any of the kinds
+above, that it is drawn inside as well. Its weight multiplies the placement's
+own - the footprint's where it has one, everything where it has none - so the
+element is drawn where both reach and eased out across whichever edge is
+softer. It is what the builder's lasso writes onto a tool that minds the
+selection, and a placement without one is drawn as it always was.
+
+```js
+{
+    type: 'mountain',
+    config: { at: [0, 0], height: [800, 800], radius: [3000, 3000] },
+    seed: 7,
+    // A wide peak cut to a square of ground around its top.
+    clip: { kind: 'rect', x: 0, z: 0, width: 4000, depth: 4000, angle: 0, corner: 0 }
+}
+```
+
 Every range an element declares says which of six kinds it is, which is what a
 host reading `ELEMENTS` has to branch on and what a value handed to
 `resolveConfig` is read as:

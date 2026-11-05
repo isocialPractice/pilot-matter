@@ -11,20 +11,35 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
-  groups them into, with the chosen tool's own fields under it and a deselect
-  that is there only while something is selected
+- [ ] **Parametric shapes**: a regular figure held as its centre, radius, sides
+  and star ratio, so changing the number of sides reshapes what was drawn
+  instead of asking for it again
+  - **The tools are waiting for the kind.** Since `1.0.0-alpha.1.46.0`
+    Triangle, Star and Polygon Select are declared in `js/lasso.js` with their
+    row and their art, drawing a `polygon`, and `lassoToolBuilt` puts them on
+    the lasso's panel the moment `js/environment/footprints.js` can read that
+    kind. This item is that kind, `lassoFootprint`'s case for it, and Polygon
+    Select's `Number of Sides` field.
   - From: Interactive Build Mode
-- [ ] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
-  two input gestures - a drag for the shapes and a click per vertex for the
-  polylines and curves - rather than ten handlers
+- [ ] **Curved selections**: a boundary of curve segments, flattened once per
+  pass rather than once per vertex, with the control points kept so the curve
+  stays editable
+  - **The gesture is there.** Since `1.0.0-alpha.1.46.0` the click-per-vertex
+    gesture - `clickVertex` in `js/lasso.js`, closed by the first point or a
+    double click - draws Polyline Select's ring, and the two curved tools are
+    declared drawing a `path`, joining the panel once that kind can be read.
   - From: Interactive Build Mode
-- [ ] **The active selection**: session state drawn as a dashed outline lying on
-  the ground, surviving a tool change and cleared only by deselect
+- [ ] **Drawing against a selection**: a shape added to it with `shift`, cut out
+  of it with `alt`, or drawn inside it with neither, read once at the press, so
+  every tool that minds the lasso shares one rule for combining with it
+  - **Until then a new shape replaces the selection.** Since
+    `1.0.0-alpha.1.46.0` `setSelection` puts a new lasso in place of the old,
+    and a clipped tool multiplies by the selection through `clip`; the ops
+    this item adds combine regions before they become the selection.
   - From: Interactive Build Mode
-- [ ] **Clipping to a selection**: the product of the tool's weight and the
-  lasso's, so a clipped edge keeps both feathers and a tool that does not mind
-  the lasso costs nothing
+- [ ] **Shift at the press, shift in the drag**: the key that adds a shape to a
+  selection when it is held at the press, and keeps the shape square or round
+  when it is pressed after the drag has begun
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -94,26 +109,29 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
-  groups them into, with the chosen tool's own fields under it and a deselect
-  that is there only while something is selected
-- [ ] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
-  two input gestures - a drag for the shapes and a click per vertex for the
-  polylines and curves - rather than ten handlers
 - [ ] **Parametric shapes**: a regular figure held as its centre, radius, sides
   and star ratio, so changing the number of sides reshapes what was drawn
   instead of asking for it again
+  - **The tools are waiting for the kind.** Since `1.0.0-alpha.1.46.0`
+    Triangle, Star and Polygon Select are declared in `js/lasso.js` with their
+    row and their art, drawing a `polygon`, and `lassoToolBuilt` puts them on
+    the lasso's panel the moment `js/environment/footprints.js` can read that
+    kind. This item is that kind, `lassoFootprint`'s case for it, and Polygon
+    Select's `Number of Sides` field.
 - [ ] **Curved selections**: a boundary of curve segments, flattened once per
   pass rather than once per vertex, with the control points kept so the curve
   stays editable
-- [ ] **Clipping to a selection**: the product of the tool's weight and the
-  lasso's, so a clipped edge keeps both feathers and a tool that does not mind
-  the lasso costs nothing
-- [ ] **The active selection**: session state drawn as a dashed outline lying on
-  the ground, surviving a tool change and cleared only by deselect
+  - **The gesture is there.** Since `1.0.0-alpha.1.46.0` the click-per-vertex
+    gesture - `clickVertex` in `js/lasso.js`, closed by the first point or a
+    double click - draws Polyline Select's ring, and the two curved tools are
+    declared drawing a `path`, joining the panel once that kind can be read.
 - [ ] **Drawing against a selection**: a shape added to it with `shift`, cut out
   of it with `alt`, or drawn inside it with neither, read once at the press, so
   every tool that minds the lasso shares one rule for combining with it
+  - **Until then a new shape replaces the selection.** Since
+    `1.0.0-alpha.1.46.0` `setSelection` puts a new lasso in place of the old,
+    and a clipped tool multiplies by the selection through `clip`; the ops
+    this item adds combine regions before they become the selection.
 - [ ] **Shift at the press, shift in the drag**: the key that adds a shape to a
   selection when it is held at the press, and keeps the shape square or round
   when it is pressed after the drag has begun
@@ -179,6 +197,10 @@ the order the work unblocks itself in.
 - [ ] **Deselect from anywhere**: the panel row every tool gets while a
   selection exists, and a right click on the selection itself, both going
   through the same place
+  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
+    the lasso's panel while something is selected, through `deselect` in
+    `js/build-mode.js`; this item puts the same answer on every tool's panel
+    and on a right click on the selection.
 - [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
   elements laid before it, any one element or all of them, preset or built, at a
   strength, and with `alt` held putting back what an earlier stroke took
@@ -304,61 +326,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 329 earlier items in `TODO-archive.md`, newest last.
+> 333 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **A tool change asks**: picking another tool with a draft pending asking
-  `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
-  discarding, and `Escape` staying where it was, so leaving a tool never decides
-  what happens to the work on it
-  - **Settled**: `chooseBuildTool` opens `ACCEPT EDITS` with the tool held in
-    the question, and `answerConfirm` changes it once answered. While a question
-    is open no tile, click or key behind it changes anything.
-  - From: Interactive Build Mode
-- [x] **Back to the built world**: the builder reopening straight onto what was
-  built rather than on the picker, with every earlier batch still a placement
-  that can be picked up and changed
-  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
-    environment a session kept opens with what it kept already committed -
-    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
-    second save keeps the first one's work. What is left is reopening straight
-    onto it rather than through the picker.
-  - **Settled**: `openBuildMode` takes the built world `builtWorld` in
-    `js/element-editor.js` hands it and opens on its canvas with every
-    placement committed, so `L` and both menus' entries skip the picker once a
-    build is kept. Starting over is choosing another world in the settings,
-    decided with the user on 11.04.2026 - it lets go of the build and the
-    picker is back. A build kept on Blank Canvas, which the settings cannot
-    name, was being flown over the settings' world; the editor now holds the
-    settings' choice apart from its own world, and `flownEnvironment` is what
-    a free flight is drawn on.
-  - From: Interactive Build Mode
-- [x] **Select a built element**: the placement under the pointer, found through
-  the footprints rather than off the scene because a built element has no mesh
-  to hit, with the one on top winning where two overlap, a click told from an
-  orbit by how far it travelled, and a click on bare ground dropping the pick
-  but never the lasso
-  - **Settled**: `placementAt` in the new `js/build-select.js` measures a click
-    against each placement's reach - a footprint's weight, or a dropped
-    mountain's peak read again through `mountainPeaks` from its own seed - the
-    strongest winning and `ELEMENT_ORDER` then the later committed breaking a
-    tie. A pick is `selectPlacement` in `js/build-mode.js`: the draft standing
-    on the placement, kept by a second click, let go on bare ground. A press is
-    a click within five pixels, ten for a finger, and the view does not turn
-    until it has gone further. A pick nothing was done to asks nothing when it
-    is let go; a changed one asks `ACCEPT EDITS` first. There is no lasso yet,
-    so nothing a click could drop.
-  - From: Interactive Build Mode
-- [x] **Selection highlight**: the hovered placement outlined lightly and the
-  chosen one firmly, on the overlay the lasso already draws on, so hovering and
-  picking rebuild no ground
-  - **Settled**: the overlay is new, `#build-overlay` drawn through
-    `js/build-overlay.js`, since the lasso that was to carry it is not built.
-    An outline is the placement's reach traced as a contour at the weight a
-    click needs, once per placement, and stood on the ground through the
-    camera every frame: white and thin for the hover, blue and firm for the
-    edit in hand, picked or dropped. Confirmed in Chromium off the layer's own
-    pixels.
-  - From: Interactive Build Mode
 - [x] **The gumball**: the two handle sets the artwork declares, one for
   elements with a height and one for those without, drawn at the placement's
   centre with its axes projected from the camera
@@ -443,4 +412,52 @@ how the simulator got here rather than as a list still to be worked.
     them back, by pointer, `Enter` or a finger. `js/build-palette.js` keeps the
     choice in storage, so the next canvas opens as the last was left; `Esc` and
     every key work the same either way.
+  - From: Interactive Build Mode
+- [x] **Lasso mode**: the sub-palette of ten shape tools in the rows the artwork
+  groups them into, with the chosen tool's own fields under it and a deselect
+  that is there only while something is selected
+  - **Settled**: `LASSO` joins the palette, and its dock is `LASSO SELECT
+    TOOLS` - the tools in the art's rows, each its icon cut from
+    `assets/builder/lasso-tools.svg` by a `#svgView` of its own box with its
+    name written in the page, the chosen one ringed, its fields under them
+    (Round Rect.'s `CORNER`), and `DESELECT` as the art's pale blue pill only
+    while something is selected. A tool is drawn once the kind it draws can be
+    read, so five of the ten are on the panel; the art's ten are declared in
+    `js/lasso.js` and the rest join with their kinds.
+  - From: Interactive Build Mode
+- [x] **Lasso shapes**: the ten tools resolving to the seven footprint kinds, by
+  two input gestures - a drag for the shapes and a click per vertex for the
+  polylines and curves - rather than ten handlers
+  - **Settled**: `LASSO_TOOLS` gives each of the ten its kind and its gesture,
+    as the plan's table has them, and `lassoFootprint` turns a gesture's ground
+    points into the region: Free a ring of what the drag gathered, Rectangle
+    and Round Rect. a box square to the canvas, Ellipse the box's ellipse, and
+    Polyline a ring a click, closed by its first point or a double click
+    through `clickVertex`. Two handlers in `js/main.js`, `lassoPress` and
+    `dragLasso`. A drag must travel past a click - found in Chromium, where a
+    slip three pixels wide spanned a region at that zoom - and the second press
+    of a closing double click starts nothing. Triangle, Star and Polygon are a
+    `polygon` and the curved two a `path`, which `Parametric shapes` and
+    `Curved selections` bring.
+  - From: Interactive Build Mode
+- [x] **The active selection**: session state drawn as a dashed outline lying on
+  the ground, surviving a tool change and cleared only by deselect
+  - **Settled**: `selection` on the session, set by `setSelection` - a new
+    shape replacing the last - and dropped by `deselect` alone, not by a tool
+    change; a new canvas starts with none. It is no edit: it asks nothing and
+    nothing keeps it. `footprintLoop` traces its edge from what it is, stood on
+    the ground every 120 units and carried across the seams by `canvasPieces`,
+    drawn as `SELECTION_OUTLINE`, a dashed white line, whatever tool is live;
+    a shape being drawn is drawn solid as it would come out.
+  - From: Interactive Build Mode
+- [x] **Clipping to a selection**: the product of the tool's weight and the
+  lasso's, so a clipped edge keeps both feathers and a tool that does not mind
+  the lasso costs nothing
+  - **Settled**: a placement may carry a `clip`, a footprint that
+    `applyFootprintedElement` multiplies with its own; `dropDraft` gives a tool
+    that minds the lasso the selection as it stands, and refuses a click
+    outside it. A placement with no clip is drawn as before. `placementReach`
+    multiplies the clip in too, so a clipped mountain is picked where it
+    stands. Confirmed in Chromium on the canvas and in the flight it was kept
+    for.
   - From: Interactive Build Mode

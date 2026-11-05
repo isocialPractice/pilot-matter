@@ -71,6 +71,11 @@ export const BUILDER_ASSETS = Object.freeze({
     // The palette folded away: the chevrons that bring it back.
     'palette-folded.svg': 'assets/ToolPanel-Hidden.svg',
 
+    // The lasso's sub-palette, whole: each tile's icon is cut from it by a
+    // view of its own box, so its ten single-tool exports - the same panel
+    // with one tile lit - are not shipped.
+    'lasso-tools.svg': 'assets/laso-mode-propertyPanelElements.svg',
+
     // One thumbnail a canvas, for the picker's cards.
     'thumb-highlands.png':      'support/thumbnail-highlands.png',
     'thumb-river-basin.png':    'support/thumbnail-riverBasin.png',

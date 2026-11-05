@@ -81,6 +81,9 @@ const NOWHERE = () => 0;
  *   drawn on, to the nearest repeat of the square - so a peak dropped by an
  *   edge is found across the seam where its slope carries on.
  * - **Both** reach where both do, which is where the ground was drawn.
+ * - **A clip** - the selection a tool that minds the lasso drew inside - is
+ *   multiplied in on top, so a mountain cut at a lasso's edge is found only
+ *   where it stands.
  *
  * `size` is the canvas's width, which the reach repeats at. A placement with
  * neither - a whole-world element, or one the registry does not hold - covers
@@ -95,9 +98,11 @@ export function placementReach(placement, size = 0) {
 
     const region = isFootprint(placement.footprint) ? footprintSampler(placement.footprint, size) : null;
     const point  = pointReach(placement, size);
+    const clip   = isFootprint(placement.clip) ? footprintSampler(placement.clip, size) : null;
 
-    if (region && point) return (x, z) => region(x, z) * point(x, z);
-    return region ?? point ?? NOWHERE;
+    const own = region && point ? (x, z) => region(x, z) * point(x, z) : region ?? point;
+    if (own == null) return NOWHERE;
+    return clip ? (x, z) => own(x, z) * clip(x, z) : own;
 }
 
 /** The reach of a mountain dropped at a point, or null for anything else. */

@@ -99,7 +99,7 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * The tools that work today. A tool is added here in the commit that makes it
  * work, and not before, so the palette never offers one that does nothing.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'mountain', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {

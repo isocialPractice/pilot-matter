@@ -20,8 +20,10 @@
  * opens on without pulling in a renderer to do it.
  */
 
-import { SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement } from './build-tools.js';
+import { SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso } from './build-tools.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
+import { footprintWeight } from './environment/footprints.js';
+import { DEFAULT_LASSO_TOOL, lassoTool, lassoToolBuilt, isSelection } from './lasso.js';
 
 /**
  * The one name, on the menu entry and on the picker that entry opens. A pilot
@@ -132,7 +134,17 @@ export function createBuildState() {
         toolValues: {},
         // How many placements this canvas has handed a seed, so each one it
         // drops draws from a stream of its own.
-        dropped: 0
+        dropped: 0,
+        // The region the lasso has drawn, and null while nothing is selected:
+        // a footprint in the canvas's frame. It is not a placement - nothing
+        // is built from it and nothing keeps it - but session state that
+        // outlives the tool that drew it, so a lasso drawn once is the region
+        // every tool that minds it works inside, until a deselect.
+        selection: null,
+        // Which of the lasso's ten tools is chosen, and where its fields were
+        // left.
+        lassoTool: DEFAULT_LASSO_TOOL,
+        lassoValues: {}
     };
 }
 
@@ -466,14 +478,24 @@ export function startDraft(state, placement, tool = null) {
  * drop, for a point that is not on the ground, and with an edit in hand that
  * this tool did not begin.
  *
+ * With a selection live, a tool that minds the lasso is clipped to it: the
+ * placement carries the selection as its `clip`, copied as it stands, and is
+ * drawn only where the selection reaches - so a mountain dropped inside a lasso
+ * is cut at the lasso's edge. A click outside the selection drops nothing,
+ * since all of what it dropped would be cut away. `size` is the canvas's
+ * width, which the selection repeats at.
+ *
  * Returns true when an edit was begun or moved.
  */
-export function dropDraft(state, point) {
+export function dropDraft(state, point, { size = 0 } = {}) {
     if (!buildModeDrawing(state) || confirmOpen(state)) return false;
 
     const tool      = buildTool(state.tool);
     const placement = droppedPlacement(tool, state.toolValues?.[tool?.id], point);
     if (placement == null) return false;
+
+    const clip = mindsLasso(tool.id) ? state.selection : null;
+    if (clip != null && !(footprintWeight(clip, point.x, point.z, size) > 0)) return false;
 
     if (draftPending(state)) {
         const draft = state.draft;
@@ -483,6 +505,7 @@ export function dropDraft(state, point) {
     }
 
     placement.seed = placementSeed(state.dropped);
+    if (clip != null) placement.clip = own(clip);
     if (!startDraft(state, placement, tool.id)) return false;
     state.dropped += 1;
     return true;
@@ -693,6 +716,10 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     // do not start from the same stream.
     state.toolValues = {};
     state.dropped = state.placements.length;
+    // A canvas opens with nothing selected and the lasso on its first tool.
+    state.selection = null;
+    state.lassoTool = DEFAULT_LASSO_TOOL;
+    state.lassoValues = {};
     return true;
 }
 
@@ -732,4 +759,70 @@ export function chooseBuildTool(state, id) {
     state.draft = null;
     state.tool = id;
     return true;
+}
+
+// --- The selection, and the lasso that draws it -----------------------------------
+
+/** True while a region is selected. */
+export function selectionLive(state) {
+    return state?.selection != null;
+}
+
+/** The region selected, as a copy, or null. */
+export function buildSelection(state) {
+    return selectionLive(state) ? own(state.selection) : null;
+}
+
+/**
+ * Makes a drawn region the selection, in place of any before it. Refused off a
+ * canvas, with a confirm open, and for anything that is not a region - a
+ * lasso that came to no region selects nothing rather than everything.
+ *
+ * A selection is not an edit: it asks nothing when it is drawn, replaced or
+ * dropped, and leaving a canvas with one drawn keeps nothing of it.
+ */
+export function setSelection(state, footprint) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !isSelection(footprint)) return false;
+    state.selection = own(footprint);
+    return true;
+}
+
+/**
+ * Drops the selection, which is the only thing that does: it survives a tool
+ * change, so a lasso drawn once is the region every tool after it works in.
+ * Returns true when there was one to drop.
+ */
+export function deselect(state) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !selectionLive(state)) return false;
+    state.selection = null;
+    return true;
+}
+
+/** The lasso tool chosen, which the next shape is drawn with. */
+export function buildLassoTool(state) {
+    return buildModeDrawing(state) ? state.lassoTool : null;
+}
+
+/** Chooses one of the lasso's tools. Refused for one that is not built. Returns true when it changed. */
+export function chooseLassoTool(state, id) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !lassoToolBuilt(id) || state.lassoTool === id) return false;
+    state.lassoTool = id;
+    return true;
+}
+
+/** Where the chosen lasso tool's fields are, filled in from what it declares. */
+export function lassoValues(state) {
+    const ranges = lassoTool(state?.lassoTool)?.ranges ?? {};
+    const values = {};
+    for (const [name, range] of Object.entries(ranges)) values[name] = state.lassoValues?.[name] ?? range.default;
+    return values;
+}
+
+/** Keeps a value moved on the chosen lasso tool's panel, for the next shape it draws. */
+export function setLassoValues(state, values = {}) {
+    const ranges = lassoTool(state?.lassoTool)?.ranges ?? {};
+    const kept = { ...(state.lassoValues ?? {}) };
+    for (const name of Object.keys(ranges)) if (Number.isFinite(values?.[name])) kept[name] = values[name];
+    state.lassoValues = kept;
+    return lassoValues(state);
 }

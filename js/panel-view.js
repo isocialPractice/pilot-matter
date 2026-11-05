@@ -54,6 +54,7 @@ function typed(row) {
 function shapeOf(content) {
     return [
         content.kind, content.heading,
+        ...(content.shapes ?? []).flatMap(row => row.tools.map(tool => `shape:${tool.id}`)),
         ...content.rows.map(rowKey),
         ...(content.nudges ?? []).map(nudge => `nudge:${nudge.id}`),
         ...(content.sections ?? []).flatMap(section => [
@@ -69,8 +70,8 @@ export class PanelView {
      * `root` holds three parts, found by `data-dock`: the heading, the fields
      * that scroll, and the answers. `handlers` are told what was done:
      * `onStep(entry, step)`, `onType(entry, figure, field)`,
-     * `onNudge(id, sign)`, `onAction(id)` and `onFold(id)` for a section's
-     * heading pressed.
+     * `onNudge(id, sign)`, `onAction(id)`, `onFold(id)` for a section's
+     * heading pressed, and `onShape(id)` for one of a mode's own tools.
      */
     constructor(root, handlers = {}) {
         this.root     = root;
@@ -109,6 +110,31 @@ export class PanelView {
         this.fields.replaceChildren();
         this.answers.replaceChildren();
         this.drawn.clear();
+
+        // A mode with tools of its own - the lasso - draws them first, a row
+        // of tiles to each row the artwork groups them into.
+        for (const row of content.shapes ?? []) {
+            const line = document.createElement('div');
+            line.className = 'dock-shapes';
+            line.dataset.shapeRow = row.row;
+            for (const tool of row.tools) {
+                const tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = 'dock-shape';
+                tile.dataset.shape = tool.id;
+                tile.title = tool.name;
+                tile.setAttribute('aria-label', tool.name);
+                const mark = document.createElement('img');
+                mark.src = tool.art;
+                mark.alt = '';
+                mark.draggable = false;
+                const name = document.createElement('span');
+                name.textContent = tool.label;
+                tile.append(mark, name);
+                line.append(tile);
+            }
+            this.fields.append(line);
+        }
 
         for (const entry of content.rows) this.drawRow(entry);
 
@@ -182,6 +208,12 @@ export class PanelView {
 
     /** Writes every reading, leaving alone the one being typed into. */
     update(content) {
+        for (const row of content.shapes ?? []) {
+            for (const tool of row.tools) {
+                this.fields.querySelector(`.dock-shape[data-shape="${tool.id}"]`)?.setAttribute('aria-pressed', String(tool.live));
+            }
+        }
+
         for (const entry of dockRows(content)) {
             const drawn = this.drawn.get(rowKey(entry));
             if (!drawn) continue;
@@ -218,6 +250,11 @@ export class PanelView {
 
         if (button.dataset.section) {
             this.handlers.onFold?.(button.dataset.section);
+            return;
+        }
+
+        if (button.dataset.shape) {
+            this.handlers.onShape?.(button.dataset.shape);
             return;
         }
 

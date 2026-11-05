@@ -4254,3 +4254,56 @@ still be found by name.
     again, until `Re-seat the aircraft`. Confirmed in Chromium, including
     `Enter` on the focused tile asking once and not running on.
   - From: Interactive Build Mode
+- [x] **A tool change asks**: picking another tool with a draft pending asking
+  `ACCEPT EDITS` before the tool or its panel changes, with yes committing, no
+  discarding, and `Escape` staying where it was, so leaving a tool never decides
+  what happens to the work on it
+  - **Settled**: `chooseBuildTool` opens `ACCEPT EDITS` with the tool held in
+    the question, and `answerConfirm` changes it once answered. While a question
+    is open no tile, click or key behind it changes anything.
+  - From: Interactive Build Mode
+- [x] **Back to the built world**: the builder reopening straight onto what was
+  built rather than on the picker, with every earlier batch still a placement
+  that can be picked up and changed
+  - **Half of it is there.** Since `1.0.0-alpha.1.42.0` a canvas opened on the
+    environment a session kept opens with what it kept already committed -
+    `keptPlacements` in `js/element-editor.js` handed to `beginCanvas` - so a
+    second save keeps the first one's work. What is left is reopening straight
+    onto it rather than through the picker.
+  - **Settled**: `openBuildMode` takes the built world `builtWorld` in
+    `js/element-editor.js` hands it and opens on its canvas with every
+    placement committed, so `L` and both menus' entries skip the picker once a
+    build is kept. Starting over is choosing another world in the settings,
+    decided with the user on 11.04.2026 - it lets go of the build and the
+    picker is back. A build kept on Blank Canvas, which the settings cannot
+    name, was being flown over the settings' world; the editor now holds the
+    settings' choice apart from its own world, and `flownEnvironment` is what
+    a free flight is drawn on.
+  - From: Interactive Build Mode
+- [x] **Select a built element**: the placement under the pointer, found through
+  the footprints rather than off the scene because a built element has no mesh
+  to hit, with the one on top winning where two overlap, a click told from an
+  orbit by how far it travelled, and a click on bare ground dropping the pick
+  but never the lasso
+  - **Settled**: `placementAt` in the new `js/build-select.js` measures a click
+    against each placement's reach - a footprint's weight, or a dropped
+    mountain's peak read again through `mountainPeaks` from its own seed - the
+    strongest winning and `ELEMENT_ORDER` then the later committed breaking a
+    tie. A pick is `selectPlacement` in `js/build-mode.js`: the draft standing
+    on the placement, kept by a second click, let go on bare ground. A press is
+    a click within five pixels, ten for a finger, and the view does not turn
+    until it has gone further. A pick nothing was done to asks nothing when it
+    is let go; a changed one asks `ACCEPT EDITS` first. There is no lasso yet,
+    so nothing a click could drop.
+  - From: Interactive Build Mode
+- [x] **Selection highlight**: the hovered placement outlined lightly and the
+  chosen one firmly, on the overlay the lasso already draws on, so hovering and
+  picking rebuild no ground
+  - **Settled**: the overlay is new, `#build-overlay` drawn through
+    `js/build-overlay.js`, since the lasso that was to carry it is not built.
+    An outline is the placement's reach traced as a contour at the weight a
+    click needs, once per placement, and stood on the ground through the
+    camera every frame: white and thin for the hover, blue and firm for the
+    edit in hand, picked or dropped. Confirmed in Chromium off the layer's own
+    pixels.
+  - From: Interactive Build Mode

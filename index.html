@@ -1309,6 +1309,63 @@
             border-color: rgba(255, 176, 0, 0.6);
         }
 
+        /* The one answer the lasso's panel has, drawn as the artwork draws it: a
+           pale blue pill in a white edge, there only while something is
+           selected. */
+        .dock-action[data-action="deselect"] {
+            color: #061d43;
+            background: #87ceeb;
+            border: 2px solid #fff;
+            border-radius: 10px;
+        }
+
+        /* A mode's own tools - the lasso's - as tiles in the rows the artwork
+           groups them into: each the tool's icon, cut from the art's panel, over
+           its name, on the navy the art draws them on, the chosen one ringed in
+           the art's green. */
+        .dock-shapes {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin: 6px 0;
+        }
+
+        .dock-shape {
+            flex: 1 1 0;
+            max-width: 90px;
+            min-height: 54px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            padding: 5px 2px;
+            color: #f0f2f3;
+            font-family: 'Courier New', monospace;
+            font-size: 8px;
+            letter-spacing: 0.5px;
+            background: #061d43;
+            border: 1px solid #1e375b;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .dock-shape img {
+            width: 100%;
+            height: 32px;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        .dock-shape:hover,
+        .dock-shape:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px #87ceeb;
+        }
+
+        .dock-shape[aria-pressed="true"] {
+            box-shadow: 0 0 0 3px #90c090;
+        }
+
         /* The builder's two confirms, ACCEPT EDITS and SAVE AND EXIT MODE: a
            small panel over the canvas rather than a screen of its own, drawn in
            the artwork's colours - the navy body, the green tab it is headed in,
