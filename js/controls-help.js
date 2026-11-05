@@ -133,6 +133,10 @@ export const BUILD_HELP_ROWS = Object.freeze([
     // The cover tool, named for each ground cover it is built for.
     ...(COVER_TOOLS.length ? [{ id: 'cover', label: 'Lay a Stroke', drag: COVER_TOOLS }] : []),
     ...(isBuiltTool('runway') ? [{ id: 'insert', label: 'Place the Chosen Runway', click: 'runway' }] : []),
+    ...(isBuiltTool('paint') ? [
+        { id: 'paint',   label: 'Paint a Stroke', drag: 'paint' },
+        { id: 'dropper', label: 'Take a Colour With the Eye Dropper', click: 'paint' }
+    ] : []),
     { id: 'handle',  label: 'Move or Shape What Is in Hand', handle: true },
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
     { id: 'answer',  label: 'Answer a Question',             keys: [MENU_SELECT_KEYS.slice(0, 1)] },

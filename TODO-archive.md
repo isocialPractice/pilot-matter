@@ -4520,3 +4520,80 @@ still be found by name.
     stamp shallower than its feather was part covered down its middle. It is
     measured from the way the drag went now.
   - From: Interactive Build Mode
+- [x] **Cover density**: how much of a stroke grass, sand, water or snow covers,
+  through noise that stays put when a tile is drawn again, defaulting to full
+  cover so every preset renders as it does today, with water and snow starting
+  full so their strokes are not drawn with gaps
+  - **Settled**: `density` on grass, sand, water and snow, 1 by default, at
+    which every preset is drawn exactly as before. `coverAt` in
+    `js/environment/elements.js` breaks a cover into clumps through value
+    noise keyed on the canvas's coordinates and repeating a canvas apart, a
+    density turned into a threshold through deciles measured off the noise so
+    it is the share of the ground covered. Water at part density is pools
+    under its level; snow's `coverage` stays how thickly it lies.
+  - From: Interactive Build Mode
+- [x] **A stroke's band is its ground**: a ground cover drawn with a footprint
+  painting all of the ground under it and graded across that ground's own
+  relief, worked out on each tile rather than once
+  - **Settled**: grass and sand declare `footprintSettles: { band: 'relief' }`,
+    and `applyFootprintedElement` works the band out on each tile - the lowest
+    and highest ground the footprint reaches there - before the element is
+    drawn, through `settleFromFootprint`, the generator left a whole-field
+    function. A clip alone settles nothing, and a batch picked again shows no
+    band on its panel.
+  - From: Interactive Build Mode
+- [x] **Water drawn above the sea**: a water line kept per vertex beside the
+  sea's one level, so water drawn on high ground is water where it was drawn and
+  nowhere else on the tile, and a runway is lifted clear of the water actually
+  under it
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for water, starting whole, and `footprintSettles` in
+    `js/environment/footprinted.js` is where a value worked out from the
+    ground under a stroke goes - the band is the first; the line is the next.
+    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
+    part density is pools under its level, which `waterSurface` still reads
+    as one sheet.
+  - **Settled**: `field.water` is `{ level, line }`: `level` the sea's, null
+    where there is none, and `line` one height a vertex. The sea writes its
+    level into the line everywhere its density reaches, so every preset's
+    surface is the one it was; drawn water writes its own line where it was
+    drawn, carried back by the compositor, and never moves the level.
+    `waterSurface` reads a vertex as wet where it lies at or under its own
+    line, looking for a line before calling a tile dry, and
+    `clearRunwayGround` takes the highest line under the strip as well as the
+    sea's level. Water joins the palette.
+  - From: Interactive Build Mode
+- [x] **Drawn water lies in the ground**: the line set at the lowest bank within
+  the stroke's half-width and the ground cut down to it, with the colour running
+  from the bank to the middle, so a stroke drawn downhill is a stream and its
+  dark end shows wherever it rests
+  - **Settled**: water declares `footprintSettles: { drawn: 'waterLine' }`
+    and `footprintIgnores` its level and flatten. `bankMeasure` in
+    `js/environment/footprinted.js` walks each stroke at half a cell's
+    spacing, finds the lowest ground within half its width at each step, and
+    gives every vertex the bank of the point it lies across from, read
+    between the steps either side - so the line is level across a stroke and
+    follows the ground down along one, measured on each tile's own vertices
+    and at each repeat of a stroke over the seam, where the step is held under
+    the swell. The plan's smoothing pass was measured and dropped: read
+    between steps half a cell apart, the line came out no more even for it.
+    The line is 1.5 under the bank and never over the ground; the
+    ground is cut to it, the colour runs pale at the bank to dark in the
+    middle, and a region with no stroke is a pond at its lowest ground. The
+    line and how far in each vertex is travel as `drawn`, carried beside the
+    ranges like `at`.
+  - From: Interactive Build Mode
+- [x] **Drawn snow settles where it is drawn**: the snow line put under the
+  stroke's lowest ground on each tile, and the depth running from a thin,
+  shadowed edge to white in the middle, so snow drawn on low ground shows and
+  both colour ends show on any ground
+  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
+    is declared for snow, starting whole, and the snow line is the next
+    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
+  - **Settled**: snow declares `footprintSettles: { line: 'lowest', drawn:
+    'inward' }`: its line is put a unit under the stroke's lowest ground on
+    each tile, and its depth is how far in from the stroke's edge a vertex is,
+    times its coverage, so it is thin and blue-grey at the edge and white down
+    the middle on any ground; `slope` still leaves steep faces bare. Snow
+    joins the palette.
+  - From: Interactive Build Mode

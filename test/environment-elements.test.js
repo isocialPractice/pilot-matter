@@ -183,7 +183,7 @@ test('no step of a gradient shifts dramatically from the step before it', () => 
 test('every element the world is described in terms of is in the registry', () => {
     const expected = [
         'mountain', 'grass', 'sand', 'water', 'river',
-        'forest', 'canyon', 'desert', 'town', 'snow', 'runway'
+        'forest', 'canyon', 'desert', 'town', 'snow', 'paint', 'runway'
     ];
     for (const id of expected) {
         assert.equal(isElementId(id), true, `${id} should be an element`);
@@ -200,7 +200,7 @@ test('an element is data: ranges to configure it and a generator to draw it', ()
         const names = Object.keys(element.ranges);
         assert.ok(names.length > 0, `${element.id} should declare what can be configured about it`);
         for (const [name, range] of Object.entries(element.ranges)) {
-            assert.ok(['span', 'scalar', 'gradient', 'gated', 'toggle'].includes(range.kind),
+            assert.ok(['span', 'scalar', 'gradient', 'gated', 'toggle', 'choice', 'color'].includes(range.kind),
                 `${element.id}.${name} is not a range`);
         }
     }

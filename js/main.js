@@ -22,13 +22,15 @@ import {
     dropDraft, confirmOpen, buildConfirm, answerConfirm, acceptToolName,
     selectPlacement, pickedIndex, pickablePlacements,
     setSelection, deselect, buildLassoTool, chooseLassoTool, lassoValues, setLassoValues,
-    drawIntoSelection, selectionLive, coverValues, setCoverValues, layStroke,
+    drawIntoSelection, selectionLive, strokeValues, setStrokeValues, layStroke,
     buildRunwayTemplate, chooseRunwayTemplate, insertTemplate,
+    resetBrush, eyeDropperArmed, toggleEyeDropper, dropEyeDropper, takeEyeDropperColor,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
 import {
-    paletteTools, dropsAtClick, toolMark, toolName, isCoverTool, coverStamp, insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
+    paletteTools, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, strokeStamp, buildTool,
+    insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
 import { placeTemplate, groupStrips, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
 import {
@@ -38,7 +40,7 @@ import { placementAt, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
-    regionEdges, contoured, stampOutline, strokeTrail
+    regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL
 } from './build-overlay.js';
 import {
     boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle,
@@ -55,8 +57,8 @@ import {
     writeCameraField, nudgeBuildCamera, unitsPerPixel, viewBearing, CAMERA_ORBIT, DEFAULT_FOV
 } from './build-camera.js';
 import {
-    dockContent, draftHolderFor, coverHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
-    DOCK_COVER, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT
+    dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
+    DOCK_COVER, DOCK_PAINT, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH
 } from './build-panel.js';
 import {
     lassoTool, lassoFootprint, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -183,7 +185,7 @@ const LASSO_SAMPLE_PIXELS = 6;
 // How far, in screen pixels, the pointer travels between the samples a cover
 // stroke is laid through: close enough that a stroke dragged round a bend is
 // the bend, and far enough apart that a stroke is not hundreds of points.
-const COVER_SAMPLE_PIXELS = 6;
+const STROKE_SAMPLE_PIXELS = 6;
 
 /** Keys a canvas keeps from the browser, whose own use of them would take the page from the builder. */
 const CANVAS_SWALLOWED_KEYS = ['AltLeft', 'AltRight'];
@@ -401,7 +403,7 @@ class FlightSimulator {
         // pointer it was pressed with, the ground points it has gathered, and
         // the world units a screen pixel spanned where it was pressed, which
         // is the scale its stamp is laid at.
-        this.coverDrawing = null;
+        this.strokeDrawing = null;
 
         // What the dock last drew, which a press on it is read against, and
         // the holder an edit in hand is stepped through - its configuration,
@@ -411,7 +413,7 @@ class FlightSimulator {
         // not against wherever the last batch left it.
         this.dockShown   = null;
         this.draftHolder = null;
-        this.coverHolder = null;
+        this.strokeHolder = null;
 
         // Whether the two menus are currently carrying the builder's entry, so
         // a card is drawn again when that changes rather than on every frame
@@ -648,7 +650,9 @@ class FlightSimulator {
             onNudge:  (id, sign) => this.onDockNudge(id, sign),
             onAction: (id) => this.onDockAction(id),
             onFold:   (id) => this.onDockFold(id),
-            onShape:  (id) => this.onDockShape(id)
+            onShape:  (id) => this.onDockShape(id),
+            onColor:  (entry, rgb) => this.onDockColor(entry, rgb),
+            onDropper: () => this.onDockDropper()
         });
 
         // The confirm is worked with the mouse as every menu here is, and a
@@ -1866,7 +1870,7 @@ class FlightSimulator {
         this.gumball = null;
         this.gumballHover = null;
         this.cancelLasso();
-        this.cancelCover();
+        this.cancelStroke();
 
         closeBuildMode(this.builder);
 
@@ -1934,7 +1938,7 @@ class FlightSimulator {
      */
     showCanvas(environmentId) {
         this.worldOpen.clear();
-        this.coverHolder = null;
+        this.strokeHolder = null;
         this.terrain.setCanvas(true);
         this.terrain.setEnvironment(environmentId, {
             runway: false,
@@ -2093,7 +2097,8 @@ class FlightSimulator {
         if (this.gumballDrag != null) return 'grabbing';
         if (this.gumballHover != null) return 'grab';
         const tool = buildModeTool(this.builder);
-        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isCoverTool(tool) || insertsTemplate(tool)) return 'crosshair';
+        if (eyeDropperArmed(this.builder)) return 'cell';
+        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool)) return 'crosshair';
         return this.hovered != null ? 'pointer' : '';
     }
 
@@ -2147,18 +2152,28 @@ class FlightSimulator {
         const drawing = this.lassoDrawingPath();
         if (drawing) strokePaths(ctx, this.screenRegion(drawing.points, drawing.closed, width, height), DRAWING_OUTLINE);
 
-        // A cover stroke as far as it has gone, as wide as the brush; and the
-        // stamp a press would lay, following a pointer that can hover - so the
-        // brush is seen before it is pressed, and not over a handle, where a
-        // press would take the handle instead.
-        const brush = isCoverTool(buildModeTool(this.builder)) ? coverValues(this.builder) : null;
-        if (brush && this.coverDrawing) {
-            strokeTrail(ctx, this.screenRuns([this.coverDrawing.points], width, height), brush.buildWidth);
+        // A stroke as far as it has gone, as the region it will cover - worked
+        // out on the ground in world units, so it is as wide on the screen as
+        // the stroke laid will be - in the cover trail's blue, or the paint's
+        // own colour; and the brush a press would lay with, following a
+        // pointer that can hover - so it is seen before it is pressed, and not
+        // over a handle, where a press would take the handle instead, nor with
+        // the eye dropper armed, where a press takes a colour.
+        const live  = buildModeTool(this.builder);
+        const brush = isStrokeTool(live) ? strokeValues(this.builder) : null;
+        if (brush && this.strokeDrawing) {
+            const stamp = strokeStamp(buildTool(live), brush, this.strokeDrawing.scale);
+            const runs  = strokeRibbon({ points: this.strokeDrawing.points, stamp })
+                .flatMap(loop => this.screenRegion(loop, true, width, height));
+            fillRegion(ctx, runs, isPaintTool(live) ? paintTrailColour(brush.color, brush.opacity) : COVER_TRAIL.colour);
         }
         const pointer = this.canvasPointer;
-        if (brush && pointer && pointer.type !== 'touch' && !confirmOpen(this.builder)
+        if (brush && pointer && pointer.type !== 'touch' && !confirmOpen(this.builder) && !eyeDropperArmed(this.builder)
             && this.gumballHover == null && this.gumballDrag == null) {
-            strokePaths(ctx, [stampOutline(pointer.x, pointer.y, brush.buildWidth, brush.buildHeight, brush.cornerRadius)], DRAWING_OUTLINE);
+            const tip = isPaintTool(live)
+                ? stampOutline(pointer.x, pointer.y, brush.size, brush.size, brush.tip === 'square' ? 0 : brush.size / 2)
+                : stampOutline(pointer.x, pointer.y, brush.buildWidth, brush.buildHeight, brush.cornerRadius);
+            strokePaths(ctx, [tip], DRAWING_OUTLINE);
         }
 
         // The template Insert Runway carries, outlined on the ground where a
@@ -2320,7 +2335,8 @@ class FlightSimulator {
         if (!gesture) {
             if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
             else if (e.button === 0 && tool === LASSO_PALETTE_TOOL) this.lassoPress(e);
-            else if (e.button === 0 && isCoverTool(tool)) this.coverPress(e);
+            else if (e.button === 0 && eyeDropperArmed(this.builder)) this.dropperAt(e);
+            else if (e.button === 0 && isStrokeTool(tool)) this.strokePress(e);
             else if (e.button === 0 && insertsTemplate(tool)) this.insertAt(e);
             return;
         }
@@ -2407,8 +2423,8 @@ class FlightSimulator {
             return;
         }
 
-        if (this.coverDrawing && e.pointerId === this.coverDrawing.pointer) {
-            this.dragCover(e);
+        if (this.strokeDrawing && e.pointerId === this.strokeDrawing.pointer) {
+            this.dragStroke(e);
             return;
         }
 
@@ -2452,11 +2468,11 @@ class FlightSimulator {
             return;
         }
 
-        if (this.coverDrawing && e.pointerId === this.coverDrawing.pointer) {
+        if (this.strokeDrawing && e.pointerId === this.strokeDrawing.pointer) {
             // Let go of, the stroke is laid; cancelled or taken away, it is not.
-            const drawn = this.coverDrawing;
-            this.cancelCover();
-            if (e.type === 'pointerup') this.finishCover(drawn);
+            const drawn = this.strokeDrawing;
+            this.cancelStroke();
+            if (e.type === 'pointerup') this.finishStroke(drawn);
             return;
         }
 
@@ -2676,14 +2692,15 @@ class FlightSimulator {
     }
 
     /**
-     * A press with the cover tool: the start of a stroke, at the ground under
-     * the press, with the scale a screen pixel spans there - which is what the
-     * brush's pixels come to in the world, so the stamp is laid the size it is
-     * on the glass. A press over the sky begins nothing. The stroke owns the
-     * pointer until it is let go, wherever it wanders, so a stroke dragged
-     * over the palette or the dock stays the stroke it began as.
+     * A press with a stroke tool - the cover tool or Free Paint: the start of
+     * a stroke, at the ground under the press, with the scale a screen pixel
+     * spans there - which is what the brush's pixels come to in the world, so
+     * the stamp is laid the size it is on the glass. A press over the sky
+     * begins nothing. The stroke owns the pointer until it is let go, wherever
+     * it wanders, so a stroke dragged over the palette or the dock stays the
+     * stroke it began as.
      */
-    coverPress(e) {
+    strokePress(e) {
         const ground = this.pickCanvasPoint(e.clientX, e.clientY);
         if (ground == null) return;
 
@@ -2691,7 +2708,7 @@ class FlightSimulator {
         const surface = this.renderer.domElement;
         surface.setPointerCapture(e.pointerId);
         const distance = this.camera.position.distanceTo(this.overlayPoint.set(ground.x, ground.y ?? this.terrain.getTerrainHeightAt(ground.x, ground.z), ground.z));
-        this.coverDrawing = {
+        this.strokeDrawing = {
             tool: buildModeTool(this.builder),
             pointer: e.pointerId,
             points: [[ground.x, ground.z]],
@@ -2701,15 +2718,15 @@ class FlightSimulator {
     }
 
     /**
-     * The pointer moving under a cover stroke: the ground under it gathered
-     * every few pixels it travels, each sample stood on the ground as it is
-     * taken, so the stroke on the screen is the stroke that is laid. Over the
-     * sky nothing is gathered.
+     * The pointer moving under a stroke: the ground under it gathered every few
+     * pixels it travels, each sample stood on the ground as it is taken, so the
+     * stroke on the screen is the stroke that is laid. Over the sky nothing is
+     * gathered.
      */
-    dragCover(e) {
-        const drawing = this.coverDrawing;
+    dragStroke(e) {
+        const drawing = this.strokeDrawing;
         const screen  = { x: e.clientX, y: e.clientY };
-        if (Math.hypot(screen.x - drawing.last.x, screen.y - drawing.last.y) < COVER_SAMPLE_PIXELS) return;
+        if (Math.hypot(screen.x - drawing.last.x, screen.y - drawing.last.y) < STROKE_SAMPLE_PIXELS) return;
 
         const ground = this.pickCanvasPoint(screen.x, screen.y);
         if (ground == null) return;
@@ -2718,41 +2735,43 @@ class FlightSimulator {
     }
 
     /**
-     * A stroke let go of: laid into the cover tool's batch with the stamp the
-     * brush comes to at the press's scale - the batch begun by it, or grown by
-     * it - and the ground drawn again with the batch on it. A stroke the
-     * selection cuts all of away lays nothing.
+     * A stroke let go of: laid into the tool's batch with the stamp the brush
+     * comes to at the press's scale - the batch begun by it, or grown by it -
+     * and the ground drawn again with the batch on it. A stroke the selection
+     * cuts all of away lays nothing.
      */
-    finishCover(drawn) {
+    finishStroke(drawn) {
         if (drawn.tool !== buildModeTool(this.builder)) return;
-        const stamp = coverStamp(coverValues(this.builder), drawn.scale);
+        const stamp = strokeStamp(buildTool(drawn.tool), strokeValues(this.builder), drawn.scale);
         if (!layStroke(this.builder, drawn.points, stamp, { size: this.terrain.size })) return;
         this.redrawCanvas();
         this.syncOverlays();
     }
 
     /** Lets go of a stroke half drawn, laying nothing of it. */
-    cancelCover() {
-        const drawing = this.coverDrawing;
+    cancelStroke() {
+        const drawing = this.strokeDrawing;
         if (!drawing) return;
-        this.coverDrawing = null;
+        this.strokeDrawing = null;
         const surface = this.renderer.domElement;
         if (surface.hasPointerCapture?.(drawing.pointer)) surface.releasePointerCapture(drawing.pointer);
     }
 
     /**
-     * The holder the cover tool's panel is stepped through, made when the tool
+     * The holder a stroke tool's panel is stepped through, made when the tool
      * is chosen and kept while it is live - across strokes and batches alike,
-     * since one panel carries from each batch to the next.
+     * since one panel carries from each batch to the next - and made again
+     * when something other than the panel changes what it holds: the eye
+     * dropper's colour, or `DEFAULT`'s brush.
      */
-    currentCoverHolder() {
+    currentStrokeHolder() {
         const tool = buildModeTool(this.builder);
-        if (!isCoverTool(tool)) {
-            this.coverHolder = null;
+        if (!isStrokeTool(tool)) {
+            this.strokeHolder = null;
             return null;
         }
-        if (this.coverHolder?.tool !== tool) this.coverHolder = { tool, ...coverHolderFor(this.builder, tool) };
-        return this.coverHolder;
+        if (this.strokeHolder?.tool !== tool) this.strokeHolder = { tool, ...strokeHolderFor(this.builder, tool) };
+        return this.strokeHolder;
     }
 
     /** Lets go of a shape half drawn, keeping nothing of it. */
@@ -2877,7 +2896,7 @@ class FlightSimulator {
             ? dockContent(this.builder, {
                 camera: this.buildCamera,
                 fov: this.camera.fov,
-                holder: isCoverTool(buildModeTool(this.builder)) ? this.currentCoverHolder() : this.currentDraftHolder(),
+                holder: isStrokeTool(buildModeTool(this.builder)) ? this.currentStrokeHolder() : this.currentDraftHolder(),
                 open: [...this.worldOpen]
             })
             : null;
@@ -2921,6 +2940,12 @@ class FlightSimulator {
      * tool is what the next shape is drawn with.
      */
     onDockShape(id) {
+        if (this.dockShown?.kind === DOCK_PAINT) {
+            if (id !== DOCK_DEFAULT_BRUSH.id || !resetBrush(this.builder)) return;
+            this.strokeHolder = null;
+            this.syncOverlays();
+            return;
+        }
         if (this.dockShown?.kind === DOCK_RUNWAY) {
             if (!chooseRunwayTemplate(this.builder, id)) return;
             if (draftPending(this.builder)) this.redrawCanvas();
@@ -2930,6 +2955,45 @@ class FlightSimulator {
         if (!chooseLassoTool(this.builder, id)) return;
         this.cancelLasso();
         this.syncDock();
+    }
+
+    /**
+     * A colour chosen at a colour row - a swatch, a band of the picker, or a
+     * hex figure typed - written into the row's holder and carried to what it
+     * stands for, as a stepped value is.
+     */
+    onDockColor(entry, rgb) {
+        const holder = this.dockHolder(entry);
+        if (!holder) return;
+        writeRowValue(holder, entry.name, entry.row, rgb);
+        this.applyDockValue(entry);
+    }
+
+    /** Free Paint's eye dropper pressed: armed, or put down again. */
+    onDockDropper() {
+        toggleEyeDropper(this.builder);
+        this.renderer.domElement.style.cursor = this.canvasCursor();
+        this.syncOverlays();
+    }
+
+    /**
+     * A click with the eye dropper armed: the colour of the ground under it
+     * taken as the brush's - and the batch in hand's, drawn again with it -
+     * and the dropper put down. A click over the sky takes nothing and leaves
+     * it armed.
+     */
+    dropperAt(e) {
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        const rgb = point ? this.terrain.getGroundColorAt(point.x, point.z) : null;
+        if (rgb == null) return;
+
+        e.preventDefault();
+        const pending = draftPending(this.builder);
+        if (!takeEyeDropperColor(this.builder, rgb)) return;
+        this.strokeHolder = null;
+        if (pending) this.redrawCanvas();
+        this.renderer.domElement.style.cursor = this.canvasCursor();
+        this.syncOverlays();
     }
 
     /** A folding section's heading pressed: an element of the world opened, or shut again. */
@@ -2961,7 +3025,9 @@ class FlightSimulator {
 
         field.setCustomValidity('');
         writeRowValue(holder, entry.name, entry.row, Number(value.toFixed(stepPlaces(rangeStep(range)))));
-        field.blur();
+        // A slider is let go of by the pointer, not by the panel: taking the
+        // focus off it would end the drag it is in the middle of.
+        if (field.type !== 'range') field.blur();
         this.applyDockValue(entry);
     }
 
@@ -2990,11 +3056,11 @@ class FlightSimulator {
             return;
         }
 
-        // The cover tool's panel: kept for the tool's next batch, and the
+        // A stroke tool's panel: kept for the tool's next batch, and the
         // batch in hand changed with it - every stroke of it, so the ground
         // is drawn again. A brush row changes only the strokes still to come.
-        if (kind === DOCK_COVER) {
-            if (setCoverValues(this.builder, holder.config)) {
+        if (kind === DOCK_COVER || kind === DOCK_PAINT) {
+            if (setStrokeValues(this.builder, holder.config)) {
                 this.redrawCanvas();
                 this.syncOverlays();
                 return;
@@ -3099,11 +3165,18 @@ class FlightSimulator {
             // Escape steps out of the innermost thing first: a drag being made
             // ends where it is, and only a press with nothing in progress asks
             // to leave.
-            if ((this.canvasDrag || this.gumballDrag || this.lassoDrawing || this.coverDrawing) && isCanvasLeaveKey(e.code)) {
+            if ((this.canvasDrag || this.gumballDrag || this.lassoDrawing || this.strokeDrawing) && isCanvasLeaveKey(e.code)) {
                 this.endCanvasDrag();
                 this.endGumballDrag();
                 this.cancelLasso();
-                this.cancelCover();
+                this.cancelStroke();
+                return;
+            }
+
+            // An armed eye dropper is put down before leaving is asked about.
+            if (isCanvasLeaveKey(e.code) && dropEyeDropper(this.builder)) {
+                this.renderer.domElement.style.cursor = this.canvasCursor();
+                this.syncOverlays();
                 return;
             }
 
@@ -3197,7 +3270,7 @@ class FlightSimulator {
         this.endCanvasDrag();
         this.endGumballDrag();
         this.cancelLasso();
-        this.cancelCover();
+        this.cancelStroke();
         this.buildKeys.clear();
         this.syncOverlays();
         this.overlays.confirmPanel.focus({ preventScroll: true });
@@ -3321,7 +3394,7 @@ class FlightSimulator {
         if (id === ACCEPT_TOOL) this.requestLeaveBuilder();
         else if (!chooseBuildTool(this.builder, id) && confirmOpen(this.builder)) this.confirmOpened();
         if (buildModeTool(this.builder) !== LASSO_PALETTE_TOOL) this.cancelLasso();
-        if (buildModeTool(this.builder) !== this.coverDrawing?.tool) this.cancelCover();
+        if (buildModeTool(this.builder) !== this.strokeDrawing?.tool) this.cancelStroke();
 
         this.syncOverlays();
     }

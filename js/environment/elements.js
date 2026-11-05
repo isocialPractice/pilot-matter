@@ -29,14 +29,16 @@ export const DEFAULT_SEGMENTS = 200;
  * The landforms are shaped first, then the ground cover is laid over them in
  * the order it layers - a dune sea sits on top of the sand band rather than
  * being repainted flat by it - then water fills what is left below its line,
- * then the cuts and the built things, and snow settles last on top of
- * everything else.
+ * then the cuts and the built things, and snow settles on top of everything
+ * else. Paint is the last colour laid, over snow and all, because a stroke is
+ * the pilot's last word on what colour the ground is.
  */
 export const ELEMENT_ORDER = [
     'mountain', 'canyon',
     'grass', 'sand', 'desert', 'water',
     'river', 'forest', 'town',
     'snow',
+    'paint',
     // The strip is cut last, over whatever else claimed the ground, because a
     // runway is the one thing in the world that is kept clear.
     'runway'
@@ -155,6 +157,61 @@ export function mixColor(field, index, color, amount) {
 }
 
 /**
+ * The colour of the vertex nearest a point of the world, or null for a point
+ * the field does not reach. Nearest rather than blended, because what reads a
+ * colour off the ground - the eye dropper - wants a colour that is there, not
+ * one mixed out of four that are.
+ */
+export function nearestColor(field, x, z) {
+    const half = field.size / 2;
+    const col = Math.round((x - field.originX + half) / field.step);
+    const row = Math.round((z - field.originZ + half) / field.step);
+    if (!(col >= 0 && col <= field.segments && row >= 0 && row <= field.segments)) return null;
+    return readColor(field, row * field.stride + col);
+}
+
+// --- Colour blending ---------------------------------------------------------
+
+/** Rec. 709's luminance weights, which is how light the eye reads a colour as. */
+export const LUMA = Object.freeze([0.2126, 0.7152, 0.0722]);
+
+export function luminance(c) {
+    return c[0] * LUMA[0] + c[1] * LUMA[1] + c[2] * LUMA[2];
+}
+
+/**
+ * The paint colour carrying the ground's own lightness: the hue and the
+ * saturation the pilot picked, at the luminance the ground already had.
+ *
+ * A stroke laid this way keeps the shading the terrain had - a gradient's
+ * pale and deep ends, a lit slope and a shadowed one - so a painted hillside
+ * still reads as a hillside. Mixing straight to the colour, which is what
+ * `mixColor` does, replaces that shading with a flat patch, and a flat patch is
+ * what makes a painted world look wrong.
+ *
+ * The luminance is set by shifting every channel by the same amount and then,
+ * where that takes a channel past what a channel holds, drawing the colour in
+ * toward its own grey until it fits - the Color blend of the W3C's compositing
+ * spec - so the result has the ground's luminance exactly, the paint's hue,
+ * and as much of its saturation as that lightness can carry. Scaling the paint
+ * to the luminance instead loses it: a deep blue scaled up to a pale ground is
+ * clipped back to the deep blue it was. A colour with no hue - black, white,
+ * a grey - comes out as the ground's own grey.
+ */
+export function tintColor(ground, paint) {
+    const target = luminance(ground);
+    const shift  = target - luminance(paint);
+    const moved  = paint.map(channel => channel + shift);
+
+    const low  = Math.min(...moved);
+    const high = Math.max(...moved);
+    let scale = 1;
+    if (low < 0)  scale = Math.min(scale, target / (target - low));
+    if (high > 1) scale = Math.min(scale, (1 - target) / (high - target));
+    return moved.map(channel => clamp(target + (channel - target) * scale, 0, 1));
+}
+
+/**
  * How steep the ground is at a vertex, as the height climbed across one cell
  * over the width of that cell: 0 on the flat and 1 on a 45 degree face.
  */
@@ -256,7 +313,7 @@ function tileMix(gx, gz) {
 // --- Configurable ranges --------------------------------------------------
 
 /**
- * The options every range kind takes as its last argument. One so far:
+ * The options every range kind takes as its last argument.
  *
  * `when` gates the range on a field holding one of a list of values -
  * `{ useLength: true }`, `{ shape: ['polygon', 'star'] }` - and a key written
@@ -266,11 +323,20 @@ function tileMix(gx, gz) {
  * there rather than the default. Generation never reads a gate: what a range
  * resolves to is the same either way.
  *
+ * `percent` says a fraction is read as a percentage - an opacity of 0.4 is
+ * `40%` on a panel, and 40 is what is typed for it - and `slider` that a panel
+ * draws a slider beside the figure, for a value set by eye: a brush's size.
+ * Neither changes what the range resolves to.
+ *
  * Added to a range only when given, so a range declared without one is the
  * object it always was.
  */
-function rangeOptions({ when } = {}) {
-    return when != null && typeof when === 'object' ? { when } : {};
+function rangeOptions({ when, percent, slider } = {}) {
+    return {
+        ...(when != null && typeof when === 'object' ? { when } : {}),
+        ...(percent === true ? { percent: true } : {}),
+        ...(slider === true ? { slider: true } : {})
+    };
 }
 
 /** A pair of bounds an element generates between, such as a peak height. */
@@ -342,6 +408,25 @@ export function gated(low, high, defaultLow, defaultHigh, on = false, options) {
  */
 export function toggle(on = false, options) {
     return { kind: 'toggle', low: 0, high: 1, default: on === true, ...rangeOptions(options) };
+}
+
+/**
+ * One flat colour, as `[r, g, b]` from 0 to 1: what a brush lays.
+ *
+ * Not a gradient. A gradient is for an element that covers ground it has to
+ * stay recognisable across, which is why its ends are only lightened and
+ * darkened along their own hue; a brush stroke is the one colour the pilot
+ * picked, anywhere on the wheel, so it is chosen rather than stepped.
+ */
+export function color(rgb, options) {
+    return { kind: 'color', default: rgbOf(rgb, [0, 0, 0]), ...rangeOptions(options) };
+}
+
+/** Three channels held to what a channel holds, or `fallback` for anything that is not three numbers. */
+function rgbOf(given, fallback) {
+    return Array.isArray(given) && given.length === 3 && given.every(Number.isFinite)
+        ? given.map(channel => clamp(channel, 0, 1))
+        : [...fallback];
 }
 
 /**
@@ -445,6 +530,12 @@ function resolveRange(range, given) {
     // element into a state nothing declared.
     if (range.kind === 'choice') {
         return range.values.includes(given) ? given : range.default;
+    }
+
+    // A colour is three channels, each held to what a channel holds; anything
+    // else is not a colour, and the declared one stands.
+    if (range.kind === 'color') {
+        return rgbOf(given, range.default);
     }
 
     // A gated range is written either way round: `{ on, range }` says both
@@ -1210,6 +1301,39 @@ const snow = {
     }
 };
 
+/**
+ * Free paint: a colour laid over the ground, and nothing else - no height is
+ * written, so a stroke of it is the ground it was laid on in another colour
+ * rather than a decal standing over that ground, and there is nothing that
+ * could float.
+ *
+ * It paints the whole field; what keeps a stroke a stroke is the footprint it
+ * is drawn through, which feathers it into the ground at its edge.
+ */
+const freePaint = {
+    id: 'paint',
+    label: 'Paint',
+    ranges: {
+        color:   color([0, 0, 0]),
+        opacity: scalar(0, 1, 1, { percent: true }),
+        // How the colour meets the ground: `tint` takes the colour's hue at
+        // the ground's own lightness - see `tintColor` - and `normal` lays the
+        // colour as it is, for the times a flat patch is what is wanted: a
+        // black that is black, or an apron in the strip's own grey.
+        blend:   choice(['tint', 'normal'], 'tint')
+    },
+
+    generate(field, config) {
+        if (!(config.opacity > 0)) return 0;
+        const tint = config.blend === 'tint';
+
+        for (let i = 0; i < field.count; i++) {
+            mixColor(field, i, tint ? tintColor(readColor(field, i), config.color) : config.color, config.opacity);
+        }
+        return field.count;
+    }
+};
+
 // --- The strip ------------------------------------------------------------
 
 // How many sites are weighed before one is built on, and how densely each of
@@ -1878,7 +2002,7 @@ function openness(field, wet, index) {
 // --- The registry ---------------------------------------------------------
 
 export const ELEMENTS = [
-    mountain, canyon, desert, grass, sand, water, river, forest, town, snow, runway
+    mountain, canyon, desert, grass, sand, water, river, forest, town, snow, freePaint, runway
 ];
 
 export const ELEMENTS_BY_ID = new Map(ELEMENTS.map(element => [element.id, element]));

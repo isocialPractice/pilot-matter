@@ -1366,6 +1366,23 @@ the further in from the footprint's edge:
 }
 ```
 
+`paint` lays a colour and no height. Its `color` is one colour, `[r, g, b]`
+from 0 to 1; its `opacity`, from 0 to 1, is how much of the colour covers the
+ground; and its `blend` is how the two meet: `'tint'`, the default, takes the
+colour's hue at the ground's own lightness, so a painted slope keeps its light
+and shade and a black or white is the ground's own grey, and `'normal'` lays the
+colour as it is. It is applied after `snow`, as the last colour laid. Without a
+footprint it paints the whole square; through one, only where the footprint
+reaches, fading in across its feather:
+
+```js
+{
+    type: 'paint',
+    config: { color: [0.2, 0.4, 0.9], opacity: 0.8 },
+    footprint: { kind: 'stroke', points: [[-1200, 300], [900, -400]], stamp: { width: 500, depth: 500, corner: 250 }, feather: 250 }
+}
+```
+
 A placement may carry a `seed`, any finite number, and then draws from a random
 stream of its own rather than the world's. A world's placements otherwise share
 one stream in the order they are applied, which is what makes a description the

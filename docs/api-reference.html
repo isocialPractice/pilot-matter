@@ -1153,6 +1153,14 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
     footprint: { kind: 'stroke', points: [[-2000, -1500], [0, 0], [1500, 2500]], stamp: { width: 700, depth: 400, corner: 100 } }
 }</code></pre>
 
+<p><code>paint</code> lays a colour and no height. Its <code>color</code> is one colour, <code>[r, g, b]</code> from 0 to 1; its <code>opacity</code>, from 0 to 1, is how much of the colour covers the ground; and its <code>blend</code> is how the two meet: <code>'tint'</code>, the default, takes the colour's hue at the ground's own lightness, so a painted slope keeps its light and shade and a black or white is the ground's own grey, and <code>'normal'</code> lays the colour as it is. It is applied after <code>snow</code>, as the last colour laid. Without a footprint it paints the whole square; through one, only where the footprint reaches, fading in across its feather:</p>
+
+<pre><code>{
+    type: 'paint',
+    config: { color: [0.2, 0.4, 0.9], opacity: 0.8 },
+    footprint: { kind: 'stroke', points: [[-1200, 300], [900, -400]], stamp: { width: 500, depth: 500, corner: 250 }, feather: 250 }
+}</code></pre>
+
 <p>A placement may carry a <code>seed</code>, any finite number, and then draws from a random stream of its own rather than the world's. A world's placements otherwise share one stream in the order they are applied, which is what makes a description the same world every time - and also means a placement added among them moves every draw after it. Seeded, it takes nothing the others were going to draw, so they stay where they were, and it draws the same values on every tile.</p>
 
 <p>A placement of type <code>group</code> is a runway template placed whole: <code>config</code> holds where it stands, <code>at</code>, which way it runs, <code>heading</code>, and how long and wide its strip is, and <code>members</code> holds the placements it stands for, laid out in its own frame - world units from its middle, a heading of 0 running north. The members are copied in when it is placed rather than looked up by the template's name, so a template changed later leaves a world built with it as it was. When the world is built the group is expanded: each member turned through its heading and moved to where it stands, its strip given its length and width, and kept wholly on the square, so no copy of it crosses an edge.</p>

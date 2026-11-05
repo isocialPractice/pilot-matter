@@ -1223,7 +1223,8 @@
             margin: 3px 0;
         }
 
-        .dock-row.locked {
+        .dock-row.locked,
+        .dock-color.locked {
             opacity: 0.6;
         }
 
@@ -1380,6 +1381,111 @@
             justify-content: center;
             font-size: 10px;
             letter-spacing: 1px;
+        }
+
+        /* A row whose value is set by eye: the slider beside the figure runs
+           the width of the row beneath it. */
+        .dock-row.dock-row-slider {
+            grid-template-rows: auto auto;
+        }
+
+        .dock-slider {
+            grid-column: 1 / -1;
+            width: 100%;
+            margin: 2px 0 4px;
+            accent-color: #e8e8cf;
+            cursor: pointer;
+        }
+
+        /* A colour row, laid out as the artwork lays Free Paint's: the eight
+           swatches in two rows of four, the picker's strip in its four bands,
+           then the eye dropper beside the hex field, all on the art's pale
+           panel. The swatch the colour is is ringed; the hex field carries the
+           colour itself down its left edge. */
+        .dock-color {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 4px 0;
+            padding: 8px;
+            background: #cfcfcf;
+            border: 2px solid #fff;
+            border-radius: 8px;
+        }
+
+        .dock-swatches {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        /* A tap's highlight would tint the very colour being chosen, so a
+           swatch and a band of the picker show none. */
+        .dock-swatch {
+            min-height: 30px;
+            border: 1px solid #000;
+            border-radius: 2px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .dock-swatch[aria-pressed="true"] {
+            box-shadow: inset 0 0 0 3px #cfcfcf, inset 0 0 0 4px #000;
+        }
+
+        .dock-picker {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dock-picker-band {
+            height: 12px;
+            border: none;
+            border-radius: 0;
+            cursor: crosshair;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .dock-color-tools {
+            display: grid;
+            grid-template-columns: 40px 1fr;
+            align-items: center;
+            gap: 8px;
+            padding-top: 6px;
+            border-top: 2px solid #fff;
+        }
+
+        /* The eye dropper, drawn as the art draws it: a navy pipette. Pressed,
+           it is ringed, and the next click on the ground takes a colour. */
+        .dock-dropper {
+            height: 30px;
+            background: no-repeat center / 18px 26px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 26'%3E%3Cpath d='M12 1a4 4 0 0 1 4 4l-2 3-9 13-3 3-1-1 1-4 9-13z' fill='%23061d43'/%3E%3Cpath d='M5 14l6 2' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E");
+            border: 1px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .dock-dropper[aria-pressed="true"] {
+            border-color: #061d43;
+            box-shadow: 0 0 0 2px #87ceeb;
+        }
+
+        .dock-color-tools .dock-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #061d43;
+        }
+
+        .dock-hex {
+            flex: 1;
+            min-width: 0;
+            color: #061d43;
+            text-align: left;
+            text-transform: uppercase;
+            background: #fff;
+            border: 2px solid #3c6482;
+            border-left: 10px solid var(--dock-color, #000);
         }
 
         /* The builder's two confirms, ACCEPT EDITS and SAVE AND EXIT MODE: a

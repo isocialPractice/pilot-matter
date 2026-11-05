@@ -269,6 +269,8 @@ test('the builder list reads as the input and then what it does', () => {
         'Click (Mountain) - Drop a Mountain',
         'Drag (Grass/Sand/Water/Snow) - Lay a Stroke',
         'Click (Runway) - Place the Chosen Runway',
+        'Drag (Free paint) - Paint a Stroke',
+        'Click (Free paint) - Take a Colour With the Eye Dropper',
         'Drag a Handle - Move or Shape What Is in Hand',
         'Esc - Accept Edits or Save and Exit',
         'Enter - Answer a Question',

@@ -5,6 +5,103 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.51.0] - 2026-11-05
+
+Free Paint: a colour laid on the ground and no height, its panel of swatches,
+picker, eye dropper and hex field, a brush sized in pixels and laid in world
+units, a stroke shown as the region it will cover while it is drawn, and a
+blend that keeps the ground's own lightness under the colour.
+
+### Added
+
+- **Free paint.** `paint` joins the element registry: a `color`, an `opacity`
+  and a `blend`. It writes a colour and no height, so a stroke of it is the
+  ground it was laid on in another colour rather than a decal standing over
+  it, and it is the last colour laid, after snow. `FREE PAINT` joins the
+  palette as the second stroke tool, beside the cover tool and sharing its
+  gestures: the strokes drawn before `ACCEPT` are one batch, the colour,
+  opacity and blend changing all of it and the brush only the strokes still to
+  come. A `color` range is one flat colour, declared with `color([r, g, b])`.
+- **Paint panel.** Free Paint's panel is the artwork's three groups.
+  `COLOR SELECTION` is eight swatches, the picker - the greys, then once round
+  the hues, in bands at 100, 75, 50 and 25 percent on white - the eye dropper,
+  and `HEX INPUT`, which reads the colour out and takes `#RRGGBB` or `#RGB`.
+  `BRUSH SELECTION` is `TIP`, round or square, and `EDGE`, hard or soft, under
+  a `DEFAULT` card, lit while the brush is the one the tool starts with - hard,
+  round and 25 pixels - and putting it back. `BRUSH PROPERTIES` is `OPACITY`,
+  read and typed as a percentage, `SIZE` with a slider, and `BLEND`. The eye
+  dropper, pressed, makes the next click on the ground take the colour there;
+  `Esc` and a tool change put it down. A paint batch picked with Select shows
+  its colour, opacity and blend, its colour chosen there the same way.
+- **Brush sizing.** The paint brush is sized in screen pixels and laid in
+  world units at the scale under the press, so a stroke does not change size
+  when the view moves. A round tip sweeps a disc and a square one a square; a
+  hard edge eases in across the sampling's two cells and a soft one across
+  half the brush's width.
+- **Paint blending.** At `TINT`, the default, a stroke takes the colour's hue
+  at the ground's own luminance - exactly, with as much of the colour's
+  saturation as that lightness can carry - so a painted hillside is still lit
+  from the same side; black and white are the ground's own grey. `NORMAL` lays
+  the colour as it is. `tintColor` is the W3C compositing spec's Color blend.
+- **The control list** carries `Drag (Free paint) - Paint a Stroke` and
+  `Click (Free paint) - Take a Colour With the Eye Dropper`.
+
+### Changed
+
+- **Strokes land as they are drawn.** A stroke being drawn, with Free Paint or
+  the cover tool, is shown as the region it will cover - worked out on the
+  ground in world units from the samples and the stamp at the press's scale -
+  rather than as a line the brush's pixels wide through the samples, which
+  was the stroke's width only where it was pressed. Free Paint's is in its own
+  colour.
+- The cover tool's functions serve both stroke tools under new names -
+  `strokeValues`, `setStrokeValues`, `strokeRanges` and `strokeHolderFor` -
+  and a brush row moved with a batch in hand no longer draws the ground again,
+  since it changes only the strokes still to come.
+- A range may declare `percent`, read and typed as a percentage, and `slider`,
+  drawn with a slider beside its figure. A dock section may carry tiles of its
+  own.
+
+Held in Node by the new `test/paint.test.js` - paint in the registry and the
+pipeline, a colour range resolved and held, paint moving no ground at a normal
+blend, part opacity and none, the tint's luminance exact for every swatch on
+grounds from black to white, its hue kept, a grey for a colour with none, a
+tinted field keeping its shading where a normal one flattens it, a stroke
+colouring only where it reaches, a paint batch picked and the airports still
+waiting, the nearest colour, the tool and its brush, the stamp at a scale, a
+stroke keeping the size it was laid at, the batch and its colour, the feather
+a stroke carries, `DEFAULT`, the eye dropper and what puts it down, the panel's
+sections and holder, the colour row, the swatches, a hex figure, the picker,
+rows read as a percentage, a stroke drawn as exactly its footprint's region
+and every outline the same way round, and the trail's colour and fill - with
+`test/page.test.js`, `test/properties-panel.test.js`, `test/build-panel.test.js`,
+`test/build-tools.test.js`, `test/cover.test.js`,
+`test/environment-elements.test.js` and `test/controls-help.test.js`. Each
+rejected the defect it names when that was put back, eighty-seven in all: among
+them paint lifting the ground, laid before snow, ignoring its opacity, tinting
+a normal blend or flattening a tint, a tint that scales and clips or clamps
+rather than drawing in toward its grey, luminance as an even mean, a colour
+drawing no row, reading as its channels, stepping round the swatches or
+shared with whoever handed it over, a percentage read or coarse stepped as a
+fraction, a hex figure of five digits taken or written in lower case, the
+picker shading toward black, the eye dropper offered everywhere or armed
+under any tool or after a tool change or a new canvas, a round tip square, a
+soft edge hard or a hard one with no feather, a stroke dropping its feather, a
+brush write redrawing the batch, `DEFAULT` putting back the colour, a stroke
+drawn without its joints, with its ends unturned or a half too wide, a paint
+stroke drawn in the cover trail's blue or at one unit a pixel, a click with the
+eye dropper armed painting, and `Esc` leaving with it armed.
+Settled in Chromium in 21 checks across a desktop and a phone: Free Paint on
+the palette with the way out still clear of the list, the panel's sections,
+rows, swatches, picker, dropper and hex field, a swatch, a hex figure taken and
+one refused, the picker's 50% band, a coarse opacity and the slider, `TIP`,
+`EDGE` and `DEFAULT`, the brush under the pointer, a stroke shown in its colour
+as it is drawn and covering exactly what the stroke laid covers, laid at the
+brush's pixels at the press's scale, the ground under it tinted at its own
+lightness with nothing outside it changed and no height moved, a second stroke
+and a colour recolouring the batch, `ACCEPT`, the eye dropper and `Esc`, the
+batch picked with Select, and a phone's swatches and a finger's stroke.
+
 ## [1.0.0-alpha.1.50.0] - 2026-11-05
 
 Insert Runway: a strip placed where it is asked for, the runway templates as

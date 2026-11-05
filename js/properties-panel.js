@@ -94,6 +94,82 @@ export function shadeColor(color, shade) {
     return color.map(channel => clamp(channel * shade, 0, 1));
 }
 
+/**
+ * The eight colours a `color` row offers as swatches, in the artwork's order:
+ * two rows of four. A press on a colour row's step walks along them, which is
+ * what a keyboard can do with a colour; the pointer has the picker and the hex
+ * field besides.
+ */
+export const COLOR_SWATCHES = Object.freeze([
+    { id: 'white',  label: 'WHITE',  rgb: [1, 1, 1] },
+    { id: 'black',  label: 'BLACK',  rgb: [0, 0, 0] },
+    { id: 'blue',   label: 'BLUE',   rgb: [0, 0, 1] },
+    { id: 'green',  label: 'GREEN',  rgb: [0, 1, 0] },
+    { id: 'purple', label: 'PURPLE', rgb: [1, 0, 1] },
+    { id: 'orange', label: 'ORANGE', rgb: [0.945, 0.353, 0.161] },
+    { id: 'red',    label: 'RED',    rgb: [1, 0, 0] },
+    { id: 'yellow', label: 'YELLOW', rgb: [1, 1, 0] }
+].map(swatch => Object.freeze({ ...swatch, rgb: Object.freeze(swatch.rgb) })));
+
+/**
+ * The custom picker's strip, left to right: the greys, then once round the
+ * hues. A position along it is a colour between the two stops either side.
+ */
+export const PICKER_STOPS = Object.freeze([
+    [1, 1, 1], [0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 1, 0], [1, 0.5, 0], [1, 0, 0], [1, 0, 1]
+].map(stop => Object.freeze(stop)));
+
+/**
+ * The picker's bands, top to bottom: each colour of the strip at its whole
+ * strength, then at 75, 50 and 25 percent of it, the rest white - so a pale
+ * version of any hue is one press away as well as the colour itself.
+ */
+export const PICKER_SHADES = Object.freeze([1, 0.75, 0.5, 0.25]);
+
+/**
+ * The colour the picker holds at `u`, from 0 at its left edge to 1 at its
+ * right, in the band at `shade`.
+ */
+export function pickerColor(u, shade = 1) {
+    const span = PICKER_STOPS.length - 1;
+    const at   = clamp(Number(u) || 0, 0, 1) * span;
+    const from = Math.min(Math.floor(at), span - 1);
+    const t    = at - from;
+    const a = PICKER_STOPS[from], b = PICKER_STOPS[from + 1];
+    const strength = clamp(Number(shade), 0, 1);
+    return a.map((channel, i) => roundChannel((channel + (b[i] - channel) * t) * strength + (1 - strength)));
+}
+
+/** A channel kept to the precision a hex figure carries, so a colour picked reads back as the figure it is. */
+function roundChannel(channel) {
+    return Math.round(clamp(channel, 0, 1) * 255) / 255;
+}
+
+/** A colour as the hex figure a panel writes it as: `#1E90FF`. */
+export function hexColor(rgb) {
+    return `#${(rgb ?? [0, 0, 0]).map(channel => Math.round(clamp(Number(channel) || 0, 0, 1) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+/**
+ * The colour a hex figure stands for - six digits or the three that are short
+ * for them, with or without the `#` - or null for anything else.
+ */
+export function parseHex(text) {
+    const digits = String(text ?? '').trim().replace(/^#/, '');
+    const full = /^[0-9a-f]{3}$/i.test(digits) ? [...digits].map(d => d + d).join('')
+        : /^[0-9a-f]{6}$/i.test(digits) ? digits : null;
+    if (full == null) return null;
+    return [0, 2, 4].map(at => parseInt(full.slice(at, at + 2), 16) / 255);
+}
+
+/** True for two colours a hex figure cannot tell apart. */
+export function sameColor(a, b) {
+    return Array.isArray(a) && Array.isArray(b) && hexColor(a) === hexColor(b);
+}
+
+/** What a panel says when a hex figure is refused. */
+export const HEX_NOTICE = 'A COLOUR IS #RRGGBB';
+
 // --- The switch on a gated range -------------------------------------------
 
 /**
@@ -126,7 +202,7 @@ export function gateOn(value) {
  * A span is two rows, because a span is two numbers and the pilot means to
  * move one of them. A gradient is two rows for the same reason, one per end.
  * A gated range is three: the switch, and then the two bounds it turns on. A
- * scalar and a choice are one row each.
+ * scalar, a choice and a colour are one row each.
  *
  * A kind this panel has no rows for draws none, rather than a number row it
  * does not know is wrong: an empty answer is one a conformance test can see.
@@ -174,6 +250,12 @@ export function rangeRows(name, range) {
         return [{ part: 'value', label: label(name), range, choice: true }];
     }
 
+    // One colour, chosen rather than stepped: a panel draws its swatches, its
+    // picker and its hex field, and a press steps it along the swatches.
+    if (range.kind === 'color') {
+        return [{ part: 'value', label: label(name), range, color: true }];
+    }
+
     if (range.kind === 'scalar') {
         return [{ part: 'value', label: label(name), range }];
     }
@@ -206,10 +288,20 @@ export function rowValue(holder, name, row) {
  * being drawn at, a switch as a word, and a choice as the value it holds.
  */
 export function rowValueLabel(row, value) {
-    if (row.shade) return `${Math.round(value * 100)}%`;
+    if (readsAsPercent(row)) return `${Math.round(value * 100)}%`;
     if (row.gate) return gateOn(value) ? GATE_ON_LABEL : GATE_OFF_LABEL;
     if (row.choice) return label(String(value));
+    if (row.color) return hexColor(value);
     return value.toFixed(stepPlaces(rangeStep(row.range)));
+}
+
+/**
+ * True for a row read as a percentage: a gradient end, which reads as the
+ * share of the preset's colour it is drawn at, and a fraction declared
+ * `percent`. Such a row is written, typed and coarse stepped in points.
+ */
+export function readsAsPercent(row) {
+    return row?.shade != null || row?.range?.percent === true;
 }
 
 /** A row as the line a panel draws: the label, and the reading between the marks that say it steps. */
@@ -259,6 +351,15 @@ export function writeRowValue(holder, name, row, value) {
         return;
     }
 
+    // A colour is copied in, each channel held to what a channel holds, so the
+    // holder never shares an array with whoever handed the colour over.
+    if (row.color) {
+        if (Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)) {
+            holder.config[name] = value.map(channel => clamp(channel, 0, 1));
+        }
+        return;
+    }
+
     holder.config[name] = value;
 }
 
@@ -282,7 +383,7 @@ export const COARSE_POINTS = 10;
  */
 export function coarseStep(row, step) {
     const sign = Math.sign(Number(step) || 0);
-    if (row?.shade) return sign * (COARSE_POINTS / 100) / rangeStep(SHADE_RANGE);
+    if (readsAsPercent(row)) return sign * (COARSE_POINTS / 100) / rangeStep(row.shade ? SHADE_RANGE : row.range);
     return sign * COARSE_STEPS * Math.max(Math.abs(Number(step) || 0), 1);
 }
 
@@ -298,6 +399,13 @@ export function stepRow(holder, name, row, step) {
     if (!step) return false;
 
     const held = rowValue(holder, name, row);
+    if (row.color) {
+        const next = stepSwatch(held, step);
+        if (sameColor(next, held)) return false;
+        writeRowValue(holder, name, row, next);
+        return true;
+    }
+
     const next = row.choice
         ? stepChoice(row.range, held, step)
         : moveValue(held, step * rangeStep(row.range), row.range.low, row.range.high);
@@ -305,6 +413,17 @@ export function stepRow(holder, name, row, step) {
 
     writeRowValue(holder, name, row, next);
     return true;
+}
+
+/**
+ * The swatch a step from a colour lands on: the next along, or back, from the
+ * swatch it is - and from a colour that is no swatch, the first going on or
+ * the last going back - stopping at either end.
+ */
+function stepSwatch(held, step) {
+    const at   = COLOR_SWATCHES.findIndex(swatch => sameColor(swatch.rgb, held));
+    const from = at >= 0 ? at : step > 0 ? -1 : COLOR_SWATCHES.length;
+    return [...COLOR_SWATCHES[clamp(from + Math.trunc(step), 0, COLOR_SWATCHES.length - 1)].rgb];
 }
 
 function stepChoice(range, held, step) {
@@ -324,7 +443,7 @@ function stepChoice(range, held, step) {
  * nothing - which is what the settings panel's choice rows already say.
  */
 export function isTypedRow(row) {
-    return row != null && !row.choice && row.range != null;
+    return row != null && !row.choice && !row.color && row.range != null;
 }
 
 /**
@@ -337,17 +456,19 @@ export function isTypedRow(row) {
  */
 export function typedRowValue(row, typed) {
     if (!Number.isFinite(typed)) return null;
-    return row?.shade ? typed / 100 : typed;
+    return readsAsPercent(row) ? typed / 100 : typed;
 }
 
 /**
  * What the row says when a press is refused: the bounds the range was declared
  * with, written the way the row writes a value, so a gradient end is refused
- * against percentages and a height against feet.
+ * against percentages and a height against feet. A colour has no bounds, and
+ * what is refused at it is a figure that is not a colour.
  */
 export function rangeNotice(row) {
     const range = row?.range;
     if (!range) return '';
+    if (row.color) return HEX_NOTICE;
     return `${rowValueLabel(row, range.low)} TO ${rowValueLabel(row, range.high)}`;
 }
 

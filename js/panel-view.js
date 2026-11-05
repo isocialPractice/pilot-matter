@@ -19,9 +19,16 @@
  * Beneath its first part the dock may hold sections, each under a heading of
  * its own - Select's panel is the camera and then what is being looked at. A
  * section that folds has a heading that is a button, opening and shutting it.
+ *
+ * A colour row is drawn as a colour is chosen rather than stepped: its
+ * swatches, the picker's strip in its four bands, the eye dropper and a hex
+ * field. A row whose range asks for a slider has one beside its figure.
  */
 
-import { isTypedRow, rangeStep, stepPlaces } from './properties-panel.js';
+import {
+    isTypedRow, rangeStep, stepPlaces, readsAsPercent, COLOR_SWATCHES, PICKER_STOPS, PICKER_SHADES,
+    pickerColor, hexColor, parseHex, sameColor, rangeNotice
+} from './properties-panel.js';
 import { OPTION_LEFT_MARK, OPTION_RIGHT_MARK } from './settings.js';
 
 /**
@@ -41,8 +48,17 @@ export function dockRows(content) {
 
 /** The figure a typed field shows for a row, in the units the row reads in. */
 export function fieldFigure(row, value) {
-    if (row.shade) return Math.round(value * 100);
+    if (readsAsPercent(row)) return Math.round(value * 100);
     return Number(Number(value).toFixed(stepPlaces(rangeStep(row.range))));
+}
+
+/** The CSS a picker band is painted with: the strip's stops at `shade` of their strength, the rest white. */
+export function pickerBandStyle(shade) {
+    const stops = PICKER_STOPS.map((_, i) => {
+        const rgb = pickerColor(i / (PICKER_STOPS.length - 1), shade).map(channel => Math.round(channel * 255));
+        return `rgb(${rgb.join(', ')}) ${((i / (PICKER_STOPS.length - 1)) * 100).toFixed(2)}%`;
+    });
+    return `linear-gradient(to right, ${stops.join(', ')})`;
 }
 
 /** True for a row drawn as a typed field rather than a reading between two marks. */
@@ -59,6 +75,7 @@ function shapeOf(content) {
         ...(content.nudges ?? []).map(nudge => `nudge:${nudge.id}`),
         ...(content.sections ?? []).flatMap(section => [
             `section:${section.id}:${section.heading}:${section.open ? 'open' : 'shut'}`,
+            ...(section.shapes ?? []).flatMap(row => row.tools.map(tool => `shape:${tool.id}`)),
             ...(section.rows ?? []).map(rowKey)
         ]),
         ...(content.actions ?? []).map(action => `action:${action.id}`)
@@ -71,7 +88,9 @@ export class PanelView {
      * that scroll, and the answers. `handlers` are told what was done:
      * `onStep(entry, step, coarse)`, `onType(entry, figure, field)`,
      * `onNudge(id, sign)`, `onAction(id)`, `onFold(id)` for a section's
-     * heading pressed, and `onShape(id)` for one of a mode's own tools.
+     * heading pressed, `onShape(id)` for one of a mode's own tools,
+     * `onColor(entry, rgb)` for a colour chosen at a colour row and
+     * `onDropper(entry)` for its eye dropper pressed.
      */
     constructor(root, handlers = {}) {
         this.root     = root;
@@ -85,6 +104,7 @@ export class PanelView {
 
         root.addEventListener('click', (event) => this.onClick(event));
         root.addEventListener('change', (event) => this.onChange(event));
+        root.addEventListener('input', (event) => this.onSlide(event));
     }
 
     /** Draws what the dock shows, or takes it off the screen for nothing. */
@@ -113,34 +133,8 @@ export class PanelView {
 
         // A mode with tools of its own - the lasso, or Insert Runway's
         // templates - draws them first, a row of tiles to each row the artwork
-        // groups them into. A tile with no art to it is a card: its name alone.
-        for (const row of content.shapes ?? []) {
-            const line = document.createElement('div');
-            line.className = 'dock-shapes';
-            line.dataset.shapeRow = row.row;
-            for (const tool of row.tools) {
-                const tile = document.createElement('button');
-                tile.type = 'button';
-                tile.className = 'dock-shape';
-                tile.dataset.shape = tool.id;
-                tile.title = tool.name;
-                tile.setAttribute('aria-label', tool.name);
-                if (tool.art) {
-                    const mark = document.createElement('img');
-                    mark.src = tool.art;
-                    mark.alt = '';
-                    mark.draggable = false;
-                    tile.append(mark);
-                } else {
-                    tile.classList.add('dock-card');
-                }
-                const name = document.createElement('span');
-                name.textContent = tool.label;
-                tile.append(name);
-                line.append(tile);
-            }
-            this.fields.append(line);
-        }
+        // groups them into.
+        this.drawShapes(content.shapes);
 
         for (const entry of content.rows) this.drawRow(entry);
 
@@ -167,6 +161,7 @@ export class PanelView {
                 heading.setAttribute('aria-expanded', String(Boolean(section.open)));
             }
             this.fields.append(heading);
+            this.drawShapes(section.shapes);
             for (const entry of section.rows ?? []) this.drawRow(entry);
         }
 
@@ -181,8 +176,110 @@ export class PanelView {
         this.answers.style.display = (content.actions ?? []).length ? 'flex' : 'none';
     }
 
+    /** Draws rows of tiles, one to each row the artwork groups them into. A tile with no art to it is a card: its name alone. */
+    drawShapes(rows) {
+        for (const row of rows ?? []) {
+            const line = document.createElement('div');
+            line.className = 'dock-shapes';
+            line.dataset.shapeRow = row.row;
+            for (const tool of row.tools) {
+                const tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = 'dock-shape';
+                tile.dataset.shape = tool.id;
+                tile.title = tool.name;
+                tile.setAttribute('aria-label', tool.name);
+                if (tool.art) {
+                    const mark = document.createElement('img');
+                    mark.src = tool.art;
+                    mark.alt = '';
+                    mark.draggable = false;
+                    tile.append(mark);
+                } else {
+                    tile.classList.add('dock-card');
+                }
+                const name = document.createElement('span');
+                name.textContent = tool.label;
+                tile.append(name);
+                line.append(tile);
+            }
+            this.fields.append(line);
+        }
+    }
+
+    /**
+     * Draws a colour row: the swatches, two rows of four; the picker, a band
+     * for each shade of its strip; and beneath them the eye dropper and the
+     * hex field the colour is read out in and can be typed into.
+     */
+    drawColorRow(entry) {
+        const key  = rowKey(entry);
+        const line = document.createElement('div');
+        line.className = 'dock-color';
+        line.dataset.row = key;
+
+        const swatches = document.createElement('div');
+        swatches.className = 'dock-swatches';
+        for (const swatch of COLOR_SWATCHES) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'dock-swatch';
+            button.dataset.swatch = swatch.id;
+            button.style.background = hexColor(swatch.rgb);
+            button.title = swatch.label;
+            button.setAttribute('aria-label', `${entry.row.label} ${swatch.label}`);
+            swatches.append(button);
+        }
+
+        const picker = document.createElement('div');
+        picker.className = 'dock-picker';
+        picker.setAttribute('role', 'presentation');
+        for (const shade of PICKER_SHADES) {
+            const band = document.createElement('button');
+            band.type = 'button';
+            band.className = 'dock-picker-band';
+            band.dataset.shade = String(shade);
+            band.style.background = pickerBandStyle(shade);
+            band.setAttribute('aria-label', `${entry.row.label} at ${Math.round(shade * 100)} percent`);
+            picker.append(band);
+        }
+
+        const tools = document.createElement('div');
+        tools.className = 'dock-color-tools';
+
+        const dropper = document.createElement('button');
+        dropper.type = 'button';
+        dropper.className = 'dock-dropper';
+        dropper.dataset.dropper = 'on';
+        dropper.title = 'Eye dropper: take a colour off the ground';
+        dropper.setAttribute('aria-label', 'Eye dropper');
+        dropper.setAttribute('aria-pressed', 'false');
+
+        const hexLabel = document.createElement('label');
+        hexLabel.className = 'dock-label';
+        hexLabel.textContent = 'HEX INPUT';
+        const hex = document.createElement('input');
+        hex.type = 'text';
+        hex.className = 'dock-value dock-hex';
+        hex.maxLength = 7;
+        hex.spellcheck = false;
+        hex.autocomplete = 'off';
+        hex.setAttribute('aria-label', `${entry.row.label} hex input`);
+        hexLabel.append(hex);
+
+        tools.append(dropper, hexLabel);
+        line.append(swatches, picker, tools);
+        this.fields.append(line);
+        this.drawn.set(key, { line, reading: hex, swatches, dropper, color: true });
+    }
+
     /** Draws one row: its label, the two steps either side of its reading, and the reading itself. */
     drawRow(entry) {
+        if (entry.row.color) {
+            this.drawColorRow(entry);
+            return;
+        }
+
         const key  = rowKey(entry);
         const line = document.createElement('div');
         line.className = 'dock-row';
@@ -208,13 +305,30 @@ export class PanelView {
         }
 
         line.append(name, down, reading, up);
+
+        // A value set by eye has a slider beside its figure, across the
+        // row's whole range, moving the same value the steps and the figure do.
+        let slider = null;
+        if (entry.row.range?.slider === true && typed(entry.row)) {
+            slider = document.createElement('input');
+            slider.type = 'range';
+            slider.className = 'dock-slider';
+            slider.min = String(entry.row.range.low);
+            slider.max = String(entry.row.range.high);
+            slider.step = '1';
+            slider.setAttribute('aria-label', `${entry.row.label} slider`);
+            line.classList.add('dock-row-slider');
+            line.append(slider);
+        }
+
         this.fields.append(line);
-        this.drawn.set(key, { line, reading, down, up });
+        this.drawn.set(key, { line, reading, down, up, slider });
     }
 
     /** Writes every reading, leaving alone the one being typed into. */
     update(content) {
-        for (const row of content.shapes ?? []) {
+        const shapes = [...(content.shapes ?? []), ...(content.sections ?? []).flatMap(section => section.shapes ?? [])];
+        for (const row of shapes) {
             for (const tool of row.tools) {
                 this.fields.querySelector(`.dock-shape[data-shape="${tool.id}"]`)?.setAttribute('aria-pressed', String(tool.live));
             }
@@ -223,6 +337,11 @@ export class PanelView {
         for (const entry of dockRows(content)) {
             const drawn = this.drawn.get(rowKey(entry));
             if (!drawn) continue;
+
+            if (drawn.color) {
+                this.updateColorRow(drawn, entry, content);
+                continue;
+            }
 
             const held = !entry.live;
             drawn.line.classList.toggle('locked', held);
@@ -238,6 +357,34 @@ export class PanelView {
             } else {
                 drawn.reading.textContent = entry.valueLabel;
             }
+
+            if (drawn.slider) {
+                drawn.slider.disabled = held;
+                if (document.activeElement !== drawn.slider) drawn.slider.value = String(entry.value);
+            }
+        }
+    }
+
+    /** Writes a colour row: the swatch it is lit, the hex field, and the dropper pressed while it is armed. */
+    updateColorRow(drawn, entry, content) {
+        const held = !entry.live;
+        drawn.line.classList.toggle('locked', held);
+        for (const button of drawn.swatches.querySelectorAll('.dock-swatch')) {
+            const swatch = COLOR_SWATCHES.find(each => each.id === button.dataset.swatch);
+            button.setAttribute('aria-pressed', String(sameColor(swatch?.rgb, entry.value)));
+            button.disabled = held;
+        }
+        // The eye dropper is offered where it can be armed - Free Paint's own
+        // panel, which says whether it is - and not on a colour row reached
+        // any other way, such as a paint batch picked with Select.
+        drawn.dropper.hidden = typeof content.dropping !== 'boolean';
+        drawn.dropper.setAttribute('aria-pressed', String(content.dropping === true));
+        drawn.dropper.disabled = held;
+        drawn.reading.disabled = held;
+        drawn.line.style.setProperty('--dock-color', hexColor(entry.value));
+        if (document.activeElement !== drawn.reading) {
+            drawn.reading.value = entry.valueLabel;
+            drawn.reading.setCustomValidity('');
         }
     }
 
@@ -264,6 +411,29 @@ export class PanelView {
             return;
         }
 
+        // A colour row's own buttons: a swatch, a band of the picker - read
+        // at the point along it the press landed - and the eye dropper.
+        const colorLine = button.closest('.dock-color');
+        if (colorLine) {
+            const entry = this.entryFor(colorLine.dataset.row);
+            if (!entry?.live) return;
+            if (button.dataset.dropper) {
+                this.handlers.onDropper?.(entry);
+                return;
+            }
+            if (button.dataset.swatch) {
+                const swatch = COLOR_SWATCHES.find(each => each.id === button.dataset.swatch);
+                if (swatch) this.handlers.onColor?.(entry, [...swatch.rgb]);
+                return;
+            }
+            if (button.dataset.shade) {
+                const box = button.getBoundingClientRect();
+                const along = box.width > 0 ? (event.clientX - box.left) / box.width : 0;
+                this.handlers.onColor?.(entry, pickerColor(along, Number(button.dataset.shade)));
+            }
+            return;
+        }
+
         const step = Number(button.dataset.step);
         if (!step) return;
 
@@ -281,9 +451,36 @@ export class PanelView {
     onChange(event) {
         const field = event.target;
         if (!(field instanceof HTMLInputElement) || this.content == null) return;
+        if (field.type === 'range') return;
+
+        // A hex figure typed at a colour row: taken when it is a colour, and
+        // refused - the field keeping what was typed - when it is not.
+        if (field.classList.contains('dock-hex')) {
+            const entry = this.entryFor(field.closest('.dock-color')?.dataset.row);
+            if (!entry?.live) return;
+            const rgb = parseHex(field.value);
+            if (rgb == null) {
+                field.setCustomValidity(rangeNotice(entry.row));
+                field.reportValidity();
+                return;
+            }
+            field.setCustomValidity('');
+            field.blur();
+            this.handlers.onColor?.(entry, rgb);
+            return;
+        }
 
         const entry = this.entryFor(field.closest('.dock-row')?.dataset.row);
         if (entry?.live) this.handlers.onType?.(entry, Number(field.value), field);
+    }
+
+    /** A slider moved: its row given the value it is at, as it moves. */
+    onSlide(event) {
+        const slider = event.target;
+        if (!(slider instanceof HTMLInputElement) || slider.type !== 'range' || this.content == null) return;
+
+        const entry = this.entryFor(slider.closest('.dock-row')?.dataset.row);
+        if (entry?.live) this.handlers.onType?.(entry, Number(slider.value), slider);
     }
 
     entryFor(key) {

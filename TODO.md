@@ -11,35 +11,39 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Free paint**: an element that writes colour and no height, so an
-  accepted stroke is ground rather than a decal standing over it
-  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
-    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
-    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
-    the strip's grey, given their members once both are in the registry.
+- [ ] **Deselect from anywhere**: the panel row every tool gets while a
+  selection exists, and a right click on the selection itself, both going
+  through the same place
+  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
+    the lasso's panel while something is selected, through `deselect` in
+    `js/build-mode.js`; this item puts the same answer on every tool's panel
+    and on a right click on the selection.
+  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
+    the lasso and its panel is three sections with no answer of their own; a
+    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
+    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
+    on the selection drawn over a paint stroke.
   - From: Interactive Build Mode
-- [ ] **Paint panel**: the colour swatches, the custom picker, the eye dropper
-  and the hex field, with the brush as a tip and an edge rather than a list of
-  named presets
+- [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
+  elements laid before it, any one element or all of them, preset or built, at a
+  strength, and with `alt` held putting back what an earlier stroke took
+  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
+    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
+    once at the press through `lassoOp`; Erase's `alt` is read the same way.
+  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
+    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
+    `layStroke` and `strokeStamp` in `js/build-tools.js` and
+    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
+    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
+    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
   - From: Interactive Build Mode
-- [ ] **Brush sizing**: a brush measured in screen pixels while painting and
-  stored in world units once the stroke is laid, so a stroke does not change
-  size when the camera moves
-  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
-    `coverStamp` turns a brush in pixels into a stamp in world units at the
-    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
-    goes the same way.
-  - From: Interactive Build Mode
-- [ ] **Strokes land as they are drawn**: each pointer sample projected to the
-  ground as it is taken, so the stroke on screen while painting is the stroke
-  that gets committed
-  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
-    `js/main.js` stands each sample on the ground as it is taken, every six
-    pixels, and the trail on the overlay is drawn through them.
-  - From: Interactive Build Mode
-- [ ] **Paint blending**: a stroke that takes the brush's hue and keeps the
-  ground's own lightness, so a painted hillside is still lit from the same side
-  rather than going flat
+- [ ] **Erasing water and runways**: the sea held per vertex so a hole erased in
+  a lake is dry ground, and a strip erased whole and only when it is the target
+  named
+  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
+    one height a vertex beside the sea's level, and `waterSurface` reads a
+    vertex as wet only where it lies under its own line - so a hole erased in a
+    lake is the line set to `NaN` there.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -109,31 +113,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Free paint**: an element that writes colour and no height, so an
-  accepted stroke is ground rather than a decal standing over it
-  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
-    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
-    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
-    the strip's grey, given their members once both are in the registry.
-- [ ] **Paint panel**: the colour swatches, the custom picker, the eye dropper
-  and the hex field, with the brush as a tip and an edge rather than a list of
-  named presets
-- [ ] **Brush sizing**: a brush measured in screen pixels while painting and
-  stored in world units once the stroke is laid, so a stroke does not change
-  size when the camera moves
-  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
-    `coverStamp` turns a brush in pixels into a stamp in world units at the
-    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
-    goes the same way.
-- [ ] **Strokes land as they are drawn**: each pointer sample projected to the
-  ground as it is taken, so the stroke on screen while painting is the stroke
-  that gets committed
-  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
-    `js/main.js` stands each sample on the ground as it is taken, every six
-    pixels, and the trail on the overlay is drawn through them.
-- [ ] **Paint blending**: a stroke that takes the brush's hue and keeps the
-  ground's own lightness, so a painted hillside is still lit from the same side
-  rather than going flat
 - [ ] **Deselect from anywhere**: the panel row every tool gets while a
   selection exists, and a right click on the selection itself, both going
   through the same place
@@ -141,12 +120,23 @@ the order the work unblocks itself in.
     the lasso's panel while something is selected, through `deselect` in
     `js/build-mode.js`; this item puts the same answer on every tool's panel
     and on a right click on the selection.
+  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
+    the lasso and its panel is three sections with no answer of their own; a
+    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
+    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
+    on the selection drawn over a paint stroke.
 - [ ] **Erase**: free paint inverted - a stroke cut out of the footprints of the
   elements laid before it, any one element or all of them, preset or built, at a
   strength, and with `alt` held putting back what an earlier stroke took
   - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
     `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
     once at the press through `lassoOp`; Erase's `alt` is read the same way.
+  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
+    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
+    `layStroke` and `strokeStamp` in `js/build-tools.js` and
+    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
+    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
+    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
 - [ ] **Erasing water and runways**: the sea held per vertex so a hole erased in
   a lake is dry ground, and a strip erased whole and only when it is the target
   named
@@ -170,6 +160,9 @@ the order the work unblocks itself in.
     over rects at fixed distances from the strip's edge and ends - see
     `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
     widens.
+  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
+    registry, so `extrude` is the last element the airports wait on; their
+    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
 - [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
   height as a single region, with two that overlap reading as one solid
   - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
@@ -181,9 +174,15 @@ the order the work unblocks itself in.
 - [ ] **Extrusion surfaces**: a top and a wall colour, with a click on either
   pointing the panel at that declared value and outlining it on the overlay,
   and the surface panel's apply keeping a change where its back drops it
+  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
+    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
+    field; `topColor` and `wallColor` declared with it are drawn the same way.
 - [ ] **Extrusions settle into the ground**: each surface taking the ground's
   own lightness, and the wall's colour fading to the ground's across the band
   its height already eases over
+  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
+    `js/environment/elements.js` gives a colour the ground's own luminance,
+    which is the first half of this.
 - [ ] **The camera from inside a tool**: a held pan that suspends the live tool
   rather than changing it, putting the tool back on release so a half-drawn
   shape is not committed by moving the view
@@ -293,85 +292,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 348 earlier items in `TODO-archive.md`, newest last.
+> 353 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Cover density**: how much of a stroke grass, sand, water or snow covers,
-  through noise that stays put when a tile is drawn again, defaulting to full
-  cover so every preset renders as it does today, with water and snow starting
-  full so their strokes are not drawn with gaps
-  - **Settled**: `density` on grass, sand, water and snow, 1 by default, at
-    which every preset is drawn exactly as before. `coverAt` in
-    `js/environment/elements.js` breaks a cover into clumps through value
-    noise keyed on the canvas's coordinates and repeating a canvas apart, a
-    density turned into a threshold through deciles measured off the noise so
-    it is the share of the ground covered. Water at part density is pools
-    under its level; snow's `coverage` stays how thickly it lies.
-  - From: Interactive Build Mode
-- [x] **A stroke's band is its ground**: a ground cover drawn with a footprint
-  painting all of the ground under it and graded across that ground's own
-  relief, worked out on each tile rather than once
-  - **Settled**: grass and sand declare `footprintSettles: { band: 'relief' }`,
-    and `applyFootprintedElement` works the band out on each tile - the lowest
-    and highest ground the footprint reaches there - before the element is
-    drawn, through `settleFromFootprint`, the generator left a whole-field
-    function. A clip alone settles nothing, and a batch picked again shows no
-    band on its panel.
-  - From: Interactive Build Mode
-- [x] **Water drawn above the sea**: a water line kept per vertex beside the
-  sea's one level, so water drawn on high ground is water where it was drawn and
-  nowhere else on the tile, and a runway is lifted clear of the water actually
-  under it
-  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
-    is declared for water, starting whole, and `footprintSettles` in
-    `js/environment/footprinted.js` is where a value worked out from the
-    ground under a stroke goes - the band is the first; the line is the next.
-    Water joins `BUILT_TOOLS` once it is drawn where it was drawn. Water at
-    part density is pools under its level, which `waterSurface` still reads
-    as one sheet.
-  - **Settled**: `field.water` is `{ level, line }`: `level` the sea's, null
-    where there is none, and `line` one height a vertex. The sea writes its
-    level into the line everywhere its density reaches, so every preset's
-    surface is the one it was; drawn water writes its own line where it was
-    drawn, carried back by the compositor, and never moves the level.
-    `waterSurface` reads a vertex as wet where it lies at or under its own
-    line, looking for a line before calling a tile dry, and
-    `clearRunwayGround` takes the highest line under the strip as well as the
-    sea's level. Water joins the palette.
-  - From: Interactive Build Mode
-- [x] **Drawn water lies in the ground**: the line set at the lowest bank within
-  the stroke's half-width and the ground cut down to it, with the colour running
-  from the bank to the middle, so a stroke drawn downhill is a stream and its
-  dark end shows wherever it rests
-  - **Settled**: water declares `footprintSettles: { drawn: 'waterLine' }`
-    and `footprintIgnores` its level and flatten. `bankMeasure` in
-    `js/environment/footprinted.js` walks each stroke at half a cell's
-    spacing, finds the lowest ground within half its width at each step, and
-    gives every vertex the bank of the point it lies across from, read
-    between the steps either side - so the line is level across a stroke and
-    follows the ground down along one, measured on each tile's own vertices
-    and at each repeat of a stroke over the seam, where the step is held under
-    the swell. The plan's smoothing pass was measured and dropped: read
-    between steps half a cell apart, the line came out no more even for it.
-    The line is 1.5 under the bank and never over the ground; the
-    ground is cut to it, the colour runs pale at the bank to dark in the
-    middle, and a region with no stroke is a pond at its lowest ground. The
-    line and how far in each vertex is travel as `drawn`, carried beside the
-    ranges like `at`.
-  - From: Interactive Build Mode
-- [x] **Drawn snow settles where it is drawn**: the snow line put under the
-  stroke's lowest ground on each tile, and the depth running from a thin,
-  shadowed edge to white in the middle, so snow drawn on low ground shows and
-  both colour ends show on any ground
-  - **The tool is waiting for it.** Since `1.0.0-alpha.1.48.0` the cover tool
-    is declared for snow, starting whole, and the snow line is the next
-    `footprintSettles` entry beside the band; snow joins `BUILT_TOOLS` with it.
-  - **Settled**: snow declares `footprintSettles: { line: 'lowest', drawn:
-    'inward' }`: its line is put a unit under the stroke's lowest ground on
-    each tile, and its depth is how far in from the stroke's edge a vertex is,
-    times its coverage, so it is thin and blue-grey at the edge and white down
-    the middle on any ground; `slope` still leaves steep faces bare. Snow
-    joins the palette.
-  - From: Interactive Build Mode
 - [x] **Coarse steps**: `shift` and a click, or `shift` and an arrow, moving any
   panel row by ten points or ten steps, in every panel including the element
   editor's
@@ -430,4 +352,94 @@ how the simulator got here rather than as a list still to be worked.
     placed strip, the first otherwise - is what `getRunway()` returns, so a
     runway start opens on the strip the pilot built. It is published in the
     API beside the other strip readers.
+  - From: Interactive Build Mode
+- [x] **Free paint**: an element that writes colour and no height, so an
+  accepted stroke is ground rather than a decal standing over it
+  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
+    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
+    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
+    the strip's grey, given their members once both are in the registry.
+  - **Settled**: `paint` is in the registry - a `color`, an `opacity` read as
+    a percentage and a `blend` of `tint` or `normal` - and paints the whole
+    field, a footprint keeping a stroke a stroke; it is applied after `snow`
+    and before the strip. `color` is a range kind of its own, one flat colour
+    clamped channel by channel, which the panel draws as the item below says;
+    it is what `1.0.0-alpha.1.40.0` left waiting. Free Paint is on the palette
+    as the second stroke tool: the cover tool's functions now serve both -
+    `strokeValues`, `setStrokeValues`, `layStroke`, `strokeRanges` and
+    `strokeHolderFor` in place of the cover-only names - each tool bringing
+    its own brush and element rows. Its batch is the cover tool's: colour,
+    opacity and blend are the whole batch's, so a colour chosen after three
+    strokes recolours all three, and a second colour is a second batch. The
+    walkthrough's frames, where the strokes before the change of colour look
+    to stay black, read as gist. The airports now wait on `extrude` alone.
+  - From: Interactive Build Mode
+- [x] **Paint panel**: the colour swatches, the custom picker, the eye dropper
+  and the hex field, with the brush as a tip and an edge rather than a list of
+  named presets
+  - **Settled**: the dock draws Free Paint as three sections under the art's
+    headings, all writing one holder. `COLOR SELECTION` is one `color` row,
+    drawn by `js/panel-view.js` as the art's eight swatches in its order - its
+    purple is the art's magenta - the picker, the eye dropper and `HEX INPUT`,
+    which takes `#RRGGBB` or `#RGB` and refuses anything else with `A COLOUR
+    IS #RRGGBB`. The picker is the greys then once round the hues, in four
+    bands at 100, 75, 50 and 25 percent of the colour, the rest white, read at
+    the point pressed; a press of a colour row's step walks the swatches.
+    `BRUSH SELECTION` is `TIP` and `EDGE` as choice rows under a `DEFAULT`
+    card, a section's own tile, lit while the brush is the one the tool starts
+    with and putting it back. The plan's "default between" for the edge is
+    read as that card: the walkthrough opens on "Hard Round", which is what
+    the tool starts with. `BRUSH PROPERTIES` is `OPACITY`, `SIZE` with a
+    slider, and `BLEND`, which the art does not draw: at `TINT` black and
+    white are the ground's own grey, and `NORMAL` is how a black that is black
+    is laid. A range declares `percent` and `slider` as options. The eye
+    dropper is session state, put down by a click that takes the vertex's
+    generated colour, by `Esc` before leaving is asked, by a tool change and
+    by a new canvas; it is offered on Free Paint's panel alone, not on a paint
+    batch picked with Select, which shows its colour row without it.
+  - From: Interactive Build Mode
+- [x] **Brush sizing**: a brush measured in screen pixels while painting and
+  stored in world units once the stroke is laid, so a stroke does not change
+  size when the camera moves
+  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
+    `coverStamp` turns a brush in pixels into a stamp in world units at the
+    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
+    goes the same way.
+  - **Settled**: `paintStamp` lays `SIZE` across and along at the press's
+    scale, a round tip with its corners at half the width and a square one
+    with none; `strokeStamp` hands each stroke tool its own. The edge is the
+    stroke's `feather`, carried by `layStroke`: `HARD` is the sampling's two
+    cells rather than the plan's 0, since an edge inside one cell is a
+    staircase of whole vertices - the cliff `FEATHER_CELLS` exists to keep off -
+    and `SOFT` is half the width, so a soft stroke is whole only down its
+    middle. A brush resized after a stroke is laid leaves the stroke as it was.
+  - From: Interactive Build Mode
+- [x] **Strokes land as they are drawn**: each pointer sample projected to the
+  ground as it is taken, so the stroke on screen while painting is the stroke
+  that gets committed
+  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
+    `js/main.js` stands each sample on the ground as it is taken, every six
+    pixels, and the trail on the overlay is drawn through them.
+  - **Settled**: the samples were already stood on the ground; the width was
+    not. The trail was a line the brush's pixels wide through them, the width
+    the stroke has only where it was pressed. A stroke being drawn - either
+    tool's - is now `strokeRibbon` in `js/build-overlay.js`: the region the
+    footprint will cover, worked out in world units from the samples and the
+    stamp at the press's scale, then stood on the ground and projected, filled
+    in the paint's own colour or the cover trail's blue. Held in Node against
+    the footprint's own measure, over bends, stamps of one point, and round
+    and square tips; `strokeTrail` is gone.
+  - From: Interactive Build Mode
+- [x] **Paint blending**: a stroke that takes the brush's hue and keeps the
+  ground's own lightness, so a painted hillside is still lit from the same side
+  rather than going flat
+  - **Settled**: `tintColor` in `js/environment/elements.js` is the W3C
+    compositing spec's Color blend in Rec. 709 luminance: every channel
+    shifted by the same amount to the ground's luminance, then drawn in toward
+    its own grey where that takes a channel past what one holds. The plan's
+    sketch, which scales the paint to the ground's luminance and clips, loses
+    it: a deep blue on pale ground is clipped back to the deep blue it was,
+    and black divides by nothing. A tinted colour has the ground's luminance
+    exactly, the paint's hue, and as much of its saturation as that lightness
+    can carry; a colour with no hue is the ground's grey.
   - From: Interactive Build Mode

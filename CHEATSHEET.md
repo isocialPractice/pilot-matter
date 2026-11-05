@@ -250,9 +250,11 @@ back.
 | Click in Lasso, with Polyline or a curved tool | Place a point; click the first one again, or double click, to close the shape |
 | Drag, or a finger, in Grass, Sand, Water or Snow | Lay a stroke of it with the stamp on the panel, which follows the pointer |
 | Click, or a finger, in Runway | Place the chosen runway, lined up with the view; with one in hand, put it down there instead |
+| Drag, or a finger, in Free Paint | Paint a stroke in the panel's colour with the brush, which follows the pointer |
+| Click in Free Paint, with the eye dropper armed | Take the colour of the ground there as the brush's |
 | `Shift` and a press on a spinner | A coarse step: ten points on a percentage, ten steps on anything else |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
-| `Esc` | End a drag being made, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
+| `Esc` | End a drag being made, put an armed eye dropper down, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
 | `H` | Collapse the control list, and open it again |
 
@@ -322,6 +324,22 @@ with it in hand puts it down there instead, and another card turns it into that
 template where it stands. A strip is kept wholly on the canvas. The two
 airports join the cards once their aprons and buildings can be drawn. A flight
 that starts on a runway starts on the last one placed.
+
+Free Paint's panel is the artwork's three groups. `COLOR SELECTION` is eight
+swatches, a strip of every hue in four bands - whole, then at 75, 50 and 25
+percent on white - the eye dropper, and `HEX INPUT`, which reads out the colour
+and takes one typed as `#RRGGBB` or `#RGB`. `BRUSH SELECTION` is `TIP`, round
+or square, and `EDGE`, hard or soft, under `DEFAULT`, which is lit while the
+brush is the one the tool starts with - hard, round and 25 pixels - and puts it
+back. `BRUSH PROPERTIES` is `OPACITY` as a percentage, `SIZE` in pixels with a
+slider, and `BLEND`. A drag is shown on the ground as the region it will cover,
+in the paint's colour, and lays a colour and no height: at `TINT` the stroke
+takes the colour's hue at the ground's own lightness, so a painted slope keeps
+its light and shade and black or white is the ground's own grey, and at
+`NORMAL` it lays the colour as it is. The strokes before `ACCEPT` are one
+batch, as a cover's are: the colour, opacity and blend change all of it, and
+the brush only the strokes still to come. The eye dropper, pressed, makes the
+next click on the ground take the colour there; `Esc` puts it down.
 
 `Shift` with a press on a spinner is a coarse step - ten points on a row read
 as a percentage, 100% to 110% to 120%, and ten steps on any other row - and

@@ -21,8 +21,8 @@
  */
 
 import {
-    SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isCoverTool, COVER_BRUSH,
-    COVER_ELEMENT_ROWS, toolPlacement, insertsTemplate
+    SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool,
+    toolBrush, toolElementRows, defaultBrush, toolPlacement, insertsTemplate
 } from './build-tools.js';
 import {
     templateBuilt, placeTemplate, groupConfig, groupReach, keepStripOnCanvas
@@ -161,7 +161,10 @@ export function createBuildState() {
         lassoValues: {},
         // The template Insert Runway is armed with, or null until a card is
         // chosen: the pointer carries nothing and a click places nothing.
-        runwayTemplate: null
+        runwayTemplate: null,
+        // True while Free Paint's eye dropper is armed: the next click on the
+        // ground takes the colour there rather than laying a stroke.
+        dropper: false
     };
 }
 
@@ -324,7 +327,10 @@ export function answerConfirm(state, answer) {
     else cancelDraft(state);
 
     const tool = asked.then?.tool;
-    if (tool != null && tool !== state.tool && isChoosableTool(tool)) state.tool = tool;
+    if (tool != null && tool !== state.tool && isChoosableTool(tool)) {
+        state.tool = tool;
+        state.dropper = false;
+    }
 
     const pick = asked.then?.pick;
     if (Number.isInteger(pick)) pickUpPlacement(state, pick);
@@ -627,58 +633,64 @@ export function insertTemplate(state, point, heading = 0, { size = 0 } = {}) {
     return startDraft(state, placement, state.tool);
 }
 
-// --- The cover tool -------------------------------------------------------------
+// --- The stroke tools: the cover tool and Free Paint ------------------------------
 
 /**
- * What the cover tool's panel holds for the cover it is pointed at: the
- * element's ranges and the brush's, each as the pilot last left it on this
- * canvas, or as the tool starts it - the element's defaults, the tool's own
- * `starts` over them, and the brush's defaults - where they have not touched
- * it. A batch in hand was begun from these and is written with them by
- * `setCoverValues`, so they are its values too.
+ * What a stroke tool's panel holds for the element it lays: the element's
+ * ranges and the brush's, each as the pilot last left it on this canvas, or as
+ * the tool starts it - the element's defaults, the tool's own `starts` over
+ * them, and the brush's defaults - where they have not touched it. A batch in
+ * hand was begun from these and is written with them by `setStrokeValues`, so
+ * they are its values too.
  *
- * Null for a tool that is not the cover tool.
+ * The cover tool's are its density, its stamp and its colour; Free Paint's are
+ * its colour, opacity and blend, and its brush. Null for a tool that draws no
+ * strokes.
  */
-export function coverValues(state, id = state?.tool) {
+export function strokeValues(state, id = state?.tool) {
     const tool = buildTool(id);
-    if (!isCoverTool(id) || !isElementId(tool.element)) return null;
+    if (!isStrokeTool(id) || !isElementId(tool.element)) return null;
 
     const defaults = resolveConfig(getElement(tool.element), {});
     const values = {
-        ...Object.fromEntries(COVER_ELEMENT_ROWS.map(name => [name, defaults[name]])),
+        ...Object.fromEntries(toolElementRows(tool).map(name => [name, defaults[name]])),
         ...(tool.starts ?? {}),
-        ...Object.fromEntries(Object.entries(COVER_BRUSH).map(([name, range]) => [name, range.default])),
+        ...defaultBrush(tool),
         ...own(state?.toolValues?.[id] ?? {})
     };
     return values;
 }
 
 /**
- * The cover tool's panel written: every value kept for the tool's next batch,
+ * A stroke tool's panel written: every value kept for the tool's next batch,
  * and the element's into the batch in hand as well - one configuration for
  * the whole batch, so a density raised after three strokes were laid raises it
- * on all three. The brush is not the batch's: it is how the next stroke is
- * drawn, and a stroke laid keeps the size it was laid at.
+ * on all three, and a colour changed recolours every stroke of the batch. The
+ * brush is not the batch's: it is how the next stroke is drawn, and a stroke
+ * laid keeps the size, tip and edge it was laid with.
  *
- * Refused off a canvas, with a confirm open, and for a live tool that is not
- * the cover tool. Returns true when the batch in hand changed, which is when
- * the ground has to be drawn again.
+ * Refused off a canvas, with a confirm open, and for a live tool that draws no
+ * strokes. Returns true when the batch in hand changed, which is when the
+ * ground has to be drawn again.
  */
-export function setCoverValues(state, values = {}) {
-    if (!buildModeDrawing(state) || confirmOpen(state) || !isCoverTool(state.tool)) return false;
+export function setStrokeValues(state, values = {}) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !isStrokeTool(state.tool)) return false;
 
     const id = state.tool;
     state.toolValues = { ...state.toolValues, [id]: { ...(state.toolValues?.[id] ?? {}), ...own(values) } };
 
     const draft = state.draft;
     if (!draftPending(state) || draft.tool !== id || draft.replaces != null) return false;
-    draft.placement.config = { ...draft.placement.config, ...toolPlacement(buildTool(id), own(values)).config };
+    const config = toolPlacement(buildTool(id), own(values)).config;
+    if (Object.keys(config).length === 0) return false;
+    draft.placement.config = { ...draft.placement.config, ...config };
     return true;
 }
 
 /**
- * A stroke of the cover tool let go of: `points`, the ground it was dragged
- * over in the canvas's frame, swept with `stamp`, in world units.
+ * A stroke let go of: `points`, the ground it was dragged over in the canvas's
+ * frame, swept with `stamp`, in world units - its width, depth and corner, and
+ * the feather Free Paint's edge sets, or the footprint's own where it sets none.
  *
  * The first stroke begins the tool's batch - its placement from the panel, set
  * down in a frame of its own so the gumball can move, turn and stretch the
@@ -690,15 +702,15 @@ export function setCoverValues(state, values = {}) {
  * reaches none of the selected ground is refused, since all of it would be cut
  * away.
  *
- * Refused off a canvas, with a confirm open, for a live tool that is not the
- * cover tool, for a stroke that covers nothing, and with an edit in hand that
+ * Refused off a canvas, with a confirm open, for a live tool that draws no
+ * strokes, for a stroke that covers nothing, and with an edit in hand that
  * this tool did not begin. Returns true when the stroke was laid.
  */
 export function layStroke(state, points = [], stamp = {}, { size = 0 } = {}) {
     if (!buildModeDrawing(state) || confirmOpen(state)) return false;
 
     const tool = buildTool(state.tool);
-    if (!isCoverTool(tool?.id)) return false;
+    if (!isStrokeTool(tool?.id)) return false;
 
     const stroke = {
         kind: 'stroke',
@@ -706,6 +718,7 @@ export function layStroke(state, points = [], stamp = {}, { size = 0 } = {}) {
         points: (points ?? []).map(([x, z]) => [Math.round(x) || 0, Math.round(z) || 0]),
         stamp: { width: stamp.width, depth: stamp.depth, corner: stamp.corner }
     };
+    if (Number.isFinite(stamp.feather) && stamp.feather >= 0) stroke.feather = stamp.feather;
     if (!isFootprint(stroke)) return false;
 
     const pending = draftPending(state);
@@ -720,9 +733,66 @@ export function layStroke(state, points = [], stamp = {}, { size = 0 } = {}) {
         return true;
     }
 
-    const placement = toolPlacement(tool, coverValues(state, tool.id), placeFootprint(stroke));
+    const placement = toolPlacement(tool, strokeValues(state, tool.id), placeFootprint(stroke));
     if (clip != null) placement.clip = own(clip);
     return startDraft(state, placement, tool.id);
+}
+
+/**
+ * Free Paint's `DEFAULT`: the brush put back as the tool starts it - a hard
+ * round brush 25 pixels across - for the strokes still to come. Refused for a
+ * live tool that is not Free Paint. Returns true when the brush changed.
+ */
+export function resetBrush(state) {
+    if (brushIsDefault(state) || confirmOpen(state)) return false;
+    if (!isPaintTool(buildModeTool(state))) return false;
+    setStrokeValues(state, defaultBrush(buildTool(state.tool)));
+    return true;
+}
+
+/** True while Free Paint's brush is the one it starts with, which is when `DEFAULT` is lit. */
+export function brushIsDefault(state) {
+    if (!isPaintTool(buildModeTool(state))) return false;
+    const values = strokeValues(state);
+    return Object.entries(defaultBrush(buildTool(state.tool))).every(([name, value]) => values[name] === value);
+}
+
+// --- The eye dropper ------------------------------------------------------------
+
+/** True while Free Paint's eye dropper is armed, so a click on the ground takes a colour rather than laying one. */
+export function eyeDropperArmed(state) {
+    return state?.dropper === true && isPaintTool(buildModeTool(state)) && !confirmOpen(state);
+}
+
+/**
+ * Free Paint's eye dropper pressed: armed, or with it armed, put down again.
+ * Refused for a live tool that is not Free Paint. Returns whether it is armed.
+ */
+export function toggleEyeDropper(state) {
+    if (!isPaintTool(buildModeTool(state)) || confirmOpen(state)) return false;
+    state.dropper = !eyeDropperArmed(state);
+    return state.dropper;
+}
+
+/** Puts the eye dropper down without taking anything. Returns true when it was armed. */
+export function dropEyeDropper(state) {
+    const armed = eyeDropperArmed(state);
+    if (state) state.dropper = false;
+    return armed;
+}
+
+/**
+ * The eye dropper's click: `rgb`, the colour of the ground under it, made the
+ * brush's colour - and the batch in hand's, as a colour chosen any other way
+ * is - and the dropper put down. Refused while it is not armed and for
+ * anything that is not a colour. Returns true when the colour was taken.
+ */
+export function takeEyeDropperColor(state, rgb) {
+    if (!eyeDropperArmed(state)) return false;
+    if (!Array.isArray(rgb) || rgb.length !== 3 || !rgb.every(Number.isFinite)) return false;
+    state.dropper = false;
+    setStrokeValues(state, { color: rgb.map(channel => Math.min(Math.max(channel, 0), 1)) });
+    return true;
 }
 
 /**
@@ -900,6 +970,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.lassoTool = DEFAULT_LASSO_TOOL;
     state.lassoValues = {};
     state.runwayTemplate = null;
+    state.dropper = false;
     return true;
 }
 
@@ -938,6 +1009,7 @@ export function chooseBuildTool(state, id) {
 
     state.draft = null;
     state.tool = id;
+    state.dropper = false;
     return true;
 }
 

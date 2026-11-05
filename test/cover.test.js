@@ -23,12 +23,12 @@ import {
     COVER_ELEMENT_ROWS, coverStamp, toolPlacement, toolBrush
 } from '../js/build-tools.js';
 import {
-    createBuildState, openBuildMode, beginCanvas, chooseBuildTool, coverValues, setCoverValues, layStroke,
+    createBuildState, openBuildMode, beginCanvas, chooseBuildTool, strokeValues, setStrokeValues, layStroke,
     acceptDraft, cancelDraft, buildDraft, committedPlacements, setSelection, confirmOpen, draftPending,
     reviseDraft, BUILD_FROM_TITLE
 } from '../js/build-mode.js';
 import {
-    dockContent, coverRanges, coverHolderFor, panelRanges, DOCK_COVER, DOCK_ACCEPT, DOCK_CANCEL
+    dockContent, strokeRanges, strokeHolderFor, panelRanges, DOCK_COVER, DOCK_ACCEPT, DOCK_CANCEL
 } from '../js/build-panel.js';
 import { boundHandles, handleBinding, dragHandle, gumballCentre, MIN_SCALE } from '../js/gumball.js';
 import { stampOutline } from '../js/build-overlay.js';
@@ -350,17 +350,17 @@ test('the brush is the artwork\'s three rows, in pixels, written to the stamp\'s
 
 test('the panel starts at the tool\'s own figures, and carries what the pilot left it at', () => {
     const state = onCanvas('grass');
-    const values = coverValues(state);
+    const values = strokeValues(state);
     assert.equal(values.density, 0.5);
     assert.deepEqual(values.color, getElement('grass').ranges.color.default);
     assert.deepEqual([values.buildHeight, values.buildWidth, values.cornerRadius], [40, 60, 10]);
     assert.deepEqual(Object.keys(values).sort(), ['buildHeight', 'buildWidth', 'color', 'cornerRadius', 'density']);
-    assert.equal(coverValues(state, 'mountain'), null);
+    assert.equal(strokeValues(state, 'mountain'), null);
 
-    assert.equal(setCoverValues(state, { ...values, density: 0.8, buildWidth: 90 }), false, 'nothing in hand to change');
-    assert.equal(coverValues(state).density, 0.8);
-    assert.equal(coverValues(state).buildWidth, 90);
-    assert.equal(coverValues(state, 'sand').density, 0.5, 'each cover its own');
+    assert.equal(setStrokeValues(state, { ...values, density: 0.8, buildWidth: 90 }), false, 'nothing in hand to change');
+    assert.equal(strokeValues(state).density, 0.8);
+    assert.equal(strokeValues(state).buildWidth, 90);
+    assert.equal(strokeValues(state, 'sand').density, 0.5, 'each cover its own');
 });
 
 test('a stroke begins the batch, and each stroke after it joins it as one placement', () => {
@@ -392,30 +392,31 @@ test('a panel edit changes the whole batch in hand; the brush only the strokes s
     layStroke(state, [[0, 3000]], STAMP, { size: DEFAULT_SIZE });
     const footprint = buildDraft(state).footprint;
 
-    assert.equal(setCoverValues(state, { density: 0.9 }), true);
+    assert.equal(setStrokeValues(state, { density: 0.9 }), true);
     assert.equal(buildDraft(state).config.density, 0.9);
-    assert.equal(setCoverValues(state, { buildWidth: 200 }), true, 'a write with a batch in hand is the batch');
+    assert.equal(setStrokeValues(state, { buildWidth: 200 }), false,
+        'a write of the brush alone leaves the batch in hand as it was, so the ground is not drawn again');
     assert.deepEqual(buildDraft(state).footprint, footprint, 'a stroke laid keeps the size it was laid at');
     assert.equal('buildWidth' in buildDraft(state).config, false);
-    assert.equal(coverValues(state).density, 0.9, 'the panel reads the batch');
+    assert.equal(strokeValues(state).density, 0.9, 'the panel reads the batch');
 
     acceptDraft(state);
-    assert.equal(coverValues(state).density, 0.9, 'and the next batch starts where the panel was left');
-    assert.equal(coverValues(state).buildWidth, 200, 'brush and all');
+    assert.equal(strokeValues(state).density, 0.9, 'and the next batch starts where the panel was left');
+    assert.equal(strokeValues(state).buildWidth, 200, 'brush and all');
     layStroke(state, LINE, STAMP, { size: DEFAULT_SIZE });
     assert.equal(buildDraft(state).config.density, 0.9);
     assert.equal(committedPlacements(state)[0].config.density, 0.9);
-    setCoverValues(state, { density: 0.3 });
+    setStrokeValues(state, { density: 0.3 });
     assert.equal(committedPlacements(state)[0].config.density, 0.9, 'a panel edit stops at the batch in hand');
 });
 
 test('a batch cancelled leaves nothing, and the panel as it was', () => {
     const state = onCanvas('sand');
-    setCoverValues(state, { density: 0.7 });
+    setStrokeValues(state, { density: 0.7 });
     layStroke(state, LINE, STAMP, { size: DEFAULT_SIZE });
     assert.equal(cancelDraft(state), true);
     assert.equal(committedPlacements(state).length, 0);
-    assert.equal(coverValues(state).density, 0.7);
+    assert.equal(strokeValues(state).density, 0.7);
 });
 
 test('a stroke after the gumball moved the batch joins it without undoing the move', () => {
@@ -454,7 +455,7 @@ test('a stroke is refused for any tool but the cover tool, under a question, and
     chooseBuildTool(asking, 'sand');
     assert.equal(confirmOpen(asking), true, 'a tool change with a batch in hand asks first');
     assert.equal(layStroke(asking, [[0, 3000]], STAMP), false);
-    assert.equal(setCoverValues(asking, { density: 0.1 }), false);
+    assert.equal(setStrokeValues(asking, { density: 0.1 }), false);
 
     const off = createBuildState();
     assert.equal(layStroke(off, LINE, STAMP), false);
@@ -475,16 +476,16 @@ test('the cover tool\'s panel is there from the moment it is chosen, in the artw
     layStroke(state, LINE, STAMP);
     assert.deepEqual(dockContent(state, {}).actions, [DOCK_ACCEPT, DOCK_CANCEL], 'and the batch\'s accept and cancel once there is one');
     assert.equal(dockContent(onCanvas('sand'), {}).heading, 'BUILD SAND');
-    assert.deepEqual(coverRanges('mountain'), {});
+    assert.deepEqual(strokeRanges('mountain'), {});
 });
 
 test('its holder steps the colour as shades of where it began', () => {
     const state = onCanvas('grass');
-    const holder = coverHolderFor(state);
-    assert.deepEqual(Object.keys(holder.config), Object.keys(coverRanges('grass')));
+    const holder = strokeHolderFor(state);
+    assert.deepEqual(Object.keys(holder.config), Object.keys(strokeRanges('grass')));
     assert.deepEqual(holder.shades, { color: { light: 1, dark: 1 } });
     assert.deepEqual(holder.base.color, holder.config.color);
-    assert.equal(coverHolderFor(onCanvas('mountain')), null);
+    assert.equal(strokeHolderFor(onCanvas('mountain')), null);
 
     const [, darker] = rangeRows('color', getElement('grass').ranges.color);
     const began = structuredClone(holder.config.color.dark);
@@ -548,7 +549,7 @@ test('a pixel is the world units it spans at the press, the same arithmetic a pa
 
 test('the grass a batch lays is drawn on the canvas where its strokes went', () => {
     const state = onCanvas('grass');
-    setCoverValues(state, { density: 1 });
+    setStrokeValues(state, { density: 1 });
     layStroke(state, LINE, { width: 2000, depth: 1000, corner: 0 });
     const field = rampField(400, 800);
     const plain = rampField(400, 800);

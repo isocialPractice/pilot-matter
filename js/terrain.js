@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-    DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight, waterSurface, tileSeed,
+    DEFAULT_SIZE, DEFAULT_SEGMENTS, sampleHeight, nearestColor, waterSurface, tileSeed,
     matchEdges, matchWater, seamBand, flightStrip
 } from './environment/elements.js';
 import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
@@ -408,6 +408,16 @@ export class Terrain {
     getTerrainHeightAt(x, z) {
         const tile = this.tileAt(x, z);
         return tile ? sampleHeight(tile.field, x, z) : 0;
+    }
+
+    /**
+     * The colour the ground was generated in at a place in the world - the
+     * vertex nearest it, as the field holds it rather than as it is lit - or
+     * null for ground not drawn. What the eye dropper takes.
+     */
+    getGroundColorAt(x, z) {
+        const tile = this.tileAt(x, z);
+        return tile ? nearestColor(tile.field, x, z) : null;
     }
 
     /**

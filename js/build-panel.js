@@ -22,12 +22,14 @@
 
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
-    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, coverValues, buildRunwayTemplate
+    pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
+    brushIsDefault, eyeDropperArmed
 } from './build-mode.js';
 import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } from './templates.js';
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import {
-    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, COVER_BRUSH, insertsTemplate
+    BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isStrokeTool,
+    COVER_BRUSH, PAINT_BRUSH, insertsTemplate
 } from './build-tools.js';
 
 /** The palette's lasso tile, whose panel is its own ten tools rather than an element's ranges. */
@@ -52,6 +54,24 @@ export const DOCK_COVER = 'cover';
 
 /** What the dock shows with Insert Runway live: its templates as cards, and the one in hand's rows. */
 export const DOCK_RUNWAY = 'runway';
+
+/** What the dock shows with Free Paint live: its colour, its brush and the brush's properties, each a section. */
+export const DOCK_PAINT = 'paint';
+
+/**
+ * Free Paint's three sections, in the artwork's order, and the ranges each
+ * holds: the colour under `COLOR SELECTION`; the brush's tip and edge under
+ * `BRUSH SELECTION`, beneath the `DEFAULT` card that puts the brush back; and
+ * the opacity, size and blend under `BRUSH PROPERTIES`.
+ */
+export const PAINT_SECTIONS = Object.freeze([
+    Object.freeze({ id: 'paint-color', heading: 'COLOR SELECTION',  ranges: Object.freeze(['color']) }),
+    Object.freeze({ id: 'paint-brush', heading: 'BRUSH SELECTION',  ranges: Object.freeze(['tip', 'edge']) }),
+    Object.freeze({ id: 'paint-props', heading: 'BRUSH PROPERTIES', ranges: Object.freeze(['opacity', 'size', 'blend']) })
+]);
+
+/** The card on Free Paint's panel that puts the brush back as the tool starts it. */
+export const DOCK_DEFAULT_BRUSH = Object.freeze({ id: 'default-brush', label: 'DEFAULT' });
 
 /** The answer that drops the selection, there only while something is selected. */
 export const DOCK_DESELECT = Object.freeze({ id: 'deselect', label: 'DESELECT' });
@@ -147,32 +167,50 @@ export function panelRanges(placement) {
 }
 
 /**
- * The cover tool's panel, in the artwork's order: `DENSITY`, then the brush's
- * three - `BUILD HEIGHT`, `BUILD WIDTH`, `CORNER RADIUS` - then the colour's
- * two ends. The rest of what the element declares is not the pilot's here; see
- * `COVER_ELEMENT_ROWS`.
+ * A stroke tool's panel, in the artwork's order.
+ *
+ * The cover tool's is `DENSITY`, then the brush's three - `BUILD HEIGHT`,
+ * `BUILD WIDTH`, `CORNER RADIUS` - then the colour's two ends; the rest of what
+ * the element declares is not the pilot's here, see `COVER_ELEMENT_ROWS`. Free
+ * Paint's is its colour, its brush's tip and edge, then its opacity, size and
+ * blend - every range `paint` declares, and the brush between them.
  */
-export function coverRanges(id) {
+export function strokeRanges(id) {
     const tool = buildTool(id);
-    if (!isCoverTool(id) || !isElementId(tool.element)) return {};
+    if (!isStrokeTool(id) || !isElementId(tool.element)) return {};
 
     const declared = getElement(tool.element).ranges;
+    if (isPaintTool(id)) {
+        return {
+            color: declared.color, tip: PAINT_BRUSH.tip, edge: PAINT_BRUSH.edge,
+            opacity: declared.opacity, size: PAINT_BRUSH.size, blend: declared.blend
+        };
+    }
     return { density: declared.density, ...COVER_BRUSH, color: declared.color };
 }
 
 /**
- * What the cover tool's panel is stepped through: its values - see
- * `coverValues` - with each gradient held as the shade its ends are drawn at
- * against the colours they were when the holder was made, as a draft's are.
- * Null for a tool that is not the cover tool.
+ * What a stroke tool's panel is stepped through: its values - see
+ * `strokeValues` - with each gradient held as the shade its ends are drawn at
+ * against the colours they were when the holder was made, as a draft's are. A
+ * flat colour, Free Paint's, is chosen rather than shaded, and is held as it
+ * is. Null for a tool that draws no strokes.
  */
-export function coverHolderFor(state, id = state?.tool) {
-    const values = coverValues(state, id);
+export function strokeHolderFor(state, id = state?.tool) {
+    const values = strokeValues(state, id);
     if (values == null) return null;
 
+    const ranges = strokeRanges(id);
     const config = {};
-    for (const name of Object.keys(coverRanges(id))) config[name] = structuredClone(values[name]);
-    return { config, shades: { color: { light: 1, dark: 1 } }, base: { color: structuredClone(config.color) } };
+    const shades = {};
+    const base   = {};
+    for (const [name, range] of Object.entries(ranges)) {
+        config[name] = structuredClone(values[name]);
+        if (range.kind !== 'gradient') continue;
+        shades[name] = { light: 1, dark: 1 };
+        base[name] = structuredClone(config[name]);
+    }
+    return { config, shades, base };
 }
 
 /**
@@ -202,6 +240,7 @@ export function dockContent(state, { camera = null, fov, holder = null, context 
     const picked = pickedIndex(state) != null;
 
     if (isCoverTool(buildModeTool(state))) return coverContent(state, holder, context);
+    if (isPaintTool(buildModeTool(state))) return paintContent(state, holder, context);
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
 
     if (draftPending(state) && !(select && picked)) {
@@ -301,10 +340,10 @@ function lassoContent(state, context) {
  */
 function coverContent(state, holder, context) {
     const id    = buildModeTool(state);
-    const held  = holder ?? coverHolderFor(state, id);
+    const held  = holder ?? strokeHolderFor(state, id);
     if (held == null) return null;
 
-    const ranges = coverRanges(id);
+    const ranges = strokeRanges(id);
     return {
         kind: DOCK_COVER,
         heading: buildTool(id).heading,
@@ -314,6 +353,47 @@ function coverContent(state, holder, context) {
         nudges: [],
         actions: draftPending(state) ? [DOCK_ACCEPT, DOCK_CANCEL] : [],
         sections: []
+    };
+}
+
+/**
+ * Free Paint's panel, there from the moment the tool is chosen, as the cover
+ * tool's is: the brush is set before the stroke. Its rows are in three
+ * sections under the artwork's headings, every one writing the one holder -
+ * see `PAINT_SECTIONS` - with `DEFAULT` lit while the brush is the one the
+ * tool starts with. With the tool's batch in hand it is that batch's panel
+ * too, with the accept and cancel that settle it.
+ *
+ * `dropping` says the eye dropper is armed, so the panel can show it pressed.
+ */
+function paintContent(state, holder, context) {
+    const id   = buildModeTool(state);
+    const held = holder ?? strokeHolderFor(state, id);
+    if (held == null) return null;
+
+    const ranges = strokeRanges(id);
+    const sections = PAINT_SECTIONS.map(({ id: section, heading, ranges: names }) => {
+        const own = Object.fromEntries(names.map(name => [name, ranges[name]]));
+        const part = dockSection(section, DOCK_PAINT, heading, own, held, context);
+        if (section === 'paint-brush') {
+            part.shapes = [{
+                row: 'brush',
+                tools: [{ ...DOCK_DEFAULT_BRUSH, name: 'Default brush', art: null, live: brushIsDefault(state) }]
+            }];
+        }
+        return part;
+    });
+
+    return {
+        kind: DOCK_PAINT,
+        heading: buildTool(id).heading,
+        ranges,
+        holder: held,
+        rows: [],
+        nudges: [],
+        actions: draftPending(state) ? [DOCK_ACCEPT, DOCK_CANCEL] : [],
+        sections,
+        dropping: eyeDropperArmed(state)
     };
 }
 

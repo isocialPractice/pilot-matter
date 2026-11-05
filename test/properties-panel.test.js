@@ -8,7 +8,7 @@ import {
 import * as editor from '../js/element-editor.js';
 import {
     ELEMENTS, BASE_RANGES, getElement, isElementId, resolveConfig,
-    span, scalar, gradient, gated, toggle, choice
+    span, scalar, gradient, gated, toggle, choice, color
 } from '../js/environment/elements.js';
 import { CHOICE_FIELD, TOGGLE_FIELD } from '../js/config.js';
 import { BUILD_TOOLS } from '../js/build-tools.js';
@@ -253,14 +253,16 @@ test('every kind the vocabulary offers renders rows that move', () => {
         gradient: gradient([0.8, 0.8, 0.8], [0.2, 0.2, 0.2]),
         gated: gated(0, 100, 20, 80),
         toggle: toggle(),
-        choice: choice(['a', 'b', 'c'], 'b')
+        choice: choice(['a', 'b', 'c'], 'b'),
+        color: color([0.2, 0.4, 0.6]),
+        percent: scalar(0, 1, 0.4, { percent: true })
     });
 });
 
 test('a kind the panel cannot draw draws no rows, which is what fails the walk above', () => {
-    assert.deepEqual(rangeRows('mystery', { kind: 'color', default: [0, 0, 0] }), []);
+    assert.deepEqual(rangeRows('mystery', { kind: 'texture', default: 'moss' }), []);
     assert.deepEqual(rangeRows('mystery', {}), []);
-    assert.throws(() => conforms('declared', { mystery: { kind: 'color', default: [0, 0, 0] } }),
+    assert.throws(() => conforms('declared', { mystery: { kind: 'texture', default: 'moss' } }),
         /renders no row/);
 });
 

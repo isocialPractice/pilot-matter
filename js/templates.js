@@ -32,10 +32,10 @@ export const GROUP_TYPE = 'group';
  *
  * The two runways are a `runway` each, the commercial one longer and wider and
  * carrying its centreline. The two airports are laid out from a `paint` apron
- * and `extrude` buildings beside their strips, which the registry does not
- * draw yet: each is declared here with the elements it waits on, and is
- * offered once every one of them is in the registry - so the panel never
- * offers a card that places part of what it shows.
+ * and `extrude` buildings beside their strips, and the registry draws paint
+ * but not yet extrude: each is declared here with the elements it waits on,
+ * and is offered once every one of them is in the registry - so the panel
+ * never offers a card that places part of what it shows.
  */
 export const RUNWAY_TEMPLATES = Object.freeze([
     {

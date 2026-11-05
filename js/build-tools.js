@@ -13,7 +13,8 @@
  * and in what order, can be unit tested in Node.
  */
 
-import { scalar } from './environment/elements.js';
+import { scalar, choice } from './environment/elements.js';
+import { DEFAULT_FEATHER } from './environment/footprints.js';
 
 /** The navigation state, and the tool a canvas opens on. */
 export const SELECT_TOOL = 'select';
@@ -36,7 +37,7 @@ export const ACCEPT_TOOL = 'accept';
  * `element` is the registry element a tool places, whose declared ranges are
  * its panel: nothing is restated here, so a range added to the element appears
  * on the tool's panel without this file being opened. A tool whose element is
- * not in the registry yet - paint, extrude - names it in the commit that adds
+ * not in the registry yet - extrude - names it in the commit that adds
  * it, and the panel's conformance test holds it to the registry from then on.
  *
  * `heading` is what the tool's panel is headed, in the artwork's own words -
@@ -60,6 +61,10 @@ export const ACCEPT_TOOL = 'accept';
  * `inserts` marks Insert Runway: a tool that places a template, chosen on its
  * panel as a card, at a click - a whole strip or airport rather than one
  * element - see `js/templates.js`.
+ *
+ * `paint` marks Free Paint, the other tool that draws by dragging: it lays
+ * `paint` with the `PAINT_BRUSH` rather than a cover with the cover tool's
+ * stamp. The two are the stroke tools, and share every gesture.
  */
 export const BUILD_TOOLS = Object.freeze([
     { id: SELECT_TOOL, label: 'SELECT',          hint: 'Look around the canvas',                      mindsLasso: false, heading: 'SELECTION MODE' },
@@ -70,7 +75,7 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER', cover: true, starts: Object.freeze({ density: 1 }) },
     { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW', cover: true, starts: Object.freeze({ density: 1 }) },
     { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY', inserts: true },
-    { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true },
+    { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true,  element: 'paint', heading: 'FREE PAINT', paint: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },
     { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false }
@@ -118,9 +123,10 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * worked out from the ground under the stroke rather than held at a height a
  * stroke would usually miss. Insert Runway places the templates whose every
  * element the registry draws - the two runways today, and the airports once
- * paint and extrude are in it.
+ * extrude is in it beside paint. Free Paint lays a colour and no height,
+ * through the same stroke as the covers.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {
@@ -224,6 +230,88 @@ export function coverStamp(brush = {}, unitsPerPixel = 1) {
 }
 
 /**
+ * Free Paint's brush, as the artwork's two groups have it: `TIP` and `EDGE`
+ * under `BRUSH SELECTION`, and `SIZE` under `BRUSH PROPERTIES`, beside the
+ * element's opacity. Two axes rather than a list of named brushes - the
+ * walkthrough's "Hard Round" is `tip: round` with `edge: hard` - so the names
+ * are what the axes come to and there are no presets to keep in step with them.
+ *
+ * `SIZE` is in screen pixels, and laid in world units at the scale under the
+ * press, as the cover tool's stamp is. The defaults are the walkthrough's: a
+ * hard round brush 25 pixels across, which is the brush `DEFAULT` puts back.
+ */
+export const PAINT_BRUSH = Object.freeze({
+    tip:  Object.freeze(choice(['round', 'square'], 'round')),
+    edge: Object.freeze(choice(['hard', 'soft'], 'hard')),
+    size: Object.freeze(scalar(5, 400, 25, { slider: true }))
+});
+
+/**
+ * How far in from its edge a soft brush eases, as a share of its width: half,
+ * so a soft stroke is whole only down its middle and fades to either side.
+ */
+export const SOFT_EDGE = 0.5;
+
+/**
+ * The element's ranges Free Paint's panel carries: the colour under `COLOR
+ * SELECTION`, and its opacity and blend under `BRUSH PROPERTIES`. They are
+ * the batch's, as a cover's density and colour are.
+ */
+export const PAINT_ELEMENT_ROWS = Object.freeze(['color', 'opacity', 'blend']);
+
+/** True for Free Paint. */
+export function isPaintTool(id) {
+    return buildTool(id)?.paint === true;
+}
+
+/** True for a tool that lays its element by dragging a stroke: the cover tool and Free Paint. */
+export function isStrokeTool(id) {
+    return isCoverTool(id) || isPaintTool(id);
+}
+
+/** The element's ranges a stroke tool's panel carries, or none for a tool that is not one. */
+export function toolElementRows(tool) {
+    if (tool?.cover === true) return COVER_ELEMENT_ROWS;
+    if (tool?.paint === true) return PAINT_ELEMENT_ROWS;
+    return [];
+}
+
+/** A tool's brush as it starts, which is the brush Free Paint's `DEFAULT` puts back. */
+export function defaultBrush(tool) {
+    return Object.fromEntries(Object.entries(toolBrush(tool)).map(([name, range]) => [name, range.default]));
+}
+
+/**
+ * The stamp a paint stroke is laid with, in world units: `SIZE` across and
+ * along at `unitsPerPixel`, the ground's scale under the press, to the whole
+ * unit and never less than one; a round tip with its corners at half that, so
+ * the stroke is a swept disc, and a square one with none.
+ *
+ * `HARD` is the feather every footprint carries unless it is told otherwise -
+ * the sampling's two cells, which is the hardest edge the ground can draw: one
+ * inside a cell is a staircase of whole vertices, the cliff the feather exists
+ * to keep off. `SOFT` eases across half the stamp's width, from its middle out.
+ */
+export function paintStamp(brush = {}, unitsPerPixel = 1) {
+    const scale  = Number(unitsPerPixel) > 0 ? Number(unitsPerPixel) : 1;
+    const pixels = Number(brush?.size ?? PAINT_BRUSH.size.default);
+    const width  = Math.max(Math.round((Number.isFinite(pixels) ? pixels : PAINT_BRUSH.size.default) * scale), 1);
+    return {
+        width,
+        depth: width,
+        corner: brush?.tip === 'square' ? 0 : width / 2,
+        feather: brush?.edge === 'soft' ? Math.round(width * SOFT_EDGE) : DEFAULT_FEATHER
+    };
+}
+
+/** The stamp a stroke tool lays a stroke with, at the scale under the press, or null for a tool that draws no strokes. */
+export function strokeStamp(tool, brush = {}, unitsPerPixel = 1) {
+    if (tool?.cover === true) return coverStamp(brush, unitsPerPixel);
+    if (tool?.paint === true) return paintStamp(brush, unitsPerPixel);
+    return null;
+}
+
+/**
  * The values a tool's gesture settles for it, which its panel does not show.
  * Empty for a tool whose panel shows every range its element declares.
  */
@@ -239,10 +327,11 @@ export function derivedValues(tool) {
  * that renders no panel of its own also builds down no path of its own, and an
  * edit that fails to register fails in one place for every tool.
  *
- * A tool with a brush - the cover tool's stamp - holds the brush's rows among
- * its values, and they are left off: they say how the pointer draws, in
- * pixels, and the gesture has already turned them into `drawn`, the footprint,
- * in world units. Everything else is the element's configuration.
+ * A tool with a brush - the cover tool's stamp, or Free Paint's - holds the
+ * brush's rows among its values, and they are left off: they say how the
+ * pointer draws, in pixels, and the gesture has already turned them into
+ * `drawn`, the footprint, in world units. Everything else is the element's
+ * configuration.
  */
 export function toolPlacement(tool, values = {}, drawn = null) {
     const brush  = toolBrush(tool);
@@ -257,9 +346,11 @@ export function toolPlacement(tool, values = {}, drawn = null) {
     return placement;
 }
 
-/** The ranges a tool's pointer draws with, which are its own rather than its element's: the cover tool's stamp, or none. */
+/** The ranges a tool's pointer draws with, which are its own rather than its element's: the cover tool's stamp, Free Paint's brush, or none. */
 export function toolBrush(tool) {
-    return tool?.cover === true ? COVER_BRUSH : {};
+    if (tool?.cover === true) return COVER_BRUSH;
+    if (tool?.paint === true) return PAINT_BRUSH;
+    return {};
 }
 
 /**

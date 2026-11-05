@@ -413,10 +413,10 @@ export function projectPath(points, heightAt, project) {
 }
 
 /**
- * A cover stroke as it is being drawn: the swathe the stamp sweeps, as wide on
- * the glass as the brush, in the lasso art's blue and pale enough to see the
- * ground through - so a stroke reads as what it will cover before it is let go
- * of and the ground is drawn with it.
+ * A cover stroke as it is being drawn: the region the stamp sweeps, in the
+ * lasso art's blue and pale enough to see the ground through - so a stroke
+ * reads as what it will cover before it is let go of and the ground is drawn
+ * with it. See `strokeRibbon`.
  */
 export const COVER_TRAIL = Object.freeze({ colour: 'rgba(135, 206, 235, 0.4)' });
 
@@ -447,24 +447,119 @@ export function stampOutline(x, y, width, depth, corner = 0) {
     return points;
 }
 
-/** Strokes screen paths as a cover trail: round-ended and round-jointed, `width` pixels wide. */
-export function strokeTrail(ctx, paths, width) {
-    if (!paths?.length || !(width > 0)) return;
-    ctx.setLineDash?.([]);
-    ctx.lineWidth = width;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = COVER_TRAIL.colour;
-    ctx.beginPath();
-    for (const path of paths) {
-        path.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
-        // A press that never travelled is a stroke of one point, which a
-        // round cap still draws as the dot it is.
-        if (path.length === 1) ctx.lineTo(path[0].x, path[0].y);
+/** How many points a joint between two stretches of a stroke is drawn round with. */
+const RIBBON_JOINT_POINTS = 16;
+
+/**
+ * A stroke as the region it covers, in the canvas's frame: closed outlines
+ * whose union is everywhere the stroke's footprint reaches - a band of the
+ * stamp's width down each stretch, a disc at each joint, where the footprint
+ * is measured from the nearest point of the way and so rounds every corner,
+ * and the stamp itself at either end, turned to the stretch it ends, as the
+ * footprint ends it. A stroke of one point is the stamp it was pressed as.
+ *
+ * It is what a stroke being drawn is shown as: worked out in world units from
+ * the samples stood on the ground and the stamp the brush comes to at the
+ * press, then stood on the ground and projected, so the stroke on the screen
+ * is the stroke the footprint will hold - as wide here as it will be there,
+ * however the ground falls away from the camera along it.
+ *
+ * Every outline runs the same way round, so filled as one path the overlaps
+ * are filled once.
+ */
+export function strokeRibbon({ points, stamp } = {}) {
+    const path = (points ?? []).filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+        .filter((p, i, all) => i === 0 || p[0] !== all[i - 1][0] || p[1] !== all[i - 1][1]);
+    const width = Math.max(Number(stamp?.width) || 0, 0);
+    const depth = Math.max(Number(stamp?.depth) || 0, 0);
+    if (path.length === 0 || !(width > 0) || !(depth > 0)) return [];
+
+    const half   = width / 2;
+    const corner = Math.max(Number(stamp?.corner) || 0, 0);
+    if (path.length === 1) return [anticlockwise(orientedBox(path[0], [0, 1], half, depth / 2, corner))];
+
+    const loops = [];
+    for (let i = 1; i < path.length; i++) {
+        const [ax, az] = path[i - 1], [bx, bz] = path[i];
+        const length = Math.hypot(bx - ax, bz - az);
+        const nx = (bz - az) / length * half, nz = -(bx - ax) / length * half;
+        loops.push([[ax + nx, az + nz], [bx + nx, bz + nz], [bx - nx, bz - nz], [ax - nx, az - nz]]);
+        if (i < path.length - 1) {
+            loops.push(Array.from({ length: RIBBON_JOINT_POINTS }, (_, k) => {
+                const t = (k / RIBBON_JOINT_POINTS) * Math.PI * 2;
+                return [bx + Math.cos(t) * half, bz + Math.sin(t) * half];
+            }));
+        }
     }
-    ctx.stroke();
-    ctx.lineCap = 'butt';
-    ctx.lineJoin = 'miter';
+
+    // Each end is the stamp, centred on the end sample and laid along the
+    // stretch it ends.
+    const ends = [[path[0], path[1]], [path[path.length - 1], path[path.length - 2]]];
+    for (const [end, from] of ends) {
+        const length = Math.hypot(end[0] - from[0], end[1] - from[1]);
+        loops.push(orientedBox(end, [(end[0] - from[0]) / length, (end[1] - from[1]) / length], half, depth / 2, corner));
+    }
+
+    return loops.map(anticlockwise);
+}
+
+/**
+ * A box centred on `centre`, `halfAlong` either way along the unit direction
+ * `along` and `halfAcross` either side of it, its corners rounded by `corner`
+ * held to half the shorter side, as a closed outline.
+ */
+function orientedBox(centre, along, halfAcross, halfAlong, corner) {
+    const [ux, uz] = along;
+    const vx = uz, vz = -ux;
+    const r = Math.min(corner, halfAcross, halfAlong);
+    const loop = [];
+    // Each corner's arc about its centre, inset by the radius, a quarter turn
+    // apiece; a corner of nothing is the corner itself.
+    const corners = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    corners.forEach(([sa, sc], k) => {
+        const ca = sa * (halfAlong - r), cc = sc * (halfAcross - r);
+        const steps = r > 0 ? STAMP_CORNER_POINTS : 0;
+        for (let i = 0; i <= steps; i++) {
+            const t = (k + i / Math.max(steps, 1)) * Math.PI / 2;
+            const a = ca + Math.cos(t) * r, c = cc + Math.sin(t) * r;
+            loop.push([centre[0] + ux * a + vx * c, centre[1] + uz * a + vz * c]);
+        }
+    });
+    return loop;
+}
+
+/** An outline run anticlockwise in the canvas's frame, reversed where it ran the other way. */
+function anticlockwise(loop) {
+    let area = 0;
+    for (let i = 0; i < loop.length; i++) {
+        const [x1, z1] = loop[i], [x2, z2] = loop[(i + 1) % loop.length];
+        area += x1 * z2 - x2 * z1;
+    }
+    return area < 0 ? [...loop].reverse() : loop;
+}
+
+/** Fills runs of screen points as one region, so where they overlap is filled once. */
+export function fillRegion(ctx, runs, colour) {
+    if (!runs?.length || !colour) return;
+    ctx.fillStyle = colour;
+    ctx.beginPath();
+    for (const run of runs) {
+        if (run.length < 3) continue;
+        run.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+        ctx.closePath();
+    }
+    ctx.fill('nonzero');
+}
+
+/**
+ * The colour a paint stroke being drawn is shown in: the brush's colour, as
+ * opaque as its opacity says, within what still lets the ground be seen
+ * through it - a stroke is shown on the ground before it is laid there.
+ */
+export function paintTrailColour(rgb, opacity = 1) {
+    const [r, g, b] = (rgb ?? [0, 0, 0]).map(channel => Math.round(Math.min(Math.max(Number(channel) || 0, 0), 1) * 255));
+    const alpha = 0.25 + 0.45 * Math.min(Math.max(Number(opacity) || 0, 0), 1);
+    return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
 }
 
 /** Strokes screen paths in a style: its under-stroke, then itself, dashed where the style says. */
