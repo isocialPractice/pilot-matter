@@ -4809,3 +4809,88 @@ still be found by name.
     its own rows. A placement erased whole is still picked where it stood,
     since its reach is its own.
   - From: Interactive Build Mode
+- [x] **Erasing water and runways**: the sea held per vertex so a hole erased in
+  a lake is dry ground, and a strip erased whole and only when it is the target
+  named
+  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
+    one height a vertex beside the sea's level, and `waterSurface` reads a
+    vertex as wet only where it lies under its own line - so a hole erased in a
+    lake is the line set to `NaN` there.
+  - **Settled**: the sea already wrote its line wherever it reached; the
+    compositor now carries a line back through what a cut leaves, so a hole
+    taken out of the sea has none and is dry ground, its basin uncut, and the
+    sea's level comes across from a sea drawn through a cut alone, being the
+    sea's still. `waterUnder` reads the highest line under a strip rather than
+    the sea's level wherever there is a line, so a strip over a dry hole is not
+    lifted - every preset's sea writes its level into the line under every
+    strip, so no preset strip moved. The `runway` element declares
+    `erasedWhole`: a strip any of whose vertices a cut reaches is not drawn at
+    all, record and grading with it. `ALL` leaves a strip, and only a placed
+    one - carrying `at` - can be taken by name, since a searched strip is laid
+    when the world is flown and never on the canvas the stroke was drawn over.
+    Found on the way: a placed template's strip was laid on all nine tiles of a
+    flown world, `tileElements` taking off only placements typed `runway`; a
+    group comes off every tile but the middle one now too.
+  - From: Interactive Build Mode
+- [x] **Shape vocabulary**: the shape tools built once over the seven footprint
+  kinds, with each mode declaring the subset it offers, so Lasso's ten and
+  Extrude's seven are one implementation
+  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
+    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
+    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
+    gestures; this item is that table shared with Extrude's seven.
+  - **Settled**: `js/shapes.js` is the vocabulary - ten shapes, each a
+    footprint kind and a gesture, with their own fields - and
+    `shapeFootprint` and `reshapeShape` what a gesture comes to. A mode
+    declares the shapes it offers through `modeTools`, under its own ids,
+    labels, rows and art: the lasso all ten, as it did, and Extrude seven, a
+    Circle the lasso's ellipse and a Polycurve its curved polyline.
+    `js/lasso.js` keeps every export it had, drawn through the vocabulary, and
+    main's gesture draws the shape of whichever mode is live - see
+    `liveShapeTool` - differing only in what is done with the region.
+    Extrude's icons are cut from its panel's art, as the lasso's are.
+  - From: Interactive Build Mode
+- [x] **Extrude stages**: the draw, extrude and surface stages with one action
+  button reading its label and its enabled state off the stage it is in
+  - **Settled**: `js/extrude.js` declares the three stages and the one button:
+    `EXTRUDE`, greyed until the region covers ground; `EDIT EXTRUSION`; and
+    `APPLY`, which the surfaces return by. The stage is carried on the draft,
+    as the plan has it; while drawing, the draft is shown over the canvas and
+    is not ground - `builtPlacements` leaves it out - and the panel offers
+    `CANCEL` and no `ACCEPT`, nothing being lifted to keep. A disabled answer
+    is drawn greyed, its label and state written without the panel being
+    built again. The surfaces stage's panel is the two colour rows under
+    `APPLY`; telling `BACK` from `APPLY`, and choosing a surface by clicking
+    it, are the next item's. Picking another shape with an extrusion lifted
+    keeps it, asking nothing, and is back at drawing - the stages' way out. A
+    shape picked while drawing keeps what was drawn, so the plan's `KEEP
+    DRAWING` has nothing to undo.
+  - From: Interactive Build Mode
+- [x] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
+  by the gumball or by a number, previewing on the overlay and writing the field
+  once on release
+  - **The airport templates wait on it too.** Their buildings are extrusions
+    over rects at fixed distances from the strip's edge and ends - see
+    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
+    widens.
+  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
+    registry, so `extrude` is the last element the airports wait on; their
+    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
+  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
+    weighed after a footprint settles what it settles, so an extrusion's level
+    worked out through `footprintSettles` is the drawn shape's, and erasing
+    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
+    pattern for anything else that is all or nothing.
+  - **Settled**: `extrude` is in the registry beside `town`, before snow:
+    `height`, `flatten`, `topColor`, `wallColor` and `level`, which a
+    footprint settles as its ground's mean on each tile through a new `mean`
+    settler, and `drawn: 'edge'` - the region's weight - which paints the
+    band at its edge the wall and what it wholly covers the top. The blue
+    arrow lifts a scalar height, a `lift` beside the mountain's `raise`. While
+    it is pulled the ground is left alone: the overlay draws the region's
+    outline on the ground and at the height reached, from the top it stood at
+    when the drag began, and the field is written on release. The airports
+    are laid out with it - a strip, a `paint` apron and `extrude` buildings,
+    each a lot kept at its distance from the paving as the strip widens, the
+    whole held on the canvas by its farthest lot and picked by any of it.
+  - From: Interactive Build Mode

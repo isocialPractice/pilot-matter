@@ -159,9 +159,13 @@
 </table>
 </div>
 
+<h2 id="builder">Builder</h2>
+
+<p>Under <code>BUILDER</code> is one row that holds no value: <code>BUILDER SETTINGS</code>, which opens the interactive builder's own settings in this panel's place - when a draft is kept without being asked about, and how fast the view over a canvas moves. Their <code>BACK</code> brings this panel back, on the row that opened them. The row stays while a game mode is being played, unlike the builder's entry on the pause menu: the builder's settings open no world and change none. The same screen opens from inside the builder, by the gear on its palette or <kbd>O</kbd>; see <a href="../terrain.html#builder-settings">the builder</a>.</p>
+
 <h2 id="walking-the-panel">Walking the panel</h2>
 
-<p><kbd>W</kbd>/<kbd>S</kbd> moves the cursor over all three parts as though they were one list, scrolling the panel to keep the cursor in view on a window too short to hold it. <kbd>A</kbd>/<kbd>D</kbd> steps the option under the cursor, and <kbd>Enter</kbd> steps it forward as well, because an option has no single thing to choose. A digit instead of either starts typing a figure into a row that holds one, and the keys that answer a figure then belong to it until it is taken or given up on.</p>
+<p><kbd>W</kbd>/<kbd>S</kbd> moves the cursor over all four parts as though they were one list, scrolling the panel to keep the cursor in view on a window too short to hold it. <kbd>A</kbd>/<kbd>D</kbd> steps the option under the cursor, and <kbd>Enter</kbd> steps it forward as well, because an option has no single thing to choose. A digit instead of either starts typing a figure into a row that holds one, and the keys that answer a figure then belong to it until it is taken or given up on.</p>
 
 <p>A row holding a number along a range - every row of the start state but the condition, the strip and the view - can also be typed into. Pressing a digit at one starts the figure, the row reads what has been typed with a <code>_</code> after it, and <kbd>Enter</kbd> takes it: a start altitude of 1390 feet is four presses that way and 139 the other, at ten feet a press. <kbd>Backspace</kbd> erases a character, <kbd>Esc</kbd> gives up and leaves the row on the value it had, and reaching for the mouse, walking the cursor to another row, or stepping the row with <kbd>A</kbd>/<kbd>D</kbd> gives up as well - the highlight says where a value is being set and the reading says what it is, so a figure never outlives either. A row holding one of a list of settings cannot be typed into, because what a list offers is positions rather than figures - nobody has a number in mind for <code>CLEAR</code>.</p>
 

@@ -28,7 +28,8 @@ import {
     openDeselectPopup, deselectPopup, closeDeselectPopup,
     buildExtrudeTool, chooseExtrudeTool, extrudeValues, setExtrudeValues, extrudeStage, extrudeDrawing, extrudeRegion,
     drawExtrudeShape, pressExtrudeStage, extrudeSurface, chooseExtrudeSurface, backFromSurfaces,
-    holdCamera, cameraHeld, releaseCamera,
+    holdCamera, cameraHeld, releaseCamera, suspendForSettings, settingsOver, resumeFromSettings,
+    setAutoAccept, drawAgain, editPending,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
@@ -38,7 +39,8 @@ import {
 } from './build-tools.js';
 import { placeTemplate, groupStrips, groupLots, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
 import {
-    createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK
+    createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK,
+    BUILDER_SETTINGS_MARK, BUILDER_SETTINGS_NAME
 } from './build-palette.js';
 import { placementAt, travelledPast } from './build-select.js';
 import {
@@ -90,7 +92,7 @@ import {
     typedSettingRow, beginTypedSetting, applyTypedSettingKey, cancelTypedSetting,
     chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
     isSettingsCloseKey, isSettingsOpenKey,
-    SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP,
+    SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP, BUILDER_GROUP, BUILDER_SETTINGS_ID,
     SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION, WEATHER_OPTION,
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
@@ -104,6 +106,12 @@ import {
     CONTROL_SETTINGS_BACK_ID, CONTROL_REFERENCE_ID,
     AXIS_GROUP, TILT_GROUP, ATTITUDE_GROUP, LEVEL_OFF_GROUP, BINDING_GROUP
 } from './control-settings.js';
+import {
+    createBuilderSettingsState, openBuilderSettings, closeBuilderSettings, builderSettingsShowing,
+    chooseBuilderSetting, adjustBuilderSetting, isBuilderSettingsCloseKey, isBuilderSettingsOpenKey, builderAutoAccept, builderCameraSpeed,
+    BUILDER_SETTINGS_FROM_BUILDER, BUILDER_SETTINGS_FROM_SETTINGS, BUILDER_SETTINGS_BACK_ID,
+    AUTO_ACCEPT_GROUP, VIEW_GROUP
+} from './builder-settings.js';
 import { aircraftBindings } from './key-bindings.js';
 import { runwayWanted } from './config.js';
 import { headingDegrees, altitudeToFeet, feetToAltitude } from './units.js';
@@ -263,6 +271,11 @@ class FlightSimulator {
         // their own: how a pilot flies outlives which world they were flying.
         this.controlSettings = createControlSettingsState(defaultStorage());
 
+        // The builder's own preferences - when a draft is kept without asking,
+        // how fast the view over a canvas moves - remembered under a key of
+        // their own. The editor reads them; nothing that builds ground does.
+        this.builderSettings = createBuilderSettingsState(defaultStorage());
+
         // The world the settings panel is holding, as the elements it was
         // assembled from, so a range can be moved and the ground drawn again
         // from the algorithm rather than from another preset.
@@ -338,6 +351,7 @@ class FlightSimulator {
         this.pauseMenuState = createMenuState(PAUSE_MENU_ENTRIES);
         this.settingsState  = createMenuState(this.settings.entries);
         this.controlState   = createMenuState(this.controlSettings.entries);
+        this.builderSettingsMenuState = createMenuState(this.builderSettings.entries);
         this.editorState    = createMenuState(this.editor.entries);
         this.modesState     = createMenuState(gameModeEntries());
 
@@ -498,6 +512,7 @@ class FlightSimulator {
             paused:    document.getElementById('paused'),
             settings:  document.getElementById('settings'),
             controls:  document.getElementById('control-settings'),
+            builderSettings: document.getElementById('builder-settings'),
             editor:    document.getElementById('element-editor'),
             picker:    document.getElementById('build-picker'),
             gameModes: document.getElementById('game-modes'),
@@ -588,16 +603,33 @@ class FlightSimulator {
         );
         this.settingsOptions = new MenuList(
             document.getElementById('settings-options'), this.settingsState,
-            entry => entry.kind !== ENVIRONMENT_ENTRY && entry.group !== START_GROUP
+            entry => entry.kind !== ENVIRONMENT_ENTRY && entry.group !== START_GROUP && entry.group !== BUILDER_GROUP
+        );
+        this.settingsBuilder = new MenuList(
+            document.getElementById('settings-builder'), this.settingsState,
+            entry => entry.group === BUILDER_GROUP
         );
 
-        // Three lists, one cursor, and so one pointer: an entry is reported by
+        // Four lists, one cursor, and so one pointer: an entry is reported by
         // its place in the whole panel rather than by its row in the list it was
         // drawn into, so the mouse and the keys walk the same panel.
         followPointers(
-            [this.settingsMenu, this.settingsStart, this.settingsOptions],
+            [this.settingsMenu, this.settingsStart, this.settingsOptions, this.settingsBuilder],
             (index, choose, step) => this.onSettingsPointer(index, choose, step)
         );
+
+        // The builder's own settings the same way: auto accept under one
+        // heading, the view under the next, and the reset and the way out
+        // under neither.
+        this.builderSettingsMenus = [
+            new MenuList(document.getElementById('builder-settings-auto'), this.builderSettingsMenuState,
+                entry => entry.group === AUTO_ACCEPT_GROUP),
+            new MenuList(document.getElementById('builder-settings-view'), this.builderSettingsMenuState,
+                entry => entry.group === VIEW_GROUP),
+            new MenuList(document.getElementById('builder-settings-end'), this.builderSettingsMenuState,
+                entry => entry.group !== AUTO_ACCEPT_GROUP && entry.group !== VIEW_GROUP)
+        ];
+        followPointers(this.builderSettingsMenus, (index, choose, step) => this.onBuilderSettingsPointer(index, choose, step));
 
         // And the control panel the same way: the axes under one heading, the
         // tilt and the attitude under the next two, and the reference list and
@@ -679,6 +711,7 @@ class FlightSimulator {
         this.setupKeys();
         this.applySettings();
         this.applyControlSettings();
+        this.applyBuilderSettings();
 
         // And then whatever the address asked for, which is the one way into a
         // stage past the first. It goes after the settings because it builds a
@@ -1026,6 +1059,7 @@ class FlightSimulator {
         return this.modesOpen
             || settingsShowing(this.settings)
             || controlSettingsShowing(this.controlSettings)
+            || builderSettingsShowing(this.builderSettings)
             || editorShowing(this.editor)
             || buildModeShowing(this.builder)
             || this.pauseState.paused;
@@ -1113,6 +1147,13 @@ class FlightSimulator {
 
         if (controlSettingsShowing(this.controlSettings)) {
             this.onControlSettingsKey(e);
+            return;
+        }
+
+        // The builder's settings over the builder are read ahead of it, which
+        // is what makes them modal over the canvas.
+        if (builderSettingsShowing(this.builderSettings)) {
+            this.onBuilderSettingsKey(e);
             return;
         }
 
@@ -1235,6 +1276,11 @@ class FlightSimulator {
 
         if (controlSettingsShowing(this.controlSettings)) {
             this.onControlSettingsKey(e);
+            return;
+        }
+
+        if (builderSettingsShowing(this.builderSettings)) {
+            this.onBuilderSettingsKey(e);
             return;
         }
 
@@ -1447,11 +1493,120 @@ class FlightSimulator {
         const applied = chooseSetting(this.settings, id, step);
         if (!applied || applied === SETTINGS_BACK_ID) return;
 
+        // The builder's own settings, opened in this panel's place.
+        if (applied === BUILDER_SETTINGS_ID) {
+            this.openBuilderSettingsPanel(BUILDER_SETTINGS_FROM_SETTINGS);
+            return;
+        }
+
         // Every choice the panel offers goes back through the same place: the
         // world and the start are worked out from the run and the settings
         // together, so a new world resets the flight, a new start waits for
         // one, and nothing here has to know which kind of choice was made.
         this.applySettings();
+    }
+
+    // --- The builder's settings ------------------------------------------
+
+    /**
+     * Opens the builder's own settings, from the builder - the gear, or `O` -
+     * or from the game's settings. Over a canvas it is modal and suspends the
+     * live tool the way a held pan does: whatever is being dragged ends, a
+     * held move key is let go, and the draft is left exactly as it was, so
+     * opening it never accepts a half-drawn stroke. A shape being drawn a click
+     * at a time is kept, as a pan keeps it.
+     */
+    openBuilderSettingsPanel(from = BUILDER_SETTINGS_FROM_BUILDER) {
+        if (builderSettingsShowing(this.builderSettings)) return false;
+
+        if (from === BUILDER_SETTINGS_FROM_BUILDER) {
+            if (!buildModeShowing(this.builder)) return false;
+            if (buildModeDrawing(this.builder)) {
+                if (!suspendForSettings(this.builder)) return false;
+                this.endCanvasDrag();
+                this.endGumballDrag();
+                this.cancelStroke();
+                if (this.lassoDrawing?.gesture === LASSO_DRAG) this.cancelLasso();
+                this.buildKeys.clear();
+            }
+        } else {
+            closeSettings(this.settings);
+        }
+
+        openBuilderSettings(this.builderSettings, from);
+        resetSelection(this.builderSettingsMenuState);
+        return true;
+    }
+
+    /**
+     * Closes the builder's settings, back to whichever screen opened them:
+     * the canvas, with the tool they suspended live again as it was, or the
+     * game's settings, on the row that opened them.
+     */
+    closeBuilderSettingsPanel() {
+        const from = closeBuilderSettings(this.builderSettings);
+        if (from === BUILDER_SETTINGS_FROM_SETTINGS) {
+            this.openSettingsPanel();
+            const at = this.settingsState.entries.findIndex(entry => entry.id === BUILDER_SETTINGS_ID);
+            if (at >= 0) this.settingsState.index = at;
+        } else if (from === BUILDER_SETTINGS_FROM_BUILDER) {
+            resumeFromSettings(this.builder);
+            this.renderer.domElement.style.cursor = this.canvasCursor();
+        }
+    }
+
+    /**
+     * Hands the builder's settings to what they drive: the moments auto
+     * accept covers, to the session - from the next event on, never to what is
+     * already in hand - and how fast the view over a canvas moves.
+     */
+    applyBuilderSettings() {
+        setAutoAccept(this.builder, builderAutoAccept(this.builderSettings));
+        this.buildCameraSpeed = builderCameraSpeed(this.builderSettings);
+    }
+
+    onBuilderSettingsKey(e) {
+        // The key that opens the screen closes it again, as `O` does the game's.
+        if (isBuilderSettingsCloseKey(e.code) || (isBuilderSettingsOpenKey(e.code) && !e.repeat)) {
+            e.preventDefault();
+            this.closeBuilderSettingsPanel();
+            this.syncOverlays();
+            return;
+        }
+
+        if (isMenuAdjustKey(e.code)) {
+            e.preventDefault();
+            const adjusted = adjustBuilderSetting(
+                this.builderSettings, selectedId(this.builderSettingsMenuState), menuAdjustStep(e.code)
+            );
+            if (adjusted) this.applyBuilderSettings();
+            this.syncOverlays();
+            return;
+        }
+
+        if (!isMenuKey(e.code)) return;
+        e.preventDefault();
+
+        const chosen = applyMenuKey(this.builderSettingsMenuState, e.code, true, e.repeat);
+        if (chosen) this.chooseBuilderSettingsEntry(chosen);
+        this.syncOverlays();
+    }
+
+    /** The builder's settings under the mouse: a click chooses, the left of a row steps it down and the right up. */
+    onBuilderSettingsPointer(index, choose, step = 1) {
+        const chosen = applyMenuPointer(this.builderSettingsMenuState, index, choose);
+        if (chosen) this.chooseBuilderSettingsEntry(chosen, step);
+        this.syncOverlays();
+    }
+
+    chooseBuilderSettingsEntry(id, step = 1) {
+        // `BACK` closes through the one place `Escape` does, so it returns to
+        // whichever screen opened the settings.
+        if (id === BUILDER_SETTINGS_BACK_ID) {
+            this.closeBuilderSettingsPanel();
+            return;
+        }
+        if (chooseBuilderSetting(this.builderSettings, id, step)) this.applyBuilderSettings();
     }
 
     // --- The control settings panel ---------------------------------------
@@ -2445,6 +2600,11 @@ class FlightSimulator {
         const tool    = buildModeTool(this.builder);
         const gesture = cameraGesture(e, tool);
         if (!gesture) {
+            // With auto accept on for drawing, a press that draws again keeps
+            // what is in hand first, so what it draws starts a draft of its
+            // own. Nothing was kept on the release before it, so until this
+            // press the stroke just drawn could still be changed.
+            if (e.button === 0 && !(e.shiftKey && dropsAtClick(tool)) && drawAgain(this.builder)) this.draftKept();
             if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
             else if (e.button === 0 && (tool === LASSO_PALETTE_TOOL || extrudeDrawing(this.builder))) this.lassoPress(e);
             else if (e.button === 0 && eyeDropperArmed(this.builder)) this.dropperAt(e);
@@ -2576,9 +2736,11 @@ class FlightSimulator {
         drag.x = e.clientX;
         drag.y = e.clientY;
 
+        // The builder's camera speed scales every gesture together.
+        const speed = this.buildCameraSpeed ?? 1;
         this.buildCamera = drag.gesture === CAMERA_ORBIT
-            ? orbitBuildCamera(this.buildCamera, dx, dy)
-            : panBuildCamera(this.buildCamera, dx, dy, {
+            ? orbitBuildCamera(this.buildCamera, dx * speed, dy * speed)
+            : panBuildCamera(this.buildCamera, dx * speed, dy * speed, {
                 viewHeight: this.renderer.domElement.clientHeight,
                 fov: this.camera.fov
             });
@@ -3066,7 +3228,8 @@ class FlightSimulator {
 
         e.preventDefault();
         const point = this.pickCanvasPoint(e.clientX, e.clientY);
-        this.buildCamera = zoomBuildCameraToward(this.buildCamera, wheelPixels(e.deltaY, e.deltaMode), point);
+        const travel = wheelPixels(e.deltaY, e.deltaMode) * (this.buildCameraSpeed ?? 1);
+        this.buildCamera = zoomBuildCameraToward(this.buildCamera, travel, point);
     }
 
     // --- The dock ----------------------------------------------------------
@@ -3169,6 +3332,17 @@ class FlightSimulator {
         if (!holder) return;
         writeRowValue(holder, entry.name, entry.row, rgb);
         this.applyDockValue(entry);
+    }
+
+    /**
+     * The draft in hand kept without a question - by auto accept - so the
+     * panel's holders, made for it, are let go, and the ground is drawn again
+     * where keeping it changes what is drawn.
+     */
+    draftKept() {
+        this.draftHolder = null;
+        this.strokeHolder = null;
+        this.redrawCanvas();
     }
 
     /** An eye dropper pressed - Free Paint's, or a surface's colour row's: armed, or put down again. */
@@ -3441,6 +3615,15 @@ class FlightSimulator {
             return;
         }
 
+        // `O`, which opens the game's settings everywhere else, opens the
+        // builder's own inside it - the screen a pilot in the editor is after.
+        if (isBuilderSettingsOpenKey(e.code) && !e.repeat) {
+            e.preventDefault();
+            this.openBuilderSettingsPanel(BUILDER_SETTINGS_FROM_BUILDER);
+            this.syncOverlays();
+            return;
+        }
+
         if (buildModeDrawing(this.builder)) {
             // Escape steps out of the innermost thing first: a drag being made
             // ends where it is, and only a press with nothing in progress asks
@@ -3541,7 +3724,9 @@ class FlightSimulator {
      * it opens.
      */
     requestLeaveBuilder() {
+        const pending = editPending(this.builder);
         const asked = requestLeave(this.builder);
+        if (pending && !draftPending(this.builder)) this.draftKept();
         if (asked?.leave) this.leaveBuilder();
         else if (asked?.confirm) this.confirmOpened();
     }
@@ -3644,6 +3829,22 @@ class FlightSimulator {
         });
         palette.append(fold);
 
+        // The gear on the same band, which opens the builder's own settings.
+        // It is not a tile: the tiles are tools, a tool has a draft, and the
+        // settings have none.
+        const gear = document.createElement('button');
+        gear.type = 'button';
+        gear.className = 'palette-gear';
+        gear.dataset.palette = 'settings';
+        gear.title = `${BUILDER_SETTINGS_NAME} (O)`;
+        gear.setAttribute('aria-label', BUILDER_SETTINGS_NAME);
+        gear.append(markImage(BUILDER_SETTINGS_MARK));
+        gear.addEventListener('click', (event) => {
+            if (event.detail > 0) gear.blur();
+            if (this.openBuilderSettingsPanel(BUILDER_SETTINGS_FROM_BUILDER)) this.syncOverlays();
+        });
+        palette.append(gear);
+
         for (const tool of paletteTools()) {
             const tile = document.createElement('button');
             tile.type = 'button';
@@ -3677,8 +3878,10 @@ class FlightSimulator {
     onPaletteClick(id) {
         if (!buildModeDrawing(this.builder)) return;
 
+        const pending = editPending(this.builder);
         if (id === ACCEPT_TOOL) this.requestLeaveBuilder();
         else if (!chooseBuildTool(this.builder, id) && confirmOpen(this.builder)) this.confirmOpened();
+        else if (pending && !draftPending(this.builder)) this.draftKept();
         if (buildModeTool(this.builder) !== this.lassoDrawing?.mode) this.cancelLasso();
         if (buildModeTool(this.builder) !== this.strokeDrawing?.tool) this.cancelStroke();
 
@@ -4138,7 +4341,10 @@ class FlightSimulator {
         const settings = !photo && !builder && !modes && settingsShowing(this.settings);
         const controls = !photo && !builder && !modes && !settings && controlSettingsShowing(this.controlSettings);
         const editor   = !photo && !builder && !modes && !settings && !controls && editorShowing(this.editor);
-        const panel    = modes || settings || controls || editor || picker;
+        // The builder's settings are drawn over whichever screen opened them,
+        // the canvas included, which goes on being drawn behind them.
+        const prefs    = !photo && builderSettingsShowing(this.builderSettings);
+        const panel    = modes || settings || controls || editor || picker || prefs;
         const paused   = !photo && !builder && !onTitle && this.pauseState.paused;
         const chrome   = !photo && !builder && !onTitle && !panel && this.hudVisibility.visible;
         // The pads belong to a flight being flown, the same as the instruments,
@@ -4156,6 +4362,7 @@ class FlightSimulator {
         this.overlays.title.style.display     = onTitle && !panel ? 'flex' : 'none';
         this.overlays.settings.style.display  = settings ? 'block' : 'none';
         this.overlays.controls.style.display  = controls ? 'block' : 'none';
+        this.overlays.builderSettings.style.display = prefs ? 'flex' : 'none';
         this.overlays.editor.style.display    = editor ? 'block' : 'none';
         this.overlays.picker.style.display    = picker ? 'block' : 'none';
         this.overlays.palette.style.display   = canvas ? 'grid' : 'none';
@@ -4258,7 +4465,9 @@ class FlightSimulator {
         this.settingsMenu.render(this.settingsState);
         this.settingsStart.render(this.settingsState);
         this.settingsOptions.render(this.settingsState);
+        this.settingsBuilder.render(this.settingsState);
         for (const menu of this.controlMenus) menu.render(this.controlState);
+        for (const menu of this.builderSettingsMenus) menu.render(this.builderSettingsMenuState);
         this.editorMenu.render(this.editorState);
         this.pickerCards.render(this.pickerState);
         this.pickerActions.render(this.pickerState);

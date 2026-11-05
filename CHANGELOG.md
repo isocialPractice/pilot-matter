@@ -5,6 +5,99 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.55.0] - 2026-11-05
+
+The builder's own settings - a third settings screen, reached from the builder
+and from the game's settings - and auto accept, its first rows.
+
+### Added
+
+- **Builder settings.** `BUILDER SETTINGS` is a screen of the builder's own
+  preferences, made the way the game's two settings screens are and stored
+  under a key of its own: `AUTO ACCEPT` - `ALL`, `WHEN DRAWING AGAIN`,
+  `WHEN LEAVING` and `WHEN CHANGING TOOL` - and `VIEW` - `CAMERA SPEED`,
+  `SLOW`, `NORMAL` or `FAST` - then `RESET TO DEFAULTS` and `BACK`. A builder
+  setting changes how the editor behaves and never what it builds: nothing that
+  generates ground reads one, and the same placements build the same world
+  whatever was set.
+- **From the builder.** A gear at the right of the palette's band, beside the
+  chevrons, and `O` inside the builder open the screen. Over a canvas it is
+  modal and suspends the live tool as a held pan does: whatever is being
+  dragged ends, nothing is kept or dropped, and closing it gives back the same
+  draft on the same tool. A setting changed there applies from the next press.
+- **From Settings.** A `BUILDER SETTINGS` row, under a `BUILDER` heading of its
+  own last before `BACK` on the game's settings, opens the same screen in the
+  panel's place; its `BACK` returns there, on that row. It stays while a game
+  mode is played.
+- **Auto accept.** With `WHEN DRAWING AGAIN` on, the next press that draws - a
+  stroke begun, a mountain dropped, a runway placed, a shape begun over a
+  lifted extrusion - keeps the draft in hand and starts a new one; nothing is
+  kept when a stroke is let go of, so the stroke just drawn can still be
+  changed or cancelled, and a pan between two strokes keeps nothing. With
+  `WHEN LEAVING` on, the way out keeps the draft and asks only `SAVE AND EXIT
+  MODE`, and the accept tool is named for that question. With `WHEN CHANGING
+  TOOL` on, another tool keeps the draft without asking. `ALL` holds the three
+  on.
+- **Camera speed.** `CAMERA SPEED` scales the orbit, the pan and the wheel's
+  zoom over a canvas together.
+- **The control list** carries `O - Builder Settings`.
+
+### Changed
+
+- The game's settings end on a `BUILDER` group holding `BUILDER SETTINGS` and
+  `BACK`.
+- A mark the art has none of is drawn in the repository and named beside the
+  copy step's list, which leaves it where it is.
+
+Held in Node by the new `test/builder-settings.test.js` - the rows under their
+headings in the plan's order, how each reads, every value kept under the
+builder's own key and read back, the defaults where nothing was stored or a
+storage fails and one stranger value costing the others nothing, `ALL`
+holding the moments on and giving them back, the reset, where the screen was
+opened from and where `BACK` goes, the row on the game's settings, nothing that
+builds ground reading a builder setting, and the same strokes building the
+same ground under every row - and the new `test/auto-accept.test.js`: the
+moments and `ALL` over them, a release keeping nothing and the next press
+keeping the stroke, the next stroke folding in with the moment off, a pan
+keeping nothing, a mountain, a runway and a lifted extrusion kept by a press
+and an extrusion being drawn or at its surfaces not, nothing kept for the
+lasso, a pick, an armed dropper or a question, the way out asking only whether
+to save, another tool keeping the draft, and the screen over a canvas
+suspending the tool and giving back the same draft - with `test/page.test.js`,
+`test/settings.test.js`, `test/controls-help.test.js` and
+`test/build-art.test.js`. Each rejected the defect it names when that was put
+back, 64 in all: among them the settings stored under the game's key, a
+stored value taken unchecked, a write to nothing reported kept, the moments
+never held or `ALL` holding itself, a held moment reading what it was left on
+or stepping, the screen opened from anywhere or over itself, the reset not put
+back or not written, `ALL` folded into the moments, `FAST` not twice as fast,
+the game's row missing or leaving the panel open, `BACK` drawn under the
+options, leaving keeping the draft always or never, the accept tool naming a
+question it will not ask, another tool always or never asking, a tool chosen
+or a pan held under the screen, the screen suspending under a question or
+twice or never letting go, a canvas begun under it, a moment on for anything
+truthy or one there is not, drawing again whatever the setting, under a
+question or a pan or with the dropper armed, a stroke, a mountain or a runway
+not drawing again, an extrusion kept at any stage or at its surfaces, a press
+never drawing again or a shift-click keeping the draft, a kept draft left
+undrawn, the screen suspending nothing or dropping a shape drawn a click at a
+time or leaving a move key held, `BACK` leaving the tool suspended or
+returning to the top of the game's settings, `O` doing nothing, the screen not
+modal, the settings never reaching the session or not in force at start, the
+camera at its own speed, no gear, the screen or the game's row never drawn,
+the gear left on a folded palette, the screen under the palette, the list not
+naming `O`, and the gear left to a sync to delete.
+Settled in Chromium in 15 checks across a desktop and a phone: the game's
+settings carrying `BUILDER SETTINGS` last before `BACK` and opening the screen
+in their place; a box kept under the builder's key and `BACK` returning to the
+row; the gear on the band; a stroke let go of still the draft; the gear
+suspending Grass with a press behind the screen reaching nothing and `Esc`
+giving back the same draft; the next stroke keeping the first; `O` and `ALL`
+holding the moments on; a held moment not stepping; `O` closing it with
+nothing kept; another tool keeping the draft; the accept tool asking only
+`SAVE AND EXIT MODE`; `FAST` orbiting twice as far; the reset; the settings
+outliving the page; and a finger on the gear.
+
 ## [1.0.0-alpha.1.54.0] - 2026-11-05
 
 Extrusion surfaces chosen by clicking them, both settled into the ground they

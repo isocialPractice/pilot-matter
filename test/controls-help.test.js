@@ -21,6 +21,7 @@ import { CANVAS_LEAVE_KEYS, PICKER_CLOSE_KEYS } from '../js/build-mode.js';
 import { CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS } from '../js/build-camera.js';
 import { PHOTO_KEY } from '../js/photo.js';
 import { MENU_SELECT_KEYS } from '../js/menu.js';
+import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
 import { dropsAtClick } from '../js/build-tools.js';
 import { createInputState, applyKeyToInput } from '../js/input-map.js';
 import { CONTROL_REFERENCE_LABEL } from '../js/control-settings.js';
@@ -221,13 +222,15 @@ test('every key row of the builder list is a key some builder handler reads', ()
     assert.equal(dropsAtClick(rows.drop.click), true);
     assert.deepEqual(rows.help.keys, [[HELP_KEY]], 'the list is collapsed by the same key as the flight\'s');
     assert.deepEqual(rows.photo.keys, [[PHOTO_KEY]], 'and a picture can be taken of a canvas like any screen');
+    assert.equal(rows['builder-settings'].keys[0], SETTINGS_OPEN_KEYS,
+        'the builder\'s settings are opened by the key that opens the game\'s everywhere else');
     assert.equal(rows.reframe.keys[0], REFRAME_KEYS, 'the hold is put back by the keys that do it');
     assert.deepEqual(rows.move.keys,
         [BUILD_MOVE_KEYS.forward, BUILD_MOVE_KEYS.left, BUILD_MOVE_KEYS.back, BUILD_MOVE_KEYS.right],
         'and the view is moved by the keys the frame reads, in the order they are read out');
 
     const read = new Set([
-        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS, ...MENU_SELECT_KEYS,
+        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS, ...MENU_SELECT_KEYS, ...SETTINGS_OPEN_KEYS,
         ...Object.values(BUILD_MOVE_KEYS).flat()
     ]);
     for (const row of BUILD_HELP_ROWS.filter(row => row.keys)) {
@@ -281,6 +284,7 @@ test('the builder list reads as the input and then what it does', () => {
         'Drag a Handle - Move or Shape What Is in Hand',
         'Esc - Accept Edits or Save and Exit',
         'Enter - Answer a Question',
+        'O - Builder Settings',
         'H - Collapse List',
         'F2 - Photo'
     ]);

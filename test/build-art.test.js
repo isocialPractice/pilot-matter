@@ -18,8 +18,8 @@ import { join } from 'node:path';
 import { BUILD_TOOLS, BUILDER_ART, toolMark, toolName, isBuildTool } from '../js/build-tools.js';
 import { cardThumbnail } from '../js/build-picker.js';
 import { BUILDER_ENVIRONMENTS } from '../js/environment/presets.js';
-import { PALETTE_FOLD_MARK } from '../js/build-palette.js';
-import { BUILDER_ASSETS, TARGET } from '../tools/sync-builder-assets.mjs';
+import { PALETTE_FOLD_MARK, BUILDER_SETTINGS_MARK } from '../js/build-palette.js';
+import { BUILDER_ASSETS, BUILDER_DRAWN, TARGET } from '../tools/sync-builder-assets.mjs';
 import { LASSO_ART } from '../js/lasso.js';
 import { EXTRUDE_ART } from '../js/extrude.js';
 
@@ -90,11 +90,25 @@ test('the copy step\'s list and the repository agree', () => {
     assert.ok(targets.includes(EXTRUDE_ART), 'and the one Extrude cuts its shapes\' icons from');
     assert.ok(tracked.has(EXTRUDE_ART));
     // And the other way: nothing is shipped from the folder that a copy would
-    // not bring up to date.
+    // not bring up to date, but for the marks drawn here because the art has
+    // none - which the copy leaves where they are.
+    const drawn = BUILDER_DRAWN.map(name => `${TARGET}/${name}`);
     for (const path of tracked) {
-        if (path.startsWith(`${TARGET}/`)) assert.ok(targets.includes(path), `${path} is tracked and not on the list`);
+        if (path.startsWith(`${TARGET}/`)) {
+            assert.ok(targets.includes(path) || drawn.includes(path), `${path} is tracked and neither copied nor drawn here`);
+        }
     }
     assert.equal(new Set(Object.values(BUILDER_ASSETS)).size, targets.length, 'and no source is copied twice');
+});
+
+test('a mark drawn here rather than copied is tracked, named by the code, and never on the copy\'s list', () => {
+    assert.deepEqual(BUILDER_DRAWN, ['builder-settings.svg']);
+    for (const name of BUILDER_DRAWN) {
+        assert.ok(tracked.has(`${TARGET}/${name}`), `${name} is tracked`);
+        assert.ok(!(name in BUILDER_ASSETS), `${name} is not on the list a sync would copy over it`);
+    }
+    assert.equal(BUILDER_SETTINGS_MARK, `${TARGET}/builder-settings.svg`, 'the gear is the one drawn here');
+    assert.match(read(BUILDER_SETTINGS_MARK), /viewBox="0 0 31\.13 31\.13"/, 'on the square the tool marks are drawn on');
 });
 
 // --- Nothing behind it ---------------------------------------------------------------

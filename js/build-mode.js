@@ -22,7 +22,7 @@
 
 import {
     SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool, isEraseTool,
-    isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate
+    isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate, dropsAtClick
 } from './build-tools.js';
 import {
     DEFAULT_EXTRUDE_TOOL, extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_SURFACES, EXTRUDE_STAGES,
@@ -180,7 +180,15 @@ export function createBuildState() {
         // While a pan is held from inside a tool, `{ overriding, resumes }`:
         // the pointer drives the camera, and the tool it was is the one it
         // goes back to. Null while nothing holds it.
-        camera: null
+        camera: null,
+        // While the builder's settings are open over the canvas, `{ resumes }`:
+        // the tool suspended under them, as a held pan suspends it.
+        settingsOver: null,
+        // The moments a pending draft is kept without being asked about,
+        // handed in from the builder's settings - which this module never
+        // reads itself, so a session works without them. `all` is over the
+        // other three.
+        autoAccept: noAutoAccept()
     };
 }
 
@@ -290,6 +298,11 @@ export function requestLeave(state) {
     if (!buildModeShowing(state) || confirmOpen(state)) return null;
     if (buildModePicking(state)) return { leave: true };
 
+    // With auto accept on for leaving, the edit in hand is kept without the
+    // first question, and the way out goes straight to the second. It never
+    // skips that one: leaving is the confirm that keeps a pilot's work.
+    if (editPending(state) && autoAccepts(state, 'exit')) acceptDraft(state);
+
     const ask = editPending(state) ? ACCEPT_EDITS : SAVE_AND_EXIT;
     state.confirm = { ask, then: null };
     return { confirm: ask };
@@ -364,7 +377,7 @@ export function answerConfirm(state, answer) {
  * ask too.
  */
 export function acceptToolName(state) {
-    return editPending(state) ? 'Accept edits' : 'Save and exit';
+    return editPending(state) && !autoAccepts(state, 'exit') ? 'Accept edits' : 'Save and exit';
 }
 
 // --- The draft and the built world --------------------------------------------
@@ -1022,6 +1035,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.extrudeTool = DEFAULT_EXTRUDE_TOOL;
     state.extrudeValues = {};
     state.camera = null;
+    state.settingsOver = null;
     return true;
 }
 
@@ -1046,16 +1060,24 @@ export function buildModeTool(state) {
  * is a placement picked and left as it was, which is let go as the tool
  * changes.
  *
+ * With auto accept on for changing tool, the edit is kept without the
+ * question - as if `ACCEPT EDITS` had been answered `YES` - and the tool
+ * changes. No tool is chosen while the live one is suspended, by a held pan
+ * or by the builder's settings over the canvas.
+ *
  * Returns true when the live tool changed, and false when it did not - which,
  * with an edit pending, is because `ACCEPT EDITS` is now asking.
  */
 export function chooseBuildTool(state, id) {
     if (!buildModeDrawing(state) || confirmOpen(state) || !isChoosableTool(id)) return false;
-    if (state.tool === id || cameraHeld(state)) return false;
+    if (state.tool === id || toolSuspended(state)) return false;
 
     if (editPending(state)) {
-        state.confirm = { ask: ACCEPT_EDITS, then: { tool: id } };
-        return false;
+        if (!autoAccepts(state, 'tool')) {
+            state.confirm = { ask: ACCEPT_EDITS, then: { tool: id } };
+            return false;
+        }
+        acceptDraft(state);
     }
 
     state.draft = null;
@@ -1084,7 +1106,7 @@ export function chooseBuildTool(state, id) {
  */
 export function holdCamera(state) {
     const tool = buildModeTool(state);
-    if (tool == null || tool === SELECT_TOOL || confirmOpen(state) || cameraHeld(state)) return false;
+    if (tool == null || tool === SELECT_TOOL || confirmOpen(state) || toolSuspended(state)) return false;
     state.camera = { overriding: true, resumes: tool };
     return true;
 }
@@ -1106,6 +1128,109 @@ export function releaseCamera(state) {
     const { resumes } = state.camera;
     state.camera = null;
     return resumes;
+}
+
+/**
+ * The builder's settings opened over the canvas. They are modal, and they
+ * suspend the live tool the way a held pan does: nothing is committed or
+ * cancelled, the draft is still the draft when they close, and the tool is
+ * the tool it was - opening a screen must never be what accepts a half-drawn
+ * stroke. A setting changed there applies from the next event on, so auto
+ * accept turned on keeps nothing already in hand.
+ *
+ * Refused off a canvas, with a question open, and while the tool is already
+ * suspended. The popup is shut. Returns true when the tool is suspended.
+ */
+export function suspendForSettings(state) {
+    const tool = buildModeTool(state);
+    if (tool == null || confirmOpen(state) || toolSuspended(state)) return false;
+    state.settingsOver = { resumes: tool };
+    state.popup = null;
+    return true;
+}
+
+/** True while the builder's settings are open over the canvas. */
+export function settingsOver(state) {
+    return state?.settingsOver != null && buildModeDrawing(state);
+}
+
+/**
+ * The builder's settings closed over the canvas: the tool they suspended is
+ * live again, as it was. Returns that tool, or null when none was suspended.
+ */
+export function resumeFromSettings(state) {
+    if (!settingsOver(state)) {
+        if (state) state.settingsOver = null;
+        return null;
+    }
+    const { resumes } = state.settingsOver;
+    state.settingsOver = null;
+    return resumes;
+}
+
+/** True while the live tool is suspended - by a held pan, or by the builder's settings over the canvas. */
+export function toolSuspended(state) {
+    return cameraHeld(state) || settingsOver(state);
+}
+
+// --- Auto accept ---------------------------------------------------------------------
+
+/**
+ * The moments a pending draft can be kept without being asked about: the next
+ * press that draws, the way out, and another tool. `all` turns every one on.
+ */
+export const AUTO_ACCEPT_MOMENTS = Object.freeze(['draw', 'exit', 'tool']);
+
+/** Nothing kept without asking, which is where a session starts. */
+function noAutoAccept() {
+    return { all: false, draw: false, exit: false, tool: false };
+}
+
+/**
+ * The moments auto accept covers, handed in from the builder's settings:
+ * `{ all, draw, exit, tool }`, anything not plainly on being off. It changes
+ * what the next event does and nothing in hand. Returns what it holds now.
+ */
+export function setAutoAccept(state, moments = {}) {
+    const next = noAutoAccept();
+    for (const key of Object.keys(next)) next[key] = moments?.[key] === true;
+    state.autoAccept = next;
+    return { ...next };
+}
+
+/** True when a pending draft is kept without being asked about at `moment`. */
+export function autoAccepts(state, moment) {
+    const set = state?.autoAccept;
+    if (set == null || !AUTO_ACCEPT_MOMENTS.includes(moment)) return false;
+    return set.all === true || set[moment] === true;
+}
+
+/**
+ * A press that draws again while a draft is pending - a stroke begun, a
+ * mountain dropped, a runway placed, a shape begun with an extrusion lifted:
+ * with auto accept on for drawing, the draft is kept first, so what is drawn
+ * now starts one of its own. Nothing is kept on a release, so a stroke just
+ * drawn stays editable until the next press.
+ *
+ * Only by a tool that draws - Select picks and the lasso selects - whose draft
+ * the one in hand is, a change of tool having settled any other. An extrusion
+ * still being drawn is not kept - its
+ * shapes are one region until `EXTRUDE` lifts it - nor one at its surfaces,
+ * where a press chooses a surface. Nothing is kept with the eye dropper armed,
+ * under a question, or with the tool suspended. Returns true when it kept the
+ * draft.
+ */
+export function drawAgain(state) {
+    const tool = buildModeTool(state);
+    if (!autoAccepts(state, 'draw') || !draftPending(state) || confirmOpen(state) || toolSuspended(state)) return false;
+    if (eyeDropperArmed(state)) return false;
+
+    const draws = isStrokeTool(tool) || dropsAtClick(tool) || insertsTemplate(tool)
+        || (isExtrudeTool(tool) && state.draft.stage === EXTRUDE_EXTRUDING);
+    if (!draws) return false;
+
+    acceptDraft(state);
+    return true;
 }
 
 // --- The selection, and the lasso that draws it -----------------------------------

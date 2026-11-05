@@ -13,8 +13,12 @@ import {
     CHOICE_ENTRY,
     TOGGLE_ENTRY,
     BACK_ENTRY,
+    SCREEN_ENTRY,
     START_GROUP,
     OPTION_GROUP,
+    BUILDER_GROUP,
+    BUILDER_SETTINGS_ID,
+    BUILDER_SETTINGS_LABEL,
     TOGGLE_ON_MARK,
     TOGGLE_OFF_MARK,
     choiceEntryId,
@@ -145,7 +149,7 @@ test('the panel starts closed, and opens and closes on request', () => {
     assert.equal(settingsShowing(state), false);
 });
 
-test('the panel lists every environment, then every option, then the way out', () => {
+test('the panel lists every environment, then every option, then the builder\'s settings and the way out', () => {
     const entries = settingsEntries();
 
     assert.deepEqual(
@@ -157,7 +161,7 @@ test('the panel lists every environment, then every option, then the way out', (
     // is why the rows are counted back to the options rather than the other way.
     assert.deepEqual(
         [...new Set(entries
-            .filter(entry => entry.kind !== ENVIRONMENT_ENTRY && entry.kind !== BACK_ENTRY)
+            .filter(entry => entry.kind !== ENVIRONMENT_ENTRY && entry.kind !== BACK_ENTRY && entry.kind !== SCREEN_ENTRY)
             .map(entry => entry.option ?? entry.id))],
         SETTINGS_OPTIONS.map(option => option.id)
     );
@@ -168,6 +172,12 @@ test('the panel lists every environment, then every option, then the way out', (
 
     assert.equal(entries.at(-1).id, SETTINGS_BACK_ID);
     assert.equal(entries.at(-1).kind, BACK_ENTRY);
+    assert.deepEqual(entries.at(-2), {
+        kind: SCREEN_ENTRY, group: BUILDER_GROUP, id: BUILDER_SETTINGS_ID, label: BUILDER_SETTINGS_LABEL,
+        note: entries.at(-2).note, current: false
+    }, 'the builder\'s settings, last before the way out');
+    assert.deepEqual(entries.filter(entry => entry.group === BUILDER_GROUP).map(entry => entry.id), [BUILDER_SETTINGS_ID, SETTINGS_BACK_ID],
+        'in a group of their own, with the way out, so the two are drawn in the order they are walked');
     assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length,
         'two rows answering to one id is one row too many');
     for (const entry of entries) {

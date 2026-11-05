@@ -711,6 +711,7 @@
         }
 
         #settings h2,
+        #builder-settings-card h2,
         #control-settings h2,
         #game-modes h2,
         #element-editor h2,
@@ -724,6 +725,7 @@
            against the rows beneath them, so a panel long enough to scroll is
            read as three sections rather than as one run of entries. */
         #settings h3,
+        #builder-settings-card h3,
         #control-settings h3,
         #element-editor h3,
         #build-picker h3 {
@@ -738,6 +740,7 @@
         }
 
         #settings small,
+        #builder-settings-card small,
         #control-settings small,
         #game-modes small,
         #element-editor small,
@@ -787,6 +790,10 @@
         #control-settings-attitude,
         #control-settings-level-off,
         #control-settings-keys,
+        #settings-builder,
+        #builder-settings-auto,
+        #builder-settings-view,
+        #builder-settings-end,
         #control-settings-reference {
             list-style: none;
             margin: 18px 0 14px;
@@ -806,6 +813,10 @@
         #control-settings-attitude li,
         #control-settings-level-off li,
         #control-settings-keys li,
+        #settings-builder li,
+        #builder-settings-auto li,
+        #builder-settings-view li,
+        #builder-settings-end li,
         #control-settings-reference li {
             margin: 4px 0;
             padding: 5px 10px;
@@ -837,6 +848,10 @@
         #control-settings-attitude li.selected,
         #control-settings-level-off li.selected,
         #control-settings-keys li.selected,
+        #settings-builder li.selected,
+        #builder-settings-auto li.selected,
+        #builder-settings-view li.selected,
+        #builder-settings-end li.selected,
         #control-settings-reference li.selected {
             color: #000;
             background: #0f0;
@@ -889,6 +904,10 @@
         #control-settings-attitude,
         #control-settings-level-off,
         #control-settings-keys,
+        #settings-builder,
+        #builder-settings-auto,
+        #builder-settings-view,
+        #builder-settings-end,
         #control-settings-reference,
         #element-editor-menu {
             margin: 10px 0 8px;
@@ -902,6 +921,10 @@
         #control-settings-attitude li,
         #control-settings-level-off li,
         #control-settings-keys li,
+        #settings-builder li,
+        #builder-settings-auto li,
+        #builder-settings-view li,
+        #builder-settings-end li,
         #control-settings-reference li,
         #element-editor-menu li {
             margin: 2px 0;
@@ -937,6 +960,7 @@
            because it is - it just is not the pilot holding it there. A range
            gated shut on the element editor is held the same way: listed, its
            value kept, and not moved by a press until its gate opens. */
+        #builder-settings-auto li.locked,
         #settings-start li.locked,
         #element-editor-menu li.locked {
             opacity: 0.6;
@@ -950,6 +974,10 @@
         #control-settings-attitude li[data-note]::after,
         #control-settings-level-off li[data-note]::after,
         #control-settings-keys li[data-note]::after,
+        #settings-builder li[data-note]::after,
+        #builder-settings-auto li[data-note]::after,
+        #builder-settings-view li[data-note]::after,
+        #builder-settings-end li[data-note]::after,
         #control-settings-reference li[data-note]::after,
         #element-editor-menu li[data-note]::after,
         #build-picker-cards li[data-note]::after,
@@ -1128,6 +1156,69 @@
             width: 100%;
             transform: none;
             clip-path: none;
+        }
+
+        /* The gear at the right-hand end of the band, which opens the
+           builder's own settings. It is not a tile - the tiles are tools - and
+           a folded palette is the tab alone, so it goes with the tools. */
+        #build-palette .palette-gear {
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            background: none;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #build-palette .palette-gear:hover,
+        #build-palette .palette-gear:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px #87ceeb;
+        }
+
+        #build-palette.folded .palette-gear {
+            display: none;
+        }
+
+        /* The builder's own settings: a card made as the game's two settings
+           cards are, on a layer of its own over whichever screen opened it.
+           Over a canvas the layer is what makes it modal - nothing behind it
+           takes a press while it is open - and it sits over the palette and
+           the dock and under the canvas's confirms. */
+        #builder-settings {
+            display: none;
+            position: fixed;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.25);
+            z-index: 345;
+        }
+
+        #builder-settings-card {
+            min-width: 360px;
+            max-width: calc(100vw - 24px);
+            max-height: 92vh;
+            overflow-y: auto;
+            box-sizing: border-box;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.72);
+            border: 1px solid rgba(0, 255, 0, 0.4);
+            padding: 20px 40px;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 420px) {
+            #builder-settings-card {
+                min-width: 0;
+                padding: 16px 18px;
+            }
         }
 
         /* The builder's control list, drawn the way the flight's is and in the
@@ -2069,6 +2160,8 @@
         <ul id="settings-start"></ul>
         <h3>OPTIONS</h3>
         <ul id="settings-options"></ul>
+        <h3>BUILDER</h3>
+        <ul id="settings-builder"></ul>
         <small>W/S OR ↑/↓ TO SELECT &middot; A/D OR ←/→ TO ADJUST &middot; TYPE A NUMBER TO SET IT &middot; ENTER OR CLICK TO CHOOSE &middot; ESC TO CLOSE</small>
     </div>
 
@@ -2130,6 +2223,18 @@
 
     <div id="build-popup" role="menu" aria-label="Selection">
         <button type="button" role="menuitem" data-popup="deselect">DESELECT</button>
+    </div>
+
+    <div id="builder-settings">
+        <div id="builder-settings-card" role="dialog" aria-modal="true" aria-labelledby="builder-settings-title">
+            <h2 id="builder-settings-title">BUILDER SETTINGS</h2>
+            <h3>AUTO ACCEPT</h3>
+            <ul id="builder-settings-auto"></ul>
+            <h3>VIEW</h3>
+            <ul id="builder-settings-view"></ul>
+            <ul id="builder-settings-end"></ul>
+            <small>W/S OR &uarr;/&darr; TO SELECT &middot; A/D OR &larr;/&rarr; TO ADJUST &middot; ENTER OR CLICK TO CHOOSE &middot; ESC OR O TO CLOSE</small>
+        </div>
     </div>
 
     <div id="build-confirm">

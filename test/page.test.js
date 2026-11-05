@@ -3602,7 +3602,7 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*return;\s*\}/,
+    assert.match(press, /if \(!gesture\) \{\s*(\/\/[^\n]*\n\s*)*if \(e\.button === 0 && !\(e\.shiftKey && dropsAtClick\(tool\)\) && drawAgain\(this\.builder\)\) this\.draftKept\(\);\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*return;\s*\}/,
         'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, the eye dropper\'s, an extrusion\'s surface\'s, a stroke tool\'s or Insert Runway\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
@@ -3685,7 +3685,8 @@ test('a pick is cast from the camera as it stands, against the canvas alone', ()
 test('the wheel zooms toward the ground under the pointer', () => {
     const wheel = methodBody(mainSource, 'onCanvasWheel');
     assert.match(wheel, /const point = this\.pickCanvasPoint\(e\.clientX, e\.clientY\);/);
-    assert.match(wheel, /zoomBuildCameraToward\(this\.buildCamera, wheelPixels\(e\.deltaY, e\.deltaMode\), point\)/);
+    assert.match(wheel, /const travel = wheelPixels\(e\.deltaY, e\.deltaMode\) \* \(this\.buildCameraSpeed \?\? 1\);\s*this\.buildCamera = zoomBuildCameraToward\(this\.buildCamera, travel, point\);/,
+        'scaled by the builder\'s camera speed');
 });
 
 // A range gated shut is held on the element editor the way a locked box is on
@@ -4652,4 +4653,108 @@ test('a pan from inside a tool holds the camera, and letting it go puts the tool
     assert.match(methodBody(mainSource, 'endCanvasDrag'), /if \(releaseCamera\(this\.builder\) != null\) surface\.style\.cursor = this\.canvasCursor\(\);/);
     assert.match(methodBody(mainSource, 'lassoDrawingPath'), /if \(drawing\.gesture === LASSO_CLICKS && this\.canvasPointer && !cameraHeld\(this\.builder\)\) \{/,
         'a shape drawn a click at a time waits, not reaching out to a pointer that is panning');
+});
+
+// --- The builder's settings ------------------------------------------------------------
+
+test('the builder\'s settings are a card on a layer of its own, its headings in the order the cursor walks', () => {
+    const layer = indexHtml.slice(indexHtml.indexOf('<div id="builder-settings">'), indexHtml.indexOf('<div id="build-confirm">'));
+    assert.ok(layer.includes('<div id="builder-settings-card" role="dialog" aria-modal="true" aria-labelledby="builder-settings-title">'));
+    assert.match(layer, /<h2 id="builder-settings-title">BUILDER SETTINGS<\/h2>/);
+    const drawn = [...layer.matchAll(/<h3>([^<]+)<\/h3>\s*<ul id="([^"]+)"><\/ul>/g)].map(([, heading, list]) => [heading, list]);
+    assert.deepEqual(drawn, [['AUTO ACCEPT', 'builder-settings-auto'], ['VIEW', 'builder-settings-view']]);
+    assert.match(layer, /<ul id="builder-settings-view"><\/ul>\s*<ul id="builder-settings-end"><\/ul>/, 'the reset and the way out under no heading, last');
+
+    // Modal over a canvas: a layer over the palette and the dock, under the confirms.
+    const css = indexHtml.slice(indexHtml.indexOf('#builder-settings {'), indexHtml.indexOf('}', indexHtml.indexOf('#builder-settings {')));
+    assert.match(css, /position: fixed;\s*inset: 0;/);
+    assert.match(css, /z-index: 345;/);
+    assert.match(indexHtml, /#build-confirm \{[^}]*z-index: 350;/);
+    assert.match(indexHtml, /#build-palette \{[^}]*z-index: 120;/);
+
+    // And the game's settings carry the row that opens it, under a heading of its own after the options.
+    const settings = indexHtml.slice(indexHtml.indexOf('<div id="settings">'), indexHtml.indexOf('<div id="control-settings">'));
+    assert.match(settings, /<h3>OPTIONS<\/h3>\s*<ul id="settings-options"><\/ul>\s*<h3>BUILDER<\/h3>\s*<ul id="settings-builder"><\/ul>/);
+});
+
+test('the builder\'s settings menus are drawn into their lists and redrawn with every other menu', () => {
+    assert.match(mainSource, /new MenuList\(document\.getElementById\('builder-settings-auto'\), this\.builderSettingsMenuState,\s*entry => entry\.group === AUTO_ACCEPT_GROUP\)/);
+    assert.match(mainSource, /new MenuList\(document\.getElementById\('builder-settings-view'\), this\.builderSettingsMenuState,\s*entry => entry\.group === VIEW_GROUP\)/);
+    assert.match(mainSource, /entry\.group !== START_GROUP && entry\.group !== BUILDER_GROUP/, 'the settings card\'s options leave the builder\'s row to its own list');
+    const sync = methodBody(mainSource, 'syncOverlays');
+    assert.match(sync, /this\.settingsBuilder\.render\(this\.settingsState\);/);
+    assert.match(sync, /for \(const menu of this\.builderSettingsMenus\) menu\.render\(this\.builderSettingsMenuState\);/);
+    assert.match(sync, /const prefs\s*= !photo && builderSettingsShowing\(this\.builderSettings\);/, 'drawn over whichever screen opened it, the canvas included');
+    assert.match(sync, /const panel\s*= modes \|\| settings \|\| controls \|\| editor \|\| picker \|\| prefs;/);
+    assert.match(sync, /this\.overlays\.builderSettings\.style\.display = prefs \? 'flex' : 'none';/);
+});
+
+test('the gear on the palette\'s band and O inside the builder open the builder\'s settings', () => {
+    const palette = methodBody(mainSource, 'drawPalette');
+    assert.match(palette, /gear\.dataset\.palette = 'settings';/);
+    assert.match(palette, /gear\.append\(markImage\(BUILDER_SETTINGS_MARK\)\);/);
+    assert.match(palette, /gear\.setAttribute\('aria-label', BUILDER_SETTINGS_NAME\);/);
+    assert.match(palette, /if \(this\.openBuilderSettingsPanel\(BUILDER_SETTINGS_FROM_BUILDER\)\) this\.syncOverlays\(\);/);
+    const appended = palette.indexOf('palette.append(gear);');
+    assert.ok(appended > 0, 'the gear is put on the palette');
+    assert.ok(appended < palette.indexOf('for (const tool of paletteTools())'), 'on the band, not among the tiles');
+    assert.match(indexHtml, /#build-palette\.folded \.palette-gear \{\s*display: none;/, 'a folded palette is the tab alone');
+
+    const keys = methodBody(mainSource, 'onBuilderKey');
+    assert.match(keys, /if \(isBuilderSettingsOpenKey\(e\.code\) && !e\.repeat\) \{\s*e\.preventDefault\(\);\s*this\.openBuilderSettingsPanel\(BUILDER_SETTINGS_FROM_BUILDER\);/);
+    assert.ok(keys.indexOf('onConfirmKey') < keys.indexOf('isBuilderSettingsOpenKey'), 'not under a question');
+    assert.ok(keys.indexOf('isBuilderSettingsOpenKey') < keys.indexOf('leavesBuilder'), 'and before the way out is asked about');
+
+    // Read ahead of the builder, which is what makes the screen modal over it.
+    for (const name of ['onKeyDown', 'onStartKey']) {
+        const body = methodBody(mainSource, name);
+        assert.ok(body.indexOf('builderSettingsShowing(this.builderSettings)') > 0, `${name} reads the builder's settings`);
+        assert.ok(body.indexOf('builderSettingsShowing(this.builderSettings)') < body.indexOf('buildModeShowing(this.builder)'), `${name} reads them ahead of the builder`);
+    }
+    assert.match(methodBody(mainSource, 'menuShowing'), /\|\| builderSettingsShowing\(this\.builderSettings\)/);
+});
+
+test('opened over a canvas the screen suspends the tool and keeps the draft; closed, it goes back to whatever opened it', () => {
+    const open = methodBody(mainSource, 'openBuilderSettingsPanel');
+    assert.match(open, /if \(buildModeDrawing\(this\.builder\)\) \{\s*if \(!suspendForSettings\(this\.builder\)\) return false;/);
+    assert.match(open, /this\.endCanvasDrag\(\);\s*this\.endGumballDrag\(\);\s*this\.cancelStroke\(\);\s*if \(this\.lassoDrawing\?\.gesture === LASSO_DRAG\) this\.cancelLasso\(\);\s*this\.buildKeys\.clear\(\);/,
+        'whatever is being dragged ends and a held key is let go, and a shape drawn a click at a time is kept');
+    assert.doesNotMatch(open, /acceptDraft|cancelDraft|chooseBuildTool|requestLeave/, 'opening it never settles the draft');
+    assert.match(open, /\} else \{\s*closeSettings\(this\.settings\);\s*\}/, 'from the game\'s settings, in their place');
+    assert.match(open, /openBuilderSettings\(this\.builderSettings, from\);\s*resetSelection\(this\.builderSettingsMenuState\);/);
+
+    const close = methodBody(mainSource, 'closeBuilderSettingsPanel');
+    assert.match(close, /const from = closeBuilderSettings\(this\.builderSettings\);/);
+    assert.match(close, /if \(from === BUILDER_SETTINGS_FROM_SETTINGS\) \{\s*this\.openSettingsPanel\(\);/);
+    assert.match(close, /if \(at >= 0\) this\.settingsState\.index = at;/, 'back on the row that opened them');
+    assert.match(close, /\} else if \(from === BUILDER_SETTINGS_FROM_BUILDER\) \{\s*resumeFromSettings\(this\.builder\);/);
+
+    const keys = methodBody(mainSource, 'onBuilderSettingsKey');
+    assert.match(keys, /if \(isBuilderSettingsCloseKey\(e\.code\) \|\| \(isBuilderSettingsOpenKey\(e\.code\) && !e\.repeat\)\) \{/, 'O closes them again, as Escape and Backspace do');
+    assert.match(methodBody(mainSource, 'chooseBuilderSettingsEntry'), /if \(id === BUILDER_SETTINGS_BACK_ID\) \{\s*this\.closeBuilderSettingsPanel\(\);/, 'BACK goes back the same way');
+    assert.match(methodBody(mainSource, 'chooseSettingsEntry'), /if \(applied === BUILDER_SETTINGS_ID\) \{\s*this\.openBuilderSettingsPanel\(BUILDER_SETTINGS_FROM_SETTINGS\);/);
+});
+
+test('what the builder\'s settings say reaches the session and the camera, from the next event on', () => {
+    const apply = methodBody(mainSource, 'applyBuilderSettings');
+    assert.match(apply, /setAutoAccept\(this\.builder, builderAutoAccept\(this\.builderSettings\)\);/);
+    assert.match(apply, /this\.buildCameraSpeed = builderCameraSpeed\(this\.builderSettings\);/);
+    assert.match(mainSource, /this\.applyControlSettings\(\);\s*this\.applyBuilderSettings\(\);/, 'in force from the first frame');
+    assert.match(methodBody(mainSource, 'onBuilderSettingsKey'), /if \(adjusted\) this\.applyBuilderSettings\(\);/);
+    assert.match(methodBody(mainSource, 'chooseBuilderSettingsEntry'), /if \(chooseBuilderSetting\(this\.builderSettings, id, step\)\) this\.applyBuilderSettings\(\);/);
+
+    const drag = methodBody(mainSource, 'onCanvasDrag');
+    assert.match(drag, /const speed = this\.buildCameraSpeed \?\? 1;/);
+    assert.match(drag, /orbitBuildCamera\(this\.buildCamera, dx \* speed, dy \* speed\)/);
+    assert.match(drag, /panBuildCamera\(this\.buildCamera, dx \* speed, dy \* speed, \{/);
+});
+
+test('a draft kept by auto accept lets the panel\'s holders go and draws the ground again', () => {
+    assert.match(methodBody(mainSource, 'draftKept'), /this\.draftHolder = null;\s*this\.strokeHolder = null;\s*this\.redrawCanvas\(\);/);
+    const palette = methodBody(mainSource, 'onPaletteClick');
+    assert.match(palette, /const pending = editPending\(this\.builder\);/);
+    assert.match(palette, /else if \(pending && !draftPending\(this\.builder\)\) this\.draftKept\(\);/, 'a tool change that kept it');
+    const leave = methodBody(mainSource, 'requestLeaveBuilder');
+    assert.match(leave, /const pending = editPending\(this\.builder\);\s*const asked = requestLeave\(this\.builder\);\s*if \(pending && !draftPending\(this\.builder\)\) this\.draftKept\(\);/,
+        'and a way out that kept it before asking whether to save');
 });

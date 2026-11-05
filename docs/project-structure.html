@@ -123,11 +123,12 @@
 │   ├── pause.js        # Pure pause toggle and frozen simulation clock
 │   ├── title-screen.js # Pure start rules and the held pre-flight clock
 │   ├── menu.js         # Pure keyboard and pointer menu, and the list any menu is drawn into
-│   ├── settings.js     # Pure settings panel state, its options, and their storage
+│   ├── settings.js     # Pure settings panel state, its options, the row that opens the builder's settings, and their storage
 │   ├── control-settings.js # Pure control settings panel: the axes, the tilt, the attitude bound, what ends a level off, the keys, and their storage
+│   ├── builder-settings.js # Pure builder settings screen: auto accept's moments with ALL over them, the camera speed, the reset, where it was opened from, and their storage - read by the editor, never by generation
 │   ├── element-editor.js # Pure element editor state: the placed elements and their ranges, what the builder kept laid over them, and the world a free flight is drawn on
 │   ├── properties-panel.js # Pure properties panel: the one row builder every panel of declared ranges is drawn from, its kinds and its gates, a colour's swatches, picker and hex figure, the rows read as a percentage, and the coarse step `shift` makes of a press
-│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, a template Insert Runway places or moves at a click, a stroke laid into its batch - an erase stroke the other way cut out of it - and the stroke tools' panel values, Free Paint's DEFAULT and the eye dropper it and an extrusion's surfaces share, an extrusion's stages, the surface a click chose and the BACK that drops what was changed there, the camera held from inside a tool, the popup a right click on the selection opens, the placement picked with Select, the selection the lasso drew and the tool that drew it, a shape drawn into it, and what has been committed
+│   ├── build-mode.js   # Pure build session: whether the builder is open, what opened it, which screen is showing, the live tool, the one way out and the two confirms it asks, the draft in hand, a click that drops one, a template Insert Runway places or moves at a click, a stroke laid into its batch - an erase stroke the other way cut out of it - and the stroke tools' panel values, Free Paint's DEFAULT and the eye dropper it and an extrusion's surfaces share, an extrusion's stages, the surface a click chose and the BACK that drops what was changed there, the camera held from inside a tool, the tool suspended under the builder's settings, auto accept's moments - the next press that draws, the way out and another tool, the popup a right click on the selection opens, the placement picked with Select, the selection the lasso drew and the tool that drew it, a shape drawn into it, and what has been committed
 │   ├── shapes.js       # Pure shape vocabulary: every shape a pointer draws on the ground, the kind of region and the gesture each is, and what a drag or a click per vertex comes to, written once for the lasso and Extrude to offer
 │   ├── lasso.js        # Pure lasso: the ten shapes it offers in the art's rows, and when a shape closes; how a shape meets the selection by the key held at its press, a figure reshaped by its fields, and shift in a drag squaring it
 │   ├── extrude.js      # Pure Extrude: the seven shapes it offers in the art's rows, cut from its panel's art, and the stages an extrusion goes through - drawing, extruding, surfaces - with the one button they share, its two surfaces and which one a point is, and the rows a surface clicked narrows the panel to
@@ -138,7 +139,7 @@
 │   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground
 │   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach - a placed runway's by its strips - and whether a press was a click
 │   ├── build-overlay.js # Pure outlines and gumball: a placement's reach traced as a contour, a region's own edge stood on the ground for the selection and a shape being drawn, a combined selection's edge traced and chained into runs, a stroke tool's brush and the region a stroke being laid will cover, an extrusion's top or wall traced at the weights a click reads them at, projected onto the screen and stroked over the canvas, and the gumball drawn in the art's colours
-│   ├── build-palette.js # Pure palette fold: whether the tools are folded away, and the stored choice
+│   ├── build-palette.js # Pure palette fold: whether the tools are folded away, and the stored choice; the gear's mark and name
 │   ├── gumball.js      # Pure gumball: the two handle sets the art declares, what each handle is bound to - a batch of strokes by its frame, a placed runway by its heading and its strip's size, an extrusion's height by the blue arrow - what a drag writes, and where each handle lies on the screen
 │   ├── build-panel.js  # Pure dock: what the panel down the right of a canvas shows - Select's camera with the pick or the world's own elements beneath it, or the cover tool's own panel, Free Paint's three sections, Erase's, or Insert Runway's cards, with DESELECT on each while something is selected - and what the canvas is drawn from
 │   ├── panel-view.js   # The one renderer the dock is drawn with: rows, a colour chosen at its swatches, picker, eye dropper and hex field, a slider, sections that fold or carry tiles, the slides, the answers, and what was done to them
@@ -185,7 +186,7 @@
 ├── tools/
 │   ├── serve.mjs       # Zero-dependency static server behind `npm run serve`
 │   ├── build-api-reference.mjs # Renders docs/api.md into its page
-│   └── sync-builder-assets.mjs # Copies the builder's art into assets/builder/ from an explicit list, renaming on the way in; run where the art is drawn, never in CI
+│   └── sync-builder-assets.mjs # Copies the builder's art into assets/builder/ from an explicit list, renaming on the way in, and names the marks drawn in the repository instead; run where the art is drawn, never in CI
 └── test/               # Zero-dependency node:test unit tests</code></pre>
 
             <nav class="page-nav" aria-label="Nearby pages">

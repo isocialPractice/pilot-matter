@@ -11,33 +11,33 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Builder settings**: a settings screen for the builder's own
-  preferences, declared and stored the way the game's two settings screens are,
-  with a reset to defaults, and read by nothing that generates ground, so a
-  built world comes out the same whoever's preferences were on
+- [ ] **Auto accept merges**: a draft the setting commits joined to the
+  placement before it when nothing about it changed, so auto accept adds a
+  placement only where the pilot changed something
+  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
+    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
+    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
+    already compares two placements' resolved configs. What is left is the
+    join: the same element and config as the placement committed just before,
+    with nothing between, its footprint added to that one's as a union.
   - From: Interactive Build Mode
-- [ ] **Builder settings from the builder**: a gear in the palette's header and
-  the `O` key opening the screen over the canvas, suspending the live tool the
-  way a pan does so a stroke still pending is not committed by it
-  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
-    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
-    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
-    repository goes in `assets/builder/` beside the copied art -
-    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
-  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
-    a tool is held as `state.camera = { overriding, resumes }` by
-    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
-    nothing is committed; the screen opened over the canvas suspends the tool
-    the same way, rather than through `chooseBuildTool`.
+- [ ] **Re-seat the aircraft**: a flight resumed over ground that changed under
+  it put back on top of that ground before the first frame is scored, so a
+  mountain built where it was parked is not a crash on resume
+  - **Until then a changed world starts the flight again.** Since
+    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
+    passes `changed` to `leaveBuilder`, and the flight goes back to its start
+    rather than resuming in moved ground. This item is what lets it resume.
   - From: Interactive Build Mode
-- [ ] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
-  settings screen opening the same screen, with `BACK` returning to whichever
-  screen opened it
-  - From: Interactive Build Mode
-- [ ] **Auto accept**: a setting that commits a pending draft at the next press
-  and at the accept tool instead of asking, never on release, so the stroke just
-  drawn stays editable and leaving asks only whether to save, switched on the
-  builder's settings screen as a group with `ALL` over it
+- [ ] **Build mode controls help**: the builder's control list, grown by each
+  item as it added a binding, carried into the docs and the cheat sheet beside
+  the flight's and held to the code there the way the flight's is
+  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
+    `js/controls-help.js` names every tool's bindings and `O - Builder
+    Settings`, each held by `test/controls-help.test.js` to a key a builder
+    handler reads; the cheat sheet's builder table was written by hand
+    beside it. What is left is the docs page and the cheat sheet read from
+    the list and held to it.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -107,33 +107,15 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Builder settings**: a settings screen for the builder's own
-  preferences, declared and stored the way the game's two settings screens are,
-  with a reset to defaults, and read by nothing that generates ground, so a
-  built world comes out the same whoever's preferences were on
-- [ ] **Builder settings from the builder**: a gear in the palette's header and
-  the `O` key opening the screen over the canvas, suspending the live tool the
-  way a pan does so a stroke still pending is not committed by it
-  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
-    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
-    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
-    repository goes in `assets/builder/` beside the copied art -
-    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
-  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
-    a tool is held as `state.camera = { overriding, resumes }` by
-    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
-    nothing is committed; the screen opened over the canvas suspends the tool
-    the same way, rather than through `chooseBuildTool`.
-- [ ] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
-  settings screen opening the same screen, with `BACK` returning to whichever
-  screen opened it
-- [ ] **Auto accept**: a setting that commits a pending draft at the next press
-  and at the accept tool instead of asking, never on release, so the stroke just
-  drawn stays editable and leaving asks only whether to save, switched on the
-  builder's settings screen as a group with `ALL` over it
 - [ ] **Auto accept merges**: a draft the setting commits joined to the
   placement before it when nothing about it changed, so auto accept adds a
   placement only where the pilot changed something
+  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
+    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
+    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
+    already compares two placements' resolved configs. What is left is the
+    join: the same element and config as the placement committed just before,
+    with nothing between, its footprint added to that one's as a union.
 - [ ] **Re-seat the aircraft**: a flight resumed over ground that changed under
   it put back on top of that ground before the first frame is scored, so a
   mountain built where it was parked is not a crash on resume
@@ -144,6 +126,12 @@ the order the work unblocks itself in.
 - [ ] **Build mode controls help**: the builder's control list, grown by each
   item as it added a binding, carried into the docs and the cheat sheet beside
   the flight's and held to the code there the way the flight's is
+  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
+    `js/controls-help.js` names every tool's bindings and `O - Builder
+    Settings`, each held by `test/controls-help.test.js` to a key a builder
+    handler reads; the cheat sheet's builder table was written by hand
+    beside it. What is left is the docs page and the cheat sheet read from
+    the list and held to it.
 
 ## Documentation & Polish
 
@@ -200,93 +188,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 365 earlier items in `TODO-archive.md`, newest last.
+> 369 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Erasing water and runways**: the sea held per vertex so a hole erased in
-  a lake is dry ground, and a strip erased whole and only when it is the target
-  named
-  - **The line is there.** Since `1.0.0-alpha.1.49.0` `field.water.line` holds
-    one height a vertex beside the sea's level, and `waterSurface` reads a
-    vertex as wet only where it lies under its own line - so a hole erased in a
-    lake is the line set to `NaN` there.
-  - **Settled**: the sea already wrote its line wherever it reached; the
-    compositor now carries a line back through what a cut leaves, so a hole
-    taken out of the sea has none and is dry ground, its basin uncut, and the
-    sea's level comes across from a sea drawn through a cut alone, being the
-    sea's still. `waterUnder` reads the highest line under a strip rather than
-    the sea's level wherever there is a line, so a strip over a dry hole is not
-    lifted - every preset's sea writes its level into the line under every
-    strip, so no preset strip moved. The `runway` element declares
-    `erasedWhole`: a strip any of whose vertices a cut reaches is not drawn at
-    all, record and grading with it. `ALL` leaves a strip, and only a placed
-    one - carrying `at` - can be taken by name, since a searched strip is laid
-    when the world is flown and never on the canvas the stroke was drawn over.
-    Found on the way: a placed template's strip was laid on all nine tiles of a
-    flown world, `tileElements` taking off only placements typed `runway`; a
-    group comes off every tile but the middle one now too.
-  - From: Interactive Build Mode
-- [x] **Shape vocabulary**: the shape tools built once over the seven footprint
-  kinds, with each mode declaring the subset it offers, so Lasso's ten and
-  Extrude's seven are one implementation
-  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
-    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
-    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
-    gestures; this item is that table shared with Extrude's seven.
-  - **Settled**: `js/shapes.js` is the vocabulary - ten shapes, each a
-    footprint kind and a gesture, with their own fields - and
-    `shapeFootprint` and `reshapeShape` what a gesture comes to. A mode
-    declares the shapes it offers through `modeTools`, under its own ids,
-    labels, rows and art: the lasso all ten, as it did, and Extrude seven, a
-    Circle the lasso's ellipse and a Polycurve its curved polyline.
-    `js/lasso.js` keeps every export it had, drawn through the vocabulary, and
-    main's gesture draws the shape of whichever mode is live - see
-    `liveShapeTool` - differing only in what is done with the region.
-    Extrude's icons are cut from its panel's art, as the lasso's are.
-  - From: Interactive Build Mode
-- [x] **Extrude stages**: the draw, extrude and surface stages with one action
-  button reading its label and its enabled state off the stage it is in
-  - **Settled**: `js/extrude.js` declares the three stages and the one button:
-    `EXTRUDE`, greyed until the region covers ground; `EDIT EXTRUSION`; and
-    `APPLY`, which the surfaces return by. The stage is carried on the draft,
-    as the plan has it; while drawing, the draft is shown over the canvas and
-    is not ground - `builtPlacements` leaves it out - and the panel offers
-    `CANCEL` and no `ACCEPT`, nothing being lifted to keep. A disabled answer
-    is drawn greyed, its label and state written without the panel being
-    built again. The surfaces stage's panel is the two colour rows under
-    `APPLY`; telling `BACK` from `APPLY`, and choosing a surface by clicking
-    it, are the next item's. Picking another shape with an extrusion lifted
-    keeps it, asking nothing, and is back at drawing - the stages' way out. A
-    shape picked while drawing keeps what was drawn, so the plan's `KEEP
-    DRAWING` has nothing to undo.
-  - From: Interactive Build Mode
-- [x] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
-  by the gumball or by a number, previewing on the overlay and writing the field
-  once on release
-  - **The airport templates wait on it too.** Their buildings are extrusions
-    over rects at fixed distances from the strip's edge and ends - see
-    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
-    widens.
-  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
-    registry, so `extrude` is the last element the airports wait on; their
-    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
-  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
-    weighed after a footprint settles what it settles, so an extrusion's level
-    worked out through `footprintSettles` is the drawn shape's, and erasing
-    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
-    pattern for anything else that is all or nothing.
-  - **Settled**: `extrude` is in the registry beside `town`, before snow:
-    `height`, `flatten`, `topColor`, `wallColor` and `level`, which a
-    footprint settles as its ground's mean on each tile through a new `mean`
-    settler, and `drawn: 'edge'` - the region's weight - which paints the
-    band at its edge the wall and what it wholly covers the top. The blue
-    arrow lifts a scalar height, a `lift` beside the mountain's `raise`. While
-    it is pulled the ground is left alone: the overlay draws the region's
-    outline on the ground and at the height reached, from the top it stood at
-    when the drag began, and the field is written on release. The airports
-    are laid out with it - a strip, a `paint` apron and `extrude` buildings,
-    each a lot kept at its distance from the paving as the strip widens, the
-    whole held on the canvas by its farthest lot and picked by any of it.
-  - From: Interactive Build Mode
 - [x] **Sum of shapes**: several shapes drawn before the extrude lifted to one
   height as a single region, with two that overlap reading as one solid
   - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
@@ -396,4 +299,70 @@ how the simulator got here rather than as a list still to be worked.
     Extrude's `level` is off its panel, a footprint settling it, and its
     `blend` is on it and read. A wall's band can fall between the vertices of
     a coarse sampling, so the check draws at half the game's density.
+  - From: Interactive Build Mode
+- [x] **Builder settings**: a settings screen for the builder's own
+  preferences, declared and stored the way the game's two settings screens are,
+  with a reset to defaults, and read by nothing that generates ground, so a
+  built world comes out the same whoever's preferences were on
+  - **Settled**: `js/builder-settings.js` is the third settings screen, made
+    as `js/settings.js` and `js/control-settings.js` are and stored under
+    `pilot-matter.builder-settings`: under `AUTO ACCEPT`, `ALL`, `WHEN
+    DRAWING AGAIN`, `WHEN LEAVING` and `WHEN CHANGING TOOL`; under `VIEW`,
+    `CAMERA SPEED` - slow, normal or fast, scaling the orbit, the pan and the
+    wheel together; then `RESET TO DEFAULTS` and `BACK`. With `ALL` on the
+    three moments read on and are held, and turning it off gives back what
+    they were. The session is handed the moments through `setAutoAccept`
+    rather than reading the screen, nothing under `js/environment/` reads it,
+    and a test builds the same ground with every row changed.
+  - From: Interactive Build Mode
+- [x] **Builder settings from the builder**: a gear in the palette's header and
+  the `O` key opening the screen over the canvas, suspending the live tool the
+  way a pan does so a stroke still pending is not committed by it
+  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
+    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
+    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
+    repository goes in `assets/builder/` beside the copied art -
+    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
+  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
+    a tool is held as `state.camera = { overriding, resumes }` by
+    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
+    nothing is committed; the screen opened over the canvas suspends the tool
+    the same way, rather than through `chooseBuildTool`.
+  - **Settled**: the gear is drawn in the repository as
+    `assets/builder/builder-settings.svg`, on the tool marks' square in their
+    navy and tan, and named by `BUILDER_DRAWN` in the sync script, so the
+    suite holds it tracked and off the copy's list. It sits at the right of
+    the band and goes with the tools when the palette folds. `O` in the
+    builder opens the screen too. Over a canvas `suspendForSettings` holds
+    `state.settingsOver = { resumes }`, under which no tool is chosen and no
+    pan held, and the screen is a full-window layer between the dock and the
+    confirms, so nothing behind it takes a press. Whatever was being dragged
+    ends, a shape drawn a click at a time is kept, and closing gives the same
+    draft back on the same tool.
+  - From: Interactive Build Mode
+- [x] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
+  settings screen opening the same screen, with `BACK` returning to whichever
+  screen opened it
+  - **Settled**: `js/settings.js` gains `SCREEN_ENTRY`, a row that opens a
+    screen: `BUILDER SETTINGS`, in a `BUILDER` group of its own with `BACK`,
+    drawn under a `BUILDER` heading so the two are drawn in the order they
+    are walked. Choosing it closes the panel and the builder's screen opens
+    in its place; its `BACK` brings the panel back with the cursor on the
+    row. Stepping it changes nothing, and it stays while a mode is played.
+  - From: Interactive Build Mode
+- [x] **Auto accept**: a setting that commits a pending draft at the next press
+  and at the accept tool instead of asking, never on release, so the stroke just
+  drawn stays editable and leaving asks only whether to save, switched on the
+  builder's settings screen as a group with `ALL` over it
+  - **Settled**: the session holds `autoAccept = { all, draw, exit, tool }`,
+    and `autoAccepts` reads `all` over each moment. `drawAgain` keeps the
+    draft at a press that draws - a stroke tool's, a drop at a click, Insert
+    Runway's, and a lifted extrusion's while it is extruding - never at a
+    release, under a held pan, with the dropper armed or under a question;
+    the page calls it before the press is routed, so what the press draws
+    starts a draft of its own. `requestLeave` keeps the edit and asks only
+    `SAVE AND EXIT MODE`, the accept tool named for that question, and
+    `chooseBuildTool` keeps it and changes the tool. Each stroke is now a
+    placement of its own; joining the ones nothing changed between is the
+    next item's.
   - From: Interactive Build Mode

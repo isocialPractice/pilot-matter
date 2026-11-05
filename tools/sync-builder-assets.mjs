@@ -89,6 +89,14 @@ export const BUILDER_ASSETS = Object.freeze({
     'thumb-blank-canvas.png':   'support/thumbnail-blank.png'
 });
 
+/**
+ * What is in `assets/builder/` without being copied there: marks drawn in the
+ * repository because the art has none - the gear that opens the builder's
+ * settings. The copy never prunes, so it leaves them where they are, and the
+ * suite holds each to being tracked and off the list above.
+ */
+export const BUILDER_DRAWN = Object.freeze(['builder-settings.svg']);
+
 /** True when the source folder is there and has something in it - not just a link to nothing. */
 function sourceResolves() {
     try {

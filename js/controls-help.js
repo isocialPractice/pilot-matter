@@ -12,6 +12,7 @@ import {
 } from './build-camera.js';
 import { PHOTO_KEY } from './photo.js';
 import { MENU_SELECT_KEYS } from './menu.js';
+import { SETTINGS_OPEN_KEYS } from './settings.js';
 import { SELECT_TOOL, BUILD_TOOLS, isBuiltTool, isCoverTool, toolName } from './build-tools.js';
 
 export const HELP_KEY = 'KeyH';
@@ -152,6 +153,7 @@ export const BUILD_HELP_ROWS = Object.freeze([
     { id: 'handle',  label: 'Move or Shape What Is in Hand', handle: true },
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },
     { id: 'answer',  label: 'Answer a Question',             keys: [MENU_SELECT_KEYS.slice(0, 1)] },
+    { id: 'builder-settings', label: 'Builder Settings',    keys: [SETTINGS_OPEN_KEYS] },
     { id: 'help',    label: 'Collapse List',     keys: [[HELP_KEY]] },
     { id: 'photo',   label: 'Photo',             keys: [[PHOTO_KEY]] }
 ].map(row => Object.freeze(row)));

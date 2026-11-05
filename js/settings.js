@@ -35,11 +35,17 @@ export const SETTINGS_TITLE = 'SETTINGS';
 export const SETTINGS_HEADING = 'ENVIRONMENT';
 export const SETTINGS_START_HEADING = 'START STATE';
 export const SETTINGS_OPTIONS_HEADING = 'OPTIONS';
+export const SETTINGS_BUILDER_HEADING = 'BUILDER';
 
 // The last entry of the panel, and the way out of it for a pilot who has not
 // found the key that closes it.
 export const SETTINGS_BACK_ID    = 'back';
 export const SETTINGS_BACK_LABEL = 'BACK';
+
+// The row that opens the builder's own settings, which are a screen of their
+// own rather than a value held here.
+export const BUILDER_SETTINGS_ID    = 'builderSettings';
+export const BUILDER_SETTINGS_LABEL = 'BUILDER SETTINGS';
 
 export const SETTINGS_CLOSE_KEYS = ['Escape', 'Backspace'];
 
@@ -49,17 +55,19 @@ export const SETTINGS_OPEN_KEYS = ['KeyO'];
 
 // What an entry in the panel is: a world, a value with settings of its own, one
 // of a set of conditions only one of which can be in force, something that is
-// simply on or off, or the way out.
+// simply on or off, a screen it opens, or the way out.
 export const ENVIRONMENT_ENTRY = 'environment';
 export const OPTION_ENTRY      = 'option';
 export const CHOICE_ENTRY      = 'choice';
 export const TOGGLE_ENTRY      = 'toggle';
+export const SCREEN_ENTRY      = 'screen';
 export const BACK_ENTRY        = 'back';
 
 // Which heading an option is drawn under. The cursor walks every option as one
 // list whichever group it is in, so a group is a heading rather than a mode.
-export const START_GROUP  = 'start';
-export const OPTION_GROUP = 'options';
+export const START_GROUP   = 'start';
+export const OPTION_GROUP  = 'options';
+export const BUILDER_GROUP = 'builder';
 
 // The options by name, so what a setting drives is looked up by an id both
 // sides agree on rather than by a string typed twice.
@@ -361,7 +369,13 @@ function optionEntries(option, options) {
 
 /**
  * The panel's entries: every environment that can be flown, then every option
- * that can be set, then the way out.
+ * that can be set, then the builder's own settings in a group of their own,
+ * then the way out.
+ *
+ * The way out is in the builder's group rather than after it, because the
+ * cursor walks the panel as one list and the lists it is drawn into are
+ * filtered by group: a row drawn under the options while it is walked after
+ * the builder's would be drawn above a row it comes after.
  */
 export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_OPTIONS) {
     return [
@@ -373,7 +387,19 @@ export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_
             current: false
         })),
         ...options.flatMap(option => optionEntries(option, options)),
-        { kind: BACK_ENTRY, id: SETTINGS_BACK_ID, label: SETTINGS_BACK_LABEL, note: '', current: false }
+        // A row that opens a screen rather than holding a value. It stays on
+        // the panel while a game mode is running: the builder's settings open
+        // no world and change none, so there is nothing for a run to be kept
+        // from.
+        {
+            kind: SCREEN_ENTRY,
+            group: BUILDER_GROUP,
+            id: BUILDER_SETTINGS_ID,
+            label: BUILDER_SETTINGS_LABEL,
+            note: 'the builder\'s own preferences, kept apart from the world it builds',
+            current: false
+        },
+        { kind: BACK_ENTRY, group: BUILDER_GROUP, id: SETTINGS_BACK_ID, label: SETTINGS_BACK_LABEL, note: '', current: false }
     ];
 }
 
@@ -568,10 +594,12 @@ function flipToggle(state, entry) {
 /**
  * Applies the entry chosen in the panel.
  *
- * Returns `SETTINGS_BACK_ID` when the panel was closed, the environment id
- * when a different world was picked, the option's id when an option was
- * stepped on to its next setting, and null when the choice changed nothing:
- * an unknown entry, a held toggle, or the environment already being flown.
+ * Returns `SETTINGS_BACK_ID` when the panel was closed, `BUILDER_SETTINGS_ID`
+ * when it was closed for the builder's settings to open in its place, the
+ * environment id when a different world was picked, the option's id when an
+ * option was stepped on to its next setting, and null when the choice changed
+ * nothing: an unknown entry, a held toggle, or the environment already being
+ * flown.
  *
  * `step` is which way the choice steps an option, for a caller that knows -
  * a click on the left of the row steps it down and a click on the right steps
@@ -582,6 +610,13 @@ export function chooseSetting(state, id, step = 1) {
     if (id === SETTINGS_BACK_ID) {
         closeSettings(state);
         return SETTINGS_BACK_ID;
+    }
+
+    // The builder's settings are a screen, opened in this one's place rather
+    // than over it, and `BACK` there brings this one back.
+    if (id === BUILDER_SETTINGS_ID) {
+        closeSettings(state);
+        return BUILDER_SETTINGS_ID;
     }
 
     const entry = settingsEntry(state, id);

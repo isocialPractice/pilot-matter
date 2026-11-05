@@ -18,7 +18,7 @@ teaching, no explanation: the keys, the options, the elements, and the calls.
 | `Space` | Level off: vertical speed to zero, nose eased to level over 0.6s. Needs an engine |
 | `C` | Cycle camera: chase, cockpit, orbit |
 | `P` | Pause, and the pause menu |
-| `O` | Settings panel, and close it |
+| `O` | Settings panel, and close it; inside the builder, the builder's own settings |
 | `L` | Interactive environment builder, and `Esc` to leave it |
 | `M` | Mute the engine and wind |
 | `H` | Collapse the control list |
@@ -151,6 +151,9 @@ why the view is the one left out.
 | `AIRSPEED IN` | `KNOTS`, `MPH` |
 | `ALTITUDE IN` | `FEET`, `METERS` |
 
+Under `BUILDER`, `BUILDER SETTINGS` opens the builder's own settings in the
+panel's place, and their `BACK` returns here - see below.
+
 Everything above is stored in `localStorage` and reopens with the next session.
 
 ## Control settings
@@ -265,6 +268,7 @@ back.
 | `Esc` | End a drag being made, shut the popup, put an armed eye dropper down, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
 | `Enter` | Answer the question asked, on the button under the cursor |
 | `H` | Collapse the control list, and open it again |
+| `O`, or the gear on the palette's band | The builder's own settings, over the canvas; the tool waits under them |
 
 Down the right is the dock: `SELECTION MODE`, the camera written out as
 fields to read and type into, or the edit in hand with `ACCEPT` and `CANCEL`
@@ -410,6 +414,38 @@ arrows slide it along one axis, the blue arrow makes a mountain taller rather
 than lifting it, the dot on each axis spreads it and the tick stands it taller
 or lower. A handle moves nothing until it has been dragged further than a
 click, and holds to the same bounds the dock's rows do.
+
+## Builder settings
+
+The builder's own preferences, opened by the gear on the palette's band or `O`
+on a canvas, and by the `BUILDER SETTINGS` row on the game's settings. `BACK`,
+`Esc`, `Backspace` or `O` returns to whichever opened it. Stored under a key of
+its own, and read by the editor alone: the same placements build the same
+ground whatever was set here while they were built.
+
+| Row | Steps through | Opens on |
+|-----|---------------|----------|
+| `ALL` | On, off | Off |
+| `WHEN DRAWING AGAIN` | On, off | Off |
+| `WHEN LEAVING` | On, off | Off |
+| `WHEN CHANGING TOOL` | On, off | Off |
+| `CAMERA SPEED` | `SLOW`, `NORMAL`, `FAST` | `NORMAL` |
+| `RESET TO DEFAULTS` | Puts every row back | |
+
+The four under `AUTO ACCEPT` are when a draft is kept without being asked
+about. `WHEN DRAWING AGAIN`: the next press that draws - a stroke begun, a
+mountain dropped, a runway placed, a shape begun over a lifted extrusion -
+keeps the draft in hand and starts a new one; nothing is kept when a stroke is
+let go of, so the stroke just drawn can still be changed or cancelled.
+`WHEN LEAVING`: the way out keeps it and asks only `SAVE AND EXIT MODE`.
+`WHEN CHANGING TOOL`: another tool keeps it rather than asking `ACCEPT EDITS`.
+With `ALL` on the three read on and do not step; off, they are what they were.
+A pan never keeps anything. `CAMERA SPEED` scales the orbit, the pan and the
+wheel's zoom together.
+
+Opened over a canvas the screen is modal and the live tool waits under it:
+nothing is kept or dropped, the draft is the draft when it closes, and a
+setting changed there applies from the next press.
 
 ## Element editor
 

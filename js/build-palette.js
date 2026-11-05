@@ -24,6 +24,17 @@ export const PALETTE_STORAGE_KEY = 'pilot-matter.builder-palette-folded';
 export const PALETTE_FOLD_MARK = `${BUILDER_ART}/palette-folded.svg`;
 
 /**
+ * The gear on the open palette's band, beside the chevrons, which opens the
+ * builder's own settings. The art has none, so it is drawn in the repository
+ * in the style of the palette's marks - their square, their navy and tan - and
+ * the copy that brings the rest of the art in leaves it where it is.
+ */
+export const BUILDER_SETTINGS_MARK = `${BUILDER_ART}/builder-settings.svg`;
+
+/** What the gear is called, on its title and its label. */
+export const BUILDER_SETTINGS_NAME = 'Builder settings';
+
+/**
  * Reads the stored choice. Anything other than a value this module wrote - a
  * missing key, a leftover, or a storage that throws - reads as open, which is
  * what a first canvas should show: the tools and the way out among them.

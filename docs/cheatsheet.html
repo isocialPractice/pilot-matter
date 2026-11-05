@@ -108,7 +108,7 @@
         <tr><td><kbd>Space</kbd></td><td>Level off: vertical speed to zero, nose eased to level over 0.6s. Needs an engine</td></tr>
         <tr><td><kbd>C</kbd></td><td>Cycle camera: chase, cockpit, orbit</td></tr>
         <tr><td><kbd>P</kbd></td><td>Pause, and the pause menu</td></tr>
-        <tr><td><kbd>O</kbd></td><td>Settings panel, and close it</td></tr>
+        <tr><td><kbd>O</kbd></td><td>Settings panel, and close it; inside the builder, the builder's own settings</td></tr>
         <tr><td><kbd>L</kbd></td><td>Interactive environment builder, and <kbd>Esc</kbd> to leave it</td></tr>
         <tr><td><kbd>M</kbd></td><td>Mute the engine and wind</td></tr>
         <tr><td><kbd>H</kbd></td><td>Collapse the control list</td></tr>
@@ -318,6 +318,7 @@
         <tr><td><kbd>Esc</kbd></td><td>End a drag being made, shut the popup, put an armed eye dropper down, or ask <code>ACCEPT EDITS</code> with an edit in hand and <code>SAVE AND EXIT MODE</code> without</td></tr>
         <tr><td><kbd>Enter</kbd></td><td>Answer the question asked, on the button under the cursor</td></tr>
         <tr><td><kbd>H</kbd></td><td>Collapse the control list, and open it again</td></tr>
+        <tr><td><kbd>O</kbd>, or the gear on the palette's band</td><td>The builder's own settings, over the canvas; the tool waits under them</td></tr>
     </tbody>
 </table>
 </div>
@@ -341,6 +342,24 @@
 <p><kbd>Shift</kbd> with a press on a spinner is a coarse step - ten points on a row read as a percentage, 100% to 110% to 120%, and ten steps on any other row - and <kbd>Shift</kbd> with an arrow in the element editor is the same.</p>
 
 <p>What is in hand carries the gumball, in the art's colours: red east, green north, blue up. The white centre moves it over the ground, the red and green arrows slide it along one axis, the blue arrow makes a mountain taller rather than lifting it, the dot on each axis spreads it and the tick stands it taller or lower. A handle moves nothing until it has been dragged further than a click, and holds to the same bounds the dock's rows do.</p>
+
+<h2 id="builder-settings-cheat">Builder settings</h2>
+<p>The builder's own preferences, opened by the gear on the palette's band or <kbd>O</kbd> on a canvas, and by the <code>BUILDER SETTINGS</code> row on the game's settings. <code>BACK</code>, <kbd>Esc</kbd>, <kbd>Backspace</kbd> or <kbd>O</kbd> returns to whichever opened it. Stored under a key of its own, and read by the editor alone: the same placements build the same ground whatever was set here while they were built.</p>
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Row</th><th>Steps through</th><th>Opens on</th></tr></thead>
+    <tbody>
+        <tr><td><code>ALL</code></td><td>On, off</td><td>Off</td></tr>
+        <tr><td><code>WHEN DRAWING AGAIN</code></td><td>On, off</td><td>Off</td></tr>
+        <tr><td><code>WHEN LEAVING</code></td><td>On, off</td><td>Off</td></tr>
+        <tr><td><code>WHEN CHANGING TOOL</code></td><td>On, off</td><td>Off</td></tr>
+        <tr><td><code>CAMERA SPEED</code></td><td><code>SLOW</code>, <code>NORMAL</code>, <code>FAST</code></td><td><code>NORMAL</code></td></tr>
+        <tr><td><code>RESET TO DEFAULTS</code></td><td>Puts every row back</td><td></td></tr>
+    </tbody>
+</table>
+</div>
+<p>The four under <code>AUTO ACCEPT</code> are when a draft is kept without being asked about. <code>WHEN DRAWING AGAIN</code>: the next press that draws - a stroke begun, a mountain dropped, a runway placed, a shape begun over a lifted extrusion - keeps the draft in hand and starts a new one; nothing is kept when a stroke is let go of, so the stroke just drawn can still be changed or cancelled. <code>WHEN LEAVING</code>: the way out keeps it and asks only <code>SAVE AND EXIT MODE</code>. <code>WHEN CHANGING TOOL</code>: another tool keeps it rather than asking <code>ACCEPT EDITS</code>. With <code>ALL</code> on the three read on and do not step; off, they are what they were. A pan never keeps anything. <code>CAMERA SPEED</code> scales the orbit, the pan and the wheel's zoom together.</p>
+<p>Opened over a canvas the screen is modal and the live tool waits under it: nothing is kept or dropped, the draft is the draft when it closes, and a setting changed there applies from the next press.</p>
 
 <h2 id="element-editor-cheat">Element editor</h2>
 
