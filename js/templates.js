@@ -27,15 +27,33 @@ import { bearingToDirection } from './units.js';
 /** The placement type a template is placed as. */
 export const GROUP_TYPE = 'group';
 
+/** The strip's own grey, which an airport's apron is painted in at a normal blend: a flat patch is what an apron is. */
+const APRON = Object.freeze({ color: [0.24, 0.24, 0.26], opacity: 1, blend: 'normal' });
+
+/** A building's two surfaces: a pale roof and a darker wall. */
+const BUILDING = Object.freeze({ topColor: [0.6, 0.59, 0.56], wallColor: [0.36, 0.35, 0.34] });
+
+/**
+ * How soft a building's edge is, in world units: half a cell of the sampling,
+ * so its wall is the steepest the ground can draw rather than a slope.
+ */
+const BUILDING_EDGE = 40;
+
 /**
  * The four templates, in the order the panel draws them, each its card's name.
  *
  * The two runways are a `runway` each, the commercial one longer and wider and
- * carrying its centreline. The two airports are laid out from a `paint` apron
- * and `extrude` buildings beside their strips, and the registry draws paint
- * but not yet extrude: each is declared here with the elements it waits on,
- * and is offered once every one of them is in the registry - so the panel
- * never offers a card that places part of what it shows.
+ * carrying its centreline. The two airports are a strip with an apron beside it
+ * - a `paint` lot in the strip's grey - and buildings beyond the apron, each an
+ * `extrude` lot levelled to its own ground and raised. A template is offered
+ * once every element its members are is in the registry, so the panel never
+ * offers a card that places part of what it shows.
+ *
+ * A lot is laid out from the strip rather than from the template's middle:
+ * `side` it stands on, `gap` from the paved edge to its near side, `across`
+ * and `length` its size, and `along` where its middle is along the strip from
+ * the strip's middle. So a lot keeps its distance from the paving as the strip
+ * is widened, rather than being paved over.
  */
 export const RUNWAY_TEMPLATES = Object.freeze([
     {
@@ -46,8 +64,27 @@ export const RUNWAY_TEMPLATES = Object.freeze([
         id: 'commercial', label: 'COMMERCIAL', length: 3600, width: 360,
         members: [{ type: 'runway', role: 'strip', config: { at: [0, 0], heading: [0, 0], centreline: true } }]
     },
-    { id: 'basic-airport',      label: 'BASIC AIRPORT',      length: 2400, width: 240, waitsOn: ['paint', 'extrude'], members: [] },
-    { id: 'commercial-airport', label: 'COMMERCIAL AIRPORT', length: 3600, width: 360, waitsOn: ['paint', 'extrude'], members: [] }
+    {
+        id: 'basic-airport', label: 'BASIC AIRPORT', length: 2400, width: 240,
+        members: [
+            { type: 'runway',  role: 'strip',    config: { at: [0, 0], heading: [0, 0] } },
+            { type: 'paint',   role: 'apron',    lot: { side: 1, gap: 60,  across: 360, along: 0,    length: 900 }, config: { ...APRON } },
+            { type: 'extrude', role: 'hangar',   lot: { side: 1, gap: 480, across: 240, along: -300, length: 320, feather: BUILDING_EDGE }, config: { height: 45, ...BUILDING } },
+            { type: 'extrude', role: 'terminal', lot: { side: 1, gap: 480, across: 240, along: 160,  length: 400, feather: BUILDING_EDGE }, config: { height: 35, ...BUILDING } },
+            { type: 'extrude', role: 'tower',    lot: { side: 1, gap: 480, across: 160, along: 560,  length: 160, feather: BUILDING_EDGE }, config: { height: 90, ...BUILDING } }
+        ]
+    },
+    {
+        id: 'commercial-airport', label: 'COMMERCIAL AIRPORT', length: 3600, width: 360,
+        members: [
+            { type: 'runway',  role: 'strip',    config: { at: [0, 0], heading: [0, 0], centreline: true } },
+            { type: 'paint',   role: 'apron',    lot: { side: 1, gap: 80,  across: 600, along: 0,    length: 1600 }, config: { ...APRON } },
+            { type: 'extrude', role: 'terminal', lot: { side: 1, gap: 760, across: 320, along: 0,    length: 900, feather: BUILDING_EDGE }, config: { height: 50, ...BUILDING } },
+            { type: 'extrude', role: 'hangar',   lot: { side: 1, gap: 760, across: 320, along: -820, length: 400, feather: BUILDING_EDGE }, config: { height: 60, ...BUILDING } },
+            { type: 'extrude', role: 'hangar',   lot: { side: 1, gap: 760, across: 320, along: 820,  length: 400, feather: BUILDING_EDGE }, config: { height: 60, ...BUILDING } },
+            { type: 'extrude', role: 'tower',    lot: { side: 1, gap: 760, across: 160, along: 1200, length: 160, feather: BUILDING_EDGE }, config: { height: 120, ...BUILDING } }
+        ]
+    }
 ].map(template => Object.freeze(template)));
 
 /** One template by its id, or null. */
@@ -59,8 +96,7 @@ export function runwayTemplate(id) {
 export function templateBuilt(id) {
     const template = runwayTemplate(id);
     if (template == null) return false;
-    const types = [...(template.waitsOn ?? []), ...template.members.map(member => member.type)];
-    return template.members.length > 0 && types.every(isElementId);
+    return template.members.length > 0 && template.members.every(member => isElementId(member.type));
 }
 
 /** The templates the panel offers, in its order. */
@@ -127,10 +163,32 @@ export function groupConfig(group) {
     return { at, heading: ((held('heading', given.heading) % 360) + 360) % 360, length: held('length', given.length), width: held('width', given.width) };
 }
 
-/** How far a placed group's strip reaches from its middle, whichever way it is turned. */
+/**
+ * How far a placed group reaches from its middle, whichever way it is turned:
+ * its strip, apron and all, or the farthest corner of a lot beside it.
+ */
 export function groupReach(group) {
     const { length, width } = groupConfig(group);
-    return stripReach(length, width);
+    let reach = stripReach(length, width);
+    for (const member of group?.members ?? []) {
+        const lot = lotFrame(member.lot, width);
+        if (lot) reach = Math.max(reach, Math.hypot(Math.abs(lot.u) + lot.across / 2, Math.abs(lot.v) + lot.length / 2));
+    }
+    return reach;
+}
+
+/**
+ * Where a lot's middle stands in the template's frame - `u` across the strip,
+ * `v` along it - and its size, for a strip `width` wide; null for a member that
+ * is not laid out as a lot.
+ */
+function lotFrame(lot, width) {
+    if (lot == null || typeof lot !== 'object') return null;
+    const number = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+    const across = Math.max(number(lot.across), 1);
+    const length = Math.max(number(lot.length), 1);
+    const side = number(lot.side, 1) < 0 ? -1 : 1;
+    return { u: side * (width / 2 + Math.max(number(lot.gap), 0) + across / 2), v: number(lot.along), across, length, feather: lot.feather };
 }
 
 /**
@@ -159,34 +217,52 @@ export function keepStripOnCanvas([x, z], reach, size = 0) {
 /**
  * A group as the placements it stands for, in the canvas's frame: each member
  * turned through the group's heading about the group's middle and moved to
- * where the group stands, a strip given the group's length and width, every
- * strip laid along the group's heading plus its own, and each held wholly on a
- * canvas `size` wide.
+ * where the group stands, a strip given the group's length and width and laid
+ * along the group's heading plus its own, a lot set down as a rectangle beside
+ * the strip at its distance from the paving, and the whole held on a canvas
+ * `size` wide - moved in together, so a lot keeps its place beside its strip.
  */
 export function expandGroup(group, size = 0) {
     if (!isGroup(group)) return [];
     const { at, heading, length, width } = groupConfig(group);
     const axis = bearingToDirection(heading);
     const across = { x: axis.z, z: -axis.x };
+    const [cx, cz] = keepStripOnCanvas(at, groupReach(group), size);
+    // The template's frame runs north at a heading of 0: `v` is along the
+    // strip and `u` across it, so a member keeps its place beside the strip
+    // whichever way the group is turned.
+    const frame = (u, v) => [cx + across.x * u + axis.x * v, cz + across.z * u + axis.z * v];
 
     return group.members.map(member => {
         const config = { ...(member.config ?? {}) };
-        const [u, v] = Array.isArray(config.at) ? config.at : [0, 0];
-        // The template's frame runs north at a heading of 0: `v` is along the
-        // strip and `u` across it, so a member keeps its place beside the strip
-        // whichever way the group is turned.
-        let place = [at[0] + across.x * u + axis.x * v, at[1] + across.z * u + axis.z * v];
+        const lot = lotFrame(member.lot, width);
+        if (lot) {
+            const [x, z] = frame(lot.u, lot.v);
+            const footprint = { kind: 'rect', x, z, width: lot.across, depth: lot.length, angle: heading * Math.PI / 180, corner: 0 };
+            if (Number.isFinite(lot.feather)) footprint.feather = lot.feather;
+            delete config.at;
+            return { type: member.type, config, footprint };
+        }
 
+        const [u, v] = Array.isArray(config.at) ? config.at : [0, 0];
         if (member.type === 'runway') {
             const own = Array.isArray(config.heading) ? Number(config.heading[0]) || 0 : 0;
             const bearing = (((heading + own) % 360) + 360) % 360;
-            place = keepStripOnCanvas(place, stripReach(length, width), size);
             Object.assign(config, { heading: [bearing, bearing], length: [length, length], width: [width, width] });
         }
 
-        config.at = place;
+        config.at = frame(u, v);
         return { type: member.type, config };
     });
+}
+
+/**
+ * Where a placed group's lots lie, as the rectangles its members are drawn
+ * through, in the canvas's frame: what an airport's buildings and apron are
+ * outlined and picked by beside its strip.
+ */
+export function groupLots(group, size = 0) {
+    return expandGroup(group, size).filter(member => member.footprint != null).map(member => member.footprint);
 }
 
 /** Every group in a list of placements expanded into its members, and everything else as it was. */

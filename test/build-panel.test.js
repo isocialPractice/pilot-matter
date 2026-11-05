@@ -88,8 +88,9 @@ test('an edit of an element no tool places yet is headed by the element', () => 
 });
 
 test('a live tool with no panel yet shows nothing', () => {
+    // Every tool has a panel now; a name that is no tool stands for one.
     const state = onCanvas();
-    state.tool = 'extrude';
+    state.tool = 'hammer';
     assert.equal(dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE) }), null);
 });
 
@@ -232,7 +233,8 @@ test('the panels the artwork heads are headed the artwork\'s way', () => {
     const headings = Object.fromEntries(BUILD_TOOLS.filter(tool => tool.heading).map(tool => [tool.id, tool.heading]));
     assert.deepEqual(headings, {
         select: 'SELECTION MODE', mountain: 'BUILD MOUNTAINS', grass: 'BUILD GRASS', sand: 'BUILD SAND',
-        water: 'BUILD WATER', snow: 'BUILD SNOW', runway: 'INSERT RUNWAY', paint: 'FREE PAINT', erase: 'ERASE'
+        water: 'BUILD WATER', snow: 'BUILD SNOW', runway: 'INSERT RUNWAY', paint: 'FREE PAINT', erase: 'ERASE',
+        extrude: 'EXTRUDE SHAPE'
     });
     assert.equal(toolForElement('water').id, 'water');
     assert.equal(toolForElement('forest'), null);

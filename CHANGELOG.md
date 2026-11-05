@@ -5,6 +5,92 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.53.0] - 2026-11-05
+
+Extrude: shapes drawn on the ground, or the selection, levelled and raised in
+stages, the shapes it draws being the lasso's from one vocabulary - and the
+airports, laid out from strips, aprons and buildings.
+
+### Added
+
+- **Extrude.** `EXTRUDE` joins the palette, and with it all twelve tools. Its
+  panel, `EXTRUDE SHAPE`, is seven shapes - Rectangle, Circle, Triangle,
+  Polygon, Star, Polyline and Polycurve - cut from the artwork's panel, the
+  chosen one's own fields, and one button whose label and whether it can be
+  pressed are read off the stage. Drawing, it is `EXTRUDE`, greyed until the
+  region covers some ground; extruding, `EDIT EXTRUSION`; at the surfaces,
+  `APPLY`.
+- **An extrusion.** `extrude` joins the element registry, applied beside the
+  town and before snow: a region levelled to the mean of the ground it covers
+  on each tile and raised by `height`, from -400 to 1200, flat on top at a
+  `flatten` of 1, its top painted `topColor` and the band at its edge, where
+  the height eases back down, `wallColor`. Pulled up with the gumball's blue
+  arrow, it is shown on the overlay - its outline on the ground and at the
+  height reached - and the ground drawn once, when it is let go.
+- **Sum of shapes.** Shapes drawn before `EXTRUDE` are one region, filled red
+  over the canvas and not yet ground: `Shift` at a shape's press adds it,
+  `Alt` cuts it out, and two that overlap lift as one block. Picking another
+  shape keeps what was drawn; picking one with an extrusion lifted keeps it,
+  asking nothing.
+- **Extrude a selection.** With a selection live, the selection is the region,
+  drawn solid red while Extrude is the tool, so `EXTRUDE` is ready on arrival,
+  and a shape is drawn within it.
+- **The airports.** `BASIC AIRPORT` and `COMMERCIAL AIRPORT` join Insert
+  Runway's cards: a strip, an apron painted in its grey beside it, and
+  buildings beyond the apron, each kept at its distance from the paving as the
+  strip widens, the whole held on the canvas and picked as one by any part of
+  it.
+- **The control list** carries `Drag (Extrude) - Draw a Shape to Lift, or
+  Within the Selection`, `Shift+Drag (Extrude) - Add a Shape to the Region` and
+  `Alt+Drag (Extrude) - Cut a Shape From the Region`.
+
+### Changed
+
+- **Shape vocabulary.** The shapes a pointer draws on the ground are written
+  once, in `js/shapes.js`, and a mode declares which it offers under its own
+  names and art: the lasso all ten, as before, and Extrude seven.
+- An airport placed far out is held on the canvas by its farthest lot, not by
+  its strip alone.
+
+Held in Node by the new `test/extrude.test.js` - the ten shapes, the lasso's
+ten and Extrude's seven as shapes of the one vocabulary, a shape the same
+region whichever mode draws it, Extrude's tiles and their art, the element in
+the registry and the pipeline, an extrusion levelled and raised without a
+footprint and with one - flat at its ground's mean plus its height, walled at
+its edge, nothing outside - a pit, an extrusion part erased, the mean and edge
+settlers, the button through the stages, a region drawn and not yet ground,
+summed, cut and refused, lifted, its surfaces opened and come back from, a
+selection lifted on arrival and drawn within, a shape picked keeping a lifted
+extrusion, a shape's fields kept, the blue arrow's lift and its bounds, the
+panel at every stage, an extrusion accepted and a drawing cancelled, the
+airports' members, a lot kept from the paving as the strip widens and turned
+with it, an airport's reach and its hold on the canvas, and a built airport
+paved and standing - with `test/page.test.js`, `test/build-art.test.js`,
+`test/templates.test.js`, `test/paint.test.js`, `test/build-panel.test.js`,
+`test/build-tools.test.js`, `test/controls-help.test.js` and
+`test/environment-elements.test.js`. Each rejected the defect it names when
+that was put back, fifty in all: among them a curved polygon run open, a
+mode's tool keeping its own copy of a shape's fields, a circle that is a box,
+an extrusion not levelled or not raised or without a wall, its level not
+settled or settled unweighted, the airports waiting still, a lot laid from the
+template's middle or not turned with its strip, an airport's reach its strip's
+alone, a building not picked as its airport, an extrusion being drawn already
+ground, `EXTRUDE` lifting a region that covers nothing, the selection not a
+region to lift, a shape drawn into a region already lifted, a shape picked
+leaving the extrusion in hand, `EXTRUDE` always pressable, `ACCEPT` before
+anything is lifted, the blue arrow lifting nothing or past its bounds, an
+answer never greyed, a pull drawn as it goes, the prism never drawn, the
+gumball out while drawing, and Extrude's art not copied. One more - the lasso drawing by its own name rather than its shape - cannot be told apart, the lasso offering every shape under the shape's own id.
+Settled in Chromium in 14 checks across a desktop and a phone: Extrude on the
+palette with all twelve and the way out clear of the list, its seven icons cut
+from the art and `EXTRUDE` greyed, a rectangle drawn red and not yet ground, a
+circle added and a box cut, `EXTRUDE` lifting it exactly 60 over its ground's
+mean with the blue arrow out, a pull previewed and written at the new height on
+release, `HEIGHT` typed, the surfaces with a red roof and `APPLY`, `ACCEPT`, a
+shape picked keeping a lifted extrusion, a selection drawn red and lifted on
+arrival, the two airports offered and a commercial one standing, and a finger's
+box lifted.
+
 ## [1.0.0-alpha.1.52.0] - 2026-11-05
 
 Erase, and Deselect from anywhere: a stroke that takes elements away -

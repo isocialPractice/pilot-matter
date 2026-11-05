@@ -4634,3 +4634,86 @@ still be found by name.
     its heading, moved into place, its strip sized and held on the canvas -
     and Select picks a group by its strips, apron and all.
   - From: Interactive Build Mode
+- [x] **Insert a template**: a card chosen on the panel, its outline carried
+  over the ground and written only on the click, arriving lined up with the
+  view to the nearest ten degrees, then turned and sized on the panel or by the
+  gumball
+  - **Settled**: Insert Runway joins the palette, its panel the templates as
+    cards - named tiles, the art's own cards still being in its
+    work-in-progress folder. A card arms it, and the template's outline
+    follows a pointer that can hover; a click places it lined up with the view
+    to the nearest ten degrees, `arrivalHeading(viewBearing(...))`, with
+    `HEADING`, `LENGTH` and `WIDTH` under the cards, and the Flat gumball's
+    centre, arc and squares moving, turning and sizing it. A click with it in
+    hand moves it, and another card turns it into that template where it
+    stands. With nine tiles the palette reached the control list on an
+    800-pixel screen, so the list now stops short of the palette and scrolls.
+  - From: Interactive Build Mode
+- [x] **The strip a flight starts on**: a placed strip outranking a searched
+  one, so a flight reset onto a runway opens on the strip the pilot built
+  - **Settled**: `flightStrip` in `js/environment/elements.js` - the last
+    placed strip, the first otherwise - is what `getRunway()` returns, so a
+    runway start opens on the strip the pilot built. It is published in the
+    API beside the other strip readers.
+  - From: Interactive Build Mode
+- [x] **Free paint**: an element that writes colour and no height, so an
+  accepted stroke is ground rather than a decal standing over it
+  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
+    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
+    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
+    the strip's grey, given their members once both are in the registry.
+  - **Settled**: `paint` is in the registry - a `color`, an `opacity` read as
+    a percentage and a `blend` of `tint` or `normal` - and paints the whole
+    field, a footprint keeping a stroke a stroke; it is applied after `snow`
+    and before the strip. `color` is a range kind of its own, one flat colour
+    clamped channel by channel, which the panel draws as the item below says;
+    it is what `1.0.0-alpha.1.40.0` left waiting. Free Paint is on the palette
+    as the second stroke tool: the cover tool's functions now serve both -
+    `strokeValues`, `setStrokeValues`, `layStroke`, `strokeRanges` and
+    `strokeHolderFor` in place of the cover-only names - each tool bringing
+    its own brush and element rows. Its batch is the cover tool's: colour,
+    opacity and blend are the whole batch's, so a colour chosen after three
+    strokes recolours all three, and a second colour is a second batch. The
+    walkthrough's frames, where the strokes before the change of colour look
+    to stay black, read as gist. The airports now wait on `extrude` alone.
+  - From: Interactive Build Mode
+- [x] **Paint panel**: the colour swatches, the custom picker, the eye dropper
+  and the hex field, with the brush as a tip and an edge rather than a list of
+  named presets
+  - **Settled**: the dock draws Free Paint as three sections under the art's
+    headings, all writing one holder. `COLOR SELECTION` is one `color` row,
+    drawn by `js/panel-view.js` as the art's eight swatches in its order - its
+    purple is the art's magenta - the picker, the eye dropper and `HEX INPUT`,
+    which takes `#RRGGBB` or `#RGB` and refuses anything else with `A COLOUR
+    IS #RRGGBB`. The picker is the greys then once round the hues, in four
+    bands at 100, 75, 50 and 25 percent of the colour, the rest white, read at
+    the point pressed; a press of a colour row's step walks the swatches.
+    `BRUSH SELECTION` is `TIP` and `EDGE` as choice rows under a `DEFAULT`
+    card, a section's own tile, lit while the brush is the one the tool starts
+    with and putting it back. The plan's "default between" for the edge is
+    read as that card: the walkthrough opens on "Hard Round", which is what
+    the tool starts with. `BRUSH PROPERTIES` is `OPACITY`, `SIZE` with a
+    slider, and `BLEND`, which the art does not draw: at `TINT` black and
+    white are the ground's own grey, and `NORMAL` is how a black that is black
+    is laid. A range declares `percent` and `slider` as options. The eye
+    dropper is session state, put down by a click that takes the vertex's
+    generated colour, by `Esc` before leaving is asked, by a tool change and
+    by a new canvas; it is offered on Free Paint's panel alone, not on a paint
+    batch picked with Select, which shows its colour row without it.
+  - From: Interactive Build Mode
+- [x] **Brush sizing**: a brush measured in screen pixels while painting and
+  stored in world units once the stroke is laid, so a stroke does not change
+  size when the camera moves
+  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
+    `coverStamp` turns a brush in pixels into a stamp in world units at the
+    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
+    goes the same way.
+  - **Settled**: `paintStamp` lays `SIZE` across and along at the press's
+    scale, a round tip with its corners at half the width and a square one
+    with none; `strokeStamp` hands each stroke tool its own. The edge is the
+    stroke's `feather`, carried by `layStroke`: `HARD` is the sampling's two
+    cells rather than the plan's 0, since an edge inside one cell is a
+    staircase of whole vertices - the cliff `FEATHER_CELLS` exists to keep off -
+    and `SOFT` is half the width, so a soft stroke is whole only down its
+    middle. A brush resized after a stroke is laid leaves the stroke as it was.
+  - From: Interactive Build Mode

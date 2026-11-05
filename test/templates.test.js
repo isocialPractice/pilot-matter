@@ -92,13 +92,13 @@ test('the dock passes shift with a spinner pressed, and steps by it', () => {
 
 // --- Runway templates ------------------------------------------------------------------------
 
-test('four templates in the panel\'s order, the two runways offered and the airports waiting on their elements', () => {
+test('four templates in the panel\'s order, every one offered now its elements are all drawn', () => {
     assert.deepEqual(RUNWAY_TEMPLATES.map(t => t.label), ['BASIC RUNWAY', 'COMMERCIAL', 'BASIC AIRPORT', 'COMMERCIAL AIRPORT']);
-    assert.deepEqual(offeredTemplates().map(t => t.id), ['basic-runway', 'commercial']);
+    assert.deepEqual(offeredTemplates().map(t => t.id), ['basic-runway', 'commercial', 'basic-airport', 'commercial-airport']);
     for (const template of offeredTemplates()) assert.ok(template.members.every(member => isElementId(member.type)), template.id);
     for (const id of ['basic-airport', 'commercial-airport']) {
-        assert.equal(templateBuilt(id), false);
-        assert.deepEqual(runwayTemplate(id).waitsOn, ['paint', 'extrude']);
+        assert.equal(templateBuilt(id), true);
+        assert.deepEqual([...new Set(runwayTemplate(id).members.map(member => member.type))], ['runway', 'paint', 'extrude']);
     }
     assert.equal(templateBuilt('runway'), false);
     assert.equal(runwayTemplate('commercial').members[0].config.centreline, true, 'the commercial strip carries its centreline');
@@ -114,7 +114,7 @@ test('a placed template carries copies of its members, and survives being writte
     assert.notEqual(placed.members[0], runwayTemplate('basic-runway').members[0], 'copied, so a template improved later leaves it as it was');
     assert.deepEqual(structuredClone(placed), placed);
     assert.deepEqual(JSON.parse(JSON.stringify(placed)), placed);
-    assert.equal(placeTemplate('basic-airport', [0, 0]), null, 'and a template not offered places nothing');
+    assert.equal(placeTemplate('regional-airport', [0, 0]), null, 'and a template not offered places nothing');
 });
 
 test('a template arrives lined up with the view, to the nearest ten degrees', () => {
@@ -255,7 +255,7 @@ test('Insert Runway is on the palette, armed by a card and refused without one',
     const state = onCanvas();
     assert.equal(buildRunwayTemplate(state), null);
     assert.equal(insertTemplate(state, { x: 0, z: 0 }, 0, { size: DEFAULT_SIZE }), false, 'no card, no runway');
-    assert.equal(chooseRunwayTemplate(state, 'basic-airport'), false, 'a card not offered cannot be chosen');
+    assert.equal(chooseRunwayTemplate(state, 'regional-airport'), false, 'a card not offered cannot be chosen');
     assert.equal(chooseRunwayTemplate(state, 'basic-runway'), true);
     assert.equal(buildRunwayTemplate(state), 'basic-runway');
     assert.equal(chooseRunwayTemplate(onCanvas('mountain'), 'basic-runway'), false, 'and only with Insert Runway live');
@@ -307,13 +307,14 @@ test('Insert Runway\'s panel is its cards, and the strip\'s rows under them once
     let shown = dockContent(state, {});
     assert.equal(shown.kind, DOCK_RUNWAY);
     assert.equal(shown.heading, 'INSERT RUNWAY');
-    assert.deepEqual(shown.shapes[0].tools.map(tool => [tool.label, tool.live, tool.art]), [['BASIC RUNWAY', false, null], ['COMMERCIAL', false, null]]);
+    assert.deepEqual(shown.shapes[0].tools.map(tool => [tool.label, tool.live, tool.art]),
+        [['BASIC RUNWAY', false, null], ['COMMERCIAL', false, null], ['BASIC AIRPORT', false, null], ['COMMERCIAL AIRPORT', false, null]]);
     assert.deepEqual([shown.rows, shown.actions], [[], []]);
 
     chooseRunwayTemplate(state, 'commercial');
     insertTemplate(state, { x: 0, z: 0 }, 0, { size: DEFAULT_SIZE });
     shown = dockContent(state, {});
-    assert.deepEqual(shown.shapes[0].tools.map(tool => tool.live), [false, true]);
+    assert.deepEqual(shown.shapes[0].tools.map(tool => tool.live), [false, true, false, false]);
     assert.deepEqual(shown.rows.map(entry => [entry.row.label, entry.value]), [['HEADING', 0], ['LENGTH', 3600], ['WIDTH', 360]]);
     assert.deepEqual(shown.actions, [DOCK_ACCEPT, DOCK_CANCEL]);
 });

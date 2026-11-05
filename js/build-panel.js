@@ -23,13 +23,17 @@
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
-    brushIsDefault, eyeDropperArmed
+    brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady
 } from './build-mode.js';
+import {
+    EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, extrudeRows, extrudeTool, extrudeToolArt,
+    extrudeToolName, extrudeStageAction
+} from './extrude.js';
 import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } from './templates.js';
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import {
     BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isEraseTool,
-    isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate
+    isExtrudeTool, isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate
 } from './build-tools.js';
 import { isErase, ERASE_RANGES } from './environment/erase.js';
 
@@ -64,6 +68,9 @@ export const DOCK_ERASE = 'erase';
 
 /** What the dock shows for a tool with no panel of its own yet while something is selected: its heading over `DESELECT`. */
 export const DOCK_TOOL = 'tool';
+
+/** What the dock shows with Extrude live: its shapes, and the rows and the one button of the stage its draft is at. */
+export const DOCK_EXTRUDE = 'extrude';
 
 /**
  * Free Paint's three sections, in the artwork's order, and the ranges each
@@ -272,7 +279,7 @@ export function dockContent(state, options = {}) {
 }
 
 /** What the dock shows before the answer every panel gets while something is selected - see `dockContent`. */
-function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [] } = {}) {
+function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [], size = 0 } = {}) {
     if (!buildModeDrawing(state)) return null;
 
     const select = buildModeTool(state) === SELECT_TOOL && camera != null;
@@ -281,6 +288,7 @@ function panelContent(state, { camera = null, fov, holder = null, context = {}, 
     if (isCoverTool(buildModeTool(state))) return coverContent(state, holder, context, DOCK_COVER);
     if (isEraseTool(buildModeTool(state))) return coverContent(state, holder, context, DOCK_ERASE);
     if (isPaintTool(buildModeTool(state))) return paintContent(state, holder, context);
+    if (isExtrudeTool(buildModeTool(state))) return extrudeContent(state, holder, context, size);
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
 
     if (draftPending(state) && !(select && picked)) {
@@ -436,6 +444,57 @@ function paintContent(state, holder, context) {
         sections,
         dropping: eyeDropperArmed(state)
     };
+}
+
+/**
+ * Extrude's panel, headed `EXTRUDE SHAPE`: its seven shapes as tiles in the
+ * artwork's rows, the chosen one lit, and under them what the stage the draft
+ * is at holds - the chosen shape's own fields while drawing, the height and
+ * the flatness while extruding, the two surfaces' colours after `EDIT
+ * EXTRUSION` - and the one button the stages share, its label and whether it
+ * can be pressed read off the stage; see `js/extrude.js`. `size` is the
+ * canvas's width, which whether the region covers ground is read on.
+ *
+ * While drawing, the rows write the next shape's fields and the draft has
+ * only `CANCEL` beside the button, since nothing is lifted to keep yet; once
+ * it is lifted, `ACCEPT` and `CANCEL` settle it as any draft's do. `stage`
+ * says which.
+ */
+function extrudeContent(state, holder, context, size) {
+    const stage = extrudeStage(state);
+    const chosen = buildExtrudeTool(state);
+    const draft = draftPending(state) && state.draft.replaces == null ? buildDraft(state) : null;
+    const lifted = draft != null && stage !== EXTRUDE_DRAWING;
+
+    const shapeRanges = extrudeTool(chosen)?.ranges ?? {};
+    const ranges = lifted ? pick(panelRanges(draft), EXTRUDE_STAGE_ROWS[stage]) : { ...shapeRanges };
+    const held = lifted ? holder ?? draftHolderFor(draft) : { config: extrudeValues(state) };
+
+    const actions = [extrudeStageAction(stage, extrudeReady(state, { size }))];
+    if (draft != null) actions.push(...(stage === EXTRUDE_DRAWING ? [DOCK_CANCEL] : stage === EXTRUDE_SURFACES ? [] : [DOCK_ACCEPT, DOCK_CANCEL]));
+
+    return {
+        kind: DOCK_EXTRUDE,
+        stage,
+        heading: EXTRUDE_HEADING,
+        shapes: extrudeRows().map(({ row, tools }) => ({
+            row,
+            tools: tools.map(tool => ({
+                id: tool.id, label: tool.label, name: extrudeToolName(tool.id), art: extrudeToolArt(tool.id), live: tool.id === chosen
+            }))
+        })),
+        ranges,
+        holder: held,
+        rows: panelRows(ranges, held, context),
+        nudges: [],
+        actions,
+        sections: []
+    };
+}
+
+/** The named ranges of a set, in the order the names come. */
+function pick(ranges, names = []) {
+    return Object.fromEntries(names.filter(name => name in ranges).map(name => [name, ranges[name]]));
 }
 
 /**

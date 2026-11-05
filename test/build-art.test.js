@@ -21,6 +21,7 @@ import { BUILDER_ENVIRONMENTS } from '../js/environment/presets.js';
 import { PALETTE_FOLD_MARK } from '../js/build-palette.js';
 import { BUILDER_ASSETS, TARGET } from '../tools/sync-builder-assets.mjs';
 import { LASSO_ART } from '../js/lasso.js';
+import { EXTRUDE_ART } from '../js/extrude.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = path => readFileSync(join(ROOT, path), 'utf8');
@@ -86,6 +87,13 @@ test('the copy step\'s list and the repository agree', () => {
     assert.ok(targets.includes(PALETTE_FOLD_MARK));
     assert.ok(targets.includes(LASSO_ART), 'and the panel the lasso cuts its tools\' icons from');
     assert.ok(tracked.has(LASSO_ART));
+    assert.ok(targets.includes(EXTRUDE_ART), 'and the one Extrude cuts its shapes\' icons from');
+    assert.ok(tracked.has(EXTRUDE_ART));
+    // And the other way: nothing is shipped from the folder that a copy would
+    // not bring up to date.
+    for (const path of tracked) {
+        if (path.startsWith(`${TARGET}/`)) assert.ok(targets.includes(path), `${path} is tracked and not on the list`);
+    }
     assert.equal(new Set(Object.values(BUILDER_ASSETS)).size, targets.length, 'and no source is copied twice');
 });
 

@@ -22,8 +22,11 @@
 
 import {
     SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool, isEraseTool,
-    toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate
+    isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate
 } from './build-tools.js';
+import {
+    DEFAULT_EXTRUDE_TOOL, extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_STAGES
+} from './extrude.js';
 import {
     templateBuilt, placeTemplate, groupConfig, groupReach, keepStripOnCanvas
 } from './templates.js';
@@ -168,7 +171,10 @@ export function createBuildState() {
         dropper: false,
         // Where the popup a right click on the selection opens stands, as the
         // screen point it was opened at, and null while it is shut.
-        popup: null
+        popup: null,
+        // Which of Extrude's shapes is chosen, and where its fields were left.
+        extrudeTool: DEFAULT_EXTRUDE_TOOL,
+        extrudeValues: {}
     };
 }
 
@@ -889,7 +895,9 @@ export function cancelDraft(state) {
  */
 export function builtPlacements(state) {
     const shown = committedPlacements(state);
-    if (!draftPending(state)) return shown;
+    // An extrusion still being drawn is not ground yet: its region is shown
+    // over the canvas, and nothing is levelled or raised until it is lifted.
+    if (!draftPending(state) || state.draft.stage === EXTRUDE_DRAWING) return shown;
 
     const { placement, replaces } = state.draft;
     if (replaces != null && replaces >= 0 && replaces < shown.length) shown[replaces] = own(placement);
@@ -988,6 +996,8 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.runwayTemplate = null;
     state.dropper = false;
     state.popup = null;
+    state.extrudeTool = DEFAULT_EXTRUDE_TOOL;
+    state.extrudeValues = {};
     return true;
 }
 
@@ -1096,6 +1106,146 @@ export function deselect(state) {
     state.selectionTool = null;
     state.popup = null;
     return true;
+}
+
+// --- Extrude ----------------------------------------------------------------------------
+
+/** The Extrude shape chosen, which the next shape is drawn with. */
+export function buildExtrudeTool(state) {
+    return extrudeTool(state?.extrudeTool) ? state.extrudeTool : DEFAULT_EXTRUDE_TOOL;
+}
+
+/** The chosen Extrude shape's own fields - a star's points, a polygon's sides - as they were left. */
+export function extrudeValues(state) {
+    const ranges = extrudeTool(buildExtrudeTool(state))?.ranges ?? {};
+    const values = {};
+    for (const [name, range] of Object.entries(ranges)) values[name] = state?.extrudeValues?.[name] ?? range.default;
+    return values;
+}
+
+/** Keeps a value moved on the chosen shape's fields, for the next shape it draws. */
+export function setExtrudeValues(state, values = {}) {
+    const ranges = extrudeTool(buildExtrudeTool(state))?.ranges ?? {};
+    const kept = { ...(state.extrudeValues ?? {}) };
+    for (const name of Object.keys(ranges)) if (Number.isFinite(values?.[name])) kept[name] = values[name];
+    state.extrudeValues = kept;
+    return extrudeValues(state);
+}
+
+/** True for Extrude's own draft, the extrusion being made - not a committed one picked up again. */
+function extrudeDraft(state) {
+    return draftPending(state) && isExtrudeTool(state.draft.tool) && state.draft.replaces == null;
+}
+
+/**
+ * The stage Extrude's draft is at, or `drawing` with Extrude live and nothing
+ * in hand yet - see `js/extrude.js`. Null for any other tool.
+ */
+export function extrudeStage(state) {
+    if (!buildModeDrawing(state) || !isExtrudeTool(state.tool)) return null;
+    return extrudeDraft(state) ? state.draft.stage ?? EXTRUDE_DRAWING : EXTRUDE_DRAWING;
+}
+
+/** True while Extrude is drawing shapes - live, with nothing lifted yet - which is when the pointer draws shapes. */
+export function extrudeDrawing(state) {
+    return extrudeStage(state) === EXTRUDE_DRAWING && !confirmOpen(state);
+}
+
+/**
+ * The region Extrude would lift: the draft's, while there is one, and with
+ * none the selection, which is a shape Extrude can lift as it stands - so
+ * `EXTRUDE` is ready on arrival with a lasso drawn. Null with neither.
+ */
+export function extrudeRegion(state) {
+    if (extrudeDraft(state)) return own(state.draft.placement.footprint);
+    if (isExtrudeTool(state?.tool) && selectionLive(state)) return own(state.selection);
+    return null;
+}
+
+/** True when the region Extrude would lift covers some ground on a canvas `size` wide, which is when `EXTRUDE` can be pressed. */
+export function extrudeReady(state, { size = 0 } = {}) {
+    const region = extrudeRegion(state);
+    return region != null && coversGround(region, size);
+}
+
+/**
+ * Choosing one of Extrude's shapes. With an extrusion lifted in hand, it is
+ * kept - committed, with nothing asked - and Extrude is back at drawing with
+ * the shape chosen: picking a shape is how the stages are left, and the
+ * question a tool change asks is for leaving a tool, not for changing shape
+ * within one. While drawing, the shapes drawn stay, and the next is drawn
+ * with the new one.
+ *
+ * Refused off a canvas, with a confirm open, with Extrude not live, and for a
+ * shape Extrude does not offer. Returns true when the shape is now chosen.
+ */
+export function chooseExtrudeTool(state, id) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !isExtrudeTool(state.tool) || extrudeTool(id) == null) return false;
+    if (extrudeDraft(state) && state.draft.stage !== EXTRUDE_DRAWING) acceptDraft(state);
+    state.extrudeTool = id;
+    return true;
+}
+
+/**
+ * A shape drawn with Extrude while it is drawing, joined to the region by
+ * `op`, which the key held at its press said - see `lassoOp`: with nothing
+ * selected, every shape is added, so several drawn before `EXTRUDE` lift as
+ * one region, overlaps and all; with a selection live, the region starts as
+ * the selection and a shape is drawn inside it, added to it with `shift` or
+ * cut out of it with `alt`.
+ *
+ * The first shape begins the draft: an extrusion of the region, set down in a
+ * frame of its own so the gumball can move, turn and stretch it, at the stage
+ * of drawing. A shape that leaves the region covering no ground is refused.
+ * Returns true when the region changed.
+ */
+export function drawExtrudeShape(state, shape, op = 'union', { size = 0 } = {}) {
+    if (!extrudeDrawing(state) || !isFootprint(shape)) return false;
+    const kind = op === 'subtract' || op === 'intersect' ? op : 'union';
+
+    if (extrudeDraft(state)) {
+        const placement = state.draft.placement;
+        const next = addToPlaced(placement.footprint, shape, kind);
+        if (!coversGround(next, size)) return false;
+        placement.footprint = next;
+        return true;
+    }
+
+    const region = combineSelection(selectionLive(state) ? own(state.selection) : null, shape, kind);
+    if (region == null || !coversGround(region, size)) return false;
+    return beginExtrusion(state, region);
+}
+
+/** An extrusion of `region` begun, at the stage of drawing, from where Extrude's panel was left. */
+function beginExtrusion(state, region) {
+    const tool = buildTool(state.tool);
+    const values = { ...resolveConfig({ ranges: toolRanges(tool) }, {}), ...own(state.toolValues?.[tool.id] ?? {}) };
+    delete values.level;
+    const placement = toolPlacement(tool, values, placeFootprint(region));
+    if (!startDraft(state, placement, tool.id)) return false;
+    state.draft.stage = EXTRUDE_DRAWING;
+    return true;
+}
+
+/**
+ * Extrude's one button pressed: `EXTRUDE` lifts the region - the draft's, or
+ * the selection as it stands - and puts the gumball on it; `EDIT EXTRUSION`
+ * puts the gumball away for the surfaces; `APPLY` comes back from them.
+ * `EXTRUDE` is refused while the region covers no ground.
+ *
+ * Returns the stage the draft is at now, or null when nothing moved on.
+ */
+export function pressExtrudeStage(state, { size = 0 } = {}) {
+    const stage = extrudeStage(state);
+    if (stage == null || confirmOpen(state)) return null;
+
+    if (stage === EXTRUDE_DRAWING) {
+        if (!extrudeReady(state, { size })) return null;
+        if (!extrudeDraft(state) && !beginExtrusion(state, own(state.selection))) return null;
+    }
+
+    state.draft.stage = EXTRUDE_STAGES[stage].next;
+    return state.draft.stage;
 }
 
 // --- The popup a right click on the selection opens ------------------------------

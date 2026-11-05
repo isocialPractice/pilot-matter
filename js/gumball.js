@@ -156,6 +156,13 @@ function spanOf(type, name) {
     return range?.kind === 'span' ? range : null;
 }
 
+/** True for one value an element declares under this name: an extrusion's height. */
+function scalarOf(type, name) {
+    if (!isElementId(type)) return null;
+    const range = getElement(type).ranges[name];
+    return range?.kind === 'scalar' ? range : null;
+}
+
 /**
  * What a handle writes on this placement, or null for a handle bound to
  * nothing the placement owns - which is then not drawn.
@@ -166,7 +173,8 @@ function spanOf(type, name) {
  *   bounds the declaration gives.
  *
  * `mode` is how a drag becomes a value: `place` follows the ground under the
- * pointer, `slide` follows it along one axis, `raise` moves a span up or down
+ * pointer, `slide` follows it along one axis, `lift` moves one value up or
+ * down, `raise` moves a span up or down
  * whole, `scale` stretches a value from the centre, and `turn` turns it.
  */
 export function handleBinding(handleOrId, placement) {
@@ -186,9 +194,9 @@ export function handleBinding(handleOrId, placement) {
             return where && { ...where, mode: 'place' };
         case 'arrow':
             if (handle.axis !== 'blue') return where && { ...where, mode: 'slide', axis: handle.axis };
-            return kind === GUMBALL_HEIGHTS && spanOf(placement.type, 'height')
-                ? { from: 'config', name: 'height', mode: 'raise' }
-                : null;
+            if (kind === GUMBALL_HEIGHTS && spanOf(placement.type, 'height')) return { from: 'config', name: 'height', mode: 'raise' };
+            // An extrusion's one height, pulled up and down whole.
+            return scalarOf(placement.type, 'height') ? { from: 'config', name: 'height', mode: 'lift' } : null;
         case 'spread':
             return spanOf(placement.type, 'radius') ? { from: 'config', name: 'radius', mode: 'scale' } : null;
         case 'stand':
@@ -331,6 +339,14 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
         const range = spanOf(placement.type, binding.name);
         const by = along * (range.high - range.low) / RAISE_PIXELS;
         changes.config[binding.name] = raiseSpan(currentSpan(placement, binding.name, range), by, range);
+        return changes;
+    }
+
+    if (binding.mode === 'lift') {
+        const range = scalarOf(placement.type, binding.name);
+        const held = Number(placement.config?.[binding.name]);
+        const from = Number.isFinite(held) ? held : range.default;
+        changes.config[binding.name] = stepped(range, clamp(from + along * (range.high - range.low) / RAISE_PIXELS, range.low, range.high));
         return changes;
     }
 

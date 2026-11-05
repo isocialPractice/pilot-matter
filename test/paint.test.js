@@ -222,14 +222,13 @@ test('a paint stroke colours the ground only where its footprint reaches, and mo
     assert.ok(inside > 20 && outside > 1000, `${inside} inside, ${outside} outside`);
 });
 
-test('a paint placement is picked by its stroke, lies on the Flat gumball, and the airports still wait on Extrude', () => {
+test('a paint placement is picked by its stroke and lies on the Flat gumball', () => {
     const stroke = { kind: 'stroke', points: LINE, stamp: { width: 1200, depth: 1200, corner: 600 } };
     const placement = { type: 'paint', config: {}, footprint: placeFootprint(stroke) };
     assert.equal(placementAt([placement], 0, 0, DEFAULT_SIZE), 0, 'on the stroke');
     assert.equal(placementAt([placement], 0, 4000, DEFAULT_SIZE), null, 'and nowhere off it');
     assert.equal(gumballKind('paint'), GUMBALL_FLAT);
-    assert.equal(templateBuilt('basic-airport'), false, 'an apron is paint, and the buildings beside it are Extrude\'s');
-    assert.deepEqual(offeredTemplates().map(template => template.id), ['basic-runway', 'commercial']);
+    assert.equal(templateBuilt('basic-airport'), true, 'an apron is paint, and the buildings beside it are extrusions');
 });
 
 test('the colour nearest a point is read off the vertex nearest it, and off the field is nothing', () => {

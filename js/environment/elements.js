@@ -29,14 +29,15 @@ export const DEFAULT_SEGMENTS = 200;
  * The landforms are shaped first, then the ground cover is laid over them in
  * the order it layers - a dune sea sits on top of the sand band rather than
  * being repainted flat by it - then water fills what is left below its line,
- * then the cuts and the built things, and snow settles on top of everything
- * else. Paint is the last colour laid, over snow and all, because a stroke is
- * the pilot's last word on what colour the ground is.
+ * then the cuts and the built things - an extrusion beside the town - and snow
+ * settles on top of everything else. Paint is the last colour laid, over snow
+ * and all, because a stroke is the pilot's last word on what colour the ground
+ * is.
  */
 export const ELEMENT_ORDER = [
     'mountain', 'canyon',
     'grass', 'sand', 'desert', 'water',
-    'river', 'forest', 'town',
+    'river', 'forest', 'town', 'extrude',
     'snow',
     'paint',
     // The strip is cut last, over whatever else claimed the ground, because a
@@ -1302,6 +1303,53 @@ const snow = {
 };
 
 /**
+ * An extrusion: ground levelled and raised, a shape pulled up off the hillside
+ * into a block - a building, a platform, a wall.
+ *
+ * Every vertex is levelled toward `level` by `flatten` - all the way at 1,
+ * which is a flat top - and raised by `height`, which may be below nothing for
+ * a pit. It is the one element that needs the ground under its own footprint
+ * to know where to level to, and it is not handed the footprint for it: the
+ * level is the ground's mean height under the footprint, worked out by the
+ * caller on each tile through `footprintSettles`, so the generator stays a
+ * whole-field function. Drawn without a footprint, it levels the whole field
+ * to the `level` it is given.
+ *
+ * A heightfield has no faces, only vertices at heights, so its two surfaces
+ * are the two kinds of vertex an extrusion makes: those wholly inside the
+ * footprint, raised and flat, which read as the top, and those in the band at
+ * its edge where the height eases back down, which read as the wall. How far
+ * in each vertex is comes with the footprint, as `edge`, and each is painted
+ * the colour of the surface it is; drawn without a footprint, it is all top.
+ */
+const extrude = {
+    id: 'extrude',
+    label: 'Extrusion',
+    ranges: {
+        height:    scalar(-400, 1200, 60),
+        // How much of the footprint is levelled before it is raised: at 1 the
+        // top is flat, which is what a shape pulled off the ground is.
+        flatten:   scalar(0, 1, 1),
+        topColor:  color([0.55, 0.54, 0.52]),
+        wallColor: color([0.38, 0.37, 0.36]),
+        // The height the ground is levelled to, which a footprint settles as
+        // the mean of the ground it covers.
+        level:     scalar(-2000, 4000, 0)
+    },
+    footprintSettles: Object.freeze({ level: 'mean', drawn: 'edge' }),
+
+    generate(field, config) {
+        const edge = drawnValues(config, 'edge', field);
+        for (let i = 0; i < field.count; i++) {
+            const h = field.height[i];
+            field.height[i] = h + (config.level - h) * config.flatten + config.height;
+            paint(field, i, edge && edge[i] < 1 ? config.wallColor : config.topColor);
+        }
+        return field.count;
+    }
+};
+
+/**
  * Free paint: a colour laid over the ground, and nothing else - no height is
  * written, so a stroke of it is the ground it was laid on in another colour
  * rather than a decal standing over that ground, and there is nothing that
@@ -2008,7 +2056,7 @@ function openness(field, wet, index) {
 // --- The registry ---------------------------------------------------------
 
 export const ELEMENTS = [
-    mountain, canyon, desert, grass, sand, water, river, forest, town, snow, freePaint, runway
+    mountain, canyon, desert, grass, sand, water, river, forest, town, extrude, snow, freePaint, runway
 ];
 
 export const ELEMENTS_BY_ID = new Map(ELEMENTS.map(element => [element.id, element]));

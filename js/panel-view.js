@@ -170,7 +170,6 @@ export class PanelView {
             answer.type = 'button';
             answer.className = 'dock-action';
             answer.dataset.action = action.id;
-            answer.textContent = action.label;
             this.answers.append(answer);
         }
         this.answers.style.display = (content.actions ?? []).length ? 'flex' : 'none';
@@ -327,6 +326,16 @@ export class PanelView {
 
     /** Writes every reading, leaving alone the one being typed into. */
     update(content) {
+        // An answer's label and whether it can be pressed can change without
+        // the panel changing shape - Extrude's one button reads both off the
+        // stage its draft is at.
+        for (const action of content.actions ?? []) {
+            const answer = this.answers.querySelector(`.dock-action[data-action="${action.id}"]`);
+            if (!answer) continue;
+            if (answer.textContent !== action.label) answer.textContent = action.label;
+            answer.disabled = action.disabled === true;
+        }
+
         const shapes = [...(content.shapes ?? []), ...(content.sections ?? []).flatMap(section => section.shapes ?? [])];
         for (const row of shapes) {
             for (const tool of row.tools) {

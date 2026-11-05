@@ -11,42 +11,52 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Shape vocabulary**: the shape tools built once over the seven footprint
-  kinds, with each mode declaring the subset it offers, so Lasso's ten and
-  Extrude's seven are one implementation
-  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
-    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
-    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
-    gestures; this item is that table shared with Extrude's seven.
+- [ ] **Extrusion surfaces**: a top and a wall colour, with a click on either
+  pointing the panel at that declared value and outlining it on the overlay,
+  and the surface panel's apply keeping a change where its back drops it
+  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
+    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
+    field; `topColor` and `wallColor` declared with it are drawn the same way.
+  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
+    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
+    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
+    `js/extrude.js`. What is left is the click on a surface pointing the
+    panel at one, its red outline, and `BACK` dropping a change.
   - From: Interactive Build Mode
-- [ ] **Extrude stages**: the draw, extrude and surface stages with one action
-  button reading its label and its enabled state off the stage it is in
+- [ ] **Extrusions settle into the ground**: each surface taking the ground's
+  own lightness, and the wall's colour fading to the ground's across the band
+  its height already eases over
+  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
+    `js/environment/elements.js` gives a colour the ground's own luminance,
+    which is the first half of this.
+  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
+    the band at its footprint's edge its wall colour, and the compositor
+    blends it into the ground by the band's weight, so the wall already fades
+    toward the ground at its foot; what is left is both surfaces through
+    `tintColor`.
   - From: Interactive Build Mode
-- [ ] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
-  by the gumball or by a number, previewing on the overlay and writing the field
-  once on release
-  - **The airport templates wait on it too.** Their buildings are extrusions
-    over rects at fixed distances from the strip's edge and ends - see
-    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
-    widens.
-  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
-    registry, so `extrude` is the last element the airports wait on; their
-    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
-  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
-    weighed after a footprint settles what it settles, so an extrusion's level
-    worked out through `footprintSettles` is the drawn shape's, and erasing
-    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
-    pattern for anything else that is all or nothing.
+- [ ] **The camera from inside a tool**: a held pan that suspends the live tool
+  rather than changing it, putting the tool back on release so a half-drawn
+  shape is not committed by moving the view
   - From: Interactive Build Mode
-- [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
-  height as a single region, with two that overlap reading as one solid
-  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
-    with `union` weighs as the larger of its parts, so two shapes that overlap
-    already read as one region; this item lifts one to a single height.
-  - From: Interactive Build Mode
-- [ ] **Extrude a selection**: a live selection taken as the region to lift, so
-  the button is ready on arrival, and drawn in red while Extrude is the tool so
-  it reads as the thing that will be lifted rather than as a clip
+- [ ] **Derived ranges are hidden**: a range the footprint already determines
+  taken off the panel rather than shown and ignored, and given the value the
+  footprint implies - the count going away while a selection is live, a ground
+  cover's band going away when it is drawn, and drawn water's level with it
+  - **The mountain's count already goes.** A mountain dropped at a click is one
+    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
+    is a `derived` value on the tool, left off the panel by `panelRanges` for
+    any placement carrying `at`. What is left is the cover band and drawn
+    water's level, which a footprint rather than a click settles.
+  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
+    off a range the element's `footprintSettles` names for a placement with a
+    footprint, and the cover tool's own panel carries only density, the stamp
+    and the colours. What is left is drawn water's level.
+  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
+    with a footprint shows neither what its element's `footprintSettles`
+    works out nor what its `footprintIgnores` - drawn water's level and
+    flatten - beside the count and the band. Its run is checking nothing else
+    is shown and ignored, and settling it.
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -116,50 +126,28 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Shape vocabulary**: the shape tools built once over the seven footprint
-  kinds, with each mode declaring the subset it offers, so Lasso's ten and
-  Extrude's seven are one implementation
-  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
-    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
-    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
-    gestures; this item is that table shared with Extrude's seven.
-- [ ] **Extrude stages**: the draw, extrude and surface stages with one action
-  button reading its label and its enabled state off the stage it is in
-- [ ] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
-  by the gumball or by a number, previewing on the overlay and writing the field
-  once on release
-  - **The airport templates wait on it too.** Their buildings are extrusions
-    over rects at fixed distances from the strip's edge and ends - see
-    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
-    widens.
-  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
-    registry, so `extrude` is the last element the airports wait on; their
-    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
-  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
-    weighed after a footprint settles what it settles, so an extrusion's level
-    worked out through `footprintSettles` is the drawn shape's, and erasing
-    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
-    pattern for anything else that is all or nothing.
-- [ ] **Sum of shapes**: several shapes drawn before the extrude lifted to one
-  height as a single region, with two that overlap reading as one solid
-  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
-    with `union` weighs as the larger of its parts, so two shapes that overlap
-    already read as one region; this item lifts one to a single height.
-- [ ] **Extrude a selection**: a live selection taken as the region to lift, so
-  the button is ready on arrival, and drawn in red while Extrude is the tool so
-  it reads as the thing that will be lifted rather than as a clip
 - [ ] **Extrusion surfaces**: a top and a wall colour, with a click on either
   pointing the panel at that declared value and outlining it on the overlay,
   and the surface panel's apply keeping a change where its back drops it
   - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
     kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
     field; `topColor` and `wallColor` declared with it are drawn the same way.
+  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
+    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
+    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
+    `js/extrude.js`. What is left is the click on a surface pointing the
+    panel at one, its red outline, and `BACK` dropping a change.
 - [ ] **Extrusions settle into the ground**: each surface taking the ground's
   own lightness, and the wall's colour fading to the ground's across the band
   its height already eases over
   - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
     `js/environment/elements.js` gives a colour the ground's own luminance,
     which is the first half of this.
+  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
+    the band at its footprint's edge its wall colour, and the compositor
+    blends it into the ground by the band's weight, so the wall already fades
+    toward the ground at its foot; what is left is both surfaces through
+    `tintColor`.
 - [ ] **The camera from inside a tool**: a held pan that suspends the live tool
   rather than changing it, putting the tool back on release so a half-drawn
   shape is not committed by moving the view
@@ -269,91 +257,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 356 earlier items in `TODO-archive.md`, newest last.
+> 361 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Insert a template**: a card chosen on the panel, its outline carried
-  over the ground and written only on the click, arriving lined up with the
-  view to the nearest ten degrees, then turned and sized on the panel or by the
-  gumball
-  - **Settled**: Insert Runway joins the palette, its panel the templates as
-    cards - named tiles, the art's own cards still being in its
-    work-in-progress folder. A card arms it, and the template's outline
-    follows a pointer that can hover; a click places it lined up with the view
-    to the nearest ten degrees, `arrivalHeading(viewBearing(...))`, with
-    `HEADING`, `LENGTH` and `WIDTH` under the cards, and the Flat gumball's
-    centre, arc and squares moving, turning and sizing it. A click with it in
-    hand moves it, and another card turns it into that template where it
-    stands. With nine tiles the palette reached the control list on an
-    800-pixel screen, so the list now stops short of the palette and scrolls.
-  - From: Interactive Build Mode
-- [x] **The strip a flight starts on**: a placed strip outranking a searched
-  one, so a flight reset onto a runway opens on the strip the pilot built
-  - **Settled**: `flightStrip` in `js/environment/elements.js` - the last
-    placed strip, the first otherwise - is what `getRunway()` returns, so a
-    runway start opens on the strip the pilot built. It is published in the
-    API beside the other strip readers.
-  - From: Interactive Build Mode
-- [x] **Free paint**: an element that writes colour and no height, so an
-  accepted stroke is ground rather than a decal standing over it
-  - **The airport templates wait on it.** Since `1.0.0-alpha.1.50.0` `BASIC
-    AIRPORT` and `COMMERCIAL AIRPORT` are declared in `js/templates.js` waiting
-    on `paint` and `extrude`; their aprons are paint rects at a normal blend in
-    the strip's grey, given their members once both are in the registry.
-  - **Settled**: `paint` is in the registry - a `color`, an `opacity` read as
-    a percentage and a `blend` of `tint` or `normal` - and paints the whole
-    field, a footprint keeping a stroke a stroke; it is applied after `snow`
-    and before the strip. `color` is a range kind of its own, one flat colour
-    clamped channel by channel, which the panel draws as the item below says;
-    it is what `1.0.0-alpha.1.40.0` left waiting. Free Paint is on the palette
-    as the second stroke tool: the cover tool's functions now serve both -
-    `strokeValues`, `setStrokeValues`, `layStroke`, `strokeRanges` and
-    `strokeHolderFor` in place of the cover-only names - each tool bringing
-    its own brush and element rows. Its batch is the cover tool's: colour,
-    opacity and blend are the whole batch's, so a colour chosen after three
-    strokes recolours all three, and a second colour is a second batch. The
-    walkthrough's frames, where the strokes before the change of colour look
-    to stay black, read as gist. The airports now wait on `extrude` alone.
-  - From: Interactive Build Mode
-- [x] **Paint panel**: the colour swatches, the custom picker, the eye dropper
-  and the hex field, with the brush as a tip and an edge rather than a list of
-  named presets
-  - **Settled**: the dock draws Free Paint as three sections under the art's
-    headings, all writing one holder. `COLOR SELECTION` is one `color` row,
-    drawn by `js/panel-view.js` as the art's eight swatches in its order - its
-    purple is the art's magenta - the picker, the eye dropper and `HEX INPUT`,
-    which takes `#RRGGBB` or `#RGB` and refuses anything else with `A COLOUR
-    IS #RRGGBB`. The picker is the greys then once round the hues, in four
-    bands at 100, 75, 50 and 25 percent of the colour, the rest white, read at
-    the point pressed; a press of a colour row's step walks the swatches.
-    `BRUSH SELECTION` is `TIP` and `EDGE` as choice rows under a `DEFAULT`
-    card, a section's own tile, lit while the brush is the one the tool starts
-    with and putting it back. The plan's "default between" for the edge is
-    read as that card: the walkthrough opens on "Hard Round", which is what
-    the tool starts with. `BRUSH PROPERTIES` is `OPACITY`, `SIZE` with a
-    slider, and `BLEND`, which the art does not draw: at `TINT` black and
-    white are the ground's own grey, and `NORMAL` is how a black that is black
-    is laid. A range declares `percent` and `slider` as options. The eye
-    dropper is session state, put down by a click that takes the vertex's
-    generated colour, by `Esc` before leaving is asked, by a tool change and
-    by a new canvas; it is offered on Free Paint's panel alone, not on a paint
-    batch picked with Select, which shows its colour row without it.
-  - From: Interactive Build Mode
-- [x] **Brush sizing**: a brush measured in screen pixels while painting and
-  stored in world units once the stroke is laid, so a stroke does not change
-  size when the camera moves
-  - **The cover tool's brush already is.** Since `1.0.0-alpha.1.48.0`
-    `coverStamp` turns a brush in pixels into a stamp in world units at the
-    scale `unitsPerPixel` gives where the stroke was pressed; paint's brush
-    goes the same way.
-  - **Settled**: `paintStamp` lays `SIZE` across and along at the press's
-    scale, a round tip with its corners at half the width and a square one
-    with none; `strokeStamp` hands each stroke tool its own. The edge is the
-    stroke's `feather`, carried by `layStroke`: `HARD` is the sampling's two
-    cells rather than the plan's 0, since an edge inside one cell is a
-    staircase of whole vertices - the cliff `FEATHER_CELLS` exists to keep off -
-    and `SOFT` is half the width, so a soft stroke is whole only down its
-    middle. A brush resized after a stroke is laid leaves the stroke as it was.
-  - From: Interactive Build Mode
 - [x] **Strokes land as they are drawn**: each pointer sample projected to the
   ground as it is taken, so the stroke on screen while painting is the stroke
   that gets committed
@@ -468,4 +373,89 @@ how the simulator got here rather than as a list still to be worked.
     Found on the way: a placed template's strip was laid on all nine tiles of a
     flown world, `tileElements` taking off only placements typed `runway`; a
     group comes off every tile but the middle one now too.
+  - From: Interactive Build Mode
+- [x] **Shape vocabulary**: the shape tools built once over the seven footprint
+  kinds, with each mode declaring the subset it offers, so Lasso's ten and
+  Extrude's seven are one implementation
+  - **The seven kinds are there.** Since `1.0.0-alpha.1.47.0`
+    `FOOTPRINT_KINDS` reads all seven, and the lasso's ten tools draw them
+    through `lassoFootprint` in `js/lasso.js` from one table of kinds and
+    gestures; this item is that table shared with Extrude's seven.
+  - **Settled**: `js/shapes.js` is the vocabulary - ten shapes, each a
+    footprint kind and a gesture, with their own fields - and
+    `shapeFootprint` and `reshapeShape` what a gesture comes to. A mode
+    declares the shapes it offers through `modeTools`, under its own ids,
+    labels, rows and art: the lasso all ten, as it did, and Extrude seven, a
+    Circle the lasso's ellipse and a Polycurve its curved polyline.
+    `js/lasso.js` keeps every export it had, drawn through the vocabulary, and
+    main's gesture draws the shape of whichever mode is live - see
+    `liveShapeTool` - differing only in what is done with the region.
+    Extrude's icons are cut from its panel's art, as the lasso's are.
+  - From: Interactive Build Mode
+- [x] **Extrude stages**: the draw, extrude and surface stages with one action
+  button reading its label and its enabled state off the stage it is in
+  - **Settled**: `js/extrude.js` declares the three stages and the one button:
+    `EXTRUDE`, greyed until the region covers ground; `EDIT EXTRUSION`; and
+    `APPLY`, which the surfaces return by. The stage is carried on the draft,
+    as the plan has it; while drawing, the draft is shown over the canvas and
+    is not ground - `builtPlacements` leaves it out - and the panel offers
+    `CANCEL` and no `ACCEPT`, nothing being lifted to keep. A disabled answer
+    is drawn greyed, its label and state written without the panel being
+    built again. The surfaces stage's panel is the two colour rows under
+    `APPLY`; telling `BACK` from `APPLY`, and choosing a surface by clicking
+    it, are the next item's. Picking another shape with an extrusion lifted
+    keeps it, asking nothing, and is back at drawing - the stages' way out. A
+    shape picked while drawing keeps what was drawn, so the plan's `KEEP
+    DRAWING` has nothing to undo.
+  - From: Interactive Build Mode
+- [x] **Extrude**: a shape drawn on the ground, levelled to it, then pulled up
+  by the gumball or by a number, previewing on the overlay and writing the field
+  once on release
+  - **The airport templates wait on it too.** Their buildings are extrusions
+    over rects at fixed distances from the strip's edge and ends - see
+    `RUNWAY_TEMPLATES` in `js/templates.js` - so they move out as the strip
+    widens.
+  - **And on it alone.** Since `1.0.0-alpha.1.51.0` `paint` is in the
+    registry, so `extrude` is the last element the airports wait on; their
+    aprons are `paint` rects at `blend: 'normal'` in the strip's grey.
+  - **An erase leaves the level it had.** Since `1.0.0-alpha.1.52.0` a cut is
+    weighed after a footprint settles what it settles, so an extrusion's level
+    worked out through `footprintSettles` is the drawn shape's, and erasing
+    part of it leaves the rest where it stood. A strip's `erasedWhole` is the
+    pattern for anything else that is all or nothing.
+  - **Settled**: `extrude` is in the registry beside `town`, before snow:
+    `height`, `flatten`, `topColor`, `wallColor` and `level`, which a
+    footprint settles as its ground's mean on each tile through a new `mean`
+    settler, and `drawn: 'edge'` - the region's weight - which paints the
+    band at its edge the wall and what it wholly covers the top. The blue
+    arrow lifts a scalar height, a `lift` beside the mountain's `raise`. While
+    it is pulled the ground is left alone: the overlay draws the region's
+    outline on the ground and at the height reached, from the top it stood at
+    when the drag began, and the field is written on release. The airports
+    are laid out with it - a strip, a `paint` apron and `extrude` buildings,
+    each a lot kept at its distance from the paving as the strip widens, the
+    whole held on the canvas by its farthest lot and picked by any of it.
+  - From: Interactive Build Mode
+- [x] **Sum of shapes**: several shapes drawn before the extrude lifted to one
+  height as a single region, with two that overlap reading as one solid
+  - **The union is there.** Since `1.0.0-alpha.1.47.0` a `combine` footprint
+    with `union` weighs as the larger of its parts, so two shapes that overlap
+    already read as one region; this item lifts one to a single height.
+  - **Settled**: shapes drawn before `EXTRUDE` are one placement's footprint,
+    joined in a `placed` frame by the op their press read - `lassoOp`, the
+    lasso's own rule: added with nothing selected or with `shift`, cut out
+    with `alt`, and drawn within a selection with neither. `addToPlaced` takes
+    `intersect` for that. A shape that leaves the region covering no ground
+    is refused. One `height` lifts the region whole, and two shapes that
+    overlap read as one block.
+  - From: Interactive Build Mode
+- [x] **Extrude a selection**: a live selection taken as the region to lift, so
+  the button is ready on arrival, and drawn in red while Extrude is the tool so
+  it reads as the thing that will be lifted rather than as a clip
+  - **Settled**: with a selection live and nothing drawn, `extrudeRegion` is
+    the selection, so `EXTRUDE` is ready on arrival and lifts it as it stands
+    - as a region, carrying no clip. The overlay draws the selection solid
+    red while Extrude is the tool, and once shapes are drawn into it the
+    region they come to is filled red under a red dashed edge, the selection
+    no longer drawn beside it.
   - From: Interactive Build Mode

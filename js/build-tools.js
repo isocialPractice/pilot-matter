@@ -38,7 +38,7 @@ export const ACCEPT_TOOL = 'accept';
  * `element` is the registry element a tool places, whose declared ranges are
  * its panel: nothing is restated here, so a range added to the element appears
  * on the tool's panel without this file being opened. A tool whose element is
- * not in the registry yet - extrude - names it in the commit that adds
+ * not in the registry yet names it in the commit that adds
  * it, and the panel's conformance test holds it to the registry from then on.
  *
  * `heading` is what the tool's panel is headed, in the artwork's own words -
@@ -63,6 +63,10 @@ export const ACCEPT_TOOL = 'accept';
  * panel as a card, at a click - a whole strip or airport rather than one
  * element - see `js/templates.js`.
  *
+ * `extrudes` marks Extrude, the one tool whose draft is not finished by a
+ * single gesture: shapes are drawn into a region, which is then lifted - see
+ * `js/extrude.js`.
+ *
  * `paint` marks Free Paint, the other tool that draws by dragging: it lays
  * `paint` with the `PAINT_BRUSH` rather than a cover with the cover tool's
  * stamp. `erase` marks Erase, which drags the same brush and lays nothing: its
@@ -82,7 +86,7 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY', inserts: true },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true,  element: 'paint', heading: 'FREE PAINT', paint: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true,  element: ERASE_TYPE, heading: 'ERASE', erase: true },
-    { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true },
+    { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true,  element: 'extrude', heading: 'EXTRUDE SHAPE', extrudes: true },
     { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false }
 ].map(tool => Object.freeze(tool)));
 
@@ -128,11 +132,12 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * worked out from the ground under the stroke rather than held at a height a
  * stroke would usually miss. Insert Runway places the templates whose every
  * element the registry draws - the two runways today, and the airports once
- * extrude is in it beside paint. Free Paint lays a colour and no height,
- * through the same stroke as the covers, and Erase takes elements away
- * through it.
+ * the airports, laid out from strips, paint and extrusions. Free Paint lays a
+ * colour and no height, through the same stroke as the covers, and Erase takes
+ * elements away through it. Extrude lifts a region drawn from its shapes, or
+ * the selection, in stages - see `js/extrude.js`.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL]);
 
 /** True for one of the twelve. */
 export function isBuildTool(id) {
@@ -268,6 +273,11 @@ export const PAINT_ELEMENT_ROWS = Object.freeze(['color', 'opacity', 'blend']);
 /** True for Free Paint. */
 export function isPaintTool(id) {
     return buildTool(id)?.paint === true;
+}
+
+/** True for Extrude. */
+export function isExtrudeTool(id) {
+    return buildTool(id)?.extrudes === true;
 }
 
 /** True for Erase. */

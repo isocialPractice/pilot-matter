@@ -1210,6 +1210,7 @@
         #build-dock-actions {
             flex: none;
             display: none;
+            flex-wrap: wrap;
             gap: 6px;
             padding: 8px 12px 10px;
             border-top: 1px solid rgba(0, 255, 0, 0.25);
@@ -1313,6 +1314,23 @@
 
         .dock-action[data-action="cancel"] {
             border-color: rgba(255, 176, 0, 0.6);
+        }
+
+        /* Extrude's one button, drawn as the artwork draws EXTRUDE: a pale blue
+           pill in a white edge across the whole of the answers, over the
+           draft's own. Greyed while it cannot be pressed - while drawing, until
+           the region covers some ground. */
+        .dock-action[data-action="extrude-stage"] {
+            flex: 1 1 100%;
+            color: #061d43;
+            background: #87ceeb;
+            border: 2px solid #fff;
+            border-radius: 10px;
+        }
+
+        .dock-action:disabled {
+            opacity: 0.45;
+            cursor: default;
         }
 
         /* The one answer the lasso's panel has, drawn as the artwork draws it: a

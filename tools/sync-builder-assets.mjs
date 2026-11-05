@@ -76,6 +76,10 @@ export const BUILDER_ASSETS = Object.freeze({
     // with one tile lit - are not shipped.
     'lasso-tools.svg': 'assets/laso-mode-propertyPanelElements.svg',
 
+    // Extrude's panel, whole, which its seven shapes' icons are cut from the
+    // same way.
+    'extrude-tools.svg': 'assets/draw-extrude-shape-propertyPanelElements.svg',
+
     // One thumbnail a canvas, for the picker's cards.
     'thumb-highlands.png':      'support/thumbnail-highlands.png',
     'thumb-river-basin.png':    'support/thumbnail-riverBasin.png',

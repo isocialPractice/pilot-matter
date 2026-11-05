@@ -26,7 +26,7 @@ import {
 import { placementRandom } from './environment/footprinted.js';
 import { footprintSampler, isFootprint } from './environment/footprints.js';
 import { mountainBump } from './terrain-math.js';
-import { isGroup, groupStrips } from './templates.js';
+import { isGroup, groupStrips, groupLots } from './templates.js';
 import { isErase } from './environment/erase.js';
 
 /**
@@ -95,12 +95,13 @@ const NOWHERE = () => 0;
  * every placement it drops; without a seed it would be read from a stream it
  * was never drawn from.
  *
- * A placed template reaches wherever any of its strips does, apron and all, so
- * it is picked as one wherever a pilot presses on it.
+ * A placed template reaches wherever any of its strips does, apron and all,
+ * and an airport wherever its apron and buildings do, so it is picked as one
+ * wherever a pilot presses on it.
  */
 export function placementReach(placement, size = 0) {
     if (isGroup(placement)) {
-        const strips = groupStrips(placement, size).map(strip => footprintSampler(strip, size));
+        const strips = [...groupStrips(placement, size), ...groupLots(placement, size)].map(strip => footprintSampler(strip, size));
         return strips.length > 0 ? (x, z) => Math.max(...strips.map(weigh => weigh(x, z))) : NOWHERE;
     }
     // An erase batch is picked by the ground its strokes covered, as a cover

@@ -1383,6 +1383,23 @@ reaches, fading in across its feather:
 }
 ```
 
+`extrude` levels and raises: every vertex is moved toward `config.level` by
+`config.flatten` - all the way at 1, which is a flat top - and raised by
+`config.height`, from -400 to 1200, below nothing for a pit. With a footprint
+of its own the level is the mean height of the ground the footprint covers on
+each square, worked out there, and the band at the footprint's edge is the
+wall: it is painted `config.wallColor`, and what the footprint wholly covers
+`config.topColor`:
+
+```js
+{
+    type: 'extrude',
+    // A block 120 over the ground's mean, roofed in red.
+    config: { height: 120, topColor: [0.6, 0.2, 0.2] },
+    footprint: { kind: 'rect', x: 0, z: 0, width: 800, depth: 500, angle: 0, corner: 0, feather: 40 }
+}
+```
+
 A placement of type `erase` lays nothing: it is cut out of the placements listed
 before it. `config.target` names what it takes - `'all'`, the default, for every
 element but `runway`, or any one element id - and `config.strength`, from 0 to

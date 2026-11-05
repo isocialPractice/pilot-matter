@@ -26,14 +26,16 @@ import {
     buildRunwayTemplate, chooseRunwayTemplate, insertTemplate,
     resetBrush, eyeDropperArmed, toggleEyeDropper, dropEyeDropper, takeEyeDropperColor,
     openDeselectPopup, deselectPopup, closeDeselectPopup,
+    buildExtrudeTool, chooseExtrudeTool, extrudeValues, setExtrudeValues, extrudeStage, extrudeDrawing, extrudeRegion,
+    drawExtrudeShape, pressExtrudeStage,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
 import {
-    paletteTools, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, strokeStamp, buildTool,
+    paletteTools, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
     insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
-import { placeTemplate, groupStrips, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
+import { placeTemplate, groupStrips, groupLots, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
 import {
     createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK
 } from './build-palette.js';
@@ -41,10 +43,11 @@ import { placementAt, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
-    regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL
+    regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL,
+    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM
 } from './build-overlay.js';
 import {
-    boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle,
+    boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle, handleBinding,
     alongAxis, sweepAround, GUMBALL_AXES
 } from './gumball.js';
 import {
@@ -59,12 +62,14 @@ import {
 } from './build-camera.js';
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
-    DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH
+    DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH
 } from './build-panel.js';
 import {
-    lassoTool, lassoFootprint, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
+    lassoTool, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
 } from './lasso.js';
-import { flattenPath, footprintWeight } from './environment/footprints.js';
+import { flattenPath, footprintWeight, footprintSampler } from './environment/footprints.js';
+import { shape as shapeOf, shapeFootprint } from './shapes.js';
+import { extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_STAGE_ACTION } from './extrude.js';
 import { PanelView } from './panel-view.js';
 import {
     stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces, coarseStep
@@ -2056,7 +2061,9 @@ class FlightSimulator {
         // A gumball drag writes the edit on every move, and the ground is
         // drawn from it here - not every frame, because a canvas takes the
         // better part of a frame to draw, but often enough to watch it change.
-        if (this.groundStale && performance.now() - this.groundDrawnAt >= GROUND_REDRAW_MS) this.redrawCanvas();
+        // An extrusion pulled up is the exception: its height is shown on the
+        // overlay while it is dragged, and the ground drawn once, on release.
+        if (this.groundStale && !this.gumballDrag?.preview && performance.now() - this.groundDrawnAt >= GROUND_REDRAW_MS) this.redrawCanvas();
     }
 
     /**
@@ -2102,7 +2109,7 @@ class FlightSimulator {
         if (this.gumballHover != null) return 'grab';
         const tool = buildModeTool(this.builder);
         if (eyeDropperArmed(this.builder)) return 'cell';
-        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool)) return 'crosshair';
+        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool) || extrudeDrawing(this.builder)) return 'crosshair';
         return this.hovered != null ? 'pointer' : '';
     }
 
@@ -2145,13 +2152,24 @@ class FlightSimulator {
         this.overlayDrawn = true;
 
         // The selection, whatever tool is live - it outlives the one that drew
-        // it - and the shape the lasso is drawing, under everything else.
+        // it - and the shape the lasso is drawing, under everything else. In
+        // Extrude the selection is what will be lifted rather than a clip, so
+        // it is drawn solid red, and once shapes are drawn into it the region
+        // they come to is filled red under a red dashed edge instead.
         const selection = this.builder.selection;
-        if (selection) {
+        const extruding = isExtrudeTool(buildModeTool(this.builder));
+        const stage = extrudeStage(this.builder);
+        const pending = extruding && stage === EXTRUDE_DRAWING && buildDraft(this.builder) != null;
+        if (selection && !(extruding && buildDraft(this.builder) != null)) {
             const edge = contoured(selection)
                 ? this.screenRuns(this.selectionEdges(selection), width, height)
                 : this.screenRegion(footprintLoop(selection), true, width, height);
-            strokePaths(ctx, edge, SELECTION_OUTLINE);
+            strokePaths(ctx, edge, extruding ? EXTRUDE_REGION : SELECTION_OUTLINE);
+        }
+        if (pending) {
+            const runs = this.screenRuns(this.selectionEdges(extrudeRegion(this.builder)), width, height);
+            fillRegion(ctx, runs, EXTRUDE_FILL);
+            strokePaths(ctx, runs, EXTRUDE_PENDING);
         }
         const drawing = this.lassoDrawingPath();
         if (drawing) strokePaths(ctx, this.screenRegion(drawing.points, drawing.closed, width, height), DRAWING_OUTLINE);
@@ -2195,11 +2213,15 @@ class FlightSimulator {
         const chosen  = buildDraft(this.builder);
 
         if (hovered) strokeOutline(ctx, this.screenOutline(hovered, width, height), HOVER_OUTLINE);
-        if (chosen) strokeOutline(ctx, this.screenOutline(chosen, width, height), CHOSEN_OUTLINE);
+        if (chosen && !pending) strokeOutline(ctx, this.screenOutline(chosen, width, height), CHOSEN_OUTLINE);
+        if (this.gumballDrag?.preview) this.drawPrism(ctx, chosen, width, height);
 
         // The gumball on the edit in hand, laid out for this frame's camera and
-        // kept so a press can be hit-tested against what is on the screen.
-        this.gumball = chosen ? this.gumballFor(chosen, width, height) : null;
+        // kept so a press can be hit-tested against what is on the screen -
+        // Extrude's only while it is extruding: while drawing there is nothing
+        // lifted to take hold of, and its surfaces are chosen without it.
+        const held = chosen && (!extruding || buildDraft(this.builder) == null || stage === EXTRUDE_EXTRUDING || this.builder.draft?.replaces != null);
+        this.gumball = held ? this.gumballFor(chosen, width, height) : null;
         if (this.gumball) strokeGumball(ctx, this.gumball, this.gumballDrag?.handle ?? this.gumballHover);
     }
 
@@ -2247,6 +2269,45 @@ class FlightSimulator {
         if (isPaintTool(tool)) return paintTrailColour(brush.color, brush.opacity);
         if (isEraseTool(tool)) return drawing.alt ? ERASE_TRAIL.restore : ERASE_TRAIL.colour;
         return COVER_TRAIL.colour;
+    }
+
+    /**
+     * An extrusion being pulled up, as the overlay previews it: its outline on
+     * the ground, the same outline at the height the drag has reached, and the
+     * corners joining them - the ground is written once, on release, since a
+     * drag that drew a canvas on every move is the one place here the cost
+     * would show. The top is where the lifted region stood when the drag began,
+     * moved by however far the height has moved since, so the preview is exact
+     * rather than approximate.
+     */
+    drawPrism(ctx, placement, width, height) {
+        const drag = this.gumballDrag;
+        if (placement == null || drag == null || !Number.isFinite(drag.top)) return;
+        const top = drag.top + (Number(placement.config?.height) || 0) - drag.lifted;
+
+        const segments = this.outlineOf(placement);
+        const point = this.overlayPoint;
+        const project = (x, y, z) => {
+            point.set(x, y, z).project(this.camera);
+            if (!(point.z >= -1 && point.z <= 1)) return null;
+            return { x: (point.x + 1) / 2 * width, y: (1 - point.y) / 2 * height };
+        };
+        const base = projectOutline(segments, (x, z) => this.terrain.getTerrainHeightAt(x, z), project);
+        const raised = projectOutline(segments, () => top, project);
+        strokeOutline(ctx, base, EXTRUDE_PRISM);
+        strokeOutline(ctx, raised, EXTRUDE_PRISM);
+
+        // A corner every so often up the side, so the two outlines read as one
+        // solid rather than as two loops.
+        const every = Math.max(1, Math.floor(segments.length / 12));
+        const sides = [];
+        for (let i = 0; i < segments.length; i += every) {
+            const [x, z] = segments[i];
+            const foot = project(x, this.terrain.getTerrainHeightAt(x, z), z);
+            const head = project(x, top, z);
+            if (foot && head) sides.push([foot, head]);
+        }
+        strokePaths(ctx, sides, EXTRUDE_PRISM);
     }
 
     /** A placement's outline as it falls on a screen `width` by `height`. */
@@ -2374,7 +2435,7 @@ class FlightSimulator {
         const gesture = cameraGesture(e, tool);
         if (!gesture) {
             if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
-            else if (e.button === 0 && tool === LASSO_PALETTE_TOOL) this.lassoPress(e);
+            else if (e.button === 0 && (tool === LASSO_PALETTE_TOOL || extrudeDrawing(this.builder))) this.lassoPress(e);
             else if (e.button === 0 && eyeDropperArmed(this.builder)) this.dropperAt(e);
             else if (e.button === 0 && isStrokeTool(tool)) this.strokePress(e);
             else if (e.button === 0 && insertsTemplate(tool)) this.insertAt(e);
@@ -2458,7 +2519,7 @@ class FlightSimulator {
         const size = this.terrain.size;
         const placed = placeTemplate(id, [ground.x, ground.z], arrivalHeading(viewBearing(this.buildCamera)));
         placed.config.at = keepStripOnCanvas(placed.config.at, groupReach(placed), size);
-        return groupStrips(placed, size).map(strip => footprintLoop(strip));
+        return [...groupStrips(placed, size), ...groupLots(placed, size)].map(strip => footprintLoop(strip));
     }
 
     /**
@@ -2522,7 +2583,7 @@ class FlightSimulator {
             // Let go of, the shape is made; cancelled or taken away, it is not.
             const drawn = this.lassoDrawing;
             this.cancelLasso();
-            if (e.type === 'pointerup' && drawn.travelled) this.finishLasso(drawn.tool, drawn.points, drawn.op, drawn.square);
+            if (e.type === 'pointerup' && drawn.travelled) this.finishLasso(drawn);
             return;
         }
 
@@ -2554,10 +2615,16 @@ class FlightSimulator {
 
         this.renderer.domElement.setPointerCapture(e.pointerId);
         const centre = gumballCentre(draft);
+        // Pulling an extrusion up is previewed on the overlay rather than drawn,
+        // from the top the lifted region stands at now and the height it has.
+        const preview = draft.type === 'extrude' && handleBinding(pressed.handle, draft)?.mode === 'lift';
         this.gumballDrag = {
             pointer: e.pointerId,
             handle: pressed.handle,
             uniform: pressed.uniform,
+            preview,
+            top: preview ? this.liftedTop(draft) : null,
+            lifted: Number(draft.config?.height) || 0,
             grab: structuredClone(draft),
             start: { x: e.clientX, y: e.clientY },
             ground: this.pickCanvasPoint(e.clientX, e.clientY) ?? (centre && { x: centre.x, z: centre.z }),
@@ -2567,6 +2634,22 @@ class FlightSimulator {
             travelled: false
         };
         this.renderer.domElement.style.cursor = this.canvasCursor();
+    }
+
+    /** The mean height of the ground an extrusion wholly covers on the canvas as it is drawn now - its top. */
+    liftedTop(placement) {
+        const field = this.terrain.tileAt(0, 0)?.field;
+        if (field == null || placement?.footprint == null) return null;
+        const weigh = footprintSampler(placement.footprint, field.size);
+        let total = 0, count = 0;
+        for (let i = 0; i < field.count; i++) {
+            const x = (i % field.stride) * field.step - field.size / 2;
+            const z = Math.floor(i / field.stride) * field.step - field.size / 2;
+            if (weigh(x, z) < 1) continue;
+            total += field.height[i];
+            count++;
+        }
+        return count > 0 ? total / count : null;
     }
 
     /**
@@ -2659,8 +2742,9 @@ class FlightSimulator {
      * point clicked there is not placed.
      */
     lassoPress(e) {
-        const tool = lassoTool(buildLassoTool(this.builder));
+        const tool = this.liveShapeTool();
         if (tool == null) return;
+        const mode = buildModeTool(this.builder);
 
         const ground = this.pickCanvasPoint(e.clientX, e.clientY);
         const screen = { x: e.clientX, y: e.clientY };
@@ -2683,11 +2767,11 @@ class FlightSimulator {
             if (shape.closed) {
                 this.cancelLasso();
                 this.lassoClosed = { ...screen, time: performance.now() };
-                this.finishLasso(tool.id, shape.points, drawing?.op ?? op, false);
+                this.finishLasso({ mode, tool: tool.id, shape: tool.shape, points: shape.points, op: drawing?.op ?? op, square: false });
             } else {
                 // A shape of clicks keeps the op its first click latched.
                 this.lassoDrawing = {
-                    gesture: LASSO_CLICKS, tool: tool.id, points: shape.points, screens: shape.screens,
+                    gesture: LASSO_CLICKS, mode, tool: tool.id, shape: tool.shape, points: shape.points, screens: shape.screens,
                     op: drawing?.op ?? op
                 };
             }
@@ -2697,7 +2781,7 @@ class FlightSimulator {
         if (ground == null) return;
         this.renderer.domElement.setPointerCapture(e.pointerId);
         this.lassoDrawing = {
-            gesture: LASSO_DRAG, tool: tool.id, pointer: e.pointerId, points: [ground], last: screen,
+            gesture: LASSO_DRAG, mode, tool: tool.id, shape: tool.shape, pointer: e.pointerId, points: [ground], last: screen,
             start: screen, type: e.pointerType, travelled: false,
             op, shiftUp: !e.shiftKey, square: false
         };
@@ -2728,7 +2812,7 @@ class FlightSimulator {
         const ground  = this.pickCanvasPoint(screen.x, screen.y);
         if (ground == null) return;
 
-        if (lassoTool(drawing.tool)?.kind === 'ring') {
+        if (shapeOf(drawing.shape)?.kind === 'ring') {
             if (Math.hypot(screen.x - drawing.last.x, screen.y - drawing.last.y) < LASSO_SAMPLE_PIXELS) return;
             drawing.points.push(ground);
             drawing.last = screen;
@@ -2743,10 +2827,30 @@ class FlightSimulator {
      * drawn inside it or cut out of it - and a shape that came to no region, a
      * box a few pixels across or a ring of two points, changes nothing.
      */
-    finishLasso(tool, points, op, square = false) {
-        const footprint = lassoFootprint(tool, points, lassoValues(this.builder), { square });
-        if (footprint) drawIntoSelection(this.builder, footprint, op, { tool, size: this.terrain.size });
+    finishLasso(drawn) {
+        const { mode, tool, shape, points, op, square = false } = drawn;
+        const footprint = shapeFootprint(shape, points, this.shapeValues(mode), { square });
+        if (footprint && mode === LASSO_PALETTE_TOOL) drawIntoSelection(this.builder, footprint, op, { tool, size: this.terrain.size });
+        else if (footprint && isExtrudeTool(mode)) drawExtrudeShape(this.builder, footprint, op, { size: this.terrain.size });
         this.syncOverlays();
+    }
+
+    /**
+     * The shape tool the live tool draws with: the lasso's chosen tool, or
+     * Extrude's chosen shape while it is drawing - the one vocabulary, see
+     * `js/shapes.js`, offered by two modes that differ only in what is done
+     * with the region drawn. Null for any other tool.
+     */
+    liveShapeTool() {
+        const tool = buildModeTool(this.builder);
+        if (tool === LASSO_PALETTE_TOOL) return lassoTool(buildLassoTool(this.builder));
+        if (extrudeDrawing(this.builder)) return extrudeTool(buildExtrudeTool(this.builder));
+        return null;
+    }
+
+    /** The fields of the shape a mode draws with: the lasso's chosen tool's, or Extrude's chosen shape's. */
+    shapeValues(mode) {
+        return isExtrudeTool(mode) ? extrudeValues(this.builder) : lassoValues(this.builder);
     }
 
     /**
@@ -2852,11 +2956,11 @@ class FlightSimulator {
     lassoDrawingPath() {
         const drawing = this.lassoDrawing;
         if (!drawing) return null;
-        const tool = lassoTool(drawing.tool);
+        const tool = shapeOf(drawing.shape);
         const points = drawing.points.map(p => [p.x, p.z]);
 
         if (drawing.gesture === LASSO_DRAG && tool?.kind !== 'ring') {
-            const region = lassoFootprint(drawing.tool, drawing.points, lassoValues(this.builder), { square: drawing.square });
+            const region = shapeFootprint(drawing.shape, drawing.points, this.shapeValues(drawing.mode), { square: drawing.square });
             return region ? { points: footprintLoop(region), closed: true } : { points, closed: false };
         }
 
@@ -2956,6 +3060,7 @@ class FlightSimulator {
             ? dockContent(this.builder, {
                 camera: this.buildCamera,
                 fov: this.camera.fov,
+                size: this.terrain.size,
                 holder: isStrokeTool(buildModeTool(this.builder)) ? this.currentStrokeHolder() : this.currentDraftHolder(),
                 open: [...this.worldOpen]
             })
@@ -3003,6 +3108,17 @@ class FlightSimulator {
         if (this.dockShown?.kind === DOCK_PAINT) {
             if (id !== DOCK_DEFAULT_BRUSH.id || !resetBrush(this.builder)) return;
             this.strokeHolder = null;
+            this.syncOverlays();
+            return;
+        }
+        if (this.dockShown?.kind === DOCK_EXTRUDE) {
+            // Picking a shape with an extrusion lifted keeps it and goes back
+            // to drawing, so the ground is drawn with it kept.
+            const lifted = extrudeStage(this.builder) !== EXTRUDE_DRAWING;
+            if (!chooseExtrudeTool(this.builder, id)) return;
+            this.cancelLasso();
+            this.draftHolder = null;
+            if (lifted) this.redrawCanvas();
             this.syncOverlays();
             return;
         }
@@ -3116,6 +3232,20 @@ class FlightSimulator {
             return;
         }
 
+        // Extrude's rows: the next shape's fields while drawing, and once the
+        // region is lifted, the extrusion's own, which draw the ground again.
+        if (kind === DOCK_EXTRUDE) {
+            if (shown.stage === EXTRUDE_DRAWING) {
+                setExtrudeValues(this.builder, holder.config);
+                this.syncDock();
+                return;
+            }
+            reviseDraft(this.builder, { config: holder.config });
+            this.redrawCanvas();
+            this.syncOverlays();
+            return;
+        }
+
         // A stroke tool's panel: kept for the tool's next batch, and the
         // batch in hand changed with it - every stroke of it, so the ground
         // is drawn again. A brush row changes only the strokes still to come.
@@ -3190,6 +3320,18 @@ class FlightSimulator {
     onDockAction(id) {
         if (id === DOCK_DESELECT.id) {
             if (deselect(this.builder)) this.syncOverlays();
+            return;
+        }
+
+        // Extrude's one button: the region lifted - and the ground drawn with
+        // it - the surfaces opened, or come back from.
+        if (id === EXTRUDE_STAGE_ACTION) {
+            const was = extrudeStage(this.builder);
+            if (pressExtrudeStage(this.builder, { size: this.terrain.size }) == null) return;
+            this.draftHolder = null;
+            this.cancelLasso();
+            if (was === EXTRUDE_DRAWING) this.redrawCanvas();
+            this.syncOverlays();
             return;
         }
 
@@ -3482,7 +3624,7 @@ class FlightSimulator {
 
         if (id === ACCEPT_TOOL) this.requestLeaveBuilder();
         else if (!chooseBuildTool(this.builder, id) && confirmOpen(this.builder)) this.confirmOpened();
-        if (buildModeTool(this.builder) !== LASSO_PALETTE_TOOL) this.cancelLasso();
+        if (buildModeTool(this.builder) !== this.lassoDrawing?.mode) this.cancelLasso();
         if (buildModeTool(this.builder) !== this.strokeDrawing?.tool) this.cancelStroke();
 
         this.syncOverlays();

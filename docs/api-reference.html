@@ -1161,6 +1161,15 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
     footprint: { kind: 'stroke', points: [[-1200, 300], [900, -400]], stamp: { width: 500, depth: 500, corner: 250 }, feather: 250 }
 }</code></pre>
 
+<p><code>extrude</code> levels and raises: every vertex is moved toward <code>config.level</code> by <code>config.flatten</code> - all the way at 1, which is a flat top - and raised by <code>config.height</code>, from -400 to 1200, below nothing for a pit. With a footprint of its own the level is the mean height of the ground the footprint covers on each square, worked out there, and the band at the footprint's edge is the wall: it is painted <code>config.wallColor</code>, and what the footprint wholly covers <code>config.topColor</code>:</p>
+
+<pre><code>{
+    type: 'extrude',
+    // A block 120 over the ground's mean, roofed in red.
+    config: { height: 120, topColor: [0.6, 0.2, 0.2] },
+    footprint: { kind: 'rect', x: 0, z: 0, width: 800, depth: 500, angle: 0, corner: 0, feather: 40 }
+}</code></pre>
+
 <p>A placement of type <code>erase</code> lays nothing: it is cut out of the placements listed before it. <code>config.target</code> names what it takes - <code>'all'</code>, the default, for every element but <code>runway</code>, or any one element id - and <code>config.strength</code>, from 0 to 1, how much of it; its <code>footprint</code>, and its <code>clip</code> where it carries one, say where. Where a placement is taken the ground is as it stood before that element ran, and anything the placement's own footprint settled is worked out as drawn, before the cut. <code>config.restore: true</code> makes one that puts back instead: it is cut out of the regions the <code>erase</code> placements before it took, from the placements it names. A <code>runway</code> is taken whole or not at all, and only when it was placed with <code>at</code> and <code>'runway'</code> is the target named; <code>water</code> taken out of the sea is dry ground, its line gone where it was taken:</p>
 
 <pre><code>[

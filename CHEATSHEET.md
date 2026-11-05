@@ -255,6 +255,10 @@ back.
 | Drag, or a finger, in Erase | Take away the target under the stroke, from what was laid before it |
 | `Alt` and drag in Erase | Put back what was erased |
 | Right click on the selection | Open a popup carrying `DESELECT` |
+| Drag, or a finger, in Extrude | Draw a shape into the region to lift, or within the selection |
+| `Shift` and drag in Extrude | Add the shape to the region |
+| `Alt` and drag in Extrude | Cut the shape out of the region |
+| The blue arrow, with an extrusion lifted | Pull it up or down, previewed until let go |
 | `Shift` and a press on a spinner | A coarse step: ten points on a percentage, ten steps on anything else |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, shut the popup, put an armed eye dropper down, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
@@ -361,6 +365,26 @@ While something is selected, every tool's panel carries `DESELECT` beside its
 own answers - Mountain's, before a drop, is its heading over `DESELECT` alone -
 and a right click on the selection opens a small popup carrying it at the
 pointer. A press anywhere off the popup, or `Esc`, shuts it and drops nothing.
+
+Extrude's panel, `EXTRUDE SHAPE`, is its seven shapes - Rectangle, Circle,
+Triangle, Polygon, Star, Polyline and Polycurve, drawn as the lasso's are - the
+chosen shape's own fields, and one button that reads off the stage the
+extrusion is at. Drawing, it is `EXTRUDE`, greyed until the region covers some
+ground: shapes drawn are one region, filled red over the canvas and not yet
+ground - `Shift` adds a shape, `Alt` cuts one out, and with a selection live
+the selection is the region, drawn solid red, so `EXTRUDE` is ready on arrival
+and a shape is drawn within it. `EXTRUDE` levels the region to its ground's
+mean and raises it, flat on top and walled at its edge, with `HEIGHT` and
+`FLATTEN` on the panel and the gumball's blue arrow pulling it up or down -
+shown red on the overlay as it is pulled, and the ground drawn when it is let
+go. `EDIT EXTRUSION` puts the gumball away for `TOP COLOR` and `WALL COLOR`,
+and `APPLY` comes back. Picking another shape keeps the extrusion lifted,
+asking nothing, and draws the next with it.
+
+Insert Runway offers `BASIC AIRPORT` and `COMMERCIAL AIRPORT` too: a strip with
+an apron painted in its grey beside it and buildings standing beyond the apron,
+each kept at its distance from the paving as the strip is widened, and picked
+as one by any part of it.
 
 `Shift` with a press on a spinner is a coarse step - ten points on a row read
 as a percentage, 100% to 110% to 120%, and ten steps on any other row - and

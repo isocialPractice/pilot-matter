@@ -142,6 +142,11 @@ export const BUILD_HELP_ROWS = Object.freeze([
         { id: 'erase',   label: 'Erase Through a Stroke', drag: 'erase' },
         { id: 'restore', label: 'Put Back What Was Erased', drag: 'erase', held: 'Alt' }
     ] : []),
+    ...(isBuiltTool('extrude') ? [
+        { id: 'extrude-draw', label: 'Draw a Shape to Lift, or Within the Selection', drag: 'extrude' },
+        { id: 'extrude-add',  label: 'Add a Shape to the Region', drag: 'extrude', held: 'Shift' },
+        { id: 'extrude-cut',  label: 'Cut a Shape From the Region', drag: 'extrude', held: 'Alt' }
+    ] : []),
     { id: 'deselect', label: 'Offer Deselect, on the Selection', rightClick: true },
     { id: 'handle',  label: 'Move or Shape What Is in Hand', handle: true },
     { id: 'leave',   label: 'Accept Edits or Save and Exit', keys: [CANVAS_LEAVE_KEYS] },

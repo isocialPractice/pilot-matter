@@ -569,6 +569,35 @@ export function paintTrailColour(rgb, opacity = 1) {
     return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
 }
 
+/**
+ * Extrude's region, in the red the surface stage outlines a chosen surface in:
+ * red wherever it appears means what Extrude acts on. A selection is drawn
+ * solid in it while Extrude is live, since there it is the thing that will be
+ * lifted rather than a clip; once shapes are drawn into it, the region they
+ * come to is filled and edged with dashes; and an extrusion pulled up is
+ * previewed as its outline on the ground and at the height reached.
+ */
+export const EXTRUDE_REGION = Object.freeze({
+    width: 2.5,
+    colour: '#ff4040',
+    under: Object.freeze({ width: 5, colour: 'rgba(6, 29, 67, 0.5)' })
+});
+
+export const EXTRUDE_PENDING = Object.freeze({
+    width: 2,
+    colour: '#ff4040',
+    dash: Object.freeze([10, 7]),
+    under: Object.freeze({ width: 4, colour: 'rgba(6, 29, 67, 0.5)' })
+});
+
+export const EXTRUDE_FILL = 'rgba(255, 64, 64, 0.22)';
+
+export const EXTRUDE_PRISM = Object.freeze({
+    width: 2,
+    colour: '#ff4040',
+    under: Object.freeze({ width: 4, colour: 'rgba(6, 29, 67, 0.5)' })
+});
+
 /** Strokes screen paths in a style: its under-stroke, then itself, dashed where the style says. */
 export function strokePaths(ctx, paths, style) {
     if (!paths?.length || style == null) return;

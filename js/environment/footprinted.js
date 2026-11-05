@@ -432,6 +432,12 @@ export function bankMeasure(field, weights, footprint) {
  *   rather than a sheet propped over it. NaN where the region does not reach.
  * - `inward` - how far in from the stroke's edge every vertex is, for drawn
  *   snow's depth.
+ * - `mean` - the mean height of the ground the region covers, each vertex
+ *   counting for as much of it as the region does: the level an extrusion is
+ *   flattened to before it is raised.
+ * - `edge` - the region's own weight at every vertex, for `drawn`: 1 wholly
+ *   inside it, and less across the band at its edge, which is where an
+ *   extrusion's wall stands.
  */
 export const FOOTPRINT_SETTLERS = Object.freeze({
     relief({ field, weights }) {
@@ -462,6 +468,21 @@ export const FOOTPRINT_SETTLERS = Object.freeze({
 
     inward(context) {
         return { inward: context.measure().inward };
+    },
+
+    mean({ field, weights }) {
+        let total = 0, weight = 0;
+        for (let i = 0; i < field.count; i++) {
+            const w = weights[i];
+            if (!(w > 0)) continue;
+            total += field.height[i] * w;
+            weight += w;
+        }
+        return weight > 0 ? total / weight : null;
+    },
+
+    edge({ weights }) {
+        return { edge: Float32Array.from(weights) };
     }
 });
 
