@@ -11,52 +11,33 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Extrusion surfaces**: a top and a wall colour, with a click on either
-  pointing the panel at that declared value and outlining it on the overlay,
-  and the surface panel's apply keeping a change where its back drops it
-  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
-    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
-    field; `topColor` and `wallColor` declared with it are drawn the same way.
-  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
-    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
-    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
-    `js/extrude.js`. What is left is the click on a surface pointing the
-    panel at one, its red outline, and `BACK` dropping a change.
+- [ ] **Builder settings**: a settings screen for the builder's own
+  preferences, declared and stored the way the game's two settings screens are,
+  with a reset to defaults, and read by nothing that generates ground, so a
+  built world comes out the same whoever's preferences were on
   - From: Interactive Build Mode
-- [ ] **Extrusions settle into the ground**: each surface taking the ground's
-  own lightness, and the wall's colour fading to the ground's across the band
-  its height already eases over
-  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
-    `js/environment/elements.js` gives a colour the ground's own luminance,
-    which is the first half of this.
-  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
-    the band at its footprint's edge its wall colour, and the compositor
-    blends it into the ground by the band's weight, so the wall already fades
-    toward the ground at its foot; what is left is both surfaces through
-    `tintColor`.
+- [ ] **Builder settings from the builder**: a gear in the palette's header and
+  the `O` key opening the screen over the canvas, suspending the live tool the
+  way a pan does so a stroke still pending is not committed by it
+  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
+    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
+    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
+    repository goes in `assets/builder/` beside the copied art -
+    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
+  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
+    a tool is held as `state.camera = { overriding, resumes }` by
+    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
+    nothing is committed; the screen opened over the canvas suspends the tool
+    the same way, rather than through `chooseBuildTool`.
   - From: Interactive Build Mode
-- [ ] **The camera from inside a tool**: a held pan that suspends the live tool
-  rather than changing it, putting the tool back on release so a half-drawn
-  shape is not committed by moving the view
+- [ ] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
+  settings screen opening the same screen, with `BACK` returning to whichever
+  screen opened it
   - From: Interactive Build Mode
-- [ ] **Derived ranges are hidden**: a range the footprint already determines
-  taken off the panel rather than shown and ignored, and given the value the
-  footprint implies - the count going away while a selection is live, a ground
-  cover's band going away when it is drawn, and drawn water's level with it
-  - **The mountain's count already goes.** A mountain dropped at a click is one
-    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
-    is a `derived` value on the tool, left off the panel by `panelRanges` for
-    any placement carrying `at`. What is left is the cover band and drawn
-    water's level, which a footprint rather than a click settles.
-  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
-    off a range the element's `footprintSettles` names for a placement with a
-    footprint, and the cover tool's own panel carries only density, the stamp
-    and the colours. What is left is drawn water's level.
-  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
-    with a footprint shows neither what its element's `footprintSettles`
-    works out nor what its `footprintIgnores` - drawn water's level and
-    flatten - beside the count and the band. Its run is checking nothing else
-    is shown and ignored, and settling it.
+- [ ] **Auto accept**: a setting that commits a pending draft at the next press
+  and at the accept tool instead of asking, never on release, so the stroke just
+  drawn stays editable and leaving asks only whether to save, switched on the
+  builder's settings screen as a group with `ALL` over it
   - From: Interactive Build Mode
 
 ## Game UI/UX
@@ -126,49 +107,6 @@ is archived - and `.claude/` is untracked, so that copy is the only one. Read
 it for what a tool is for and how its panel is generated; the items below are
 the order the work unblocks itself in.
 
-- [ ] **Extrusion surfaces**: a top and a wall colour, with a click on either
-  pointing the panel at that declared value and outlining it on the overlay,
-  and the surface panel's apply keeping a change where its back drops it
-  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
-    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
-    field; `topColor` and `wallColor` declared with it are drawn the same way.
-  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
-    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
-    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
-    `js/extrude.js`. What is left is the click on a surface pointing the
-    panel at one, its red outline, and `BACK` dropping a change.
-- [ ] **Extrusions settle into the ground**: each surface taking the ground's
-  own lightness, and the wall's colour fading to the ground's across the band
-  its height already eases over
-  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
-    `js/environment/elements.js` gives a colour the ground's own luminance,
-    which is the first half of this.
-  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
-    the band at its footprint's edge its wall colour, and the compositor
-    blends it into the ground by the band's weight, so the wall already fades
-    toward the ground at its foot; what is left is both surfaces through
-    `tintColor`.
-- [ ] **The camera from inside a tool**: a held pan that suspends the live tool
-  rather than changing it, putting the tool back on release so a half-drawn
-  shape is not committed by moving the view
-- [ ] **Derived ranges are hidden**: a range the footprint already determines
-  taken off the panel rather than shown and ignored, and given the value the
-  footprint implies - the count going away while a selection is live, a ground
-  cover's band going away when it is drawn, and drawn water's level with it
-  - **The mountain's count already goes.** A mountain dropped at a click is one
-    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
-    is a `derived` value on the tool, left off the panel by `panelRanges` for
-    any placement carrying `at`. What is left is the cover band and drawn
-    water's level, which a footprint rather than a click settles.
-  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
-    off a range the element's `footprintSettles` names for a placement with a
-    footprint, and the cover tool's own panel carries only density, the stamp
-    and the colours. What is left is drawn water's level.
-  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
-    with a footprint shows neither what its element's `footprintSettles`
-    works out nor what its `footprintIgnores` - drawn water's level and
-    flatten - beside the count and the band. Its run is checking nothing else
-    is shown and ignored, and settling it.
 - [ ] **Builder settings**: a settings screen for the builder's own
   preferences, declared and stored the way the game's two settings screens are,
   with a reset to defaults, and read by nothing that generates ground, so a
@@ -181,6 +119,11 @@ the order the work unblocks itself in.
     in `js/main.js`; the gear goes on it beside them. A gear drawn in the
     repository goes in `assets/builder/` beside the copied art -
     `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
+  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
+    a tool is held as `state.camera = { overriding, resumes }` by
+    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
+    nothing is committed; the screen opened over the canvas suspends the tool
+    the same way, rather than through `chooseBuildTool`.
 - [ ] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
   settings screen opening the same screen, with `BACK` returning to whichever
   screen opened it
@@ -257,100 +200,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 361 earlier items in `TODO-archive.md`, newest last.
+> 365 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Strokes land as they are drawn**: each pointer sample projected to the
-  ground as it is taken, so the stroke on screen while painting is the stroke
-  that gets committed
-  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
-    `js/main.js` stands each sample on the ground as it is taken, every six
-    pixels, and the trail on the overlay is drawn through them.
-  - **Settled**: the samples were already stood on the ground; the width was
-    not. The trail was a line the brush's pixels wide through them, the width
-    the stroke has only where it was pressed. A stroke being drawn - either
-    tool's - is now `strokeRibbon` in `js/build-overlay.js`: the region the
-    footprint will cover, worked out in world units from the samples and the
-    stamp at the press's scale, then stood on the ground and projected, filled
-    in the paint's own colour or the cover trail's blue. Held in Node against
-    the footprint's own measure, over bends, stamps of one point, and round
-    and square tips; `strokeTrail` is gone.
-  - From: Interactive Build Mode
-- [x] **Paint blending**: a stroke that takes the brush's hue and keeps the
-  ground's own lightness, so a painted hillside is still lit from the same side
-  rather than going flat
-  - **Settled**: `tintColor` in `js/environment/elements.js` is the W3C
-    compositing spec's Color blend in Rec. 709 luminance: every channel
-    shifted by the same amount to the ground's luminance, then drawn in toward
-    its own grey where that takes a channel past what one holds. The plan's
-    sketch, which scales the paint to the ground's luminance and clips, loses
-    it: a deep blue on pale ground is clipped back to the deep blue it was,
-    and black divides by nothing. A tinted colour has the ground's luminance
-    exactly, the paint's hue, and as much of its saturation as that lightness
-    can carry; a colour with no hue is the ground's grey.
-  - From: Interactive Build Mode
-- [x] **Deselect from anywhere**: the panel row every tool gets while a
-  selection exists, and a right click on the selection itself, both going
-  through the same place
-  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
-    the lasso's panel while something is selected, through `deselect` in
-    `js/build-mode.js`; this item puts the same answer on every tool's panel
-    and on a right click on the selection.
-  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
-    the lasso and its panel is three sections with no answer of their own; a
-    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
-    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
-    on the selection drawn over a paint stroke.
-  - **Settled**: `dockContent` in `js/build-panel.js` puts `DESELECT` among
-    every panel's answers while something is selected, after the edit's own,
-    and the lasso's once; a tool with no panel yet - Mountain before a drop -
-    shows its heading over `DESELECT` alone. It is an answer rather than the
-    plan's `when: { 'ctx.lasso': true }` row, since the lasso's was one
-    already and a gated range would have to be declared on every tool's
-    ranges. A right click on the selected ground - a right press that did not
-    travel, without `shift`, with no drag or stroke under way - opens
-    `#build-popup` at the pointer, carrying the same answer through
-    `deselect`. The popup is session state, `openDeselectPopup`,
-    `deselectPopup` and `closeDeselectPopup`, and is shut by a press anywhere
-    off it - on the canvas the press goes no further - by `Esc` before
-    anything else, by a tool change, by any question once it is answered, and
-    by a new canvas; no brush is drawn under it. The control list reads
-    `Right Click - Offer Deselect, on the Selection`.
-  - From: Interactive Build Mode
-- [x] **Erase**: free paint inverted - a stroke cut out of the footprints of the
-  elements laid before it, any one element or all of them, preset or built, at a
-  strength, and with `alt` held putting back what an earlier stroke took
-  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
-    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
-    once at the press through `lassoOp`; Erase's `alt` is read the same way.
-  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
-    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
-    `layStroke` and `strokeStamp` in `js/build-tools.js` and
-    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
-    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
-    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
-  - **Settled**: `js/environment/erase.js`. An erase batch is
-    `{ type: 'erase', config: { target, strength, restore }, footprint, clip }`
-    and is applied to nothing: `buildEnvironment` hands the placements, once
-    templates are expanded, to `resolveErasures`, which gives each placement a
-    batch after it reaches a `cut` - the regions taken, their strengths, and
-    the put-back batches after each that hand part back. The compositor weighs
-    what the cut leaves beside the footprint rather than inside it, after the
-    footprint has settled what it settles, so a cover's band and drawn
-    water's line come from the footprint as drawn; that is why there is no
-    `WHOLE` footprint, as the plan sketched - a preset's placement goes through
-    the copy on its cut alone. A cut leaves `1 - strength * taken`, and a
-    put-back batch takes `1 - strength * putBack` off what it hands back. The
-    first stroke of a batch says what it is - `alt` held at its press makes one
-    that puts back - and a stroke the other way within a batch is cut out of
-    it through `addToPlaced`'s `subtract`, so an overshoot is put right before
-    an accept. `TARGET` is `ALL` and every registry id, read off it. Erase is
-    on the palette, its `element` the batch's type, with its own ranges
-    through `toolRanges`, the paint brush, and the panel `TARGET`, `STRENGTH`,
-    `TIP`, `EDGE` and `SIZE`; a stroke is drawn red, or green with `alt`. A
-    batch is picked by its strokes, carries the Flat gumball, and is edited by
-    its own rows. A placement erased whole is still picked where it stood,
-    since its reach is its own.
-  - From: Interactive Build Mode
 - [x] **Erasing water and runways**: the sea held per vertex so a hole erased in
   a lake is dry ground, and a strip erased whole and only when it is the target
   named
@@ -458,4 +309,91 @@ how the simulator got here rather than as a list still to be worked.
     red while Extrude is the tool, and once shapes are drawn into it the
     region they come to is filled red under a red dashed edge, the selection
     no longer drawn beside it.
+  - From: Interactive Build Mode
+- [x] **Extrusion surfaces**: a top and a wall colour, with a click on either
+  pointing the panel at that declared value and outlining it on the overlay,
+  and the surface panel's apply keeping a change where its back drops it
+  - **A colour row is there.** Since `1.0.0-alpha.1.51.0` `color` is a range
+    kind, drawn on the dock as swatches, the picker, an eye dropper and a hex
+    field; `topColor` and `wallColor` declared with it are drawn the same way.
+  - **The stage is there.** Since `1.0.0-alpha.1.53.0` `EDIT EXTRUSION` puts the
+    gumball away and the panel is `TOP COLOR` and `WALL COLOR` under `APPLY`,
+    which keeps a change as it comes back - see `EXTRUDE_STAGES` in
+    `js/extrude.js`. What is left is the click on a surface pointing the
+    panel at one, its red outline, and `BACK` dropping a change.
+  - **Settled**: a heightfield has no faces, so the two surfaces are the two
+    kinds of vertex the element paints - the top where the footprint's weight
+    is whole, the wall short of it - and `surfaceAt` in `js/extrude.js` reads
+    a click as one or the other off the footprint's weight under the pointer,
+    as the element does. `chooseExtrudeSurface` points the panel at that
+    surface's colour and `BLEND`; nothing in the ground is selected.
+    `surfaceEdges` in `js/build-overlay.js` outlines it in red, the top round
+    its rim and the wall at its foot and its head, traced a hair under whole
+    so the rim falls between the sampled corners. `BACK` beside `APPLY` comes
+    back with the surfaces as `pressExtrudeStage` remembered them on the way
+    in, and `ACCEPT` and `CANCEL` wait while the surfaces are open. Each
+    surface's colour row offers the eye dropper and it fills that row:
+    `state.dropper` names the row, where Free Paint's is `true`.
+  - From: Interactive Build Mode
+- [x] **Extrusions settle into the ground**: each surface taking the ground's
+  own lightness, and the wall's colour fading to the ground's across the band
+  its height already eases over
+  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
+    `js/environment/elements.js` gives a colour the ground's own luminance,
+    which is the first half of this.
+  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
+    the band at its footprint's edge its wall colour, and the compositor
+    blends it into the ground by the band's weight, so the wall already fades
+    toward the ground at its foot; what is left is both surfaces through
+    `tintColor`.
+  - **Settled**: `extrude` has a `blend`, `tint` by default, as paint's
+    does: each surface is `tintColor` of the ground and its colour, so a wall
+    shades down a hillside the way the hillside does, and the wall, blended
+    into the ground by the band's weight as before, fades from its tinted
+    colour. `normal` lays the colours as they are. The ground a surface takes
+    its lightness from is the ground as composited at the extrusion's turn in
+    the order, so water and snow drawn after it - which raised ground may no
+    longer be under - are not what it is measured against.
+  - From: Interactive Build Mode
+- [x] **The camera from inside a tool**: a held pan that suspends the live tool
+  rather than changing it, putting the tool back on release so a half-drawn
+  shape is not committed by moving the view
+  - **Settled**: `holdCamera`, `cameraHeld` and `releaseCamera` in
+    `js/build-mode.js` are the plan's override, `state.camera = {
+    overriding, resumes }`: held as a `shift` and right-button pan begins
+    with any tool but Select, whose camera is its own, and let go when the
+    drag ends. While it is held no tool is chosen, the cursor grabs, the
+    brush and a runway's outline are put away, and a shape drawn a click at a
+    time stops reaching to the pointer; nothing is committed, cancelled or
+    asked about, so the draft, a shape half drawn and the selection are as
+    they were when it is let go. The pan was already the camera's for every
+    tool; what this adds is the state saying so, which the builder's settings
+    screen can suspend a tool through as well.
+  - From: Interactive Build Mode
+- [x] **Derived ranges are hidden**: a range the footprint already determines
+  taken off the panel rather than shown and ignored, and given the value the
+  footprint implies - the count going away while a selection is live, a ground
+  cover's band going away when it is drawn, and drawn water's level with it
+  - **The mountain's count already goes.** A mountain dropped at a click is one
+    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
+    is a `derived` value on the tool, left off the panel by `panelRanges` for
+    any placement carrying `at`. What is left is the cover band and drawn
+    water's level, which a footprint rather than a click settles.
+  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
+    off a range the element's `footprintSettles` names for a placement with a
+    footprint, and the cover tool's own panel carries only density, the stamp
+    and the colours. What is left is drawn water's level.
+  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
+    with a footprint shows neither what its element's `footprintSettles`
+    works out nor what its `footprintIgnores` - drawn water's level and
+    flatten - beside the count and the band. Its run is checking nothing else
+    is shown and ignored, and settling it.
+  - **Settled**: nothing else was shown and ignored, and
+    `test/derived-ranges.test.js` now holds it: every row a tool's placement
+    shows - each cover's stroke, paint, an extrusion, a dropped mountain, a
+    runway and an airport - is stepped both ways and must change the ground
+    the placement draws, a switch's bounds judged with the switch on.
+    Extrude's `level` is off its panel, a footprint settling it, and its
+    `blend` is on it and read. A wall's band can fall between the vertices of
+    a coarse sampling, so the check draws at half the game's density.
   - From: Interactive Build Mode

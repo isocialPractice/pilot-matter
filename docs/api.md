@@ -1389,12 +1389,16 @@ reaches, fading in across its feather:
 of its own the level is the mean height of the ground the footprint covers on
 each square, worked out there, and the band at the footprint's edge is the
 wall: it is painted `config.wallColor`, and what the footprint wholly covers
-`config.topColor`:
+`config.topColor`. Its `blend` is how the two meet the ground, as paint's does:
+`'tint'`, the default, takes each colour's hue at the lightness of the ground
+it stands on, so a wall shades down a slope the way the slope does, and the
+wall, blended by the band's weight, fades to the ground's own colour at its
+foot; `'normal'` lays the two colours as they are:
 
 ```js
 {
     type: 'extrude',
-    // A block 120 over the ground's mean, roofed in red.
+    // A block 120 over the ground's mean, roofed in red at the ground's own lightness.
     config: { height: 120, topColor: [0.6, 0.2, 0.2] },
     footprint: { kind: 'rect', x: 0, z: 0, width: 800, depth: 500, angle: 0, corner: 0, feather: 40 }
 }

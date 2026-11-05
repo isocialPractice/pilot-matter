@@ -27,7 +27,8 @@ import {
     resetBrush, eyeDropperArmed, toggleEyeDropper, dropEyeDropper, takeEyeDropperColor,
     openDeselectPopup, deselectPopup, closeDeselectPopup,
     buildExtrudeTool, chooseExtrudeTool, extrudeValues, setExtrudeValues, extrudeStage, extrudeDrawing, extrudeRegion,
-    drawExtrudeShape, pressExtrudeStage,
+    drawExtrudeShape, pressExtrudeStage, extrudeSurface, chooseExtrudeSurface, backFromSurfaces,
+    holdCamera, cameraHeld, releaseCamera,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
@@ -44,7 +45,7 @@ import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
     regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL,
-    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM
+    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM, surfaceEdges
 } from './build-overlay.js';
 import {
     boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle, handleBinding,
@@ -69,7 +70,9 @@ import {
 } from './lasso.js';
 import { flattenPath, footprintWeight, footprintSampler } from './environment/footprints.js';
 import { shape as shapeOf, shapeFootprint } from './shapes.js';
-import { extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_STAGE_ACTION } from './extrude.js';
+import {
+    extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ACTION, EXTRUDE_BACK, surfaceAt
+} from './extrude.js';
 import { PanelView } from './panel-view.js';
 import {
     stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces, coarseStep
@@ -661,7 +664,7 @@ class FlightSimulator {
             onFold:   (id) => this.onDockFold(id),
             onShape:  (id) => this.onDockShape(id),
             onColor:  (entry, rgb) => this.onDockColor(entry, rgb),
-            onDropper: () => this.onDockDropper()
+            onDropper: entry => this.onDockDropper(entry)
         });
 
         // The confirm is worked with the mouse as every menu here is, and a
@@ -2105,7 +2108,7 @@ class FlightSimulator {
      */
     canvasCursor() {
         if (!buildModeDrawing(this.builder)) return '';
-        if (this.gumballDrag != null) return 'grabbing';
+        if (this.gumballDrag != null || cameraHeld(this.builder)) return 'grabbing';
         if (this.gumballHover != null) return 'grab';
         const tool = buildModeTool(this.builder);
         if (eyeDropperArmed(this.builder)) return 'cell';
@@ -2192,7 +2195,7 @@ class FlightSimulator {
         }
         const pointer = this.canvasPointer;
         if (brush && pointer && pointer.type !== 'touch' && !confirmOpen(this.builder) && !eyeDropperArmed(this.builder)
-            && deselectPopup(this.builder) == null && this.gumballHover == null && this.gumballDrag == null) {
+            && !cameraHeld(this.builder) && deselectPopup(this.builder) == null && this.gumballHover == null && this.gumballDrag == null) {
             const tip = isPaintTool(live)
                 ? stampOutline(pointer.x, pointer.y, brush.size, brush.size, brush.tip === 'square' ? 0 : brush.size / 2)
                 : stampOutline(pointer.x, pointer.y, brush.buildWidth, brush.buildHeight, brush.cornerRadius);
@@ -2201,7 +2204,7 @@ class FlightSimulator {
 
         // The template Insert Runway carries, outlined on the ground where a
         // click would put it - the field is written once, on the click.
-        if (insertsTemplate(buildModeTool(this.builder)) && !confirmOpen(this.builder)
+        if (insertsTemplate(buildModeTool(this.builder)) && !confirmOpen(this.builder) && !cameraHeld(this.builder)
             && this.gumballHover == null && this.gumballDrag == null) {
             for (const loop of this.insertPreview() ?? []) {
                 strokePaths(ctx, this.screenRegion(loop, true, width, height), DRAWING_OUTLINE);
@@ -2215,6 +2218,14 @@ class FlightSimulator {
         if (hovered) strokeOutline(ctx, this.screenOutline(hovered, width, height), HOVER_OUTLINE);
         if (chosen && !pending) strokeOutline(ctx, this.screenOutline(chosen, width, height), CHOSEN_OUTLINE);
         if (this.gumballDrag?.preview) this.drawPrism(ctx, chosen, width, height);
+
+        // At an extrusion's surfaces, the one a click pointed the panel at,
+        // edged in Extrude's red: the top round its rim, the wall at its foot
+        // and its head.
+        const surface = extruding ? extrudeSurface(this.builder) : null;
+        if (surface && chosen?.footprint) {
+            strokePaths(ctx, this.screenRuns(this.surfaceRuns(chosen.footprint, surface), width, height), EXTRUDE_REGION);
+        }
 
         // The gumball on the edit in hand, laid out for this frame's camera and
         // kept so a press can be hit-tested against what is on the screen -
@@ -2437,6 +2448,7 @@ class FlightSimulator {
             if (e.button === 0 && !e.shiftKey && dropsAtClick(tool)) this.dropAt(e);
             else if (e.button === 0 && (tool === LASSO_PALETTE_TOOL || extrudeDrawing(this.builder))) this.lassoPress(e);
             else if (e.button === 0 && eyeDropperArmed(this.builder)) this.dropperAt(e);
+            else if (e.button === 0 && extrudeStage(this.builder) === EXTRUDE_SURFACES) this.surfacePress(e);
             else if (e.button === 0 && isStrokeTool(tool)) this.strokePress(e);
             else if (e.button === 0 && insertsTemplate(tool)) this.insertAt(e);
             return;
@@ -2451,6 +2463,10 @@ class FlightSimulator {
             picks: tool === SELECT_TOOL && e.button === 0 && !e.shiftKey,
             travelled: false
         };
+        // From inside a tool the pan is an override: the tool is suspended,
+        // not changed, so a shape half drawn waits for it rather than being
+        // committed or asked about.
+        if (holdCamera(this.builder)) this.renderer.domElement.style.cursor = this.canvasCursor();
     }
 
     /**
@@ -2964,7 +2980,8 @@ class FlightSimulator {
             return region ? { points: footprintLoop(region), closed: true } : { points, closed: false };
         }
 
-        if (drawing.gesture === LASSO_CLICKS && this.canvasPointer) {
+        // Out to the pointer, unless the pointer is panning the view.
+        if (drawing.gesture === LASSO_CLICKS && this.canvasPointer && !cameraHeld(this.builder)) {
             const ground = this.pickCanvasPoint(this.canvasPointer.x, this.canvasPointer.y);
             if (ground) points.push([ground.x, ground.z]);
         }
@@ -2986,6 +3003,13 @@ class FlightSimulator {
         const key = `${this.terrain.size}:${JSON.stringify(selection)}`;
         if (this.selectionTrace?.key !== key) this.selectionTrace = { key, runs: regionEdges(selection, this.terrain.size) };
         return this.selectionTrace.runs;
+    }
+
+    /** An extrusion's surface's edge, traced once for its footprint and kept, as a selection's is. */
+    surfaceRuns(footprint, surface) {
+        const key = `${this.terrain.size}:${surface}:${JSON.stringify(footprint)}`;
+        if (this.surfaceTrace?.key !== key) this.surfaceTrace = { key, runs: surfaceEdges(footprint, surface, this.terrain.size) };
+        return this.surfaceTrace.runs;
     }
 
     /** A run of canvas points as it falls on a screen `width` by `height`, wherever on the canvas it repeats. */
@@ -3027,6 +3051,8 @@ class FlightSimulator {
         this.canvasDrag = null;
         const surface = this.renderer.domElement;
         if (surface.hasPointerCapture?.(drag.pointer)) surface.releasePointerCapture(drag.pointer);
+        // Let go of, a pan held from inside a tool puts the tool back.
+        if (releaseCamera(this.builder) != null) surface.style.cursor = this.canvasCursor();
     }
 
     /**
@@ -3145,10 +3171,26 @@ class FlightSimulator {
         this.applyDockValue(entry);
     }
 
-    /** Free Paint's eye dropper pressed: armed, or put down again. */
-    onDockDropper() {
-        toggleEyeDropper(this.builder);
+    /** An eye dropper pressed - Free Paint's, or a surface's colour row's: armed, or put down again. */
+    onDockDropper(entry) {
+        toggleEyeDropper(this.builder, entry?.name);
         this.renderer.domElement.style.cursor = this.canvasCursor();
+        this.syncOverlays();
+    }
+
+    /**
+     * A click on an extrusion at its surfaces: the panel pointed at the
+     * surface under it - the top or the wall, read off the footprint's weight
+     * there as the element paints them - or, off the extrusion, at both again.
+     */
+    surfacePress(e) {
+        const footprint = buildDraft(this.builder)?.footprint;
+        if (footprint == null) return;
+        e.preventDefault();
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        const weight = point ? footprintWeight(footprint, point.x, point.z, this.terrain.size) : 0;
+        if (!chooseExtrudeSurface(this.builder, surfaceAt(weight))) return;
+        this.draftHolder = null;
         this.syncOverlays();
     }
 
@@ -3167,6 +3209,7 @@ class FlightSimulator {
         const pending = draftPending(this.builder);
         if (!takeEyeDropperColor(this.builder, rgb)) return;
         this.strokeHolder = null;
+        this.draftHolder = null;
         if (pending) this.redrawCanvas();
         this.renderer.domElement.style.cursor = this.canvasCursor();
         this.syncOverlays();
@@ -3331,6 +3374,18 @@ class FlightSimulator {
             this.draftHolder = null;
             this.cancelLasso();
             if (was === EXTRUDE_DRAWING) this.redrawCanvas();
+            this.renderer.domElement.style.cursor = this.canvasCursor();
+            this.syncOverlays();
+            return;
+        }
+
+        // `BACK` from the surfaces: the colours changed there dropped, and
+        // the ground drawn again as it stood.
+        if (id === EXTRUDE_BACK.id) {
+            if (!backFromSurfaces(this.builder)) return;
+            this.draftHolder = null;
+            this.redrawCanvas();
+            this.renderer.domElement.style.cursor = this.canvasCursor();
             this.syncOverlays();
             return;
         }

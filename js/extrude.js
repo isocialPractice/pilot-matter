@@ -14,7 +14,7 @@
  * | --- | --- | --- |
  * | drawing | `EXTRUDE`, enabled once the region covers ground | Shapes are added to the region, as many as wanted |
  * | extruding | `EDIT EXTRUSION` | The region is levelled and raised, and the gumball's blue arrow sets its height |
- * | surfaces | `APPLY` | The gumball is put away, and the panel is the two surfaces' colours |
+ * | surfaces | `APPLY`, and `BACK` | The gumball is put away; a click on the top or the wall points the panel at its colour |
  *
  * Pure module with no DOM or Three.js dependency, so the stages can be unit
  * tested in Node.
@@ -95,13 +95,50 @@ export const EXTRUDE_STAGES = Object.freeze({
 /**
  * The element's ranges each stage's panel carries: none while drawing, when the
  * panel is the shapes and the chosen one's own fields; the height and how flat
- * the top is while extruding; and the two surfaces' colours.
+ * the top is while extruding; and the two surfaces' colours and how they meet
+ * the ground - narrowed to the one surface clicked, once one is; see
+ * `surfaceRows`.
  */
 export const EXTRUDE_STAGE_ROWS = Object.freeze({
     [EXTRUDE_DRAWING]:   Object.freeze([]),
     [EXTRUDE_EXTRUDING]: Object.freeze(['height', 'flatten']),
-    [EXTRUDE_SURFACES]:  Object.freeze(['topColor', 'wallColor'])
+    [EXTRUDE_SURFACES]:  Object.freeze(['topColor', 'wallColor', 'blend'])
 });
+
+/**
+ * The two surfaces a heightfield extrusion has - the top, which its footprint
+ * wholly covers, and the wall, the band at its edge - and the colour each is
+ * painted, which is what a click on one points the panel at. There are two,
+ * not a face to each side: nothing in a heightfield tells the north wall from
+ * the south one.
+ */
+export const EXTRUDE_SURFACES_DECLARED = Object.freeze({ top: 'topColor', wall: 'wallColor' });
+
+/** The rows the surfaces panel carries with a surface clicked: its colour, and the blend both surfaces share. */
+export function surfaceRows(surface) {
+    const color = EXTRUDE_SURFACES_DECLARED[surface];
+    return color ? [color, 'blend'] : [...EXTRUDE_STAGE_ROWS[EXTRUDE_SURFACES]];
+}
+
+/**
+ * How much of the footprint a point under the top has: the whole of it. A
+ * footprint's weight eases to exactly 1 a feather inside its edge, and the
+ * `extrude` element paints every vertex short of that the wall's colour.
+ */
+export const TOP_WEIGHT = 1;
+
+/**
+ * Which surface the extrusion's footprint makes a point with weight `weight`:
+ * the top where the footprint wholly covers it, the wall across the band at
+ * its edge, and neither off it - as the `extrude` element paints them.
+ */
+export function surfaceAt(weight) {
+    if (!(weight > 0)) return null;
+    return weight >= TOP_WEIGHT ? 'top' : 'wall';
+}
+
+/** The answer beside `APPLY` that comes back from the surfaces with the colours as they were. */
+export const EXTRUDE_BACK = Object.freeze({ id: 'extrude-back', label: 'BACK' });
 
 /**
  * The one button as a stage shows it: its label, and whether it can be pressed

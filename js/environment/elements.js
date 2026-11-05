@@ -1321,6 +1321,14 @@ const snow = {
  * its edge where the height eases back down, which read as the wall. How far
  * in each vertex is comes with the footprint, as `edge`, and each is painted
  * the colour of the surface it is; drawn without a footprint, it is all top.
+ *
+ * Each surface settles into the ground it stands on: at the `tint` blend, the
+ * default, it takes its colour's hue at the ground's own lightness, through
+ * `tintColor`, so a wall shades down a hillside the way the hillside does
+ * rather than reading as one printed rectangle; and the wall, painted in the
+ * band the height eases across, is blended into the ground by that band's
+ * weight, so it fades to the ground's own colour at its foot. `normal` lays
+ * the two colours as they are.
  */
 const extrude = {
     id: 'extrude',
@@ -1332,6 +1340,8 @@ const extrude = {
         flatten:   scalar(0, 1, 1),
         topColor:  color([0.55, 0.54, 0.52]),
         wallColor: color([0.38, 0.37, 0.36]),
+        // How the two surfaces meet the ground they stand on, as paint's do.
+        blend:     choice(['tint', 'normal'], 'tint'),
         // The height the ground is levelled to, which a footprint settles as
         // the mean of the ground it covers.
         level:     scalar(-2000, 4000, 0)
@@ -1340,10 +1350,12 @@ const extrude = {
 
     generate(field, config) {
         const edge = drawnValues(config, 'edge', field);
+        const tint = config.blend === 'tint';
         for (let i = 0; i < field.count; i++) {
             const h = field.height[i];
             field.height[i] = h + (config.level - h) * config.flatten + config.height;
-            paint(field, i, edge && edge[i] < 1 ? config.wallColor : config.topColor);
+            const surface = edge && edge[i] < 1 ? config.wallColor : config.topColor;
+            paint(field, i, tint ? tintColor(readColor(field, i), surface) : surface);
         }
         return field.count;
     }

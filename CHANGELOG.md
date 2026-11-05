@@ -5,6 +5,90 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.54.0] - 2026-11-05
+
+Extrusion surfaces chosen by clicking them, both settled into the ground they
+stand on, the camera reachable from inside any tool, and every row a tool's
+placement shows held to changing the ground.
+
+### Added
+
+- **Extrusion surfaces.** At an extrusion's surfaces, a click on the top or
+  the wall points the panel at that surface's colour and `BLEND`, and outlines
+  it in red - the top round its rim, the wall at its foot and its head; a
+  click off the extrusion points it at all three again. Which surface a point
+  is reads off the footprint's weight there, as the element paints them, so
+  nothing in the ground is selected.
+- **`BACK`** beside `APPLY` at the surfaces: back at extruding with the
+  surfaces as they stood on the way in, where `APPLY` keeps what was changed.
+  `ACCEPT` and `CANCEL` wait while the surfaces are open.
+- **An eye dropper on each surface's colour row**, filling that row with the
+  colour of the ground where the next click lands.
+- **`BLEND` on an extrusion**, `TINT` by default: each surface takes its
+  colour's hue at the lightness of the ground it stands on, as paint does, so
+  a wall shades down a hillside the way the hillside does and fades to the
+  ground's own colour at its foot. `NORMAL` lays the two colours as they are.
+- **The camera from inside a tool.** A `Shift` and right-button pan held with
+  any tool but Select suspends the tool rather than changing it: the cursor
+  grabs, the brush and a runway's outline are put away, no tool is chosen
+  under it, and letting go puts the tool back as it was - a shape drawn a
+  click at a time still being drawn, a stroke still pending, nothing
+  committed or asked about.
+- **The control list** carries `Click (Extrude) - Choose the Top or the Wall to
+  Colour`.
+
+### Changed
+
+- An extrusion's top and wall are tinted to their ground by default; an
+  extrusion built before this one is drawn tinted too, its colours' hue kept.
+- Free Paint's eye dropper and an extrusion's share one dropper, which says
+  which colour it fills.
+
+Held in Node by the new `test/surfaces.test.js` - the two surfaces and which
+one a point is, the panel narrowed to the surface clicked and widened again
+off it, a surface chosen only at the surfaces and forgotten on the way out,
+`BACK` putting back what `APPLY` keeps, `ACCEPT` and `CANCEL` waiting, the
+dropper filling the row it was pressed on and put down by a surface chosen or
+the surfaces left, Free Paint's still filling the brush, a surface's edge
+traced at the weights a click reads it at, both surfaces tinted to their
+ground's lightness and the wall faded at its foot, `NORMAL` laid as it is, a
+pan held from inside a tool that suspends it and puts it back with the draft,
+the shape half drawn and the selection untouched, and Select's camera and a
+question never overridden - and the new `test/derived-ranges.test.js`, which
+steps every row a tool's placement shows both ways and holds it to changing
+the ground, a switch's bounds judged with the switch on - with
+`test/extrude.test.js`, `test/page.test.js` and `test/controls-help.test.js`.
+Each rejected the defect it names when that was put back, 53 in all:
+among them the top short of the whole footprint, off the extrusion read as the
+wall, a surface's rows without the blend, a surface chosen at any stage or one
+it does not have, the surfaces remembering nothing on the way in or not
+their blend, an extrusion begun without its values, `BACK` keeping what was
+changed or staying at the surfaces, `BACK` not offered, the panel not
+narrowed, the dropper not offered at the surfaces or filling the brush or any
+row named, left armed by a surface chosen or by `APPLY`, pressed on every row
+or hidden, the wall outlined at its foot alone, the top traced on the corners
+and broken, a click at the surfaces doing nothing or always the top, the
+outline never drawn or traced every frame, the dropper's row not handed on,
+the surfaces laid as they are at `TINT` or tinted at `NORMAL`, `NORMAL` the
+default, the wall tinted the top's colour, a pan not held, Select's camera or
+a question overridden, a tool chosen under a held pan, the pan never let go,
+the brush or a runway shown under a pan, a polyline reaching to a panning
+pointer, a pan dropping the shape half drawn, and what a footprint settles or
+ignores, or a dropped mountain's count, shown on the panel. One more changed
+nothing: the surfaces remembered from the draft's own values rather than read
+through the element, because an extrusion holds every value from the moment
+it is begun - so the reading through the element was taken out, and an
+extrusion begun without its values is a defect held instead.
+Settled in Chromium in 10 checks across a desktop and a phone: a pan held with
+a polyline half drawn, grabbing and moving the view, and let go with the
+polyline still being drawn and nothing committed; a lifted top at its
+colour's hue and its ground's own lightness, shaded rather than one grey;
+`TOP COLOR`, `WALL COLOR` and `BLEND` under `APPLY` and `BACK`, the top
+clicked and outlined; the wall clicked and outlined at its foot and head; the
+wall's dropper taking the ground's colour; `BACK` putting the wall back;
+`APPLY` keeping a blue top at its ground's lightness; `ACCEPT`; and a
+finger's tap on the top.
+
 ## [1.0.0-alpha.1.53.0] - 2026-11-05
 
 Extrude: shapes drawn on the ground, or the selection, levelled and raised in

@@ -23,11 +23,11 @@
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
-    brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady
+    brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface
 } from './build-mode.js';
 import {
-    EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, extrudeRows, extrudeTool, extrudeToolArt,
-    extrudeToolName, extrudeStageAction
+    EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, EXTRUDE_BACK, extrudeRows, extrudeTool,
+    extrudeToolArt, extrudeToolName, extrudeStageAction, surfaceRows
 } from './extrude.js';
 import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } from './templates.js';
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
@@ -450,15 +450,20 @@ function paintContent(state, holder, context) {
  * Extrude's panel, headed `EXTRUDE SHAPE`: its seven shapes as tiles in the
  * artwork's rows, the chosen one lit, and under them what the stage the draft
  * is at holds - the chosen shape's own fields while drawing, the height and
- * the flatness while extruding, the two surfaces' colours after `EDIT
- * EXTRUSION` - and the one button the stages share, its label and whether it
- * can be pressed read off the stage; see `js/extrude.js`. `size` is the
- * canvas's width, which whether the region covers ground is read on.
+ * the flatness while extruding, the two surfaces' colours and their blend
+ * after `EDIT EXTRUSION` - narrowed to the surface clicked, once one is - and
+ * the one button the stages share, its label and whether it can be pressed
+ * read off the stage; see `js/extrude.js`. `size` is the canvas's width,
+ * which whether the region covers ground is read on.
  *
  * While drawing, the rows write the next shape's fields and the draft has
  * only `CANCEL` beside the button, since nothing is lifted to keep yet; once
- * it is lifted, `ACCEPT` and `CANCEL` settle it as any draft's do. `stage`
- * says which.
+ * it is lifted, `ACCEPT` and `CANCEL` settle it as any draft's do; at the
+ * surfaces, `BACK` beside `APPLY` comes back dropping what was changed there.
+ * `stage` says which, and `surface` which surface the rows are.
+ *
+ * At the surfaces each colour row offers the eye dropper, and `dropping`
+ * names the row it is armed for, or is false.
  */
 function extrudeContent(state, holder, context, size) {
     const stage = extrudeStage(state);
@@ -466,16 +471,20 @@ function extrudeContent(state, holder, context, size) {
     const draft = draftPending(state) && state.draft.replaces == null ? buildDraft(state) : null;
     const lifted = draft != null && stage !== EXTRUDE_DRAWING;
 
+    const surfaces = lifted && stage === EXTRUDE_SURFACES;
+    const surface = extrudeSurface(state);
     const shapeRanges = extrudeTool(chosen)?.ranges ?? {};
-    const ranges = lifted ? pick(panelRanges(draft), EXTRUDE_STAGE_ROWS[stage]) : { ...shapeRanges };
+    const names = surfaces ? surfaceRows(surface) : EXTRUDE_STAGE_ROWS[stage];
+    const ranges = lifted ? pick(panelRanges(draft), names) : { ...shapeRanges };
     const held = lifted ? holder ?? draftHolderFor(draft) : { config: extrudeValues(state) };
 
     const actions = [extrudeStageAction(stage, extrudeReady(state, { size }))];
-    if (draft != null) actions.push(...(stage === EXTRUDE_DRAWING ? [DOCK_CANCEL] : stage === EXTRUDE_SURFACES ? [] : [DOCK_ACCEPT, DOCK_CANCEL]));
+    if (draft != null) actions.push(...(stage === EXTRUDE_DRAWING ? [DOCK_CANCEL] : surfaces ? [EXTRUDE_BACK] : [DOCK_ACCEPT, DOCK_CANCEL]));
 
-    return {
+    const content = {
         kind: DOCK_EXTRUDE,
         stage,
+        surface,
         heading: EXTRUDE_HEADING,
         shapes: extrudeRows().map(({ row, tools }) => ({
             row,
@@ -490,6 +499,8 @@ function extrudeContent(state, holder, context, size) {
         actions,
         sections: []
     };
+    if (surfaces) content.dropping = eyeDropperArmed(state) ? state.dropper : false;
+    return content;
 }
 
 /** The named ranges of a set, in the order the names come. */

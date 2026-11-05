@@ -121,7 +121,8 @@ test('Extrude\'s shapes are tiles in the artwork\'s rows, each its icon cut from
 test('extrude is in the registry, applied with the built things and before snow, its level settled by its footprint', () => {
     assert.equal(isElementId('extrude'), true);
     const { ranges, footprintSettles } = getElement('extrude');
-    assert.deepEqual(Object.keys(ranges), ['height', 'flatten', 'topColor', 'wallColor', 'level']);
+    assert.deepEqual(Object.keys(ranges), ['height', 'flatten', 'topColor', 'wallColor', 'blend', 'level']);
+    assert.deepEqual(ranges.blend, { kind: 'choice', values: ['tint', 'normal'], default: 'tint' });
     assert.deepEqual(ranges.height, { kind: 'scalar', low: -400, high: 1200, default: 60 });
     assert.deepEqual(ranges.flatten, { kind: 'scalar', low: 0, high: 1, default: 1 });
     assert.equal(ranges.topColor.kind, 'color');
@@ -139,7 +140,7 @@ test('drawn without a footprint, an extrusion levels the whole field to its leve
     const half = createField({ size: SIZE, segments: 20 });
     applyBase(half, { maxHeight: 300 });
     const before = [...half.height];
-    applyElement(half, { type: 'extrude', config: { level: 100, height: 0, flatten: 0.5 } });
+    applyElement(half, { type: 'extrude', config: { level: 100, height: 0, flatten: 0.5, blend: 'normal' } });
     assert.ok([...half.height].every((h, i) => near(h, before[i] + (100 - before[i]) * 0.5, 1e-3)), 'half way to it at a flatten of a half');
     assert.ok(readColor(half, 0).every((c, k) => near(c, getElement('extrude').ranges.topColor.default[k])), 'all top');
 });
@@ -161,7 +162,7 @@ test('through a footprint, an extrusion is a block: flat on top at its ground\'s
     applyBase(field, { maxHeight: 400 });
     const before = { height: [...field.height], color: [...field.color] };
     const footprint = { ...BOX, feather: 240 };
-    applyFootprintedElement(field, { type: 'extrude', config: { height: 120 }, footprint });
+    applyFootprintedElement(field, { type: 'extrude', config: { height: 120, blend: 'normal' }, footprint });
 
     let inside = [], band = 0, outside = 0, total = 0, weight = 0;
     for (let i = 0; i < field.count; i++) {
@@ -221,7 +222,7 @@ test('the one button reads its label and whether it can be pressed off the stage
     assert.deepEqual(extrudeStageAction('lost', true), { id: EXTRUDE_STAGE_ACTION, label: 'EXTRUDE', disabled: false });
     assert.deepEqual(Object.fromEntries(Object.entries(EXTRUDE_STAGES).map(([stage, { next }]) => [stage, next])),
         { drawing: 'extruding', extruding: 'surfaces', surfaces: 'extruding' });
-    assert.deepEqual(EXTRUDE_STAGE_ROWS, { drawing: [], extruding: ['height', 'flatten'], surfaces: ['topColor', 'wallColor'] });
+    assert.deepEqual(EXTRUDE_STAGE_ROWS, { drawing: [], extruding: ['height', 'flatten'], surfaces: ['topColor', 'wallColor', 'blend'] });
 });
 
 test('Extrude is built, places an extrusion, and starts at drawing with nothing to lift', () => {
@@ -373,8 +374,9 @@ test('Extrude\'s panel is its shapes and the stage it is at, the one button unde
 
     pressExtrudeStage(state, { size: SIZE });
     shown = dockContent(state, { size: SIZE });
-    assert.deepEqual(shown.rows.map(entry => [entry.row.label, entry.valueLabel]), [['TOP COLOR', '#8C8A85'], ['WALL COLOR', '#615E5C']]);
-    assert.deepEqual(shown.actions, [{ id: EXTRUDE_STAGE_ACTION, label: 'APPLY', disabled: false }]);
+    assert.deepEqual(shown.rows.map(entry => [entry.row.label, entry.valueLabel]),
+        [['TOP COLOR', '#8C8A85'], ['WALL COLOR', '#615E5C'], ['BLEND', 'TINT']]);
+    assert.deepEqual(shown.actions, [{ id: EXTRUDE_STAGE_ACTION, label: 'APPLY', disabled: false }, { id: 'extrude-back', label: 'BACK' }]);
 
     setSelection(state, SELECTION);
     assert.equal(dockContent(state, { size: SIZE }).actions.at(-1), DOCK_DESELECT, 'and DESELECT, as every panel has');

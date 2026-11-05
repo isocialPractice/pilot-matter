@@ -276,6 +276,7 @@ test('the builder list reads as the input and then what it does', () => {
         'Drag (Extrude) - Draw a Shape to Lift, or Within the Selection',
         'Shift+Drag (Extrude) - Add a Shape to the Region',
         'Alt+Drag (Extrude) - Cut a Shape From the Region',
+        'Click (Extrude) - Choose the Top or the Wall to Colour',
         'Right Click - Offer Deselect, on the Selection',
         'Drag a Handle - Move or Shape What Is in Hand',
         'Esc - Accept Edits or Save and Exit',

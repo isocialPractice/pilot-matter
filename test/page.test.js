@@ -3602,8 +3602,8 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*return;\s*\}/,
-        'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, the eye dropper\'s, a stroke tool\'s or Insert Runway\'s');
+    assert.match(press, /if \(!gesture\) \{\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*return;\s*\}/,
+        'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, the eye dropper\'s, an extrusion\'s surface\'s, a stroke tool\'s or Insert Runway\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
 
@@ -4056,7 +4056,8 @@ test('a handle under the pointer is lit and comes before what is on the ground u
     assert.match(hover, /if \(looking && handle == null && buildModeTool/, 'a placement is looked for only off the gumball');
 
     const cursor = methodBody(mainSource, 'canvasCursor');
-    assert.match(cursor, /if \(this\.gumballDrag != null\) return 'grabbing';\s*if \(this\.gumballHover != null\) return 'grab';/);
+    assert.match(cursor, /if \(this\.gumballDrag != null \|\| cameraHeld\(this\.builder\)\) return 'grabbing';\s*if \(this\.gumballHover != null\) return 'grab';/,
+        'grabbing while a handle is dragged, or the view is panned from inside a tool');
 });
 
 test('Select\'s panel draws each section\'s rows against its own holder, and folds the world\'s elements', () => {
@@ -4376,8 +4377,8 @@ test('a stroke is drawn as it goes, as the region it will cover, and the stamp f
     assert.match(colour, /if \(isEraseTool\(tool\)\) return drawing\.alt \? ERASE_TRAIL\.restore : ERASE_TRAIL\.colour;/,
         'an erase stroke in red, and one that puts back in green');
     assert.match(colour, /return COVER_TRAIL\.colour;/);
-    assert.match(draw, /pointer\.type !== 'touch' && !confirmOpen\(this\.builder\) && !eyeDropperArmed\(this\.builder\)\s*&& deselectPopup\(this\.builder\) == null && this\.gumballHover == null && this\.gumballDrag == null/,
-        'not for a finger, under a question, with the eye dropper armed or the popup open, or over a handle');
+    assert.match(draw, /pointer\.type !== 'touch' && !confirmOpen\(this\.builder\) && !eyeDropperArmed\(this\.builder\)\s*&& !cameraHeld\(this\.builder\) && deselectPopup\(this\.builder\) == null && this\.gumballHover == null && this\.gumballDrag == null/,
+        'not for a finger, under a question, with the eye dropper armed, the view being panned or the popup open, or over a handle');
     assert.match(draw, /stampOutline\(pointer\.x, pointer\.y, brush\.buildWidth, brush\.buildHeight, brush\.cornerRadius\)/);
     assert.match(draw, /stampOutline\(pointer\.x, pointer\.y, brush\.size, brush\.size, brush\.tip === 'square' \? 0 : brush\.size \/ 2\)/,
         'and the paint brush as its size and its tip');
@@ -4393,18 +4394,19 @@ test('Free Paint\'s panel writes the batch in hand as the cover tool\'s does, an
 
 test('a colour chosen on the dock is written through the row\'s holder and carried as a stepped value is', () => {
     assert.match(mainSource, /onColor: {2}\(entry, rgb\) => this\.onDockColor\(entry, rgb\),/);
-    assert.match(mainSource, /onDropper: \(\) => this\.onDockDropper\(\)/);
+    assert.match(mainSource, /onDropper: entry => this\.onDockDropper\(entry\)/, 'the row the dropper was pressed on handed on');
     const color = methodBody(mainSource, 'onDockColor');
     assert.match(color, /const holder = this\.dockHolder\(entry\);\s*if \(!holder\) return;\s*writeRowValue\(holder, entry\.name, entry\.row, rgb\);\s*this\.applyDockValue\(entry\);/);
-    assert.match(methodBody(mainSource, 'onDockDropper'), /toggleEyeDropper\(this\.builder\);/);
+    assert.match(methodBody(mainSource, 'onDockDropper'), /toggleEyeDropper\(this\.builder, entry\?\.name\);/,
+        'so a surface\'s dropper fills the colour of the row it is on');
 });
 
 test('a click with the eye dropper armed takes the ground\'s colour, and Escape puts it down first', () => {
     const dropper = methodBody(mainSource, 'dropperAt');
     assert.match(dropper, /const rgb = point \? this\.terrain\.getGroundColorAt\(point\.x, point\.z\) : null;\s*if \(rgb == null\) return;/,
         'over the sky nothing is taken and it stays armed');
-    assert.match(dropper, /if \(!takeEyeDropperColor\(this\.builder, rgb\)\) return;\s*this\.strokeHolder = null;\s*if \(pending\) this\.redrawCanvas\(\);/,
-        'the panel made again with the colour, and a batch in hand drawn again in it');
+    assert.match(dropper, /if \(!takeEyeDropperColor\(this\.builder, rgb\)\) return;\s*this\.strokeHolder = null;\s*this\.draftHolder = null;\s*if \(pending\) this\.redrawCanvas\(\);/,
+        'the panel made again with the colour - the brush\'s, or the extrusion\'s - and what is in hand drawn again in it');
     assert.match(methodBody(mainSource, 'onBuilderKey'),
         /if \(isCanvasLeaveKey\(e\.code\) && dropEyeDropper\(this\.builder\)\) \{/);
     const key = methodBody(mainSource, 'onBuilderKey');
@@ -4429,9 +4431,10 @@ test('a colour row is drawn as its swatches, the picker\'s bands, the eye droppe
 test('a colour row lights the swatch it is, and offers the eye dropper only where it can be armed', () => {
     const update = methodBody(panelViewSource, 'updateColorRow');
     assert.match(update, /button\.setAttribute\('aria-pressed', String\(sameColor\(swatch\?\.rgb, entry\.value\)\)\);/);
-    assert.match(update, /drawn\.dropper\.hidden = typeof content\.dropping !== 'boolean';/,
+    assert.match(update, /drawn\.dropper\.hidden = content\.dropping === undefined;/,
         'not on a paint batch picked with Select, where nothing can arm it');
-    assert.match(update, /drawn\.dropper\.setAttribute\('aria-pressed', String\(content\.dropping === true\)\);/);
+    assert.match(update, /drawn\.dropper\.setAttribute\('aria-pressed', String\(content\.dropping === true \|\| content\.dropping === entry\.name\)\);/,
+        'pressed on Free Paint\'s row, or on the one surface\'s row it is armed for');
     assert.match(update, /if \(document\.activeElement !== drawn\.reading\) \{\s*drawn\.reading\.value = entry\.valueLabel;/,
         'and the hex field is left alone while it is typed into');
 });
@@ -4599,7 +4602,8 @@ test('the template armed is outlined where a click would put it, for a pointer t
         'an airport\'s apron and buildings as well as its strip');
     assert.doesNotMatch(preview, /redrawCanvas|insertTemplate|startDraft/);
     const draw = methodBody(mainSource, 'drawBuildOverlay');
-    assert.match(draw, /if \(insertsTemplate\(buildModeTool\(this\.builder\)\) && !confirmOpen\(this\.builder\)\s*&& this\.gumballHover == null && this\.gumballDrag == null\) \{\s*for \(const loop of this\.insertPreview\(\) \?\? \[\]\) \{/);
+    assert.match(draw, /if \(insertsTemplate\(buildModeTool\(this\.builder\)\) && !confirmOpen\(this\.builder\) && !cameraHeld\(this\.builder\)\s*&& this\.gumballHover == null && this\.gumballDrag == null\) \{\s*for \(const loop of this\.insertPreview\(\) \?\? \[\]\) \{/,
+        'and not while the view is panned from inside the tool');
 });
 
 test('a card pressed on Insert Runway\'s panel arms it, and turns the template in hand into it', () => {
@@ -4615,4 +4619,37 @@ test('the control list stops short of the palette and scrolls, however tall the 
     const css = indexHtml.slice(indexHtml.indexOf('#build-help {'), indexHtml.indexOf('}', indexHtml.indexOf('#build-help {')));
     assert.match(css, /max-height: calc\(100vh - var\(--build-palette-bottom, 0px\) - 34px\);/);
     assert.match(css, /overflow-y: auto;/);
+});
+
+test('a click on an extrusion at its surfaces points the panel at the one under it, and outlines it', () => {
+    const press = methodBody(mainSource, 'surfacePress');
+    assert.ok(press, 'js/main.js should define surfacePress()');
+    assert.match(press, /const footprint = buildDraft\(this\.builder\)\?\.footprint;\s*if \(footprint == null\) return;/);
+    assert.match(press, /const weight = point \? footprintWeight\(footprint, point\.x, point\.z, this\.terrain\.size\) : 0;\s*if \(!chooseExtrudeSurface\(this\.builder, surfaceAt\(weight\)\)\) return;\s*this\.draftHolder = null;\s*this\.syncOverlays\(\);/,
+        'read off the footprint\'s weight there, as the element paints it, and the panel made again for it');
+
+    const draw = methodBody(mainSource, 'drawBuildOverlay');
+    assert.match(draw, /const surface = extruding \? extrudeSurface\(this\.builder\) : null;\s*if \(surface && chosen\?\.footprint\) \{\s*strokePaths\(ctx, this\.screenRuns\(this\.surfaceRuns\(chosen\.footprint, surface\), width, height\), EXTRUDE_REGION\);/,
+        'edged in Extrude\'s red');
+    assert.match(methodBody(mainSource, 'surfaceRuns'), /if \(this\.surfaceTrace\?\.key !== key\) this\.surfaceTrace = \{ key, runs: surfaceEdges\(footprint, surface, this\.terrain\.size\) \};/,
+        'traced once for its footprint and kept, not on every frame');
+});
+
+test('BACK from the surfaces draws the ground again as it stood', () => {
+    const action = methodBody(mainSource, 'onDockAction');
+    assert.match(action, /if \(id === EXTRUDE_BACK\.id\) \{\s*if \(!backFromSurfaces\(this\.builder\)\) return;\s*this\.draftHolder = null;\s*this\.redrawCanvas\(\);/);
+    assert.ok(action.indexOf('EXTRUDE_BACK.id') < action.indexOf('acceptDraft'), 'before ACCEPT and CANCEL are read');
+});
+
+test('a pan from inside a tool holds the camera, and letting it go puts the tool back', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /travelled: false\s*\};\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*if \(holdCamera\(this\.builder\)\) this\.renderer\.domElement\.style\.cursor = this\.canvasCursor\(\);/,
+        'held as the drag begins');
+    const begun = press.slice(press.indexOf('const gesture'));
+    assert.doesNotMatch(begun.slice(begun.indexOf('e.preventDefault();')), /cancelLasso|cancelStroke|acceptDraft|cancelDraft|chooseBuildTool|finishLasso/,
+        'a pan neither settles the draft nor drops a shape half drawn');
+
+    assert.match(methodBody(mainSource, 'endCanvasDrag'), /if \(releaseCamera\(this\.builder\) != null\) surface\.style\.cursor = this\.canvasCursor\(\);/);
+    assert.match(methodBody(mainSource, 'lassoDrawingPath'), /if \(drawing\.gesture === LASSO_CLICKS && this\.canvasPointer && !cameraHeld\(this\.builder\)\) \{/,
+        'a shape drawn a click at a time waits, not reaching out to a pointer that is panning');
 });

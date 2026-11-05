@@ -384,10 +384,11 @@ export class PanelView {
             button.disabled = held;
         }
         // The eye dropper is offered where it can be armed - Free Paint's own
-        // panel, which says whether it is - and not on a colour row reached
-        // any other way, such as a paint batch picked with Select.
-        drawn.dropper.hidden = typeof content.dropping !== 'boolean';
-        drawn.dropper.setAttribute('aria-pressed', String(content.dropping === true));
+        // panel, which says whether it is, and an extrusion's surfaces, which
+        // name the row it is armed for - and not on a colour row reached any
+        // other way, such as a paint batch picked with Select.
+        drawn.dropper.hidden = content.dropping === undefined;
+        drawn.dropper.setAttribute('aria-pressed', String(content.dropping === true || content.dropping === entry.name));
         drawn.dropper.disabled = held;
         drawn.reading.disabled = held;
         drawn.line.style.setProperty('--dock-color', hexColor(entry.value));

@@ -235,7 +235,7 @@ back.
 | Input | Does |
 |-------|------|
 | Drag, or one finger, in Select | Orbit the view about the middle of the screen |
-| Middle drag in Select, or `Shift` and right drag | Pan, the ground following the pointer |
+| Middle drag in Select, or `Shift` and right drag | Pan, the ground following the pointer; with any other tool live the tool waits rather than changing, so a shape half drawn is still being drawn when the pan is let go |
 | Wheel | Zoom toward the ground under the pointer, out no further than the whole canvas |
 | `W`/`A`/`S`/`D` or the arrows | Move across the ground, the way the view faces |
 | `Home` | Back to the view the canvas opened on |
@@ -259,6 +259,7 @@ back.
 | `Shift` and drag in Extrude | Add the shape to the region |
 | `Alt` and drag in Extrude | Cut the shape out of the region |
 | The blue arrow, with an extrusion lifted | Pull it up or down, previewed until let go |
+| Click on an extrusion, at its surfaces | Point the panel at the top or the wall, outlined red; off it, at both again |
 | `Shift` and a press on a spinner | A coarse step: ten points on a percentage, ten steps on anything else |
 | `Shift` and a dot or a tick | Stretch a mountain's height and spread together |
 | `Esc` | End a drag being made, shut the popup, put an armed eye dropper down, or ask `ACCEPT EDITS` with an edit in hand and `SAVE AND EXIT MODE` without |
@@ -377,9 +378,22 @@ and a shape is drawn within it. `EXTRUDE` levels the region to its ground's
 mean and raises it, flat on top and walled at its edge, with `HEIGHT` and
 `FLATTEN` on the panel and the gumball's blue arrow pulling it up or down -
 shown red on the overlay as it is pulled, and the ground drawn when it is let
-go. `EDIT EXTRUSION` puts the gumball away for `TOP COLOR` and `WALL COLOR`,
-and `APPLY` comes back. Picking another shape keeps the extrusion lifted,
-asking nothing, and draws the next with it.
+go. `EDIT EXTRUSION` puts the gumball away for `TOP COLOR`, `WALL COLOR` and
+`BLEND`: a click on the top or the wall points the panel at that surface's
+colour and `BLEND`, outlined red - the top round its rim, the wall at its foot
+and its head - and a click off the extrusion points it at all three again.
+Each colour row carries the eye dropper, which fills that row. `APPLY` comes
+back keeping what was changed, and `BACK` comes back with the surfaces as they
+were. At `TINT`, the default, each surface takes its colour's hue at the
+lightness of the ground it stands on, so a wall shades down a hillside the way
+the hillside does, and the wall fades to the ground's own colour at its foot;
+at `NORMAL` the two colours are laid as they are. Picking another shape keeps
+the extrusion lifted, asking nothing, and draws the next with it.
+
+A pan from inside any tool - `Shift` and the right button held - moves the view
+and nothing else: the tool waits, the cursor grabs, the brush and a runway's
+outline are put away, and letting go puts the tool back as it was, with a
+shape half drawn still being drawn and nothing committed or asked about.
 
 Insert Runway offers `BASIC AIRPORT` and `COMMERCIAL AIRPORT` too: a strip with
 an apron painted in its grey beside it and buildings standing beyond the apron,

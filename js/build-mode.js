@@ -25,7 +25,8 @@ import {
     isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate
 } from './build-tools.js';
 import {
-    DEFAULT_EXTRUDE_TOOL, extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_STAGES
+    DEFAULT_EXTRUDE_TOOL, extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_SURFACES, EXTRUDE_STAGES,
+    EXTRUDE_SURFACES_DECLARED
 } from './extrude.js';
 import {
     templateBuilt, placeTemplate, groupConfig, groupReach, keepStripOnCanvas
@@ -166,15 +167,20 @@ export function createBuildState() {
         // The template Insert Runway is armed with, or null until a card is
         // chosen: the pointer carries nothing and a click places nothing.
         runwayTemplate: null,
-        // True while Free Paint's eye dropper is armed: the next click on the
-        // ground takes the colour there rather than laying a stroke.
+        // While an eye dropper is armed, what it fills: true for Free Paint's
+        // brush, or the name of the colour an extrusion's surface is painted;
+        // the next click on the ground takes the colour there for it.
         dropper: false,
         // Where the popup a right click on the selection opens stands, as the
         // screen point it was opened at, and null while it is shut.
         popup: null,
         // Which of Extrude's shapes is chosen, and where its fields were left.
         extrudeTool: DEFAULT_EXTRUDE_TOOL,
-        extrudeValues: {}
+        extrudeValues: {},
+        // While a pan is held from inside a tool, `{ overriding, resumes }`:
+        // the pointer drives the camera, and the tool it was is the one it
+        // goes back to. Null while nothing holds it.
+        camera: null
     };
 }
 
@@ -781,19 +787,32 @@ export function brushIsDefault(state) {
 
 // --- The eye dropper ------------------------------------------------------------
 
-/** True while Free Paint's eye dropper is armed, so a click on the ground takes a colour rather than laying one. */
+/** True where an eye dropper can be armed: Free Paint, and an extrusion at its surfaces. */
+function dropperOffered(state) {
+    return isPaintTool(buildModeTool(state)) || (extrudeStage(state) === EXTRUDE_SURFACES && extrudeDraft(state));
+}
+
+/** True while an eye dropper is armed, so a click on the ground takes a colour rather than doing what the tool does. */
 export function eyeDropperArmed(state) {
-    return state?.dropper === true && isPaintTool(buildModeTool(state)) && !confirmOpen(state);
+    return Boolean(state?.dropper) && dropperOffered(state) && !confirmOpen(state);
 }
 
 /**
- * Free Paint's eye dropper pressed: armed, or with it armed, put down again.
- * Refused for a live tool that is not Free Paint. Returns whether it is armed.
+ * An eye dropper pressed: armed, or with it armed, put down again. Free
+ * Paint's fills the brush; an extrusion's surfaces' fills the colour `name`
+ * - `topColor` or `wallColor`, the row it was pressed on. Refused anywhere
+ * else. Returns whether it is armed.
  */
-export function toggleEyeDropper(state) {
-    if (!isPaintTool(buildModeTool(state)) || confirmOpen(state)) return false;
-    state.dropper = !eyeDropperArmed(state);
-    return state.dropper;
+export function toggleEyeDropper(state, name = null) {
+    if (!dropperOffered(state) || confirmOpen(state)) return false;
+    if (eyeDropperArmed(state)) {
+        state.dropper = false;
+        return false;
+    }
+    state.dropper = isPaintTool(buildModeTool(state))
+        ? true
+        : Object.values(EXTRUDE_SURFACES_DECLARED).includes(name) ? name : 'topColor';
+    return true;
 }
 
 /** Puts the eye dropper down without taking anything. Returns true when it was armed. */
@@ -806,14 +825,18 @@ export function dropEyeDropper(state) {
 /**
  * The eye dropper's click: `rgb`, the colour of the ground under it, made the
  * brush's colour - and the batch in hand's, as a colour chosen any other way
- * is - and the dropper put down. Refused while it is not armed and for
- * anything that is not a colour. Returns true when the colour was taken.
+ * is - or the extrusion's surface's, and the dropper put down. Refused while
+ * it is not armed and for anything that is not a colour. Returns true when
+ * the colour was taken.
  */
 export function takeEyeDropperColor(state, rgb) {
     if (!eyeDropperArmed(state)) return false;
     if (!Array.isArray(rgb) || rgb.length !== 3 || !rgb.every(Number.isFinite)) return false;
+    const fills = state.dropper;
+    const color = rgb.map(channel => Math.min(Math.max(channel, 0), 1));
     state.dropper = false;
-    setStrokeValues(state, { color: rgb.map(channel => Math.min(Math.max(channel, 0), 1)) });
+    if (typeof fills === 'string') reviseDraft(state, { config: { [fills]: color } });
+    else setStrokeValues(state, { color });
     return true;
 }
 
@@ -998,6 +1021,7 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.popup = null;
     state.extrudeTool = DEFAULT_EXTRUDE_TOOL;
     state.extrudeValues = {};
+    state.camera = null;
     return true;
 }
 
@@ -1027,7 +1051,7 @@ export function buildModeTool(state) {
  */
 export function chooseBuildTool(state, id) {
     if (!buildModeDrawing(state) || confirmOpen(state) || !isChoosableTool(id)) return false;
-    if (state.tool === id) return false;
+    if (state.tool === id || cameraHeld(state)) return false;
 
     if (editPending(state)) {
         state.confirm = { ask: ACCEPT_EDITS, then: { tool: id } };
@@ -1039,6 +1063,49 @@ export function chooseBuildTool(state, id) {
     state.dropper = false;
     state.popup = null;
     return true;
+}
+
+// --- The camera from inside a tool -------------------------------------------------
+
+/**
+ * The camera taken from inside a tool: a pan held with the tool live, the
+ * pointer driving the view rather than the tool until it is let go.
+ *
+ * It is an override rather than a tool, and not a change of one, because a
+ * change of tool settles the draft - commits it, or asks whether to - and
+ * moving the view in the middle of drawing a shape must do neither. So the
+ * tool is suspended rather than changed: the draft, a shape half drawn, the
+ * selection and the values are left as they are, nothing asks, and the tool
+ * it was is the one it goes back to. Select's camera is its own, so nothing
+ * overrides it.
+ *
+ * Refused off a canvas, with a question open, with Select live, and while
+ * already held. Returns true when it is held.
+ */
+export function holdCamera(state) {
+    const tool = buildModeTool(state);
+    if (tool == null || tool === SELECT_TOOL || confirmOpen(state) || cameraHeld(state)) return false;
+    state.camera = { overriding: true, resumes: tool };
+    return true;
+}
+
+/** True while a pan held from inside a tool is driving the camera. */
+export function cameraHeld(state) {
+    return state?.camera?.overriding === true && buildModeDrawing(state);
+}
+
+/**
+ * The pan let go of: the tool it suspended is live again, as it was. Returns
+ * that tool, or null when nothing was held.
+ */
+export function releaseCamera(state) {
+    if (!cameraHeld(state)) {
+        if (state) state.camera = null;
+        return null;
+    }
+    const { resumes } = state.camera;
+    state.camera = null;
+    return resumes;
 }
 
 // --- The selection, and the lasso that draws it -----------------------------------
@@ -1230,8 +1297,9 @@ function beginExtrusion(state, region) {
 /**
  * Extrude's one button pressed: `EXTRUDE` lifts the region - the draft's, or
  * the selection as it stands - and puts the gumball on it; `EDIT EXTRUSION`
- * puts the gumball away for the surfaces; `APPLY` comes back from them.
- * `EXTRUDE` is refused while the region covers no ground.
+ * puts the gumball away for the surfaces, remembering their colours as they
+ * are; `APPLY` comes back from them keeping what was changed. `EXTRUDE` is
+ * refused while the region covers no ground.
  *
  * Returns the stage the draft is at now, or null when nothing moved on.
  */
@@ -1244,8 +1312,57 @@ export function pressExtrudeStage(state, { size = 0 } = {}) {
         if (!extrudeDraft(state) && !beginExtrusion(state, own(state.selection))) return null;
     }
 
-    state.draft.stage = EXTRUDE_STAGES[stage].next;
-    return state.draft.stage;
+    const draft = state.draft;
+    draft.stage = EXTRUDE_STAGES[stage].next;
+    if (draft.stage === EXTRUDE_SURFACES) {
+        // What `BACK` puts back: the surfaces as they stood on the way in. An
+        // extrusion holds every value from the moment it is begun, so its own
+        // are all there is to read.
+        const { topColor, wallColor, blend } = draft.placement.config;
+        draft.surfacesFrom = { topColor, wallColor, blend };
+    } else {
+        delete draft.surfacesFrom;
+        delete draft.surface;
+        state.dropper = false;
+    }
+    return draft.stage;
+}
+
+/** The surface of the extrusion in hand a click has pointed the panel at - `top` or `wall` - or null for neither. */
+export function extrudeSurface(state) {
+    return extrudeStage(state) === EXTRUDE_SURFACES && extrudeDraft(state) ? state.draft.surface ?? null : null;
+}
+
+/**
+ * A click on the extrusion at its surfaces: the panel pointed at the surface
+ * clicked - `top` or `wall`, as `surfaceAt` reads the footprint there - or, off
+ * the extrusion, at both again. It chooses which declared colour the panel
+ * edits; nothing in the ground is selected. Refused at any other stage.
+ * Returns true when the surface the panel is pointed at changed.
+ */
+export function chooseExtrudeSurface(state, surface) {
+    if (extrudeStage(state) !== EXTRUDE_SURFACES || !extrudeDraft(state) || confirmOpen(state)) return false;
+    const next = EXTRUDE_SURFACES_DECLARED[surface] ? surface : null;
+    if ((state.draft.surface ?? null) === next) return false;
+    state.draft.surface = next;
+    state.dropper = false;
+    return true;
+}
+
+/**
+ * `BACK` from the surfaces: back at extruding, with the surfaces as they stood
+ * on the way in - the colours changed since dropped, as a cancel drops them,
+ * where `APPLY` keeps them. Returns true when it went back.
+ */
+export function backFromSurfaces(state) {
+    if (extrudeStage(state) !== EXTRUDE_SURFACES || !extrudeDraft(state) || confirmOpen(state)) return false;
+    const draft = state.draft;
+    if (draft.surfacesFrom) draft.placement.config = { ...draft.placement.config, ...own(draft.surfacesFrom) };
+    draft.stage = EXTRUDE_EXTRUDING;
+    delete draft.surfacesFrom;
+    delete draft.surface;
+    state.dropper = false;
+    return true;
 }
 
 // --- The popup a right click on the selection opens ------------------------------

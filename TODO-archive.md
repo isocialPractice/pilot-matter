@@ -4717,3 +4717,95 @@ still be found by name.
     and `SOFT` is half the width, so a soft stroke is whole only down its
     middle. A brush resized after a stroke is laid leaves the stroke as it was.
   - From: Interactive Build Mode
+- [x] **Strokes land as they are drawn**: each pointer sample projected to the
+  ground as it is taken, so the stroke on screen while painting is the stroke
+  that gets committed
+  - **The cover tool's do.** Since `1.0.0-alpha.1.48.0` `dragCover` in
+    `js/main.js` stands each sample on the ground as it is taken, every six
+    pixels, and the trail on the overlay is drawn through them.
+  - **Settled**: the samples were already stood on the ground; the width was
+    not. The trail was a line the brush's pixels wide through them, the width
+    the stroke has only where it was pressed. A stroke being drawn - either
+    tool's - is now `strokeRibbon` in `js/build-overlay.js`: the region the
+    footprint will cover, worked out in world units from the samples and the
+    stamp at the press's scale, then stood on the ground and projected, filled
+    in the paint's own colour or the cover trail's blue. Held in Node against
+    the footprint's own measure, over bends, stamps of one point, and round
+    and square tips; `strokeTrail` is gone.
+  - From: Interactive Build Mode
+- [x] **Paint blending**: a stroke that takes the brush's hue and keeps the
+  ground's own lightness, so a painted hillside is still lit from the same side
+  rather than going flat
+  - **Settled**: `tintColor` in `js/environment/elements.js` is the W3C
+    compositing spec's Color blend in Rec. 709 luminance: every channel
+    shifted by the same amount to the ground's luminance, then drawn in toward
+    its own grey where that takes a channel past what one holds. The plan's
+    sketch, which scales the paint to the ground's luminance and clips, loses
+    it: a deep blue on pale ground is clipped back to the deep blue it was,
+    and black divides by nothing. A tinted colour has the ground's luminance
+    exactly, the paint's hue, and as much of its saturation as that lightness
+    can carry; a colour with no hue is the ground's grey.
+  - From: Interactive Build Mode
+- [x] **Deselect from anywhere**: the panel row every tool gets while a
+  selection exists, and a right click on the selection itself, both going
+  through the same place
+  - **The lasso's own is there.** Since `1.0.0-alpha.1.46.0` `DESELECT` is on
+    the lasso's panel while something is selected, through `deselect` in
+    `js/build-mode.js`; this item puts the same answer on every tool's panel
+    and on a right click on the selection.
+  - **Free Paint has none yet.** Since `1.0.0-alpha.1.51.0` Free Paint minds
+    the lasso and its panel is three sections with no answer of their own; a
+    `DESELECT` there goes under `actions` beside the batch's `ACCEPT` and
+    `CANCEL`, as on the lasso's, and the `paint` walkthrough's right click is
+    on the selection drawn over a paint stroke.
+  - **Settled**: `dockContent` in `js/build-panel.js` puts `DESELECT` among
+    every panel's answers while something is selected, after the edit's own,
+    and the lasso's once; a tool with no panel yet - Mountain before a drop -
+    shows its heading over `DESELECT` alone. It is an answer rather than the
+    plan's `when: { 'ctx.lasso': true }` row, since the lasso's was one
+    already and a gated range would have to be declared on every tool's
+    ranges. A right click on the selected ground - a right press that did not
+    travel, without `shift`, with no drag or stroke under way - opens
+    `#build-popup` at the pointer, carrying the same answer through
+    `deselect`. The popup is session state, `openDeselectPopup`,
+    `deselectPopup` and `closeDeselectPopup`, and is shut by a press anywhere
+    off it - on the canvas the press goes no further - by `Esc` before
+    anything else, by a tool change, by any question once it is answered, and
+    by a new canvas; no brush is drawn under it. The control list reads
+    `Right Click - Offer Deselect, on the Selection`.
+  - From: Interactive Build Mode
+- [x] **Erase**: free paint inverted - a stroke cut out of the footprints of the
+  elements laid before it, any one element or all of them, preset or built, at a
+  strength, and with `alt` held putting back what an earlier stroke took
+  - **`alt` is the builder's.** Since `1.0.0-alpha.1.47.0` `AltLeft` and
+    `AltRight` are swallowed while a canvas is open, and the lasso reads `alt`
+    once at the press through `lassoOp`; Erase's `alt` is read the same way.
+  - **The stroke is shared.** Since `1.0.0-alpha.1.51.0` the cover tool and
+    Free Paint are the stroke tools: `isStrokeTool`, `strokeValues`,
+    `layStroke` and `strokeStamp` in `js/build-tools.js` and
+    `js/build-mode.js` serve any tool marked `cover` or `paint`, and
+    `strokeRibbon` shows a stroke as it is drawn. Erase's stroke is a third
+    through the same, its brush `PAINT_BRUSH`'s tip, edge and size.
+  - **Settled**: `js/environment/erase.js`. An erase batch is
+    `{ type: 'erase', config: { target, strength, restore }, footprint, clip }`
+    and is applied to nothing: `buildEnvironment` hands the placements, once
+    templates are expanded, to `resolveErasures`, which gives each placement a
+    batch after it reaches a `cut` - the regions taken, their strengths, and
+    the put-back batches after each that hand part back. The compositor weighs
+    what the cut leaves beside the footprint rather than inside it, after the
+    footprint has settled what it settles, so a cover's band and drawn
+    water's line come from the footprint as drawn; that is why there is no
+    `WHOLE` footprint, as the plan sketched - a preset's placement goes through
+    the copy on its cut alone. A cut leaves `1 - strength * taken`, and a
+    put-back batch takes `1 - strength * putBack` off what it hands back. The
+    first stroke of a batch says what it is - `alt` held at its press makes one
+    that puts back - and a stroke the other way within a batch is cut out of
+    it through `addToPlaced`'s `subtract`, so an overshoot is put right before
+    an accept. `TARGET` is `ALL` and every registry id, read off it. Erase is
+    on the palette, its `element` the batch's type, with its own ranges
+    through `toolRanges`, the paint brush, and the panel `TARGET`, `STRENGTH`,
+    `TIP`, `EDGE` and `SIZE`; a stroke is drawn red, or green with `alt`. A
+    batch is picked by its strokes, carries the Flat gumball, and is edited by
+    its own rows. A placement erased whole is still picked where it stood,
+    since its reach is its own.
+  - From: Interactive Build Mode

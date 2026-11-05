@@ -25,6 +25,7 @@ import { placementReach, PICK_WEIGHT } from './build-select.js';
 import { footprintSampler, polygonPoints, flattenPath, COMBINE_KIND } from './environment/footprints.js';
 import { canvasPickBounds } from './build-picking.js';
 import { AXIS_COLOURS } from './gumball.js';
+import { TOP_WEIGHT, EXTRUDE_SURFACES_DECLARED } from './extrude.js';
 
 /**
  * How many cells across the canvas an outline is traced over. A canvas is a
@@ -635,6 +636,31 @@ export function regionEdges(footprint, size = 0, cells = OUTLINE_CELLS) {
     if (!(Number(size) > 0)) return [];
     const segments = contourSegments(footprintSampler(footprint, size), canvasPickBounds(size), cells, EDGE_LEVEL);
     return chainSegments(segments);
+}
+
+/**
+ * The weight the top's rim is traced at: a hair short of the whole of it, so
+ * the line falls between the sampled corners rather than on them - traced at
+ * exactly the whole, every crossing lands on a corner that two of its edges
+ * share, and the chain breaks into stray pieces there.
+ */
+const TOP_LEVEL = TOP_WEIGHT - 1e-6;
+
+/**
+ * The edge of one surface of an extrusion standing on `footprint`, as runs of
+ * canvas points: the top's where the footprint stops wholly covering the
+ * ground, and the wall's on both sides of the band it is - its foot, where
+ * the footprint reaches nothing, and its head, where the top begins. Traced
+ * from the footprint's weight at the levels `surfaceAt` reads, so the line
+ * goes round exactly the ground a click there chooses. Nothing for a surface
+ * an extrusion does not have.
+ */
+export function surfaceEdges(footprint, surface, size = 0, cells = OUTLINE_CELLS) {
+    if (!(Number(size) > 0) || footprint == null || !EXTRUDE_SURFACES_DECLARED[surface]) return [];
+    const weigh = footprintSampler(footprint, size);
+    const bounds = canvasPickBounds(size);
+    const levels = surface === 'top' ? [TOP_LEVEL] : [EDGE_LEVEL, TOP_LEVEL];
+    return levels.flatMap(level => chainSegments(contourSegments(weigh, bounds, cells, level)));
 }
 
 /** True for a region that is drawn from its contour rather than its own outline. */
