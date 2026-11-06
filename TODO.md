@@ -11,6 +11,60 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
+- [ ] Write the request against the automation tool that `### Pruning the
+  Roadmap` says to queue in place of a seventh pruning item
+  - The record under that heading settled this on 10.29.2026: every run that
+    completes a queued item leaves its roadmap original behind, so pruning is a
+    pass that comes round rather than a job that finishes, and the fix belongs
+    in the tool rather than in this file. The 10.31.2026 run met it three more
+    times - the two mountain footprint items and the weather lift - and closed
+    each original inline rather than writing an eighth, ninth and tenth pruning
+    item for them.
+  - What the request has to say: section 5 of the instructions copies an item
+    into `## Current` and leaves the original in place, `todo.mjs` carries no
+    notion of item identity across those two copies, and no rule covers the
+    original once the copy archives. The archive already shows the cost - grep
+    it for `**Mountain** length` and it answers twice, which is one item
+    recorded as two pieces of finished work.
+  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
+    automation, and what shape the fix takes there is theirs to decide. Write
+    it where the user will find it and name both halves - the copy that is left
+    behind, and the archive that then double-counts it.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+
+### UI/UX Override - a refused file row says why in a colour it cannot be read in
+
+#### Found Issues
+
+- [ ] The Settings file row's refusal is amber on the selection's green, at
+  1.34:1
+  - **Issue**: `#settings-menu li.refused::after` writes the reason a file was
+    refused in `#ffb000`, and `li.selected` fills the row `#0f0` with black
+    text. A row is only ever refused just after it was pressed, and a row is
+    pressed where the cursor is, so the two always land together: the reason
+    is drawn amber on bright green. Measured in Chromium at 1.34:1 over 10
+    pixel text, where the row's own label manages 15.3:1 on the same fill -
+    below the 4.5:1 small text needs, and close enough to 1:1 that the line
+    reads as a texture rather than as words. Driven three times over
+    `LOAD ENVIRONMENT...` in Settings with a JSON file whose `format` is not
+    `pilot-matter.environment`; the reason itself is right
+    (`could not load not-a-world.json: the file is not an environment file`).
+    Stepping the cursor one row down makes the same text legible at 11.46:1,
+    so the message is only unreadable in the one state it appears in. The
+    builder's own SAVE / LOAD dock is not affected - its refusal is the same
+    amber on the dock's dark fill at 11.46:1 - so this is the Settings list
+    alone.
+  - **Goal**: give a row that is both selected and refused a fill the warning
+    amber reads against, rather than the ordinary green selection. A rule
+    after the two existing ones - `#settings-menu li.selected.refused` with a
+    dark fill and an amber border, keeping `::after` at `#ffb000` - clears
+    4.5:1 and keeps the warning reading as a warning; the green selection fill
+    is what has to go on that row, not the amber. Check the same pairing on
+    `#settings-start`, `#settings-options` and `#settings-builder`, which
+    share the `li.selected` rule, and hold whatever is chosen with a contrast
+    assertion in `test/page.test.js` beside the existing `li.refused` one.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
