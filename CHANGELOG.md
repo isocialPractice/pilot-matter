@@ -5,6 +5,89 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.65.0] - 2026-11-06
+
+Your own models: loaded, kept, and placed as planes, buildings and runways.
+
+### Added
+
+- **Load an asset.** `LOAD ASSET…` on `SAVE / LOAD` reads a GLB, glTF, OBJ,
+  STL or SVG from your computer, in the page - nothing is sent anywhere. A
+  file over 25 MB, or a model over 300,000 triangles, is refused with why; so
+  is a glTF that points at other files. An SVG is a plan, extruded to a height,
+  and never put into the page, so a script inside it never runs.
+- **The step after loading.** `LOADED ASSET` shows the model on the canvas
+  with its name, scale, which way is up, which way it faces, its colour where
+  the format has none, and a plan's height - each guessed - and a switch for
+  each place it could go: a plane 3 to 90 metres long, a building up to 600
+  metres a side, or a runway 600 to 5000 metres long. A use it does not fit is
+  held off, with why. `ADD` keeps it.
+- **Loaded assets kept.** The browser keeps loaded models, so they are there
+  after a reload. `ASSETS` on `SAVE / LOAD` lists them and says what each is
+  used as, and `REMOVE ASSET` takes one away - asking first when the canvas
+  uses it.
+- **Inserting them.** A loaded plane is a card on Insert Plane, flown as
+  itself with the figures of the plane chosen for it. A loaded building is a
+  card in its Insert City section. A loaded runway is a card on Insert
+  Runway, placed over a real strip of its size, so it is landed on as any
+  strip is.
+- **Carried in a file.** A saved environment carries every model it uses,
+  once each, so it opens on a computer that never loaded them. A model is
+  known by the SHA-256 of its bytes: one already kept is not kept twice, and
+  one whose bytes do not match is refused.
+
+Held in Node by `test/assets.test.js` - the formats read and their limits, an
+asset known by its hash, a model's size through its scale, up and facing, the
+guesses - millimetres for a long OBJ or STL, metres for a glTF, Z-up for an
+STL, its facing along its longest side - every bound of what fits where, the
+step starting with every fitting use on and a plan a building only, a use it
+no longer fits switched off, a building placed as a reference at its size, a
+runway placed as a real strip with the model over it facing its way, a library
+offering by use and section and a world saying which it uses and letting one
+go, base64 and SHA-256, an asset written and read back and refused for a field
+out of place, a saved world carrying what it uses and refused for what it does
+not carry, every insert menu offering and placing its cards, the step's rows
+written back and `ADD` only with a use on, `ASSETS` and `REMOVE` asking only
+when the canvas uses one, an asset recipe read whole, and the loaders, store
+and page as their source says - and by the tests of the objects, the file,
+Insert Plane, save and load and the page. Each rejected the defect it names
+when that was put back, 46 in all: a glTF guessed as millimetres, millimetres
+never guessed, an STL taken as Y-up, Z-up read as Y-up, a plane of any height,
+a building of any size, a runway shorter than its strip, a runway of any
+width, a plan offered as a plane, a use switched off switched back on, the
+section never suggested, a plan not the height its step asks, a runway strip
+as wide as any, a runway's model in the way, base64 dropping its padding, an
+asset read under an id its hash does not name, an asset read with a field it
+does not have, the plane flown as an asset let go of kept, an asset a group's
+member uses missed, a runway's model facing north whatever the strip, a
+runway's model losing what it is drawn from, a group's objects never stood, an
+asset recipe drawn as nothing, an asset recipe read with parts, a file
+carrying assets the world does not use, a placement referring to an asset not
+carried read, a plane asset not carried read, a loaded runway never offered, a
+building offered as a runway, a loaded plane never flown, the colour row's
+channels kept as channels, ADD with nothing switched on, REMOVE never asking,
+what used a removed asset kept, REMOVE pressable with nothing chosen, a glTF
+asked for a colour, a use it does not fit never held shut, ADD pressable with
+nothing on, a loaded plane offered nowhere, a model's hash never checked, a
+save carrying no assets, a glTF pointing outside itself read, a model of any
+size read, a loaded plane drawn as the trainer, a loaded building drawn as a
+box, a model shared with every copy given back by a tile.
+
+Settled in Chromium in 21 checks: `LOAD ASSET` and `ASSETS` on `SAVE / LOAD`;
+an OBJ tower read, shown, fitting the city alone under the skylines with the
+others held off and why, and asked its colour; an STL taken as millimetres and
+Z-up and fitting a plane; a self-contained glTF 2400 metres long fitting a
+runway; a glTF pointing at another file, and a file that is no model, refused;
+an SVG plan a building only with its script never run; the four listed; each
+offered by Insert City, Insert Runway and Insert Plane; the tower and the
+runway's model drawn as their models over a real 2400-metre strip; the file
+saved carrying the three used and the plane as a reference; flown in the
+glider like a jet over the strip; after a reload all four kept and read; an
+asset chosen saying what it is used as, and removing one the canvas uses
+asking first and taking what used it; on a fresh browser the file bringing its
+three and flown as built; and a model whose bytes do not match its hash
+refused.
+
 ## [1.0.0-alpha.1.64.0] - 2026-11-05
 
 Insert City, and roads that snap end to end.

@@ -245,7 +245,7 @@ test('the aircraft builds a plane from its recipe, flies its figures, and keeps 
         assert.match(setPlane, new RegExp(`this\\.${figure}\\s*= figures\\.${figure}\\s*\\?\\?`), `setPlane flies the plane's ${figure}`);
     }
     assert.match(setPlane, /this\.setSensitivity\(this\.sensitivity\);/, 'and its handling, over the pilot\'s own sensitivity');
-    assert.match(setPlane, /if \(this\.group && !this\.external\) \{/, 'its model only where the host flies none of its own');
+    assert.match(setPlane, /if \(this\.group && !this\.external && !this\.custom\) \{/, 'its model only where neither the host nor the pilot flies one of their own');
     assert.match(setPlane, /this\.group\.add\(\.\.\.planeModel\(chosen\)\);/);
     assert.match(methodBody(aircraftSource, 'setSensitivity'), /this\.rates = controlRates\(planeSensitivity\(sensitivity, this\.plane\)\);/);
     assert.match(methodBody(aircraftSource, 'createModel'), /this\.external = external != null;/);
@@ -606,7 +606,8 @@ test('the schema names the start point and the planes the module reads', () => {
     assert.deepEqual(Object.keys(schema.properties.start.properties), START_FIELDS);
     assert.deepEqual(schema.properties.start.required, ['at']);
     assert.equal(schema.properties.start.additionalProperties, false);
-    assert.deepEqual(schema.properties.plane.enum, planeIds());
+    assert.deepEqual(schema.properties.plane.anyOf[0].enum, planeIds());
+    assert.equal(schema.properties.plane.anyOf[1].pattern, '^asset:a-[0-9a-f]{16}$', 'or a loaded plane the file carries');
     assert.equal(schema.required.includes('start') || schema.required.includes('plane'), false, 'and neither is required');
 });
 
@@ -719,9 +720,10 @@ test('the world put in force puts the pilot in its plane and holds the start row
         'held before the start is read from them');
 
     const fly = methodBody(mainSource, 'flyPlane');
-    assert.match(fly, /const plane = planeById\(this\.worldPlane\(\)\);\s*if \(this\.aircraft\.plane\?\.id === plane\.id\) return false;/,
-        'a setting applied for another reason swaps no model');
-    assert.match(fly, /this\.aircraft\.setPlane\(plane\);\s*this\.camera2\.setChase\(chaseFor\(plane\)\);/);
+    assert.match(fly, /const plane = planeById\(asset \? asset\.fliesLike : id\);/, 'a loaded plane flies like the one chosen for it');
+    assert.match(fly, /if \(this\.flownKey === key\) return false;/, 'a setting applied for another reason swaps no model');
+    assert.match(fly, /this\.aircraft\.setPlane\(plane\);\s*this\.aircraft\.setModel\(model\);/);
+    assert.match(fly, /this\.camera2\.setChase\(asset \? chaseFor\(\{ span: asset\.size\.width, length: asset\.size\.depth \}\) : chaseFor\(plane\)\);/);
 
     const key = methodBody(mainSource, 'flightWorldKey');
     assert.match(key, /start: flownStartPoint\(this\.editor, currentEnvironment\(this\.settings\)\),\s*plane: flownPlane\(this\.editor, currentEnvironment\(this\.settings\)\)/,

@@ -553,7 +553,8 @@ function withMountainDropped() {
 
 test('a confirm is headed in the artwork\'s words and opens on YES', () => {
     assert.deepEqual(CONFIRM_HEADINGS, {
-        [ACCEPT_EDITS]: 'ACCEPT EDITS', [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE', [REPLACE_WORLD]: 'REPLACE THE BUILT WORLD'
+        [ACCEPT_EDITS]: 'ACCEPT EDITS', [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE', [REPLACE_WORLD]: 'REPLACE THE BUILT WORLD',
+        'remove-asset': 'REMOVE THE ASSET'
     });
     assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.id), [CONFIRM_YES, CONFIRM_NO, CONFIRM_STAY],
         'YES first, so Enter on a confirm just opened keeps the work, and CANCEL last, never the default');

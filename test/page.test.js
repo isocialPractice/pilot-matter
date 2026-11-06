@@ -4974,7 +4974,7 @@ test('the settings save the world they would fly, under the loaded world\'s name
         'the build kept on it, or the preset as it is');
     assert.match(save, /const name = loadedChosen\(this\.settings\) \? this\.loadedWorld\.name : defaultEnvironmentName\(world\.environment\);/);
     assert.match(methodBody(mainSource, 'writeEnvironment'),
-        /const document = environmentDocument\(world, \{ name \}\);\s*return saveEnvironmentText\(environmentFileName\(document\.name\), environmentText\(document\)\);/);
+        /const document = environmentDocument\(world, \{ name, library: this\.assets \}\);\s*return saveEnvironmentText\(environmentFileName\(document\.name\), environmentText\(document\)\);/);
 });
 
 test('SAVE / LOAD\'s answers save the canvas under its name, and load through the question when something is built', () => {

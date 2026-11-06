@@ -380,7 +380,7 @@ test('the schema takes a written object, and wants its prefab and its recipe', (
     const rule = schema.$defs.placement.allOf.find(each => each.if.properties.type.const === 'object');
     assert.deepEqual(rule.then.required, ['prefab', 'recipe']);
     assert.equal(schema.$defs.placement.properties.recipe.$ref, '#/$defs/recipe');
-    assert.deepEqual(schema.$defs.recipe.required, ['parts']);
+    assert.deepEqual(schema.$defs.recipe.anyOf, [{ required: ['parts'] }, { required: ['asset', 'size'] }], 'parts, or a loaded asset it refers to');
     assert.equal(schema.$defs.recipe.properties.parts.maxItems, RECIPE_PART_LIMIT);
 });
 
@@ -402,7 +402,7 @@ test('the aircraft hits an object at any speed, before the ground is ever asked 
 test('every tile stands the objects on its own ground once it is settled, and lets them go with it', () => {
     const terrain = source('terrain.js');
     const add = methodBody(terrain, 'addTile');
-    assert.match(add, /const objects = standingObjects\(this\.built\.elements \?\? \[\], \{\s*groundAt: \(x, z\) => sampleHeight\(field, x, z\),\s*originX: middle\.x,\s*originZ: middle\.z,\s*size: this\.size\s*\}\);/);
+    assert.match(add, /const objects = standingObjects\(expandGroups\(tileElements\(this\.built\.elements, home\) \?\? \[\], this\.size\), \{\s*groundAt: \(x, z\) => sampleHeight\(field, x, z\),\s*originX: middle\.x,\s*originZ: middle\.z,\s*size: this\.size\s*\}\);/);
     const joined = add.indexOf('const settled = this.joinTile(field, index);');
     assert.ok(joined >= 0 && joined < add.indexOf('standingObjects('), 'on ground already matched to its neighbours');
     assert.match(add, /objects, objectMesh: objectGroup\(objects, \{ groundAt: \(x, z\) => sampleHeight\(field, x, z\) \}\)/);

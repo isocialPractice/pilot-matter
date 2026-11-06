@@ -4,7 +4,7 @@ import {
     matchEdges, matchWater, seamBand, flightStrip
 } from './environment/elements.js';
 import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './environment/presets.js';
-import { isGroup } from './templates.js';
+import { isGroup, expandGroups } from './templates.js';
 import { animateWater } from './water.js';
 import { updateNormals } from './terrain-normals.js';
 import { holdGroundColor } from './ground-material.js';
@@ -247,7 +247,7 @@ export class Terrain {
         // object the world places, at its point of this tile, on this tile's
         // own ground - which is the same point of every tile, and different
         // ground under it on each.
-        const objects = standingObjects(this.built.elements ?? [], {
+        const objects = standingObjects(expandGroups(tileElements(this.built.elements, home) ?? [], this.size), {
             groundAt: (x, z) => sampleHeight(field, x, z),
             originX: middle.x,
             originZ: middle.z,
@@ -457,6 +457,22 @@ export class Terrain {
             if (over != null && (top == null || over > top)) top = over;
         }
         return top;
+    }
+
+    /**
+     * Draws every tile's objects again from what it already stands - for a
+     * loaded model read after the tiles that place it were laid, which were
+     * drawn with a box of its size in its place.
+     */
+    redrawObjects() {
+        for (const tile of this.tiles.values()) {
+            if (tile.objectMesh) {
+                this.scene.remove(tile.objectMesh);
+                disposeObjectGroup(tile.objectMesh);
+            }
+            tile.objectMesh = objectGroup(tile.objects, { groundAt: (x, z) => sampleHeight(tile.field, x, z) });
+            if (tile.objectMesh) this.scene.add(tile.objectMesh);
+        }
     }
 
     /** Every object the tiles drawn stand, in the world - for anything that has to see them all. */

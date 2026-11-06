@@ -252,6 +252,13 @@ export function expandGroup(group, size = 0) {
         }
 
         config.at = frame(u, v);
+        // An object over the strip - a loaded runway's model - keeps what it
+        // is drawn from, and faces the way the group does.
+        if (member.type === 'object') {
+            const own = Number(config.heading) || 0;
+            config.heading = (((heading + own) % 360) + 360) % 360;
+            return { type: member.type, prefab: member.prefab, recipe: member.recipe, config };
+        }
         return { type: member.type, config };
     });
 }

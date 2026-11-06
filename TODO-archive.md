@@ -5290,3 +5290,62 @@ still be found by name.
     name carried, and the file becomes the world the browser keeps. A refused
     file says why under the name, the canvas as it was.
   - From: Post Interactive Build
+
+## Archived 11-06-26
+
+- [x] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
+  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
+  the pause menu, a loaded world becoming a chosen entry of the list that is
+  kept across a reload, and both rows gone while a game mode runs
+  - **Settled**: the two rows are `FILE_ENTRY`s in a `FILE_GROUP` of their
+    own, drawn under the worlds and walked after them, and gone while a game
+    mode runs. The loaded world is `js/loaded-world.js`: the last file's text,
+    kept under `pilot-matter.environment` and read back through the format each
+    time. The settings list it after the presets under its name, and its
+    choice is `values.loaded` beside the environment, which stays a preset -
+    the one it was built on, where the settings offer it - so every reader of
+    the environment can still draw it; it is kept on the editor as a build is,
+    through `keepBuiltWorld`. A preset chosen over it, even its own, is that
+    preset as it is, through the new `releaseBuiltWorld`; a build kept from the
+    builder lets go of it too. A row says what it came to in place of its note,
+    which needed `MenuList.render` to draw a changed note again, and a refusal
+    is drawn in amber. A save writes the world the settings would fly, under
+    the loaded world's name when that is the one chosen.
+  - From: Post Interactive Build
+- [x] **Start point**: one point and heading per environment, placed by a
+  click with Insert Plane live, turned by its arrow, written out as typed rows,
+  saved with the world, and flown from - over it at its height above the ground
+  when flying, on the runway nearest it for a takeoff - with the settings rows
+  it overrides locked
+  - **Settled**: the start point is `js/start-point.js`, held as `{ at,
+    heading, heightFeet }` and cleaned to the world, the compass and 100 to
+    10000 ft. The session holds one on `state.start`, set by a click with
+    Insert Plane live (`placesStartPoint`, `Insert config<flight:start-point>`),
+    moved by a second click with its heading and height kept, and turned by
+    dragging the white knob at the end of its arrow on the overlay - a press
+    the canvas takes before an orbit, a pick or a drop. It rides
+    `sessionWorld`, the SAVE AND EXIT answer, `replacesBuild` and the canvas
+    reopened, is kept on the editor by `keepBuiltWorld`'s new `flight`, and is
+    written to the file as `start`. A free flight on a world with one opens
+    through `startAtPoint` - over it, on its heading, at its height above the
+    ground there - and a takeoff on `nearestRunway` to it. While it is flown,
+    `holdStartFields` holds START HEADING and START ALTITUDE, drawn locked with
+    "set by this environment", refusing a step and a typed figure.
+  - From: Post Interactive Build
+- [x] **Pre-built planes**: five original planes drawn from primitives as the
+  trainer is, each with the flight figures the aircraft already takes, each
+  leaving the ground within BASIC RUNWAY, swapped between flights by
+  `setPlane`, the trainer the default
+  - **Settled**: `js/planes.js` holds the five as recipes of boxes,
+    cylinders and cones - the trainer part for part the old `bundledModel`,
+    which is now `planeModel(trainer)` - each with the three speeds, the two
+    arrival speeds and a `handling` share of the pilot's sensitivity, set
+    against the trainer. `Aircraft.setPlane` swaps the figures and, unless the
+    host flies its own model, the meshes; `CameraController.setChase` takes
+    `chaseFor(plane)`, the trainer's 30 and 10 scaled by size. A test runs the
+    pure flight model from a standstill at full throttle and holds every plane
+    to leaving the ground inside BASIC RUNWAY above its stall; another holds
+    the opening throttle to asking no plane for less than its stall, which
+    raised the twin's top speed to 240. A preset world and every game mode fly
+    the trainer.
+  - From: Post Interactive Build

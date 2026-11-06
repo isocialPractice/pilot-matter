@@ -57,8 +57,17 @@
       }
     },
     "plane": {
-      "description": "The plane this world is flown in. Left out, it is flown in the trainer.",
-      "enum": ["trainer", "bush", "twin", "jet", "biplane"]
+      "description": "The plane this world is flown in: one of the five, or asset:<id> for a loaded plane the file carries. Left out, it is flown in the trainer.",
+      "anyOf": [
+        { "enum": ["trainer", "bush", "twin", "jet", "biplane"] },
+        { "type": "string", "pattern": "^asset:a-[0-9a-f]{16}$" }
+      ]
+    },
+    "assets": {
+      "description": "The models the world uses that the pilot loaded, carried whole so the file opens on another computer. Nothing in them is run: they are decoded and read by the page's loaders.",
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/asset" }
     }
   },
   "$defs": {
@@ -167,9 +176,9 @@
       ]
     },
     "recipe": {
-      "description": "A building as parts of simple shapes, in metres in its own frame - x across, y up from the ground, z the way it faces - copied into an object when it is placed. Read whole or refused: a part out of its bounds is not guessed at.",
+      "description": "A building as parts of simple shapes, in metres in its own frame - x across, y up from the ground, z the way it faces - copied into an object when it is placed; or a reference to a model the file carries in assets, by its id and its size. Read whole or refused: a part out of its bounds is not guessed at.",
       "type": "object",
-      "required": ["parts"],
+      "anyOf": [{ "required": ["parts"] }, { "required": ["asset", "size"] }],
       "additionalProperties": false,
       "properties": {
         "parts": { "type": "array", "minItems": 1, "maxItems": 400, "items": { "$ref": "#/$defs/part" } },
@@ -189,7 +198,32 @@
               "heading": { "type": "number" }
             }
           }
-        }
+        },
+        "asset": { "description": "A loaded model this recipe refers to, by its id: one of the file's assets.", "type": "string", "pattern": "^a-[0-9a-f]{16}$" },
+        "size": { "description": "A referred-to model's size in metres: across, up and along.", "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3 }
+      }
+    },
+    "asset": {
+      "description": "A model the pilot loaded: its file's bytes as base64, the SHA-256 of them its id is drawn from, and how the step after loading took it.",
+      "type": "object",
+      "required": ["id", "name", "format", "hash", "data", "raw", "scale", "up", "facing", "color", "height", "uses", "fliesLike", "section"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^a-[0-9a-f]{16}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "format": { "enum": ["glb", "gltf", "obj", "stl", "svg"] },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "data": { "description": "The file's own bytes, as base64.", "type": "string" },
+        "raw": { "description": "The model's size in its own units.", "type": "object", "required": ["x", "y", "z"], "properties": { "x": { "type": "number", "minimum": 0 }, "y": { "type": "number", "minimum": 0 }, "z": { "type": "number", "minimum": 0 } } },
+        "triangles": { "type": "integer", "minimum": 0 },
+        "scale": { "description": "Its units to metres.", "type": "number", "exclusiveMinimum": 0 },
+        "up": { "enum": ["y", "z"] },
+        "facing": { "enum": ["+z", "-z", "+x", "-x"] },
+        "color": { "type": "integer", "minimum": 0, "maximum": 16777215 },
+        "height": { "description": "How high a plan is drawn, in metres.", "type": "number", "exclusiveMinimum": 0 },
+        "uses": { "type": "object", "required": ["plane", "city", "runway"], "properties": { "plane": { "type": "boolean" }, "city": { "type": "boolean" }, "runway": { "type": "boolean" } } },
+        "fliesLike": { "enum": ["trainer", "bush", "twin", "jet", "biplane"] },
+        "section": { "enum": ["skylines", "factory", "residential", "commercial", "infrastructure", "parks"] }
       }
     },
     "part": {

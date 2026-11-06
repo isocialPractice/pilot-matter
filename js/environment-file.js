@@ -46,6 +46,7 @@ import { elementRow } from './element-editor.js';
 import { SHADE_RANGE } from './properties-panel.js';
 import { cleanStartPoint } from './start-point.js';
 import { isPlaneId } from './planes.js';
+import { readAsset, assetForFile, assetsUsed, refAsset, ASSET_FILE_LIMIT } from './asset-fit.js';
 import { OBJECT_TYPE, OBJECT_RANGES } from './objects.js';
 import { readRecipe } from './prefabs.js';
 
@@ -70,7 +71,7 @@ export const ENVIRONMENT_NAME_LIMIT = 60;
 
 /** The fields a file may carry at its top, the first three of which it must. */
 export const DOCUMENT_FIELDS = Object.freeze([
-    '$schema', 'format', 'version', 'name', 'savedAt', 'base', 'elements', 'placements', 'start', 'plane'
+    '$schema', 'format', 'version', 'name', 'savedAt', 'base', 'elements', 'placements', 'start', 'plane', 'assets'
 ]);
 export const DOCUMENT_REQUIRED = Object.freeze(['format', 'version', 'base']);
 
@@ -112,10 +113,17 @@ export function defaultEnvironmentName(base) {
  * environment built on, the committed placements, and the environment's own
  * rows - and its `start` and `plane` when it has them. Every part is copied, so
  * the document shares nothing with the world.
+ *
+ * `library` is the loaded assets the page holds. Every one the world uses - an
+ * object referring to it, a runway drawn as it, the plane flown as it - is
+ * carried in the file's `assets`, its bytes as base64, so the file opens on a
+ * computer that never loaded it.
  */
-export function environmentDocument(world, { name = '', savedAt = new Date().toISOString() } = {}) {
+export function environmentDocument(world, { name = '', savedAt = new Date().toISOString(), library = [] } = {}) {
     const base = getEnvironment(world?.environment).id;
     const start = cleanStartPoint(world?.start);
+    const used = assetsUsed(world);
+    const assets = used.map(id => library.find(asset => asset.id === id)).filter(Boolean).map(assetForFile);
     return {
         format: ENVIRONMENT_FORMAT,
         version: ENVIRONMENT_VERSION,
@@ -131,7 +139,8 @@ export function environmentDocument(world, { name = '', savedAt = new Date().toI
         })),
         placements: (world?.placements ?? []).map(placement => withoutDrawnDeep(structuredClone(placement))),
         ...(start ? { start } : {}),
-        ...(isPlaneId(world?.plane) ? { plane: world.plane } : {})
+        ...(isPlaneId(world?.plane) || assets.some(asset => asset.id === refAsset(world?.plane)) ? { plane: world.plane } : {}),
+        ...(assets.length > 0 ? { assets } : {})
     };
 }
 
@@ -151,9 +160,12 @@ export function environmentFileName(name) {
 /**
  * A file's text read back as a world: `{ ok, world, name, savedAt, problems }`.
  * `world` is `{ environment, placements, world }`, the shape the builder keeps
- * a world in - with `start` and `plane` when the file has them - or null for a
- * file refused. `problems` says why, first problem
- * first. Never throws.
+ * a world in - with `start` and `plane` when the file has them, and `assets`,
+ * the models it carries, each with its bytes decoded - or null for a file
+ * refused. `problems` says why, first problem first. Never throws.
+ *
+ * Nothing a file carries is run: a model's bytes are only decoded here, and
+ * read later by the page's loaders, never put into the document.
  */
 export function readEnvironmentDocument(text) {
     const problems = [];
@@ -213,8 +225,14 @@ export function readEnvironmentDocument(text) {
         const rows = readRows(document.elements, problems);
         const placements = readPlacements(document.placements, 'placements', problems, true);
         const start = readStart(document.start, problems);
-        if (document.plane != null && !isPlaneId(document.plane)) {
+        const assets = readAssets(document.assets, problems);
+        const carried = new Set(assets.map(asset => asset.id));
+        const planeAsset = refAsset(document.plane);
+        if (document.plane != null && !isPlaneId(document.plane) && !(planeAsset && assets.some(asset => asset.id === planeAsset && asset.uses.plane))) {
             problems.push(`plane: no plane is called ${JSON.stringify(document.plane)}`);
+        }
+        for (const id of assetsUsed({ placements })) {
+            if (!carried.has(id)) problems.push(`placements: asset ${id} is used and not carried in assets`);
         }
 
         if (problems.length > 0) return refused();
@@ -223,7 +241,8 @@ export function readEnvironmentDocument(text) {
             world: {
                 environment: document.base, placements, world: rows,
                 ...(start ? { start } : {}),
-                ...(document.plane != null ? { plane: document.plane } : {})
+                ...(document.plane != null ? { plane: document.plane } : {}),
+                ...(assets.length > 0 ? { assets } : {})
             },
             name: cleanName(name) || defaultEnvironmentName(document.base),
             savedAt,
@@ -257,6 +276,27 @@ function readStart(start, problems) {
         if (start[key] != null && !Number.isFinite(start[key])) problems.push(`start: ${key} is not a number`);
     }
     return cleanStartPoint(start);
+}
+
+/** The most assets a file may carry. */
+export const ASSET_COUNT_LIMIT = 64;
+
+/** The models a file carries, each read as an asset - bytes decoded, size worked out - or [] for none. */
+function readAssets(assets, problems) {
+    if (assets == null) return [];
+    if (!Array.isArray(assets) || assets.length > ASSET_COUNT_LIMIT) {
+        problems.push(`assets: not a list of up to ${ASSET_COUNT_LIMIT} assets`);
+        return [];
+    }
+    const read = [];
+    assets.forEach((value, at) => {
+        const { asset, problems: wrong } = readAsset(value, `assets[${at}]`);
+        problems.push(...wrong);
+        if (asset) read.push(asset);
+    });
+    const total = read.reduce((sum, asset) => sum + asset.bytes.length, 0);
+    if (total > ASSET_FILE_LIMIT * 2) problems.push('assets: more model than one file may carry');
+    return read;
 }
 
 /** The environment's own rows, each rebuilt as the editor builds one, or [] for none. */

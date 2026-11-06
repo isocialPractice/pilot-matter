@@ -309,6 +309,46 @@
 
 <p>A card chosen is armed, and pressed. The pointer carries its footprint, outlined where a click would put it, lined up with the view to the nearest ten degrees. A click places it as the edit in hand, with its <code>HEADING</code> and <code>SCALE</code> leading the panel over <code>ACCEPT</code> and <code>CANCEL</code>; a second click moves it, facing the way it was turned, and another card chosen becomes the piece in hand where it stood. Once placed it is an object like any other: Select picks it up again, the gumball moves, turns and scales it, and Erase takes it whole. With auto accept on for drawing, the next click keeps the piece in hand and places another.</p>
 
+<h3 id="loading-assets">Loading assets</h3>
+
+<p>A pilot can load a model of their own, <code>Load data&lt;asset&gt;</code>, and it joins the insert menus. <code>LOAD ASSET&hellip;</code> on <code>SAVE / LOAD</code> reads one of these, in the page - nothing is sent anywhere:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Format</th><th>Can be</th><th>Notes</th></tr></thead>
+    <tbody>
+        <tr><td><code>.glb</code>, <code>.gltf</code></td><td>plane, building, runway</td><td>Colours carried, and drawn in metres, as glTF is. A <code>.gltf</code> must carry its buffers and images inside it; one pointing at other files is refused, since only one file was given and nothing is fetched.</td></tr>
+        <tr><td><code>.obj</code></td><td>plane, building, runway</td><td>Geometry only; its colour is chosen in the step.</td></tr>
+        <tr><td><code>.stl</code></td><td>plane, building, runway</td><td>Geometry only, and taken as drawn Z-up.</td></tr>
+        <tr><td><code>.svg</code></td><td>building</td><td>A plan: its shapes are extruded up to the height the step asks for, flat-roofed. It is read as text and never put into the page, so a script inside it never runs.</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A file over 25 MB is refused before it is read, and a model over 300,000 triangles once it is; each refusal says which. A model read goes to <code>LOADED ASSET</code>, and is shown on the canvas where the camera looks:</p>
+
+<ul>
+    <li><strong>MODEL</strong> - its <code>NAME</code>, from the file's; its <code>SCALE</code>, its units to metres - guessed as millimetres for an OBJ or STL longer than 2000 units, and as metres for a glTF, which is drawn in them; which way is <code>UP</code>; which way it is <code>FACING</code>, guessed as its longest side; its <code>COLOR</code>, for a format that brings none; and its <code>HEIGHT</code>, for a plan.</li>
+    <li><strong>USE AS</strong> - a switch for each place it could go, on where it fits and held shut where it does not, with why written under them; the plane it <code>FLIES LIKE</code>; and the Insert City <code>SECTION</code> it joins, suggested by its height.</li>
+</ul>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Use</th><th>Fits when</th><th>Joins</th></tr></thead>
+    <tbody>
+        <tr><td>Plane</td><td>3 to 90 m long, and under half as high</td><td>Insert Plane's cards, flying like the plane chosen under <code>FLIES LIKE</code></td></tr>
+        <tr><td>Building</td><td>up to 600 m a side, and 900 m high</td><td>Insert City's cards, in the section chosen</td></tr>
+        <tr><td>Runway</td><td>600 to 5000 m long, no wider than a quarter of that, no taller than 2% of it</td><td>Insert Runway's cards</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>ADD</code> keeps it, and <code>CANCEL</code> drops it. A runway is at least 600 metres long because a runway asset is placed over a real strip of its size, and no strip is shorter.</p>
+
+<p><strong>Where they go.</strong> A loaded plane is a card on <code>SELECT PLANE</code>: flown, it is drawn as itself and flies with the figures of the plane it flies like. A loaded building is a card in its section, placed as an object that refers to the model rather than copying it, drawn as a box of its size until the model is read. A loaded runway is a card on Insert Runway, placed as a real strip of its length and width with the model drawn over it: the model is how it looks and the strip is how it behaves, so landing, scoring and takeoff work on it unchanged.</p>
+
+<p><strong>Where they are kept.</strong> The browser keeps loaded assets in IndexedDB, so they are there after a reload; <code>ASSETS</code> on <code>SAVE / LOAD</code> lists them, says what each is used as, and <code>REMOVE ASSET</code> takes the one chosen away - asking <code>REMOVE THE ASSET</code> first when the canvas uses it, since what uses it goes with it. A saved environment carries every asset it uses inside its <code>assets</code>, as base64, so the file opens on another computer; an asset is known by the SHA-256 of its bytes, so one already kept is not kept twice, and one whose bytes are not the ones its hash names is refused.</p>
+
 <h2 id="the-element-editor">The element editor</h2>
 
 <p>Because an environment is a description rather than a mesh, there is nothing to re-author when a range moves: the ground is generated again from the algorithm. The panel opens the world being flown as the elements it was assembled from, one row each, and choosing an element opens the ranges it declared underneath it. <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> step the range under the cursor, and the ground is drawn again the moment it moves. <kbd>L</kbd> opens the builder, which carries these rows now: in Select with nothing picked, each element is a <code>WORLD:</code> section on the dock, and what is changed there is kept with what was built.</p>

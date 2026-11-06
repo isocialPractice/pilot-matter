@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { recipeGeometry } from './prefabs.js';
 import { drapedGeometry } from './objects.js';
+import { hasAssetModel, assetModel } from './asset-loader.js';
 import { holdGroundColor } from './ground-material.js';
 
 /**
@@ -24,18 +25,29 @@ export function objectGroup(objects = [], { groundAt = () => 0 } = {}) {
     const group = new THREE.Group();
     group.name = 'objects';
 
-    const byRecipe = new Map();
-    for (const object of objects) {
-        if (object.drape) continue;
-        if (!byRecipe.has(object.key)) byRecipe.set(object.key, []);
-        byRecipe.get(object.key).push(object);
-    }
-
     const matrix = new THREE.Matrix4();
     const turn = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3();
+
+    // A building the pilot loaded is a copy of its model, sharing what the
+    // model is drawn with, once the model is read - and a box of its size,
+    // instanced with the rest, until then.
+    const byRecipe = new Map();
+    for (const object of objects) {
+        if (object.drape) continue;
+        if (object.recipe?.asset && hasAssetModel(object.recipe.asset)) {
+            const model = assetModel(object.recipe.asset, 'base');
+            model.position.set(object.x, object.stand, object.z);
+            model.rotation.y = object.yaw;
+            model.scale.setScalar(object.scale);
+            group.add(model);
+            continue;
+        }
+        if (!byRecipe.has(object.key)) byRecipe.set(object.key, []);
+        byRecipe.get(object.key).push(object);
+    }
 
     for (const standing of byRecipe.values()) {
         const shape = recipeGeometry(standing[0].recipe);
@@ -112,6 +124,9 @@ function objectMaterial() {
 export function disposeObjectGroup(group) {
     if (group == null) return;
     for (const mesh of group.children) {
+        // A loaded model's copy shares what it is drawn with; it is not this
+        // tile's to give back.
+        if (mesh.userData?.asset) continue;
         mesh.geometry?.dispose?.();
         mesh.material?.dispose?.();
         mesh.dispose?.();

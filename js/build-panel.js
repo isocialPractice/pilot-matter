@@ -24,7 +24,8 @@ import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
     brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface,
-    saveName, fileStatus, buildStartPoint, buildPlane, buildCityPrefab, buildCitySection
+    saveName, fileStatus, buildStartPoint, buildPlane, buildCityPrefab, buildCitySection,
+    assetLibrary, assetStep, chosenLibraryAsset
 } from './build-mode.js';
 import {
     EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, EXTRUDE_BACK, extrudeRows, extrudeTool,
@@ -49,7 +50,11 @@ import { isErase, ERASE_RANGES } from './environment/erase.js';
 const LASSO_TOOL = 'lasso';
 import { cameraFieldRanges, readCameraFields, CAMERA_NUDGES } from './build-camera.js';
 import { panelRows, label } from './properties-panel.js';
-import { getElement, isElementId, resolveConfig } from './environment/elements.js';
+import { getElement, isElementId, resolveConfig, scalar, choice, toggle, color as colorRange } from './environment/elements.js';
+import {
+    assetsFor, assetRef, ASSET_FORMATS, ASSET_UPS, ASSET_FACINGS, ASSET_NAME_LIMIT, fitReasons, draftUsable
+} from './asset-fit.js';
+import { planeIds } from './planes.js';
 import { environmentElements } from './environment/presets.js';
 
 /** What the dock is showing: the camera, or an edit in hand. */
@@ -90,6 +95,21 @@ export const DOCK_FILES = 'files';
  */
 export const DOCK_LOAD_ENVIRONMENT = Object.freeze({ id: 'load-environment', label: 'LOAD ENVIRONMENT\u2026' });
 export const DOCK_SAVE_ENVIRONMENT = Object.freeze({ id: 'save-environment', label: 'SAVE ENVIRONMENT\u2026' });
+
+/** SAVE / LOAD's asset answers: `Load data<asset>`, and taking a loaded asset away. */
+export const DOCK_LOAD_ASSET = Object.freeze({ id: 'load-asset', label: 'LOAD ASSET\u2026' });
+export const DOCK_REMOVE_ASSET = Object.freeze({ id: 'remove-asset', label: 'REMOVE ASSET' });
+
+/** SAVE / LOAD's section listing the loaded assets. */
+export const ASSETS_SECTION = 'assets';
+
+/** The step after loading: its panel, its two sections, its name field, and its two answers. */
+export const DOCK_ASSET = 'asset';
+export const ASSET_MODEL_SECTION = 'asset-model';
+export const ASSET_USE_SECTION = 'asset-use';
+export const ASSET_NAME_FIELD = 'asset-name';
+export const DOCK_ADD_ASSET = Object.freeze({ id: 'add-asset', label: 'ADD' });
+export const DOCK_CANCEL_ASSET = Object.freeze({ id: 'cancel-asset', label: 'CANCEL' });
 
 /** SAVE / LOAD's one section, `Save data<file>` and `Load data<file>`, and its name field. */
 export const FILES_SECTION = 'environment';
@@ -152,7 +172,7 @@ function cityContent(state, holder, context) {
                 id: citySection(category.id), kind: DOCK_CITY, category: category.id, heading: category.label,
                 folds: true, open: shown, holder: { config: {} }, rows: [],
                 shapes: shown ? [
-                    { row: category.id, tools: buildings.map(card) },
+                    { row: category.id, tools: [...buildings.map(card), ...assetsFor(assetLibrary(state), 'city', category.id).map(asset => assetCard(asset, chosen))] },
                     ...(roads.length > 0 ? [{ row: 'roads', tools: roads.map(card) }] : [])
                 ] : []
             };
@@ -199,8 +219,11 @@ export const DOCK_CANCEL = Object.freeze({ id: 'cancel', label: 'CANCEL' });
  * or load came to, with the two answers pinned under it. Nothing on it is a
  * range: the work is files, started from the answers.
  */
-function filesContent(state) {
+function filesContent(state, context) {
+    if (assetStep(state)) return assetContent(state, context);
     const tool = buildTool(buildModeTool(state));
+    const library = assetLibrary(state);
+    const chosen = chosenLibraryAsset(state);
     return {
         kind: DOCK_FILES,
         heading: tool?.heading ?? '',
@@ -208,7 +231,7 @@ function filesContent(state) {
         holder: { config: {} },
         rows: [],
         nudges: [],
-        actions: [DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT],
+        actions: [DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, DOCK_LOAD_ASSET, { ...DOCK_REMOVE_ASSET, disabled: chosen == null }],
         sections: [{
             id: FILES_SECTION,
             kind: DOCK_FILES,
@@ -226,7 +249,93 @@ function filesContent(state) {
                 max: ENVIRONMENT_NAME_LIMIT
             },
             status: fileStatus(state)
+        }, {
+            id: ASSETS_SECTION,
+            kind: DOCK_FILES,
+            heading: 'ASSETS',
+            folds: false,
+            open: true,
+            holder: { config: {} },
+            rows: [],
+            shapes: library.length > 0 ? [{ row: 'assets', tools: library.map(asset => ({ ...assetCard(asset, chosen ? assetRef(chosen.id) : null), id: asset.id })) }] : [],
+            status: { text: chosen ? assetSummary(chosen) : library.length > 0 ? 'choose an asset to see what it is used as' : 'no assets loaded - LOAD ASSET reads a GLB, glTF, OBJ, STL or SVG' }
         }]
+    };
+}
+
+/** A loaded asset as a card: its name, on its own. */
+function assetCard(asset, chosen) {
+    const ref = assetRef(asset.id);
+    return { id: ref, label: asset.name.toUpperCase(), name: `${asset.name} - loaded`, art: null, live: ref === chosen };
+}
+
+/** What an asset is used as, and how large it is, in one line. */
+function assetSummary(asset) {
+    const uses = ['plane', 'city', 'runway'].filter(use => asset.uses?.[use]).map(use => use.toUpperCase()).join(', ') || 'nothing';
+    const size = asset.size ? ` - ${[asset.size.width, asset.size.height, asset.size.depth].map(n => Math.round(n * 10) / 10).join(' x ')} m` : '';
+    return `${asset.name}: used as ${uses}${size}`;
+}
+
+/** An asset's colour as the three channels a colour row writes. */
+function colourRow(hex) {
+    return [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+}
+
+/**
+ * The step after loading, `Load data<asset>`, headed `LOADED ASSET`: under
+ * MODEL its `NAME`, from the file's; its `SCALE`, guessed from its size; which
+ * way is `UP`; which way it is `FACING`; its `COLOR`, for a format that brings
+ * none; and its `HEIGHT`, for a plan. Under USE AS a switch for each place it
+ * could go - on where it fits, off and held shut where it does not, the reason
+ * written under them - and where each goes: the plane it `FLIES LIKE`, and the
+ * Insert City `SECTION`. `ADD` keeps it, pressable once a use is on, and
+ * `CANCEL` drops it.
+ */
+function assetContent(state, context) {
+    const step = assetStep(state);
+    const format = ASSET_FORMATS[step.format];
+    const model = {
+        scale: Object.freeze({ ...scalar(0.001, 1000, 1), step: 0.001 }),
+        up: choice(ASSET_UPS, 'y'),
+        facing: choice(ASSET_FACINGS, '+z'),
+        ...(format.colours ? {} : { color: colorRange([0.6, 0.64, 0.66]) }),
+        ...(step.format === 'svg' ? { height: Object.freeze({ ...scalar(1, 300, 12), step: 1 }) } : {})
+    };
+    if (step.format === 'svg') delete model.up;
+    const uses = {
+        asPlane: toggle(false, { when: { 'ctx.fitsPlane': true } }),
+        asCity: toggle(false, { when: { 'ctx.fitsCity': true } }),
+        asRunway: toggle(false, { when: { 'ctx.fitsRunway': true } }),
+        fliesLike: choice(planeIds(), 'trainer', { when: { asPlane: true } }),
+        section: choice(PREFAB_CATEGORIES.map(category => category.id), 'residential', { when: { asCity: true } })
+    };
+    const fits = { ...context, fitsPlane: step.fit.plane.fits, fitsCity: step.fit.city.fits, fitsRunway: step.fit.runway.fits };
+    const modelHolder = {
+        config: { scale: step.scale, up: step.up, facing: step.facing, color: colourRow(step.color), height: step.height },
+        shades: {}, base: {}
+    };
+    const useHolder = {
+        config: { asPlane: step.uses.plane, asCity: step.uses.city, asRunway: step.uses.runway, fliesLike: step.fliesLike, section: step.section },
+        shades: {}, base: {}
+    };
+    const size = step.size;
+    const modelSection = dockSection(ASSET_MODEL_SECTION, DOCK_ASSET, 'MODEL', model, modelHolder, fits);
+    modelSection.text = { id: ASSET_NAME_FIELD, label: 'NAME', value: step.name, placeholder: step.name, max: ASSET_NAME_LIMIT };
+    modelSection.status = {
+        text: `${format.label}, ${step.triangles.toLocaleString('en-GB')} triangles - ${[size.width, size.height, size.depth].map(n => Math.round(n * 10) / 10).join(' x ')} m`
+    };
+    const useSection = dockSection(ASSET_USE_SECTION, DOCK_ASSET, 'USE AS', uses, useHolder, fits);
+    useSection.status = { text: fitReasons(step), refused: !draftUsable(step) };
+
+    return {
+        kind: DOCK_ASSET,
+        heading: 'LOADED ASSET',
+        ranges: {},
+        holder: { config: {} },
+        rows: [],
+        nudges: [],
+        actions: [{ ...DOCK_ADD_ASSET, disabled: !draftUsable(step) }, DOCK_CANCEL_ASSET],
+        sections: [modelSection, useSection]
     };
 }
 
@@ -266,10 +375,13 @@ function planeContent(state, context, altitude) {
                 mode: modes.find(type => modeIs(type, 'insert', 'asset', 'flight:plane')) ?? null,
                 shapes: [{
                     row: 'planes',
-                    tools: PLANES.map(plane => ({
-                        id: plane.id, label: plane.label, name: `${plane.label} - ${plane.note}`, art: null,
-                        live: plane.id === chosen
-                    }))
+                    tools: [
+                        ...PLANES.map(plane => ({
+                            id: plane.id, label: plane.label, name: `${plane.label} - ${plane.note}`, art: null,
+                            live: plane.id === chosen
+                        })),
+                        ...assetsFor(assetLibrary(state), 'plane').map(asset => assetCard(asset, chosen))
+                    ]
                 }]
             },
             start
@@ -471,7 +583,7 @@ function panelContent(state, { camera = null, fov, holder = null, context = {}, 
     if (isPaintTool(buildModeTool(state))) return paintContent(state, holder, context);
     if (isExtrudeTool(buildModeTool(state))) return extrudeContent(state, holder, context, size);
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
-    if (isPaletteBar(buildModeTool(state))) return filesContent(state);
+    if (isPaletteBar(buildModeTool(state))) return filesContent(state, context);
     if (choosesPlane(buildModeTool(state)) || placesStartPoint(buildModeTool(state))) return planeContent(state, context, altitude);
     if (insertsCity(buildModeTool(state))) return cityContent(state, holder, context);
 
@@ -708,9 +820,12 @@ function runwayContent(state, holder, context) {
         heading: buildTool(buildModeTool(state)).heading,
         shapes: [{
             row: 'templates',
-            tools: offeredTemplates().map(template => ({
-                id: template.id, label: template.label, name: label(template.id), art: null, live: template.id === chosen
-            }))
+            tools: [
+                ...offeredTemplates().map(template => ({
+                    id: template.id, label: template.label, name: label(template.id), art: null, live: template.id === chosen
+                })),
+                ...assetsFor(assetLibrary(state), 'runway').map(asset => assetCard(asset, chosen))
+            ]
         }],
         ranges,
         holder: held,

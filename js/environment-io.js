@@ -64,6 +64,41 @@ export async function saveEnvironmentText(name, text, { win = globalThis } = {})
 }
 
 /**
+ * Opens the file dialog on `input` for a model, and reads the file chosen as
+ * bytes, in the page - nothing is sent anywhere. Resolves `{ name, bytes }`,
+ * `{ name, tooLarge: true }` for a file past `limit`, refused before it is
+ * read, or null for a dialog closed with nothing chosen.
+ */
+export function pickAssetFile(input, { accept = '', limit = Infinity } = {}) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            input.removeEventListener('change', changed);
+            input.removeEventListener('cancel', cancelled);
+            resolve(value);
+        };
+        const cancelled = () => finish(null);
+        const changed = async () => {
+            const file = input.files?.[0];
+            if (!file) return finish(null);
+            if (file.size > limit) return finish({ name: file.name, tooLarge: true });
+            try {
+                finish({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+            } catch {
+                finish({ name: file.name, bytes: null });
+            }
+        };
+        input.accept = accept;
+        input.value = '';
+        input.addEventListener('change', changed);
+        input.addEventListener('cancel', cancelled);
+        input.click();
+    });
+}
+
+/**
  * Opens the file dialog on `input` - an `<input type="file">` the page keeps -
  * and reads the file chosen. Must be called from the press that asked for it.
  *

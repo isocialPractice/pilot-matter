@@ -24,6 +24,7 @@ import {
 import { getEnvironment, environmentElements } from './environment/presets.js';
 import { cleanStartPoint } from './start-point.js';
 import { isPlaneId } from './planes.js';
+import { refAsset } from './asset-fit.js';
 import {
     rangePlaces, label, rowValue, rangeEntryText,
     writeRowValue, stepRow, isTypedRow, typedRowValue, rangeNotice, panelRows, coarseStep
@@ -268,7 +269,7 @@ export function keepBuiltWorld(
         : editorElements(getEnvironment(wanted), state.runway);
     state.built = (Array.isArray(placements) ? placements : []).map(placement => structuredClone(placement));
     state.start = cleanStartPoint(flight?.start);
-    state.plane = isPlaneId(flight?.plane) ? flight.plane : null;
+    state.plane = isPlaneId(flight?.plane) || refAsset(flight?.plane) ? flight.plane : null;
     state.typing = null;
     syncEditorEntries(state);
     return state;

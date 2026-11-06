@@ -36,6 +36,10 @@ import { cleanStartPoint, placeStartPoint, turnStartPoint } from './start-point.
 import { placeObject, objectConfig, keepObjectOnCanvas } from './objects.js';
 import { prefabById, PREFAB_CATEGORIES } from './prefabs.js';
 import { isRoad, snapRoad } from './roads.js';
+import {
+    libraryAsset, refAsset, assetRef, placeAssetObject, placeAssetRunway, settleDraft, draftUsable, assetsUsed,
+    withoutAsset, ASSET_NAME_LIMIT, ASSET_USES
+} from './asset-fit.js';
 import { isPlaneId } from './planes.js';
 import { isErase, eraseConfig } from './environment/erase.js';
 import {
@@ -177,6 +181,13 @@ export function createBuildState() {
         // not scroll past six grids to reach the one it wants.
         cityPrefab: null,
         citySection: PREFAB_CATEGORIES[0].id,
+        // The models the pilot has loaded, as the page holds them - handed in,
+        // since they outlive any session - which every insert menu offers
+        // cards from; the step a model just read is at, and the one chosen on
+        // SAVE / LOAD's ASSETS to remove. See `setAssetLibrary`.
+        library: [],
+        assetStep: null,
+        assetChosen: null,
         // The world's own flight, which Insert Plane sets: where a flight on it
         // starts, as `js/start-point.js` holds one, and which plane it is flown
         // in, by id - each null for none. One of each per world, so they are
@@ -261,6 +272,9 @@ export const SAVE_AND_EXIT = 'save-and-exit';
  */
 export const REPLACE_WORLD = 'replace-world';
 
+/** The question removing an asset the canvas uses asks, since it takes those placements away. */
+export const REMOVE_ASSET = 'remove-asset';
+
 /**
  * What each confirm is headed, in the artwork's own words. The original tour
  * wrote the second as "Do you want to keep the current built environment?";
@@ -269,7 +283,8 @@ export const REPLACE_WORLD = 'replace-world';
 export const CONFIRM_HEADINGS = Object.freeze({
     [ACCEPT_EDITS]: 'ACCEPT EDITS',
     [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE',
-    [REPLACE_WORLD]: 'REPLACE THE BUILT WORLD'
+    [REPLACE_WORLD]: 'REPLACE THE BUILT WORLD',
+    [REMOVE_ASSET]: 'REMOVE THE ASSET'
 });
 
 /**
@@ -301,7 +316,7 @@ export const CONFIRM_ENTRIES = Object.freeze([
  * way out last, as on the other two.
  */
 export function confirmEntries(ask) {
-    return ask === REPLACE_WORLD ? CONFIRM_ENTRIES.filter(entry => entry.id !== CONFIRM_NO) : CONFIRM_ENTRIES;
+    return ask === REPLACE_WORLD || ask === REMOVE_ASSET ? CONFIRM_ENTRIES.filter(entry => entry.id !== CONFIRM_NO) : CONFIRM_ENTRIES;
 }
 
 /** How an edit was settled, as `answerConfirm` reports it. */
@@ -386,6 +401,7 @@ export function answerConfirm(state, answer) {
 
     // `YES` goes on to the file; anything else - and it has no `NO` - stays.
     if (asked.ask === REPLACE_WORLD) return answer === CONFIRM_YES ? { load: true } : { stay: true };
+    if (asked.ask === REMOVE_ASSET) return answer === CONFIRM_YES ? { remove: asked.then?.asset ?? null } : { stay: true };
 
     if (asked.ask === SAVE_AND_EXIT) {
         return {
@@ -543,7 +559,7 @@ export function clearBuildStartPoint(state) {
 
 /** Chooses the plane the world is flown in. Refused for a plane there is not, and for the one already chosen. */
 export function chooseBuildPlane(state, id) {
-    if (!flightEditable(state) || !isPlaneId(id) || state.plane === id) return false;
+    if (!flightEditable(state) || !flyable(state, id) || state.plane === id) return false;
     state.plane = id;
     return true;
 }
@@ -809,7 +825,18 @@ function rememberToolValues(state) {
 
 /** The template Insert Runway is armed with, or null before a card is chosen. */
 export function buildRunwayTemplate(state) {
-    return templateBuilt(state?.runwayTemplate) ? state.runwayTemplate : null;
+    return runwayCardOffered(state, state?.runwayTemplate) ? state.runwayTemplate : null;
+}
+
+/** True for a card Insert Runway offers: a built template, or a loaded runway the library holds. */
+function runwayCardOffered(state, id) {
+    return templateBuilt(id) || libraryAsset(state?.library, id)?.uses?.runway === true;
+}
+
+/** A runway card placed: its template's group, or a loaded runway's - a real strip of its size, drawn as the model. */
+export function runwayCard(state, id, at, heading = 0) {
+    const asset = refAsset(id) ? libraryAsset(state?.library, id) : null;
+    return asset ? placeAssetRunway(asset, at, heading) : placeTemplate(id, at, heading);
 }
 
 /**
@@ -823,7 +850,7 @@ export function buildRunwayTemplate(state) {
  * chosen.
  */
 export function chooseRunwayTemplate(state, id) {
-    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsTemplate(state.tool) || !templateBuilt(id)) return false;
+    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsTemplate(state.tool) || !runwayCardOffered(state, id)) return false;
 
     state.runwayTemplate = id;
     const draft = state.draft;
@@ -831,16 +858,150 @@ export function chooseRunwayTemplate(state, id) {
         // A new draft rather than the old one changed, so what the panel
         // steps it through is made again from the template now in hand.
         const { at, heading } = groupConfig(draft.placement);
-        state.draft = { ...draft, placement: placeTemplate(id, at, heading) };
+        state.draft = { ...draft, placement: runwayCard(state, id, at, heading) };
     }
     return true;
+}
+
+// --- Loaded assets -----------------------------------------------------------------
+
+/**
+ * The models the pilot has loaded, handed in by the page that keeps them, so
+ * every insert menu can offer cards from them. A card armed for an asset the
+ * library no longer holds is armed no longer: every getter asks the library.
+ */
+export function setAssetLibrary(state, library = []) {
+    state.library = Array.isArray(library) ? [...library] : [];
+    return state.library;
+}
+
+/** The models the pilot has loaded, as the session was last handed them. */
+export function assetLibrary(state) {
+    return state?.library ?? [];
+}
+
+/** True for a plane a world can be flown in: one of the five, or a loaded plane the library holds. */
+function flyable(state, id) {
+    return isPlaneId(id) || libraryAsset(state?.library, id)?.uses?.plane === true;
+}
+
+/** The step a model just read is at, or null while none is. */
+export function assetStep(state) {
+    return buildModeDrawing(state) ? state.assetStep ?? null : null;
+}
+
+/** A model read, put to the step after loading - its draft from `assetDraft` - in place of SAVE / LOAD's panel. */
+export function beginAssetStep(state, draft) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || draft == null) return false;
+    state.assetStep = draft;
+    return true;
+}
+
+/**
+ * The step's rows written back: its scale, up, facing, colour and height, and
+ * its uses and where they go, the draft settled again - a use the new size no
+ * longer fits switched off. Returns the draft.
+ */
+export function writeAssetStep(state, changes = {}) {
+    const step = assetStep(state);
+    if (step == null) return null;
+    const next = { ...step };
+    for (const name of ['scale', 'up', 'facing', 'color', 'height', 'fliesLike', 'section']) {
+        if (changes[name] !== undefined) next[name] = changes[name];
+    }
+    if (Array.isArray(next.color)) {
+        next.color = next.color.slice(0, 3).reduce((hex, channel) => (hex << 8) | Math.round(Math.min(Math.max(Number(channel) || 0, 0), 1) * 255), 0);
+    }
+    const uses = { ...step.uses };
+    for (const use of ASSET_USES) {
+        const name = `as${use.charAt(0).toUpperCase()}${use.slice(1)}`;
+        if (changes[name] !== undefined) uses[use] = changes[name] === true;
+    }
+    next.uses = uses;
+    state.assetStep = settleDraft(next, { first: false });
+    return state.assetStep;
+}
+
+/** The step's name, as typed, held to its length. */
+export function setAssetStepName(state, name) {
+    const step = assetStep(state);
+    if (step == null) return false;
+    const typed = typeof name === 'string' ? name.replace(/\s+/g, ' ').slice(0, ASSET_NAME_LIMIT) : '';
+    state.assetStep = { ...step, name: typed.trim() || step.name };
+    return true;
+}
+
+/**
+ * `ADD`: the step closed and the asset it settled handed back to be kept -
+ * the draft less what is worked out again from it - or null where no use is
+ * switched on.
+ */
+export function finishAssetStep(state) {
+    const step = assetStep(state);
+    if (step == null || !draftUsable(step)) return null;
+    state.assetStep = null;
+    const { fit, settled, ...asset } = step;
+    return asset;
+}
+
+/** `CANCEL`: the step closed, and the model dropped. */
+export function cancelAssetStep(state) {
+    if (assetStep(state) == null) return false;
+    state.assetStep = null;
+    return true;
+}
+
+/** An asset chosen on ASSETS - pressed again, let go of. */
+export function chooseLibraryAsset(state, id) {
+    if (!buildModeDrawing(state) || libraryAsset(state.library, id) == null) return false;
+    state.assetChosen = state.assetChosen === id ? null : id;
+    return true;
+}
+
+/** The asset chosen on ASSETS, or null. */
+export function chosenLibraryAsset(state) {
+    return libraryAsset(state?.library, state?.assetChosen);
+}
+
+/**
+ * Asks to remove an asset. One the canvas uses asks `REMOVE THE ASSET` first,
+ * with `YES` and `CANCEL`, since its placements go with it - `{ confirm }`;
+ * one it does not is removed at once - `{ remove }`.
+ */
+export function requestRemoveAsset(state, id) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || draftPending(state) || libraryAsset(state.library, id) == null) return null;
+    if (!assetsUsed(sessionWorld(state)).includes(id)) return { remove: id };
+    state.confirm = { ask: REMOVE_ASSET, then: { asset: id } };
+    return { confirm: REMOVE_ASSET };
+}
+
+/** The canvas with every placement - and its plane - that used an asset taken away. True where anything went. */
+export function removeAssetFromCanvas(state, id) {
+    if (!buildModeDrawing(state)) return false;
+    const before = state.placements.length;
+    const world = withoutAsset({ placements: state.placements, plane: state.plane }, id);
+    state.placements = world.placements;
+    if ('plane' in world) state.plane = world.plane;
+    if (state.assetChosen === id) state.assetChosen = null;
+    return state.placements.length !== before || 'plane' in world;
 }
 
 // --- Insert City -----------------------------------------------------------------
 
 /** The card Insert City is armed with, or null while none is chosen. */
 export function buildCityPrefab(state) {
-    return prefabById(state?.cityPrefab) ? state.cityPrefab : null;
+    return cityCardOffered(state, state?.cityPrefab) ? state.cityPrefab : null;
+}
+
+/** True for a card Insert City offers: a prefab, or a loaded building the library holds. */
+function cityCardOffered(state, id) {
+    return prefabById(id) != null || libraryAsset(state?.library, id)?.uses?.city === true;
+}
+
+/** A city card placed at a point: the prefab, or the loaded building as an object referring to it. */
+function cityCard(state, id, at, options) {
+    const asset = refAsset(id) ? libraryAsset(state?.library, id) : null;
+    return asset ? placeAssetObject(asset, at, options) : placeObject(id, at, options);
 }
 
 /** The category Insert City's panel has open, or null with every one shut. */
@@ -865,12 +1026,12 @@ export function openCitySection(state, id) {
  * for a card there is not.
  */
 export function chooseCityPrefab(state, id) {
-    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsCity(state.tool) || prefabById(id) == null) return false;
+    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsCity(state.tool) || !cityCardOffered(state, id)) return false;
     state.cityPrefab = id;
     const draft = state.draft;
     if (draftPending(state) && draft.tool === state.tool && draft.replaces == null) {
         const { at, heading, scale } = objectConfig(draft.placement);
-        state.draft = { ...draft, placement: placeObject(id, at, { heading, scale }) };
+        state.draft = { ...draft, placement: cityCard(state, id, at, { heading, scale }) };
     }
     return true;
 }
@@ -889,7 +1050,7 @@ export function cityPlacement(state, point, heading = 0, { size = 0, free = fals
     // Held to a tenth of a metre, so a file carries the point a pilot put it
     // at rather than the last digits of a ray through the ground.
     const at = keepObjectOnCanvas([point.x, point.z], size).map(value => Math.round(value * 10) / 10 || 0);
-    const placement = placeObject(id, at, { heading, scale });
+    const placement = cityCard(state, id, at, { heading, scale });
     if (free || !isRoad(placement)) return { placement, snapped: false };
     const snap = snapRoad(placement, committedPlacements(state));
     return snap ? { placement: snap.placement, snapped: true } : { placement, snapped: false };
@@ -945,7 +1106,7 @@ export function insertTemplate(state, point, heading = 0, { size = 0 } = {}) {
         return true;
     }
 
-    const placement = placeTemplate(id, [point.x, point.z], heading);
+    const placement = runwayCard(state, id, [point.x, point.z], heading);
     placement.config.at = keepStripOnCanvas(placement.config.at, groupReach(placement), size).map(value => Math.round(value) || 0);
     return startDraft(state, placement, state.tool);
 }
@@ -1338,7 +1499,7 @@ function openCanvas(state, environmentId, kept, world, flight = null) {
     state.settingsOver = null;
     state.kept = null;
     state.start = cleanStartPoint(flight?.start);
-    state.plane = isPlaneId(flight?.plane) ? flight.plane : null;
+    state.plane = isPlaneId(flight?.plane) || refAsset(flight?.plane) ? flight.plane : null;
     // The environment's own rows and flight as the canvas opened with them,
     // so a change made to them since is something a file loaded over it would
     // replace.

@@ -11,20 +11,6 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
-  never sent anywhere, then a step that sets its scale, up and facing and says
-  which insert menus it fits, from its bounds, with the reason where it does
-  not
-  - From: Post Interactive Build
-- [ ] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
-  listed with what each is used as and removable, and carried inside an
-  environment file that uses them so it opens on another computer
-  - From: Post Interactive Build
-- [ ] **Inserting loaded assets**: a loaded plane flown as a card of Insert
-  Plane, a loaded building placed as an object in its Insert City section, and
-  a loaded runway placed over a real strip of its size
-  - From: Post Interactive Build
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -105,17 +91,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
-  never sent anywhere, then a step that sets its scale, up and facing and says
-  which insert menus it fits, from its bounds, with the reason where it does
-  not
-- [ ] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
-  listed with what each is used as and removable, and carried inside an
-  environment file that uses them so it opens on another computer
-- [ ] **Inserting loaded assets**: a loaded plane flown as a card of Insert
-  Plane, a loaded building placed as an object in its Insert City section, and
-  a loaded runway placed over a real strip of its size
-
 ## Documentation & Polish
 
 Keep the docs accurate and improve first-run experience. Completing items
@@ -171,64 +146,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 392 earlier items in `TODO-archive.md`, newest last.
+> 395 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
-  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
-  the pause menu, a loaded world becoming a chosen entry of the list that is
-  kept across a reload, and both rows gone while a game mode runs
-  - **Settled**: the two rows are `FILE_ENTRY`s in a `FILE_GROUP` of their
-    own, drawn under the worlds and walked after them, and gone while a game
-    mode runs. The loaded world is `js/loaded-world.js`: the last file's text,
-    kept under `pilot-matter.environment` and read back through the format each
-    time. The settings list it after the presets under its name, and its
-    choice is `values.loaded` beside the environment, which stays a preset -
-    the one it was built on, where the settings offer it - so every reader of
-    the environment can still draw it; it is kept on the editor as a build is,
-    through `keepBuiltWorld`. A preset chosen over it, even its own, is that
-    preset as it is, through the new `releaseBuiltWorld`; a build kept from the
-    builder lets go of it too. A row says what it came to in place of its note,
-    which needed `MenuList.render` to draw a changed note again, and a refusal
-    is drawn in amber. A save writes the world the settings would fly, under
-    the loaded world's name when that is the one chosen.
-  - From: Post Interactive Build
-- [x] **Start point**: one point and heading per environment, placed by a
-  click with Insert Plane live, turned by its arrow, written out as typed rows,
-  saved with the world, and flown from - over it at its height above the ground
-  when flying, on the runway nearest it for a takeoff - with the settings rows
-  it overrides locked
-  - **Settled**: the start point is `js/start-point.js`, held as `{ at,
-    heading, heightFeet }` and cleaned to the world, the compass and 100 to
-    10000 ft. The session holds one on `state.start`, set by a click with
-    Insert Plane live (`placesStartPoint`, `Insert config<flight:start-point>`),
-    moved by a second click with its heading and height kept, and turned by
-    dragging the white knob at the end of its arrow on the overlay - a press
-    the canvas takes before an orbit, a pick or a drop. It rides
-    `sessionWorld`, the SAVE AND EXIT answer, `replacesBuild` and the canvas
-    reopened, is kept on the editor by `keepBuiltWorld`'s new `flight`, and is
-    written to the file as `start`. A free flight on a world with one opens
-    through `startAtPoint` - over it, on its heading, at its height above the
-    ground there - and a takeoff on `nearestRunway` to it. While it is flown,
-    `holdStartFields` holds START HEADING and START ALTITUDE, drawn locked with
-    "set by this environment", refusing a step and a typed figure.
-  - From: Post Interactive Build
-- [x] **Pre-built planes**: five original planes drawn from primitives as the
-  trainer is, each with the flight figures the aircraft already takes, each
-  leaving the ground within BASIC RUNWAY, swapped between flights by
-  `setPlane`, the trainer the default
-  - **Settled**: `js/planes.js` holds the five as recipes of boxes,
-    cylinders and cones - the trainer part for part the old `bundledModel`,
-    which is now `planeModel(trainer)` - each with the three speeds, the two
-    arrival speeds and a `handling` share of the pilot's sensitivity, set
-    against the trainer. `Aircraft.setPlane` swaps the figures and, unless the
-    host flies its own model, the meshes; `CameraController.setChase` takes
-    `chaseFor(plane)`, the trainer's 30 and 10 scaled by size. A test runs the
-    pure flight model from a standstill at full throttle and holds every plane
-    to leaving the ground inside BASIC RUNWAY above its stall; another holds
-    the opening throttle to asking no plane for less than its stall, which
-    raised the twin's top speed to 240. A preset world and every game mode fly
-    the trainer.
-  - From: Post Interactive Build
 - [x] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
   SELECT STARTING POINT's rows as two sections, the chosen plane saved with
   the world and flown on it
@@ -346,4 +265,52 @@ how the simulator got here rather than as a list still to be worked.
     `Shift+Click (Insert city)`, which needed the list to write a held key
     before a click. The browser check found a row of six cards running off
     both sides of the dock under the canvas, so a row of tiles now wraps.
+  - From: Post Interactive Build
+- [x] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
+  never sent anywhere, then a step that sets its scale, up and facing and says
+  which insert menus it fits, from its bounds, with the reason where it does
+  not
+  - **Settled**: `LOAD ASSET…` on SAVE / LOAD reads a file with
+    `file.arrayBuffer()` - refused past 25 MB before it is read, and by its
+    name where it is no GLB, glTF, OBJ, STL or SVG - and `js/asset-loader.js`
+    reads it with three's own loaders, fetched with three: a `.gltf` only when
+    every buffer and image is a `data:` address, an SVG parsed as text and
+    extruded, never put into the page, and any model past 300,000 triangles
+    refused. `LOADED ASSET` shows it on the canvas, the camera brought in to
+    it, with MODEL - `NAME`, `SCALE`, `UP`, `FACING`, `COLOR` for a format
+    with none, `HEIGHT` for a plan - and USE AS - a switch for each use, held
+    shut with why where `assetFit` in the pure `js/asset-fit.js` says it does
+    not fit, `FLIES LIKE` and `SECTION`. glTF is taken as metres, its own
+    unit, and only OBJ and STL are guessed as millimetres past 2000 units; a
+    runway's least length is the strip's own 600 m, not the 400 the plan
+    first said, since it is placed over a real strip of its size.
+  - From: Post Interactive Build
+- [x] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
+  listed with what each is used as and removable, and carried inside an
+  environment file that uses them so it opens on another computer
+  - **Settled**: `js/asset-store.js` keeps each asset in IndexedDB,
+    database `pilot-matter`, store `assets`, by an id drawn from the SHA-256
+    of its bytes, so the same file is one asset wherever it comes from. The
+    page reads them back once it is up and draws each model in place of the
+    box that stood for it. ASSETS lists them with what each is used as;
+    `REMOVE ASSET` asks `REMOVE THE ASSET`, with `YES` and `CANCEL`, when the
+    canvas uses the one chosen, and takes what used it with it. A saved
+    environment carries every asset it uses once, in `assets`, as base64;
+    loading one checks each against its hash, keeps the ones not held, and
+    refuses the file where a placement or the plane refers to one it does not
+    carry.
+  - From: Post Interactive Build
+- [x] **Inserting loaded assets**: a loaded plane flown as a card of Insert
+  Plane, a loaded building placed as an object in its Insert City section, and
+  a loaded runway placed over a real strip of its size
+  - **Settled**: a loaded plane is a card on SELECT PLANE, flown through
+    `Aircraft.setModel` anchored at its bounds' middle, with the figures of
+    the plane it flies like and a chase scaled by its size. A loaded building
+    is a card in its Insert City section, placed as an object whose recipe is
+    `{ asset, size }` - a reference, not a copy - drawn as a copy of the read
+    model sharing its geometry, or as a box of its size until then. A loaded
+    runway is a card on Insert Runway, placed as a group of a real strip of
+    its length and width and the model as an object over it, facing the way
+    the strip does, so landing, scoring and takeoff work on the strip as they
+    do on any.
   - From: Post Interactive Build

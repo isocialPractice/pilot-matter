@@ -64,7 +64,39 @@ export const MAX_SEGMENTS = 32;
 
 /** The fields a part may carry, and a recipe. */
 export const PART_FIELDS = Object.freeze(['shape', 'at', 'color', 'turn', 'size', 'ridge', 'radius', 'top', 'height', 'segments', 'points', 'width', 'closed']);
-export const RECIPE_FIELDS = Object.freeze(['parts', 'solid', 'plinth', 'drape', 'connectors']);
+export const RECIPE_FIELDS = Object.freeze(['parts', 'solid', 'plinth', 'drape', 'connectors', 'asset', 'size']);
+
+/**
+ * A recipe may instead refer to a model the pilot loaded - `{ asset, size }`,
+ * the asset's id and its size in metres, across, up and along - which is drawn
+ * as the model once it is read, and as a plain box of its size until then. The
+ * model is never copied into the recipe: a file carries it once.
+ */
+export const ASSET_RECIPE_FIELDS = Object.freeze(['asset', 'size', 'solid']);
+
+/** How far an asset's size may run, in metres: a runway asset is kilometres long. */
+export const ASSET_REACH = 10000;
+
+/** The colour an asset not read yet is drawn as a box of. */
+export const ASSET_STAND_IN = 0x9aa3a8;
+
+/** True for a recipe that refers to a loaded asset rather than listing parts. */
+export function isAssetRecipe(recipe) {
+    return typeof recipe?.asset === 'string';
+}
+
+/**
+ * The parts a recipe is drawn from: its own, or for one referring to an asset,
+ * a box of the asset's size standing on its point - what is drawn until the
+ * model is read, and what its bounds are.
+ */
+export function recipeParts(recipe) {
+    if (isAssetRecipe(recipe)) {
+        const [w, h, d] = Array.isArray(recipe.size) ? recipe.size : [1, 1, 1];
+        return [{ shape: 'box', size: [w, h, d], at: [0, 0, 0], color: ASSET_STAND_IN }];
+    }
+    return recipe?.parts ?? [];
+}
 
 /** The fields a road's connector has. */
 export const CONNECTOR_FIELDS = Object.freeze(['at', 'heading']);
@@ -839,7 +871,7 @@ export function linearColor(hex) {
 export function recipeGeometry(recipe) {
     const positions = [], normals = [], colors = [];
 
-    for (const part of recipe?.parts ?? []) {
+    for (const part of recipeParts(recipe)) {
         const faces = partFaces(part).map(face => face.map(corner => placeCorner(part, corner)));
         const centre = middleOf(faces.flat());
         const color = linearColor(part.color);
@@ -883,7 +915,7 @@ export function recipeGeometry(recipe) {
  */
 export function recipeBounds(recipe) {
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, top = -Infinity;
-    for (const part of recipe?.parts ?? []) {
+    for (const part of recipeParts(recipe)) {
         for (const face of partFaces(part)) {
             for (const corner of face) {
                 const [x, y, z] = placeCorner(part, corner);
@@ -915,6 +947,17 @@ export function readRecipe(value, where = 'recipe') {
     if (value == null || typeof value !== 'object' || Array.isArray(value)) {
         problems.push(`${where}: not a recipe`);
         return refuse();
+    }
+    if (value.asset != null) {
+        for (const key of Object.keys(value)) {
+            if (!ASSET_RECIPE_FIELDS.includes(key)) problems.push(`${where}: ${key} is not a field a recipe for an asset has`);
+        }
+        if (!(typeof value.asset === 'string' && /^a-[0-9a-f]{16}$/.test(value.asset))) problems.push(`${where}: asset is not an asset's id`);
+        if (!Array.isArray(value.size) || value.size.length !== 3 || !value.size.every(n => Number.isFinite(n) && n > 0 && n <= ASSET_REACH)) {
+            problems.push(`${where}: size is not three lengths`);
+        }
+        if (value.solid != null && typeof value.solid !== 'boolean') problems.push(`${where}: solid is not true or false`);
+        return problems.length > 0 ? refuse() : { recipe: structuredClone(value), problems };
     }
     for (const key of Object.keys(value)) {
         if (!RECIPE_FIELDS.includes(key)) problems.push(`${where}: ${key} is not a field a recipe has`);

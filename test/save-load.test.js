@@ -353,8 +353,9 @@ test('SAVE / LOAD\'s panel is the world\'s name, what the last answer came to, a
     let content = dockContent(state);
     assert.equal(content.kind, DOCK_FILES);
     assert.equal(content.heading, 'SAVE / LOAD');
-    assert.deepEqual(content.actions, [DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT]);
-    assert.deepEqual(content.actions.map(action => action.label), ['LOAD ENVIRONMENT…', 'SAVE ENVIRONMENT…']);
+    assert.deepEqual(content.actions.slice(0, 2), [DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT]);
+    assert.deepEqual(content.actions.map(action => action.label), ['LOAD ENVIRONMENT…', 'SAVE ENVIRONMENT…', 'LOAD ASSET…', 'REMOVE ASSET'],
+        'the world first, then the models');
     const [section] = content.sections;
     assert.equal(section.id, FILES_SECTION);
     assert.equal(section.heading, 'ENVIRONMENT');
@@ -371,5 +372,5 @@ test('SAVE / LOAD\'s panel is the world\'s name, what the last answer came to, a
 
     setSelection(state, { kind: 'disc', x: 0, z: 0, radius: 500 });
     assert.deepEqual(dockContent(state).actions.map(action => action.id),
-        [DOCK_LOAD_ENVIRONMENT.id, DOCK_SAVE_ENVIRONMENT.id, DOCK_DESELECT.id], 'and DESELECT while something is selected');
+        [DOCK_LOAD_ENVIRONMENT.id, DOCK_SAVE_ENVIRONMENT.id, 'load-asset', 'remove-asset', DOCK_DESELECT.id], 'and DESELECT while something is selected');
 });

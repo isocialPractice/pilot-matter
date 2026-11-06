@@ -229,7 +229,7 @@ export class Aircraft {
         this.runwayImpactSpeed = figures.runwayImpactSpeed ?? RUNWAY_IMPACT_SPEED;
         this.setSensitivity(this.sensitivity);
 
-        if (this.group && !this.external) {
+        if (this.group && !this.external && !this.custom) {
             for (const part of [...this.group.children]) {
                 this.group.remove(part);
                 part.geometry?.dispose?.();
@@ -238,6 +238,31 @@ export class Aircraft {
             this.group.add(...planeModel(chosen));
         }
         return this.plane;
+    }
+
+    /**
+     * Flies a model the pilot loaded in place of the plane's own - anchored at
+     * the middle of its bounds, nose along `+z` - or, with none, the plane's
+     * own again. The figures stay the plane's: a loaded plane flies like the
+     * one chosen for it. A model shared with the page's other copies of it is
+     * never given back here; the plane's own parts are.
+     *
+     * Returns false where the host flies a model of its own, which nothing
+     * here replaces.
+     */
+    setModel(model = null) {
+        if (!this.group || this.external) return false;
+        const wasCustom = this.custom != null;
+        for (const part of [...this.group.children]) {
+            this.group.remove(part);
+            if (!wasCustom) {
+                part.geometry?.dispose?.();
+                part.material?.dispose?.();
+            }
+        }
+        this.custom = model ?? null;
+        this.group.add(...(model ? [model] : planeModel(this.plane)));
+        return true;
     }
 
     /**

@@ -34,7 +34,9 @@ import {
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE,
     confirmEntries, requestLoad, loadCanvas, sessionWorld, saveName, setSaveName, setFileStatus,
     buildStartPoint, setBuildStartPoint, turnBuildStartPoint, writeBuildStartPoint, clearBuildStartPoint, chooseBuildPlane,
-    chooseCityPrefab, openCitySection, cityPlacement, insertObject, buildCityPrefab
+    chooseCityPrefab, openCitySection, cityPlacement, insertObject, buildCityPrefab,
+    setAssetLibrary, assetStep, beginAssetStep, writeAssetStep, setAssetStepName, finishAssetStep, cancelAssetStep,
+    chooseLibraryAsset, chosenLibraryAsset, requestRemoveAsset, removeAssetFromCanvas, runwayCard
 } from './build-mode.js';
 import {
     paletteTools, BUILT_TOOLS, isPaletteBar, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
@@ -70,7 +72,8 @@ import {
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
     DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH,
-    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD, DOCK_PLANE, DOCK_START, DOCK_CLEAR_START, DOCK_CITY
+    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD, DOCK_PLANE, DOCK_START, DOCK_CLEAR_START, DOCK_CITY,
+    DOCK_FILES, DOCK_LOAD_ASSET, DOCK_REMOVE_ASSET, DOCK_ASSET, DOCK_ADD_ASSET, DOCK_CANCEL_ASSET, ASSET_NAME_FIELD
 } from './build-panel.js';
 import {
     lassoTool, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -161,7 +164,12 @@ import {
 import {
     environmentDocument, environmentText, environmentFileName, cleanName, defaultEnvironmentName
 } from './environment-file.js';
-import { saveEnvironmentText, pickEnvironmentFile } from './environment-io.js';
+import { saveEnvironmentText, pickEnvironmentFile, pickAssetFile } from './environment-io.js';
+import {
+    assetDraft, assetFormat, assetHash, assetSize, libraryAsset, refAsset, ASSET_FILE_LIMIT, ASSET_FILE_ACCEPT
+} from './asset-fit.js';
+import { readModel, registerAsset, keepModel, forgetModel, hasAssetModel, assetModel, placedModel, AssetRefused } from './asset-loader.js';
+import { readKeptAssets, keepAsset, forgetAsset } from './asset-store.js';
 import { readLoadedWorld, writeLoadedWorld, loadedWorldOf, loadedWorldEntry } from './loaded-world.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
@@ -311,6 +319,19 @@ class FlightSimulator {
         this.environmentFileInput.hidden = true;
         this.environmentFileInput.setAttribute('aria-hidden', 'true');
         document.body.append(this.environmentFileInput);
+
+        // And the one for a model, from SAVE / LOAD's LOAD ASSET. The models
+        // loaded so far are the library every insert menu offers cards from,
+        // read back from the browser once the page is up; the one being taken
+        // through the step after loading is shown on the canvas as it is set.
+        this.assetFileInput = document.createElement('input');
+        this.assetFileInput.type = 'file';
+        this.assetFileInput.hidden = true;
+        this.assetFileInput.setAttribute('aria-hidden', 'true');
+        document.body.append(this.assetFileInput);
+        this.assets = [];
+        this.assetRead = null;
+        this.assetPreview = null;
 
         // Free flight is the run every session opens in, so the first world is
         // the settings panel's rather than a mode's.
@@ -763,6 +784,170 @@ class FlightSimulator {
 
         this.clock = new THREE.Clock();
         this.animate();
+        this.restoreAssets();
+    }
+
+    // --- Loaded assets ---------------------------------------------------------
+
+    /**
+     * The models the browser kept, read back into the page once it is up, and
+     * the ones a world it keeps carries: each read into its model, handed to
+     * the builder as its library, and drawn in place of the box that stood for
+     * it. A model that will not read is left out rather than stopping the rest.
+     */
+    async restoreAssets() {
+        const kept = await readKeptAssets();
+        for (const asset of kept) {
+            try {
+                await registerAsset(asset);
+                this.assets.push({ ...asset, size: assetSize(asset) });
+            } catch {
+                // Kept by a version that read it, and unreadable now: not offered.
+            }
+        }
+        await this.adoptAssets(this.loadedWorld?.world?.assets ?? []);
+        this.assetsChanged();
+    }
+
+    /** The library handed on to everything that offers it, and every model read so far drawn in place of its box. */
+    assetsChanged() {
+        setAssetLibrary(this.builder, this.assets);
+        this.terrain.redrawObjects();
+        this.flownKey = null;
+        this.flyPlane();
+        this.syncOverlays();
+    }
+
+    /**
+     * Assets a world carried, taken into the library: each checked against the
+     * hash its id is drawn from, read into its model, and kept - an identical
+     * one already held is left as it is. Resolves to null, or to why one was
+     * refused, nothing kept.
+     */
+    async adoptAssets(assets = []) {
+        for (const asset of assets ?? []) {
+            if (await assetHash(asset.bytes) !== asset.hash) return `asset ${asset.name} is not the model its hash names`;
+        }
+        for (const asset of assets ?? []) {
+            if (this.assets.some(held => held.id === asset.id)) continue;
+            try {
+                await registerAsset(asset);
+            } catch (error) {
+                return `asset ${asset.name} could not be read: ${error?.message ?? error}`;
+            }
+            await keepAsset(asset);
+            this.assets.push({ ...asset, size: assetSize(asset) });
+        }
+        return null;
+    }
+
+    /**
+     * LOAD ASSET on SAVE / LOAD: a model chosen, read in the page - its format
+     * by its name, refused past 25 MB before it is read and past 300,000
+     * triangles after - and taken to the step after loading, shown on the
+     * canvas where the camera looks. Refused with why, nothing changed.
+     */
+    async loadAssetFromBuilder() {
+        const picked = await pickAssetFile(this.assetFileInput, { accept: ASSET_FILE_ACCEPT, limit: ASSET_FILE_LIMIT });
+        if (!picked || !buildModeDrawing(this.builder)) return;
+        const refuse = why => {
+            setFileStatus(this.builder, `could not load ${picked.name}: ${why}`, { refused: true });
+            this.syncOverlays();
+        };
+        const format = assetFormat(picked.name);
+        if (!format) return refuse('it is not a GLB, glTF, OBJ, STL or SVG');
+        if (picked.tooLarge) return refuse(`it is larger than ${ASSET_FILE_LIMIT / 1048576} MB`);
+        if (!picked.bytes) return refuse('it could not be read');
+        let read;
+        try {
+            read = await readModel(format, picked.bytes);
+        } catch (error) {
+            return refuse(error instanceof AssetRefused ? error.message : `it could not be read: ${error?.message ?? error}`);
+        }
+        const hash = await assetHash(picked.bytes);
+        const draft = assetDraft({ fileName: picked.name, format, raw: read.raw, triangles: read.triangles, hash, bytes: picked.bytes });
+        if (!beginAssetStep(this.builder, draft)) return;
+        this.assetRead = read.object;
+        // Brought in close enough to see it: a house is a speck across a
+        // whole canvas, and the step is about how it looks.
+        const reach = Math.max(draft.size.width, draft.size.height, draft.size.depth);
+        if (this.buildCamera) this.buildCamera = { ...this.buildCamera, distance: Math.min(Math.max(reach * 3, 60), 6000) };
+        this.showAssetPreview();
+        this.syncOverlays();
+    }
+
+    /** The model in the step after loading, on the canvas where the camera looks, taken as the step now says. */
+    showAssetPreview() {
+        if (this.assetPreview) this.scene.remove(this.assetPreview);
+        this.assetPreview = null;
+        const step = assetStep(this.builder);
+        if (!step || !this.assetRead) return;
+        const model = placedModel(this.assetRead, { up: step.up, facing: step.facing, scale: step.scale, anchor: 'base' });
+        const target = this.buildCamera?.target ?? { x: 0, z: 0 };
+        model.position.set(target.x, this.terrain.getTerrainHeightAt(target.x, target.z), target.z);
+        this.scene.add(model);
+        this.assetPreview = model;
+    }
+
+    /** A row of the step changed: written back, and the model on the canvas taken again - a plan read again at its new height. */
+    async assetStepChanged(config) {
+        const was = assetStep(this.builder);
+        const step = writeAssetStep(this.builder, config);
+        if (!step) return;
+        if (step.format === 'svg' || (!['glb', 'gltf'].includes(step.format) && was?.color !== step.color)) {
+            try {
+                this.assetRead = (await readModel(step.format, step.bytes, { color: step.color, height: step.height, scale: step.scale })).object;
+            } catch {
+                // Read once already; a height that will not extrude keeps the last.
+            }
+        }
+        this.showAssetPreview();
+        this.syncOverlays();
+    }
+
+    /** `ADD`: the asset kept - in the browser and in the library - and offered from every insert menu it fits. */
+    async addAssetFromBuilder() {
+        const asset = finishAssetStep(this.builder);
+        if (!asset) return;
+        if (this.assetPreview) this.scene.remove(this.assetPreview);
+        this.assetPreview = null;
+        keepModel(asset, this.assetRead);
+        this.assetRead = null;
+        const kept = await keepAsset(asset);
+        this.assets = [...this.assets.filter(held => held.id !== asset.id), asset];
+        setFileStatus(this.builder, `added ${asset.name}${kept ? '' : ' - the browser will not keep it after a reload'}`);
+        this.assetsChanged();
+    }
+
+    /** `CANCEL` on the step: the model dropped. */
+    cancelAssetFromBuilder() {
+        if (!cancelAssetStep(this.builder)) return;
+        if (this.assetPreview) this.scene.remove(this.assetPreview);
+        this.assetPreview = null;
+        this.assetRead = null;
+        this.syncOverlays();
+    }
+
+    /** REMOVE ASSET: the asset chosen on ASSETS taken away - asking first when the canvas uses it. */
+    removeAssetFromBuilder() {
+        const chosen = chosenLibraryAsset(this.builder);
+        if (!chosen) return;
+        const asked = requestRemoveAsset(this.builder, chosen.id);
+        if (asked?.confirm) this.confirmOpened();
+        else if (asked?.remove) this.removeAsset(asked.remove);
+        this.syncOverlays();
+    }
+
+    /** An asset taken away: from the canvas, the browser, the library and the models read. */
+    async removeAsset(id) {
+        const asset = libraryAsset(this.assets, id);
+        const changed = removeAssetFromCanvas(this.builder, id);
+        await forgetAsset(id);
+        forgetModel(id);
+        this.assets = this.assets.filter(held => held.id !== id);
+        if (changed) this.redrawCanvas();
+        setFileStatus(this.builder, `removed ${asset?.name ?? 'the asset'}`);
+        this.assetsChanged();
     }
 
     /** Reports a step of the start-up to the screen covering it. */
@@ -1052,10 +1237,16 @@ class FlightSimulator {
      * flown, so a setting applied for any other reason swaps no model.
      */
     flyPlane() {
-        const plane = planeById(this.worldPlane());
-        if (this.aircraft.plane?.id === plane.id) return false;
+        const id = this.worldPlane();
+        const asset = refAsset(id) ? libraryAsset(this.assets, id) : null;
+        const plane = planeById(asset ? asset.fliesLike : id);
+        const model = asset && hasAssetModel(asset.id) ? assetModel(asset.id, 'centre') : null;
+        const key = asset ? `${asset.id}:${model ? 'model' : 'waiting'}` : plane.id;
+        if (this.flownKey === key) return false;
+        this.flownKey = key;
         this.aircraft.setPlane(plane);
-        this.camera2.setChase(chaseFor(plane));
+        this.aircraft.setModel(model);
+        this.camera2.setChase(asset ? chaseFor({ span: asset.size.width, length: asset.size.depth }) : chaseFor(plane));
         return true;
     }
 
@@ -1679,7 +1870,7 @@ class FlightSimulator {
 
     /** A world written to a file under its name, as the browser offers: `{ saved, name }`, `{ cancelled }` or `{ error }`. */
     writeEnvironment(world, name) {
-        const document = environmentDocument(world, { name });
+        const document = environmentDocument(world, { name, library: this.assets });
         return saveEnvironmentText(environmentFileName(document.name), environmentText(document));
     }
 
@@ -1703,6 +1894,13 @@ class FlightSimulator {
             this.syncOverlays();
             return;
         }
+        const assetsRefused = await this.adoptAssets(chosen.loaded.world.assets);
+        if (assetsRefused) {
+            setFileNotice(this.settings, LOAD_ENVIRONMENT_ID, `could not load ${chosen.name}: ${assetsRefused}`, { refused: true });
+            this.syncOverlays();
+            return;
+        }
+        this.assetsChanged();
         const kept = this.adoptLoadedWorld(chosen.loaded);
         this.chooseLoaded();
         setFileNotice(this.settings, LOAD_ENVIRONMENT_ID,
@@ -1759,6 +1957,13 @@ class FlightSimulator {
             this.syncOverlays();
             return;
         }
+        const assetsRefused = await this.adoptAssets(chosen.loaded.world.assets);
+        if (assetsRefused) {
+            setFileStatus(this.builder, `could not load ${chosen.name}: ${assetsRefused}`, { refused: true });
+            this.syncOverlays();
+            return;
+        }
+        this.assetsChanged();
         if (!loadCanvas(this.builder, chosen.loaded.world, chosen.loaded.name)) return;
         const kept = this.adoptLoadedWorld(chosen.loaded);
         this.draftHolder = null;
@@ -1770,6 +1975,7 @@ class FlightSimulator {
     /** The name typed on SAVE / LOAD's panel, taken as the one a save writes the world under. */
     onDockText(id, text) {
         if (id === FILES_NAME_FIELD && setSaveName(this.builder, text)) this.syncDock();
+        if (id === ASSET_NAME_FIELD && setAssetStepName(this.builder, text)) this.syncDock();
     }
 
     // --- The builder's settings ------------------------------------------
@@ -3111,7 +3317,8 @@ class FlightSimulator {
         if (ground == null) return null;
 
         const size = this.terrain.size;
-        const placed = placeTemplate(id, [ground.x, ground.z], arrivalHeading(viewBearing(this.buildCamera)));
+        const placed = runwayCard(this.builder, id, [ground.x, ground.z], arrivalHeading(viewBearing(this.buildCamera)));
+        if (placed == null) return null;
         placed.config.at = keepStripOnCanvas(placed.config.at, groupReach(placed), size);
         return [...groupStrips(placed, size), ...groupLots(placed, size)].map(strip => footprintLoop(strip));
     }
@@ -3749,6 +3956,10 @@ class FlightSimulator {
             if (chooseBuildPlane(this.builder, id)) this.syncOverlays();
             return;
         }
+        if (this.dockShown?.kind === DOCK_FILES) {
+            if (chooseLibraryAsset(this.builder, id)) this.syncDock();
+            return;
+        }
         if (this.dockShown?.kind === DOCK_CITY) {
             if (!chooseCityPrefab(this.builder, id)) return;
             if (draftPending(this.builder)) this.redrawCanvas();
@@ -3899,6 +4110,13 @@ class FlightSimulator {
             return;
         }
 
+        // The step after loading: its rows written back, and the model on the
+        // canvas taken again.
+        if (kind === DOCK_ASSET) {
+            this.assetStepChanged(holder.config);
+            return;
+        }
+
         // The start point's rows, read back in the altitude unit they were
         // written out in.
         if (kind === DOCK_START) {
@@ -4002,6 +4220,24 @@ class FlightSimulator {
         // Insert Plane's `CLEAR`: the world starts where it always did.
         if (id === DOCK_CLEAR_START.id) {
             if (clearBuildStartPoint(this.builder)) this.syncOverlays();
+            return;
+        }
+
+        // SAVE / LOAD's asset answers, and the step after loading's.
+        if (id === DOCK_LOAD_ASSET.id) {
+            this.loadAssetFromBuilder();
+            return;
+        }
+        if (id === DOCK_REMOVE_ASSET.id) {
+            this.removeAssetFromBuilder();
+            return;
+        }
+        if (id === DOCK_ADD_ASSET.id) {
+            this.addAssetFromBuilder();
+            return;
+        }
+        if (id === DOCK_CANCEL_ASSET.id) {
+            this.cancelAssetFromBuilder();
             return;
         }
 
@@ -4281,6 +4517,9 @@ class FlightSimulator {
             // `YES` on REPLACE THE BUILT WORLD is the press the file dialog
             // opens from.
             this.loadIntoCanvas();
+        } else if (answered.remove) {
+            // `YES` on REMOVE THE ASSET: it goes, and what used it with it.
+            this.removeAsset(answered.remove);
         } else if (answered.settled) {
             this.draftHolder = null;
             this.redrawCanvas();
