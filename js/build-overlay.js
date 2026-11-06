@@ -26,6 +26,7 @@ import { footprintSampler, polygonPoints, flattenPath, COMBINE_KIND } from './en
 import { canvasPickBounds } from './build-picking.js';
 import { AXIS_COLOURS } from './gumball.js';
 import { TOP_WEIGHT, EXTRUDE_SURFACES_DECLARED } from './extrude.js';
+import { isObject, objectFootprint } from './objects.js';
 
 /**
  * How many cells across the canvas an outline is traced over. A canvas is a
@@ -142,6 +143,15 @@ export function contourSegments(weigh, bounds, cells = OUTLINE_CELLS, level = PI
  */
 export function placementOutline(placement, size = 0, cells = OUTLINE_CELLS) {
     if (!(Number(size) > 0)) return [];
+    // An object is far smaller than a cell of the contour, so its footprint
+    // is traced round as it stands rather than found by weighing the canvas.
+    if (isObject(placement)) {
+        const loop = footprintLoop(objectFootprint(placement));
+        return loop.map(([x, z], i) => {
+            const [nx, nz] = loop[(i + 1) % loop.length];
+            return [x, z, nx, nz];
+        });
+    }
     return contourSegments(placementReach(placement, size), canvasPickBounds(size), cells, PICK_WEIGHT);
 }
 

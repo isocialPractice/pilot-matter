@@ -250,6 +250,33 @@
 
 <p>The plane and the start point are kept with the build on the way out and saved in the environment file. A preset world is flown in the trainer from where every world starts, and so is every game mode, which brings its own world.</p>
 
+<h3 id="objects-on-the-ground">Objects on the ground</h3>
+
+<p>Everything else the builder makes is ground: an airport's hangar is an extrusion of the heightfield, and the ground is sampled every 80 metres. A house falls between two of those samples, so a building is drawn as a mesh standing on the ground instead - an <strong>object</strong>. An object is a placement like any other: committed, picked up and changed, saved in the file, and repeated at the same point of every tile of the endless world. It changes no ground; the ground is drawn as it would be without it, and the object stands on what was drawn.</p>
+
+<ul>
+    <li><strong>Where it stands.</strong> On the highest ground under its footprint, over a plinth down to the lowest, so no corner is buried and none floats. On every tile, it stands on that tile's own ground.</li>
+    <li><strong>How it is drawn.</strong> One instanced mesh to each kind of building on a tile, coloured at its corners, and lit and fogged as the ground is.</li>
+    <li><strong>It is solid.</strong> Any touch on an object is a crash, at any speed: a wall flown into, or a roof come down on. A roof is not ground, so it is never landed on; the ground is, as it always was, including the top of an extrusion. Something marked as not solid - a park - is flown over.</li>
+    <li><strong>The tools handle it.</strong> Select picks it anywhere inside its footprint, over the ground it stands on; its panel is <code>HEADING</code> and <code>SCALE</code> under its name, and the Flat gumball moves it, turns it by its arc and scales it evenly by its two squares. Erase taking everything takes it whole when a stroke covers its middle, and a stroke putting back over its middle puts it back.</li>
+</ul>
+
+<p>A building is a <strong>prefab</strong>: a recipe of boxes, cylinders, cones and wedges - a roof's triangular prism - each part standing its base on a point in the building's own frame, in metres, with a colour. The recipe is copied into the placement when it is placed, so a prefab changed later leaves a world already built as it was built. In the file, an object is its prefab's name, its recipe and its point, heading and scale:</p>
+
+<pre><code>{
+  "type": "object",
+  "prefab": "cottage",
+  "recipe": {
+    "parts": [
+      { "shape": "box", "size": [8, 3, 10], "at": [0, 0, 0], "color": 15260864 },
+      { "shape": "wedge", "size": [8.6, 2.6, 10.6], "at": [0, 3, 0], "color": 9190190 }
+    ]
+  },
+  "config": { "at": [1200, -800], "heading": 30, "scale": 1 }
+}</code></pre>
+
+<p>A recipe is read whole or refused: a part of a shape there is not, a size that is not three lengths, or a part out past 500 metres refuses the file, with where it was named. A heading and a scale are held to what they may be, 0 to 359 and 0.5 to 3.</p>
+
 <h2 id="the-element-editor">The element editor</h2>
 
 <p>Because an environment is a description rather than a mesh, there is nothing to re-author when a range moves: the ground is generated again from the algorithm. The panel opens the world being flown as the elements it was assembled from, one row each, and choosing an element opens the ranges it declared underneath it. <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> step the range under the cursor, and the ground is drawn again the moment it moves. <kbd>L</kbd> opens the builder, which carries these rows now: in Select with nothing picked, each element is a <code>WORLD:</code> section on the dock, and what is changed there is kept with what was built.</p>

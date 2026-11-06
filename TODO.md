@@ -11,15 +11,12 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Objects on the ground**: a placement drawn as a mesh standing on the
-  ground rather than as ground, repeated on every tile on that tile's own
-  ground, fogged like the ground, solid to the aircraft - any touch on one a
-  crash, roofs included, while an extrusion's top is still landed on as
-  ground - picked by Select and taken whole by Erase
+- [ ] **City buildings**: five skylines, three factories, nine residential,
+  five commercial and five infrastructure buildings, original and generic, in
+  the catalogue a test holds to the counts asked
   - From: Post Interactive Build
-- [ ] **Prefabs**: a building as a recipe of primitives in its own frame,
-  copied into the placement as a template's members are, merged and instanced
-  per prefab
+- [ ] **Parks**: seven parks of trees, paths, water and fields, drawn as
+  objects with no roof
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -102,14 +99,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Objects on the ground**: a placement drawn as a mesh standing on the
-  ground rather than as ground, repeated on every tile on that tile's own
-  ground, fogged like the ground, solid to the aircraft - any touch on one a
-  crash, roofs included, while an extrusion's top is still landed on as
-  ground - picked by Select and taken whole by Erase
-- [ ] **Prefabs**: a building as a recipe of primitives in its own frame,
-  copied into the placement as a template's members are, merged and instanced
-  per prefab
 - [ ] **City buildings**: five skylines, three factories, nine residential,
   five commercial and five infrastructure buildings, original and generic, in
   the catalogue a test holds to the counts asked
@@ -187,36 +176,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 386 earlier items in `TODO-archive.md`, newest last.
+> 388 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **The dock's own spin buttons**: the browser's spinner, which moves a
-  field by 1, replaced by the panel's own up and down inside the field, with
-  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
-  and `Page Down` always coarse, and the wheel over a field moving nothing
-  - **Settled**: a figure's field carries `.dock-spin`, an up and a down of
-    the panel's own inside its right edge, on the path the marks stepped by,
-    `shift` coarse; the browser's spinner is taken off, and the field has
-    `step="any"` and the row's bounds. They show under a pointer that hovers
-    or while the field has the focus, as the goal draws a field at rest, and
-    always under a coarse pointer, 22 pixels wide. The arrows and page keys in
-    a field are `FIELD_STEP_KEYS`, read by the dock's `onKey`. Found in
-    Chromium: the page's key listener runs on the way down and stopped every
-    key a field had before the dock could see one, so the browser's own step
-    by 1 went on regardless - the page now hands the field's keys to the dock.
-    The wheel over a focused field lets go of it rather than moving the figure.
-  - From: Post Interactive Build
-- [x] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
-  with no figure to type, a number row the label and its field with the column
-  of figures kept in line, and a switch's or choice's reading drawn as a box a
-  click steps
-  - **Settled**: `‹ ›` are drawn beside a switch and a choice only - and a
-    nudge, which holds no figure either - and a figure's row is its label and
-    its field, the field standing in the readings' column so every reading
-    lines up. A switch's or a choice's reading is a button, `.dock-pick`, that
-    steps it by `cycleStep`: a switch either way, a choice on and round from
-    its last value to its first, where its marks stop at the ends. The goal's
-    mixed-case `Off` is the mockup's lettering; the panel keeps its own.
-  - From: Post Interactive Build
 - [x] **Mode types**: what an insert, load or save section does declared on it
   as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
   config<flight:start-point>`, `Load data<file>` - written and read back by one
@@ -358,4 +319,48 @@ how the simulator got here rather than as a list still to be worked.
     through `flyPlane`. The control list gains `Click (Insert plane) - Put the
     Start Point There` and `Drag (Insert plane) - Turn the Start Point by Its
     Knob`.
+  - From: Post Interactive Build
+- [x] **Objects on the ground**: a placement drawn as a mesh standing on the
+  ground rather than as ground, repeated on every tile on that tile's own
+  ground, fogged like the ground, solid to the aircraft - any touch on one a
+  crash, roofs included, while an extrusion's top is still landed on as
+  ground - picked by Select and taken whole by Erase
+  - **Settled**: an object is a placement of type `object` - `{ prefab,
+    recipe, config: { at, heading, scale } }` - and `js/objects.js` lays it
+    out. `buildEnvironment` leaves objects out, so the ground is drawn as
+    without them; each tile then stands them with `standingObjects`, once its
+    ground is joined to its neighbours, at the same canvas point on every tile:
+    on the highest ground under the footprint, over a plinth to the lowest.
+    The footprint is a hard-edged rect round the recipe, scaled and turned to
+    the heading. `js/object-mesh.js` draws one `InstancedMesh` to a recipe and
+    one for the plinths, in the ground's own held material, so fog takes them
+    as it takes the ground. `Terrain.obstacleTopAt` asks the tile under a point
+    and the tiles beside it; `Aircraft.update` takes it as `obstacle` and
+    crashes at any touch, read before the ground so a roof is never landed on,
+    while the ground - an extrusion's top included - is landed on as before; a
+    recipe marked `solid: false` is flown over. Select picks it inside its
+    footprint, over the ground it stands on; its outline is the footprint
+    traced; the Flat gumball moves it, turns it by its arc and scales it evenly
+    by its two ground squares; its panel is `HEADING` and `SCALE` under its
+    prefab's name. Erase taking everything takes it whole when a stroke's region
+    reaches its middle at all, and a put-back there gives it back - the last
+    batch to reach it deciding. The file reads it with its recipe and holds its
+    heading and scale.
+  - From: Post Interactive Build
+- [x] **Prefabs**: a building as a recipe of primitives in its own frame,
+  copied into the placement as a template's members are, merged and instanced
+  per prefab
+  - **Settled**: `js/prefabs.js` holds recipes of boxes, cylinders, cones
+    and wedges - a wedge's ridge down its middle or along its +x edge, a
+    cylinder narrowing to a `top` - each part standing its base on `at`, turned
+    about its upright by `turn` degrees, with a `0xrrggbb` colour.
+    `recipeGeometry` merges them into one list of triangles, every face wound
+    outward from its part and its normal worked from its own corners, colours
+    turned from sRGB to the linear light a vertex colour is read in.
+    `placeObject` copies the recipe in, so a prefab changed later leaves a
+    built world alone; `recipeKey` groups placements of one recipe into one
+    instanced mesh. `readRecipe` takes a file's recipe whole or refuses it,
+    naming where. The catalogue starts with two - COTTAGE and WATER TOWER -
+    under the six categories Insert City will fold; the city's own buildings
+    are the next run's.
   - From: Post Interactive Build

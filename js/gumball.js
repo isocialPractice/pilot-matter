@@ -33,6 +33,7 @@ import { getElement, isElementId, wrapOffset } from './environment/elements.js';
 import { rangePlaces } from './properties-panel.js';
 import { GROUP_TYPE, GROUP_RANGES, isGroup, groupReach, keepStripOnCanvas } from './templates.js';
 import { ERASE_TYPE } from './environment/erase.js';
+import { OBJECT_TYPE, OBJECT_RANGES, isObject } from './objects.js';
 
 /** The gumball an element is drawn with: one that stands to a height, or one that lies flat. */
 export const GUMBALL_HEIGHTS = 'heights';
@@ -108,7 +109,9 @@ export function gumballHandle(id) {
 export function gumballKind(type) {
     // A placed runway lies flat, as every strip does, and so does an erase
     // batch, which is a region of ground and nothing standing on it.
-    if (type === GROUP_TYPE || type === ERASE_TYPE) return GUMBALL_FLAT;
+    // An object is drawn with it too: moved, turned and scaled on the ground
+    // it stands on, with no height of its own to raise.
+    if (type === GROUP_TYPE || type === ERASE_TYPE || type === OBJECT_TYPE) return GUMBALL_FLAT;
     if (!isElementId(type)) return null;
     return getElement(type).ranges.height?.kind === 'span' ? GUMBALL_HEIGHTS : GUMBALL_FLAT;
 }
@@ -202,6 +205,9 @@ export function handleBinding(handleOrId, placement) {
         case 'stand':
             return spanOf(placement.type, 'height') ? { from: 'config', name: 'height', mode: 'scale' } : null;
         case 'extent': {
+            // An object is scaled evenly, whichever of the two squares on the
+            // ground is pulled - the Flat gumball's two, as a runway's are.
+            if (isObject(placement)) return handle.axis === 'blue' ? null : { from: 'config', name: 'scale', mode: 'scale' };
             // A placed runway is sized by its strip: across it, and along it.
             if (isGroup(placement)) {
                 const strip = GROUP_EXTENTS[handle.axis];
@@ -211,7 +217,7 @@ export function handleBinding(handleOrId, placement) {
             return name && Number.isFinite(footprint[name]) ? { from: 'footprint', name, mode: 'scale' } : null;
         }
         case 'turn':
-            if (handle.axis === 'blue' && isGroup(placement)) return { from: 'config', name: 'heading', mode: 'turn' };
+            if (handle.axis === 'blue' && (isGroup(placement) || isObject(placement))) return { from: 'config', name: 'heading', mode: 'turn' };
             return handle.axis === 'blue' && TURNED.includes(footprint?.kind)
                 ? { from: 'footprint', name: 'angle', mode: 'turn' }
                 : null;
@@ -354,8 +360,8 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
         const factor = Math.exp(along / SCALE_PIXELS);
         const scaled = drag.uniform ? scaleHandles(placement) : [binding];
         for (const each of scaled) {
-            if (each.from === 'config' && isGroup(placement)) {
-                const range = GROUP_RANGES[each.name];
+            if (each.from === 'config' && (isGroup(placement) || isObject(placement))) {
+                const range = (isObject(placement) ? OBJECT_RANGES : GROUP_RANGES)[each.name];
                 const held = Number(placement.config?.[each.name]);
                 const value = Math.min(Math.max((Number.isFinite(held) ? held : range.default) * factor, range.low), range.high);
                 changes.config[each.name] = stepped(range, value);

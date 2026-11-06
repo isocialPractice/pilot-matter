@@ -112,23 +112,30 @@
       }
     },
     "placement": {
-      "description": "Something the builder placed: an element, an erase batch, or a runway template's group of members. A placement may carry more than the fields named here, which the builder adds as it needs to.",
+      "description": "Something the builder placed: an element, an erase batch, a runway template's group of members, or an object standing on the ground. A placement may carry more than the fields named here, which the builder adds as it needs to.",
       "type": "object",
       "required": ["type"],
       "properties": {
         "type": {
           "anyOf": [
             { "$ref": "#/$defs/elementType" },
-            { "enum": ["erase", "group"] }
+            { "enum": ["erase", "group", "object"] }
           ]
         },
         "config": {
-          "description": "The element's ranges, each held to its bounds when the file is read, and the point it was dropped at.",
+          "description": "The element's ranges, each held to its bounds when the file is read, and the point it was dropped at. An object's are its point, its heading in degrees and its scale, held to 0.5 to 3.",
           "type": "object",
           "properties": {
             "at": { "$ref": "#/$defs/point" }
           }
         },
+        "prefab": {
+          "description": "An object's prefab, by its id: the catalogue entry it was placed from.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "recipe": { "$ref": "#/$defs/recipe" },
         "footprint": { "$ref": "#/$defs/region" },
         "clip": { "$ref": "#/$defs/region" },
         "seed": { "type": "number" },
@@ -148,8 +155,44 @@
           }
         }
       },
-      "if": { "properties": { "type": { "const": "group" } } },
-      "then": { "required": ["template"] }
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "group" } } },
+          "then": { "required": ["template"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "object" } } },
+          "then": { "required": ["prefab", "recipe"] }
+        }
+      ]
+    },
+    "recipe": {
+      "description": "A building as parts of simple shapes, in metres in its own frame - x across, y up from the ground, z the way it faces - copied into an object when it is placed. Read whole or refused: a part out of its bounds is not guessed at.",
+      "type": "object",
+      "required": ["parts"],
+      "additionalProperties": false,
+      "properties": {
+        "parts": { "type": "array", "minItems": 1, "maxItems": 400, "items": { "$ref": "#/$defs/part" } },
+        "solid": { "description": "False for something the aircraft flies over rather than into, such as a park.", "type": "boolean" }
+      }
+    },
+    "part": {
+      "description": "One part of a recipe - a box, a wedge (a roof's triangular prism), a cylinder or a cone - its base standing on the point it names.",
+      "type": "object",
+      "required": ["shape", "at", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "shape": { "enum": ["box", "cylinder", "cone", "wedge"] },
+        "at": { "description": "Where the part's base stands, in metres: x, y and z.", "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "color": { "description": "The colour as a number, 0xrrggbb.", "type": "integer", "minimum": 0, "maximum": 16777215 },
+        "turn": { "description": "A turn about the part's upright, in degrees.", "type": "number" },
+        "size": { "description": "A box's or a wedge's width, height and depth, in metres.", "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3 },
+        "ridge": { "description": "Where a wedge's ridge runs: down its middle, or along its +x edge.", "enum": ["middle", "edge"] },
+        "radius": { "type": "number", "exclusiveMinimum": 0 },
+        "top": { "description": "A cylinder's radius at its top, where it narrows.", "type": "number", "minimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "segments": { "description": "How many sides a cylinder or a cone is drawn with.", "type": "integer", "minimum": 3, "maximum": 32 }
+      }
     }
   }
 }

@@ -97,7 +97,7 @@
 ├── index.html          # Entry point - overlay markup, import map, styles
 ├── js/
 │   ├── main.js         # Scene setup, render loop, keys, and overlay state
-│   ├── aircraft.js     # 3D model built from a plane's recipe, the plane flown and its figures, and the frame loop the flight model drives
+│   ├── aircraft.js     # 3D model built from a plane's recipe, the plane flown and its figures, and the frame loop the flight model drives - a touch on an object standing on the ground a crash at any speed
 │   ├── flight-model.js # Pure throttle, speed convergence, the engineless glide, lift and stall math
 │   ├── config.js       # Pure simulator start state, and the fields it is set through
 │   ├── flight-state.js # Pure configured start in the units the model flies in, and whether a world put in force is a new flight
@@ -137,6 +137,8 @@
 │   ├── environment-file.js # Pure environment file: a built world written as one JSON document and read back, refused whole with its first problem named, every range it sets held to its bounds
 │   ├── environment-io.js # An environment file written through the browser's save dialog or downloaded, and one chosen in the file dialog and read
 │   ├── loaded-world.js # Pure loaded world: the last world a file brought, kept by the browser as the file's text and listed by the settings under its name
+│   ├── prefabs.js      # Pure prefabs: buildings as recipes of boxes, cylinders, cones and wedges in their own frame, merged into coloured triangles wound outward, their bounds, the catalogue and its categories, and a recipe read back from a file whole or refused
+│   ├── objects.js      # Pure objects on the ground: a prefab placed with its recipe copied in, its footprint turned to its heading, standing on the highest ground under it over a plinth to the lowest on every tile, taken whole by an erase over its middle, and the top the aircraft hits
 │   ├── planes.js       # Pure planes: the five a world can be flown in - trainer, bush plane, twin, jet and biplane - each a recipe of boxes, cylinders and cones with the figures it flies on, and the chase distance its size calls for
 │   ├── start-point.js  # Pure start point: where on a world a flight begins, which way and how high above the ground, held to the world, written out as Insert Plane's rows in the settings' altitude unit, and opened as a flying start
 │   ├── templates.js    # Pure runway templates: the cards Insert Runway offers - two runways and two airports - a template placed as one group of the registry's own elements, an airport's apron and buildings laid out as lots from its strip's paving, and the group expanded, turned and kept on the canvas when the ground is built
@@ -156,7 +158,8 @@
 │   ├── hud-visibility.js # Pure instrument toggle and its stored choice
 │   ├── photo.js        # Pure photo mode state and filename, and the download
 │   ├── terrain-math.js # Pure noise, fBm, height curve, and mountain bump math
-│   ├── terrain.js      # An assembled environment as scene geometry, tile by tile, and the strip a flight opens on
+│   ├── terrain.js      # An assembled environment as scene geometry, tile by tile, the objects each tile stands on its own ground, the top of whatever stands over a point, and the strip a flight opens on
+│   ├── object-mesh.js  # A tile's objects as one instanced mesh to a recipe, lit and fogged as the ground is, over plinths where the ground falls away
 │   ├── ground-material.js # Pure shader edit holding the ground's interpolated colour to 0 and 1, so the fog reaches a saturated paint seen from far off
 │   ├── day-night.js    # Pure day cycle: the sky, the light, and the sun's arc
 │   ├── water.js        # Pure wave, sheen, and the surface animation both use

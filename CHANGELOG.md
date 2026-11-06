@@ -5,6 +5,87 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.62.0] - 2026-11-05
+
+Objects on the ground: buildings drawn as meshes standing on the ground, built
+from recipes of simple shapes.
+
+### Added
+
+- **Objects on the ground.** A new kind of placement stands on the ground
+  rather than being raised out of it, so a building smaller than the ground's
+  sampling is drawn as it is. It stands on the highest ground under its
+  footprint over a plinth to the lowest, at the same point of every tile of
+  the endless world on that tile's own ground, and is lit and fogged as the
+  ground is.
+- **Objects are solid.** Any touch on one is a crash, at any speed - a wall
+  flown into or a roof come down on. The ground is landed on as before, the
+  top of an extrusion included. Something marked as not solid is flown over.
+- **Prefabs.** A building is a recipe of boxes, cylinders, cones and wedges,
+  merged into one coloured mesh and drawn as one instanced mesh however many
+  times it is placed. The recipe is copied into each placement, so a prefab
+  changed later leaves a world already built as it was. Two to start with: a
+  cottage and a water tower.
+- **The builder's tools handle them.** Select picks an object inside its
+  footprint and shows `HEADING` and `SCALE` under its name; the gumball moves
+  it, turns it and scales it evenly. Erase taking everything takes an object
+  whole when a stroke covers its middle, and a stroke putting back gives it
+  back.
+- **The environment file** carries objects with their recipes, and the schema
+  describes a recipe and its parts. A recipe is read whole or refused, naming
+  where; a heading and a scale are held to what they may be.
+
+Held in Node by `test/objects.test.js` - every prefab named once under a
+category with the footprint its card says, every recipe building into finite
+triangles with a colour at every corner, every face wound outward with its
+normal its own whatever the shape, a wedge's ridge and a cylinder's top where
+they are named, a part standing on its point and turned about its upright,
+colours handed on as linear light, a recipe read whole or refused with each
+problem named, and copied out of its prefab; an object placed with its recipe
+copied in and its figures held, its footprint turned and scaled round its
+reach, standing on the highest ground over a plinth to the lowest at its point
+of every tile, taken whole by an erase of everything over its middle and given
+back by a put-back, the last to reach it deciding, `obstacleTop` reading the
+highest solid top and passing a park, and no ground changed by it; Select
+picking it over the hill it stands on, its outline its footprint, the gumball
+moving, turning and scaling it inside its bounds, and its panel; the file and
+the schema; and the aircraft, the tiles and the mesh as their source says.
+Each rejected the defect it names when that was put back, 55 in all: a face
+left wound inward, a turned face's normal not its own length, a part not
+turned, a part stood off its point, a colour handed on as sRGB, a recipe read
+with a field it does not have, a part out of reach read, a ridge on a box
+read, too many parts read, the cottage's card the wrong size, a recipe read
+back the one given, a park solid, an object's recipe its prefab's own, a scale
+not held, a footprint not turned to the heading, a footprint not scaled, a
+footprint feathered, a footprint round its point, not its reach, an erase of
+one element taking objects, a weak batch taking an object, a put-back giving
+nothing back, an object taken only where a batch takes all of the ground, a
+batch taking what was placed after it, an object sunk to the lowest ground,
+every tile's object at the middle tile's point, the height not scaled, a park
+in the way, the lower of two tops, the inside of a turned footprint read
+square, an object drawn as ground, a tile's objects never let go of, the tiles
+beside a point not asked, objects stood on ground before it is matched, the
+objects drawn without the ground's material, no plinth, a roof landed on, a
+roof met only below the clearance, the aircraft never told what stands under
+it, an object never picked, the hill picked over the house, no gumball on an
+object, an object scaled past its bounds, a square standing up off an object,
+an object's arc turning nothing, an object outlined by the contour it falls
+through, a picked object's panel empty, a picked object called OBJECT, a
+picked object holding nothing, an object read with no prefab, an object's
+recipe not read, an object read standing nowhere, an object's scale read
+unheld, an object no placement a file has, a single slope drawn as two, a
+cylinder never narrowing.
+
+Settled in Chromium in 10 checks: a kept build's objects standing on every one
+of the nine tiles drawn; one instanced mesh to a recipe and one for the
+plinths, fogged, coloured at their corners; each on the highest ground under
+it over a plinth to the lowest; flying down onto the water tower a crash,
+flying level into its side a crash where its footprint begins, and flying
+clear over it none; the builder reopening on the three; a click picking the
+cottage with `SELECTED COTTAGE`, `HEADING`, `SCALE` and its gumball; `SCALE`
+typed and accepted drawing it larger; and Erase over the tower's middle taking
+it whole and leaving the cottages.
+
 ## [1.0.0-alpha.1.61.0] - 2026-11-05
 
 Insert Plane: five planes to fly a built world in, and a start point of the

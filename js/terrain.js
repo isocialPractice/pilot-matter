@@ -14,6 +14,15 @@ import {
     tilesTouching
 } from './world-tiles.js';
 import { recordWorld, sameWorld } from './world-record.js';
+import { standingObjects, obstacleTop } from './objects.js';
+import { objectGroup, disposeObjectGroup } from './object-mesh.js';
+
+/**
+ * How far past a tile's edge, in world units, an object standing on it may
+ * reach - which is how far round a point the tiles beside it are asked about
+ * what stands there.
+ */
+const OBJECT_REACH = 300;
 
 /**
  * The ground, as the mesh side of an assembled environment. Everything about
@@ -234,8 +243,23 @@ export class Terrain {
         // ground that has already been matched rather than drawn and corrected.
         const settled = this.joinTile(field, index);
 
-        const tile = { index, field, mesh: buildMesh(field), water: waterSurface(field), watered: false };
+        // What stands on the ground is laid out on it once it is settled: every
+        // object the world places, at its point of this tile, on this tile's
+        // own ground - which is the same point of every tile, and different
+        // ground under it on each.
+        const objects = standingObjects(this.built.elements ?? [], {
+            groundAt: (x, z) => sampleHeight(field, x, z),
+            originX: middle.x,
+            originZ: middle.z,
+            size: this.size
+        });
+
+        const tile = {
+            index, field, mesh: buildMesh(field), water: waterSurface(field), watered: false,
+            objects, objectMesh: objectGroup(objects)
+        };
         this.scene.add(tile.mesh);
+        if (tile.objectMesh) this.scene.add(tile.objectMesh);
         this.tiles.set(key, tile);
 
         for (const neighbour of settled) redrawTile(neighbour);
@@ -331,6 +355,10 @@ export class Terrain {
         this.scene.remove(tile.mesh);
         tile.mesh.geometry.dispose();
         tile.mesh.material.dispose();
+        if (tile.objectMesh) {
+            this.scene.remove(tile.objectMesh);
+            disposeObjectGroup(tile.objectMesh);
+        }
         this.tiles.delete(key);
     }
 
@@ -410,6 +438,30 @@ export class Terrain {
     getTerrainHeightAt(x, z) {
         const tile = this.tileAt(x, z);
         return tile ? sampleHeight(tile.field, x, z) : 0;
+    }
+
+    /**
+     * The top of whatever solid object stands over a place in the world, or
+     * null where nothing does - see `obstacleTop` in js/objects.js. Every tile
+     * a building near the point could be standing on is asked, so one standing
+     * across a tile's edge is still in the way on the far side of it.
+     */
+    obstacleTopAt(x, z) {
+        const seen = new Set();
+        let top = null;
+        for (const [dx, dz] of [[0, 0], [-OBJECT_REACH, 0], [OBJECT_REACH, 0], [0, -OBJECT_REACH], [0, OBJECT_REACH]]) {
+            const tile = this.tileAt(x + dx, z + dz);
+            if (!tile || seen.has(tile)) continue;
+            seen.add(tile);
+            const over = obstacleTop(tile.objects, x, z);
+            if (over != null && (top == null || over > top)) top = over;
+        }
+        return top;
+    }
+
+    /** Every object the tiles drawn stand, in the world - for anything that has to see them all. */
+    standingObjects() {
+        return [...this.tiles.values()].flatMap(tile => tile.objects ?? []);
     }
 
     /**

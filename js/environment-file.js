@@ -46,6 +46,8 @@ import { elementRow } from './element-editor.js';
 import { SHADE_RANGE } from './properties-panel.js';
 import { cleanStartPoint } from './start-point.js';
 import { isPlaneId } from './planes.js';
+import { OBJECT_TYPE, OBJECT_RANGES } from './objects.js';
+import { readRecipe } from './prefabs.js';
 
 /** What a file says it is, so a JSON file that is something else is refused by name. */
 export const ENVIRONMENT_FORMAT = 'pilot-matter.environment';
@@ -78,10 +80,13 @@ export const START_FIELDS = Object.freeze(['at', 'heading', 'heightFeet']);
 /** The fields an element's row carries in a file. Its label and note are read off the element. */
 export const ROW_FIELDS = Object.freeze(['id', 'type', 'config', 'base', 'shades']);
 
-/** The types a placement may be: an element, an erase batch, or a template's group. */
+/** The types a placement may be: an element, an erase batch, a template's group, or an object standing on the ground. */
 export function placementTypes() {
-    return [...ELEMENTS_BY_ID.keys(), ERASE_TYPE, GROUP_TYPE];
+    return [...ELEMENTS_BY_ID.keys(), ERASE_TYPE, GROUP_TYPE, OBJECT_TYPE];
 }
+
+/** The longest a prefab's name may be. */
+export const PREFAB_NAME_LIMIT = 60;
 
 /** The environments a world may be built on: the builder's canvases. */
 export function baseIds() {
@@ -349,6 +354,25 @@ function readPlacement(placement, where, problems, groups) {
 
     const config = read.config ?? {};
     if (config.at != null && resolvePoint(config.at) == null) problems.push(`${where}: at is not a point`);
+
+    // An object carries the building it was placed as, so the recipe is read
+    // as strictly as the rest of the file - a part out of its bounds refuses
+    // the file rather than being guessed at - and its point, heading and scale
+    // are held to what they may be.
+    if (type === OBJECT_TYPE) {
+        if (typeof read.prefab !== 'string' || read.prefab === '' || read.prefab.length > PREFAB_NAME_LIMIT) {
+            problems.push(`${where}: prefab is not named`);
+        }
+        const recipe = readRecipe(read.recipe, `${where}.recipe`);
+        problems.push(...recipe.problems);
+        if (recipe.recipe) read.recipe = recipe.recipe;
+        if (config.at == null) problems.push(`${where}: at is missing, so the object stands nowhere`);
+        for (const key of ['heading', 'scale']) {
+            if (config[key] != null && !Number.isFinite(config[key])) problems.push(`${where}: ${key} is not a number`);
+        }
+        read.config = clampConfig({ ranges: OBJECT_RANGES }, config);
+        return read;
+    }
 
     if (type === GROUP_TYPE) {
         if (typeof read.template !== 'string' || read.template === '') problems.push(`${where}: template is not named`);

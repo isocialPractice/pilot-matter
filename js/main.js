@@ -5011,6 +5011,8 @@ class FlightSimulator {
 
         const aircraftPos = this.aircraft.getPosition();
         const groundH     = this.terrain.getTerrainHeightAt(aircraftPos.x, aircraftPos.z);
+        // And whatever stands over that ground, which is not ground to land on.
+        const obstacle    = this.terrain.obstacleTopAt(aircraftPos.x, aircraftPos.z);
 
         // Read before the frame is flown, so the attitude the device is being
         // held at is the attitude this frame is flown in.
@@ -5022,7 +5024,7 @@ class FlightSimulator {
         // paused would set it down on top of the block and lose the height it
         // was flying at, which is what it is put back at when the flight
         // resumes over the world kept.
-        if (!canvas) this.aircraft.update(dt, groundH);
+        if (!canvas) this.aircraft.update(dt, groundH, obstacle);
 
         // The world has no end to it: the ground is laid on ahead of the
         // aircraft as it flies, out past everything the camera can see, so the

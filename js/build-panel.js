@@ -38,6 +38,8 @@ import {
     choosesPlane, placesStartPoint, toolModes
 } from './build-tools.js';
 import { PLANES, DEFAULT_PLANE_ID } from './planes.js';
+import { isObject, objectConfig, OBJECT_RANGES } from './objects.js';
+import { prefabById } from './prefabs.js';
 import { startRanges, startRowValues } from './start-point.js';
 import { modeIs } from './mode-types.js';
 import { defaultEnvironmentName, ENVIRONMENT_NAME_LIMIT } from './environment-file.js';
@@ -246,6 +248,11 @@ export function draftHolderFor(placement) {
         const { heading, length, width } = groupConfig(placement);
         return { config: { heading, length, width }, shades: {}, base: {} };
     }
+    // An object's own two, the way it faces and how large it is drawn.
+    if (isObject(placement)) {
+        const { heading, scale } = objectConfig(placement);
+        return { config: { heading, scale }, shades: {}, base: {} };
+    }
     // An erase batch's own two, what it takes and how much of it.
     if (isErase(placement)) {
         return { config: resolveConfig({ ranges: ERASE_RANGES }, placement.config), shades: {}, base: {} };
@@ -284,6 +291,7 @@ export function draftHolderFor(placement) {
  */
 export function panelRanges(placement) {
     if (isGroup(placement)) return { ...GROUP_RANGES };
+    if (isObject(placement)) return { ...OBJECT_RANGES };
     if (isErase(placement)) return { ...ERASE_RANGES };
     if (!isElementId(placement?.type)) return {};
 
@@ -663,6 +671,7 @@ function runwayContent(state, holder, context) {
 
 /** What a placement is called on the dock: a placed template by its card's name, and an element by its own. */
 function placementName(placement) {
+    if (isObject(placement)) return prefabById(placement.prefab)?.label ?? 'OBJECT';
     return isGroup(placement) ? runwayTemplate(placement.template)?.label ?? 'RUNWAY' : label(placement.type);
 }
 

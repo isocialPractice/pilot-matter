@@ -4897,9 +4897,9 @@ test('a flight resumed over ground that changed is put back over it, read where 
 test('while a canvas is open the aircraft is neither flown nor measured against the canvas\'s ground', () => {
     const frame = methodBody(mainSource, 'animate');
     assert.match(frame, /const canvas = buildModeDrawing\(this\.builder\);/);
-    assert.match(frame, /if \(!canvas\) this\.aircraft\.update\(dt, groundH\);/,
+    assert.match(frame, /if \(!canvas\) this\.aircraft\.update\(dt, groundH, obstacle\);/,
         'a frozen frame still meets the ground, and the canvas\'s is not the ground under the flight');
-    assert.doesNotMatch(frame.replace('if (!canvas) this.aircraft.update(dt, groundH);', ''), /this\.aircraft\.update\(/,
+    assert.doesNotMatch(frame.replace('if (!canvas) this.aircraft.update(dt, groundH, obstacle);', ''), /this\.aircraft\.update\(/,
         'and nothing else flies it there');
 });
 

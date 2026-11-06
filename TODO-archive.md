@@ -5191,3 +5191,31 @@ still be found by name.
     its own step keeps it. Ten presses on a fraction is the whole of it, so
     `shift` takes one to the end its arrow points at.
   - From: Post Interactive Build
+- [x] **The dock's own spin buttons**: the browser's spinner, which moves a
+  field by 1, replaced by the panel's own up and down inside the field, with
+  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
+  and `Page Down` always coarse, and the wheel over a field moving nothing
+  - **Settled**: a figure's field carries `.dock-spin`, an up and a down of
+    the panel's own inside its right edge, on the path the marks stepped by,
+    `shift` coarse; the browser's spinner is taken off, and the field has
+    `step="any"` and the row's bounds. They show under a pointer that hovers
+    or while the field has the focus, as the goal draws a field at rest, and
+    always under a coarse pointer, 22 pixels wide. The arrows and page keys in
+    a field are `FIELD_STEP_KEYS`, read by the dock's `onKey`. Found in
+    Chromium: the page's key listener runs on the way down and stopped every
+    key a field had before the dock could see one, so the browser's own step
+    by 1 went on regardless - the page now hands the field's keys to the dock.
+    The wheel over a focused field lets go of it rather than moving the figure.
+  - From: Post Interactive Build
+- [x] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
+  with no figure to type, a number row the label and its field with the column
+  of figures kept in line, and a switch's or choice's reading drawn as a box a
+  click steps
+  - **Settled**: `‹ ›` are drawn beside a switch and a choice only - and a
+    nudge, which holds no figure either - and a figure's row is its label and
+    its field, the field standing in the readings' column so every reading
+    lines up. A switch's or a choice's reading is a button, `.dock-pick`, that
+    steps it by `cycleStep`: a switch either way, a choice on and round from
+    its last value to its first, where its marks stop at the ends. The goal's
+    mixed-case `Off` is the mockup's lettering; the panel keeps its own.
+  - From: Post Interactive Build

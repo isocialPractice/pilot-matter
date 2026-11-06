@@ -28,6 +28,7 @@ import { footprintSampler, isFootprint } from './environment/footprints.js';
 import { mountainBump } from './terrain-math.js';
 import { isGroup, groupStrips, groupLots } from './templates.js';
 import { isErase } from './environment/erase.js';
+import { isObject, objectFootprint } from './objects.js';
 
 /**
  * How strongly a placement has to reach a point for a click there to find it,
@@ -97,9 +98,14 @@ const NOWHERE = () => 0;
  *
  * A placed template reaches wherever any of its strips does, apron and all,
  * and an airport wherever its apron and buildings do, so it is picked as one
- * wherever a pilot presses on it.
+ * wherever a pilot presses on it. An object reaches its footprint, hard-edged,
+ * which is the box round the building it stands for.
  */
 export function placementReach(placement, size = 0) {
+    if (isObject(placement)) {
+        const footprint = objectFootprint(placement);
+        return footprint ? footprintSampler(footprint, size) : NOWHERE;
+    }
     if (isGroup(placement)) {
         const strips = [...groupStrips(placement, size), ...groupLots(placement, size)].map(strip => footprintSampler(strip, size));
         return strips.length > 0 ? (x, z) => Math.max(...strips.map(weigh => weigh(x, z))) : NOWHERE;
@@ -143,8 +149,9 @@ function pointReach(placement, size) {
  * most strongly - a small peak on the slope of a large one is picked near its
  * own top, where it stands out of the slope, and the large one everywhere
  * else. A tie goes to the later in `ELEMENT_ORDER`, which is the one drawn
- * over the other, and between two of a type to the later committed, which is
- * drawn after the first.
+ * over the other - an object after every element, standing over them all - and
+ * between two of a type to the later committed, which is drawn after the
+ * first.
  */
 export function placementAt(placements, x, z, size = 0) {
     let best = null;
@@ -153,7 +160,9 @@ export function placementAt(placements, x, z, size = 0) {
         const weight = placementReach(placement, size)(x, z);
         if (!(weight >= PICK_WEIGHT)) return;
 
-        const order = ELEMENT_ORDER.indexOf(placement.type);
+        // An object stands on whatever ground is under it, so it is over all
+        // of it, and picked first where both reach.
+        const order = isObject(placement) ? ELEMENT_ORDER.length : ELEMENT_ORDER.indexOf(placement.type);
         if (best == null || weight > best.weight || (weight === best.weight && order >= best.order)) {
             best = { index, weight, order };
         }

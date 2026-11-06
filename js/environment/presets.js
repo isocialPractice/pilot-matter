@@ -20,6 +20,7 @@ import {
 import { applyFootprintedElement } from './footprinted.js';
 import { resolveErasures } from './erase.js';
 import { expandGroups } from '../templates.js';
+import { isObject } from '../objects.js';
 
 /**
  * The world the simulator has always generated, and the one a fresh install
@@ -350,6 +351,9 @@ export function environmentElements(environment, runway = false) {
  * before it - see `resolveErasures` - once a placed template has become the
  * placements it stands for, so a batch reaches into a template member by
  * member.
+ *
+ * An object changes no ground, so it is left out here: it stands on the field
+ * this draws, laid out by `js/objects.js`.
  */
 export function buildEnvironment(environment = getEnvironment(), options = {}) {
     const { runway = false, base, elements, seed, ...size } = options;
@@ -361,7 +365,9 @@ export function buildEnvironment(environment = getEnvironment(), options = {}) {
     // A placed template is the placements it stands for, each applied in the
     // pipeline's order with everything else: its strip last with the other
     // runways, its buildings where extrusions go.
-    const placements = resolveErasures(expandGroups(elements ?? environmentElements(environment, runway), field.size));
+    const placements = resolveErasures(
+        expandGroups(elements ?? environmentElements(environment, runway), field.size).filter(placement => !isObject(placement))
+    );
     for (const placement of orderPlacements(placements)) {
         applyFootprintedElement(field, placement, random);
     }

@@ -425,7 +425,13 @@ export class Aircraft {
         return true;
     }
 
-    update(dt, terrainHeight = 0) {
+    /**
+     * Flies one frame. `terrainHeight` is the ground under the aircraft, and
+     * `obstacle` the top of whatever solid object stands over it - null over
+     * open ground - which the host reads off its own world, as it reads the
+     * ground.
+     */
+    update(dt, terrainHeight = 0, obstacle = null) {
         dt = Math.min(dt, 0.05);
         this.terrainHeight = terrainHeight;
 
@@ -590,6 +596,17 @@ export class Aircraft {
         // is a rollout, and a rollout is not a second arrival: judging every
         // frame of one would turn a landing into a crash as the airspeed - and
         // with it the lift holding the aircraft up - bled away underneath it.
+        // An object standing on the ground is not ground. Any touch on one is
+        // a crash, at any speed - a wall flown into, or a roof come down on -
+        // so it is read apart from the ground rather than as a higher floor,
+        // and the gentle arrival a hillside or a strip forgives never reaches
+        // a roof. The ground under it, an extrusion's top included, is landed
+        // on as it always was.
+        if (Number.isFinite(obstacle) && this.position.y - this.clearance <= obstacle) {
+            recordTouchdown(this.crash, CRASHED);
+            return this.stopOnTheGround();
+        }
+
         const impactRate = dt > 0 ? (this.position.y - startY) / dt : 0;
         const minY = terrainHeight + this.clearance;
         const onGround = this.position.y <= minY;
