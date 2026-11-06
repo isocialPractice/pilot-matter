@@ -241,6 +241,31 @@ test('a body with no way through it is a pond, flat at its lowest ground', () =>
     }
 });
 
+test('every vertex a stroke narrower than the sampling weighs is given a bank, wherever it runs', () => {
+    // A cross-section thinner than a cell holds no vertex of its own, so the
+    // bank is read from the ground the sampling does reach. Searched by the
+    // stroke's width alone, a stroke 40 across weighed its vertices from a row
+    // it ran along and left every one of them dry once it was moved a few
+    // units off that row, so the same river drawn a pixel lower drew nothing.
+    let weighed = 0;
+    for (const offset of [0, 7, 13, 19]) {
+        const stroke = { kind: 'stroke', points: [[-2500, offset], [2500, offset]], stamp: { width: 40, depth: 40, corner: 0 } };
+        const bare  = ground(SLOPE);
+        const field = ground(SLOPE);
+        const covered = Array.from(weightsOf(bare, stroke)).filter(weight => weight > 0).length;
+
+        applyFootprintedElement(field, { type: 'water', config: { density: 1 }, footprint: stroke });
+        const wet = Array.from(field.water.line).filter(Number.isFinite).length;
+        let cut = 0;
+        for (let i = 0; i < field.count; i++) if (field.height[i] < bare.height[i] - 1e-6) cut++;
+
+        assert.equal(wet, covered, `${covered} weighed and ${wet} wet, ${offset} off a row of vertices`);
+        assert.equal(cut, covered, `and the ground cut to the line at every one of them, ${offset} off a row`);
+        weighed += covered;
+    }
+    assert.ok(weighed > 0, 'a stroke this narrow reaches vertices to be measured at some of those offsets');
+});
+
 test('drawn water is pale at its bank and dark in its middle, across its own width', () => {
     const { inward } = bankMeasure(ground(SLOPE), weightsOf(ground(SLOPE), STREAM), STREAM);
     const field = ground(SLOPE);

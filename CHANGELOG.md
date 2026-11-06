@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A narrow stroke of water or snow is laid wherever it is drawn.** The bank a
+  drawn body rests at was measured by searching the stroke's own width for
+  ground, and a stroke narrower than the ground is sampled at has no sampled
+  ground inside it - so a thin river or drift was laid only where it happened
+  to run along a row of the ground's own points, and the same stroke drawn a
+  few units to either side came out part covered or not at all. The search now
+  covers the sampling as well as the stroke, which leaves a stroke wider than
+  the sampling measured as it was. Held in Node by `test/drawn-water.test.js`.
+
 ## [1.0.0-alpha.1.65.0] - 2026-11-06
 
 Your own models: loaded, kept, and placed as planes, buildings and runways.

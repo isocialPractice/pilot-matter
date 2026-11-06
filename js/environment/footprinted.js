@@ -284,7 +284,10 @@ function resample(points, spacing) {
  *
  * Each way is walked at half a cell's spacing, and at every step the lowest
  * ground within half the stroke's width is found - the lowest bank of the
- * stroke's cross-section there. Every vertex then takes the bank of the point
+ * stroke's cross-section there - the search opened to the sampling where the
+ * stroke is narrower than it, since a cross-section thinner than a cell holds
+ * no vertex to read and every vertex the stroke weighs needs a bank. Every
+ * vertex then takes the bank of the point
  * of the way it lies across from, read between the two steps either side of
  * it: so every vertex across a stroke sees the same lowest bank and water lies
  * level across it, along it the line runs on between steps with no step of its
@@ -352,10 +355,23 @@ export function bankMeasure(field, weights, footprint) {
             if (maxX + sx + reach < -half || minX + sx - reach > half || maxZ + sz + reach < -half || minZ + sz - reach > half) continue;
 
             const samples = resample(way.points.map(([x, z]) => [x + sx, z + sz]), step / 2);
+            // How far a step searches for its cross-section's ground: its own
+            // half width, opened to the sampling the way is walked at.
+            //
+            // A vertex within half a width of the way lies up to half a step's
+            // spacing further from the nearest step than from the way itself,
+            // and one narrower than a cell has no vertex inside its width at
+            // all - so the width alone leaves vertices the stroke has a weight
+            // on with no bank measured, and drawn water and drawn snow come out
+            // part covered or, moved a few units off a row of vertices, not
+            // drawn anywhere. Half a cell's diagonal is the least that reaches
+            // a vertex wherever a step falls. A stroke wider than the sampling
+            // searches its own width, as it always did.
+            const span = Math.max(Math.hypot(way.half, step / 4), step / Math.SQRT2);
             // NaN for a step whose cross-section finds none of this tile's ground.
             const lows = samples.map(([x, z]) => {
                 let low = Infinity;
-                around(x, z, way.half, index => { if (field.height[index] < low) low = field.height[index]; });
+                around(x, z, span, index => { if (field.height[index] < low) low = field.height[index]; });
                 return Number.isFinite(low) ? low : NaN;
             });
 
