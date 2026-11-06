@@ -3608,7 +3608,7 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*(\/\/[^\n]*\n\s*)*if \(e\.button === 0 && !\(e\.shiftKey && dropsAtClick\(tool\)\) && drawAgain\(this\.builder\)\) this\.draftKept\(\);\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*else if \(e\.button === 0 && placesStartPoint\(tool\)\) this\.startPointAt\(e\);\s*return;\s*\}/,
+    assert.match(press, /if \(!gesture\) \{\s*(\/\/[^\n]*\n\s*)*if \(e\.button === 0 && !\(e\.shiftKey && dropsAtClick\(tool\)\) && drawAgain\(this\.builder\)\) this\.draftKept\(\);\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*else if \(e\.button === 0 && placesStartPoint\(tool\)\) this\.startPointAt\(e\);\s*else if \(e\.button === 0 && insertsCity\(tool\)\) this\.cityAt\(e\);\s*return;\s*\}/,
         'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, the eye dropper\'s, an extrusion\'s surface\'s, a stroke tool\'s or Insert Runway\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
@@ -3819,7 +3819,7 @@ test('an edit in hand redraws the canvas from what it holds, and is settled from
         /this\.terrain\.setEnvironment\(id, \{ runway: false, elements: canvasElements\(getEnvironment\(id\), this\.builder\) \}\)/);
 
     const apply = methodBody(mainSource, 'applyDockValue');
-    assert.match(apply, /else if \(kind === DOCK_DRAFT \|\| kind === DOCK_RUNWAY\) \{\s*reviseDraft\(this\.builder, \{ config: holder\.config \}\);\s*this\.redrawCanvas\(\);/,
+    assert.match(apply, /else if \(kind === DOCK_DRAFT \|\| kind === DOCK_RUNWAY \|\| kind === DOCK_CITY\) \{\s*reviseDraft\(this\.builder, \{ config: holder\.config \}\);\s*this\.redrawCanvas\(\);/,
         'a value moved on an edit is the ground moving under it');
 
     const settle = methodBody(mainSource, 'onDockAction');
@@ -3950,7 +3950,7 @@ test('a click with a tool that drops picks the ground and drops there', () => {
         /this\.renderer\.domElement\.style\.cursor = canvas \? this\.canvasCursor\(\) : '';/,
         'over ground marked as somewhere to click');
     assert.match(methodBody(mainSource, 'canvasCursor'),
-        /const tool = buildModeTool\(this\.builder\);\s*if \(eyeDropperArmed\(this\.builder\)\) return 'cell';\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/,
+        /const tool = buildModeTool\(this\.builder\);\s*if \(eyeDropperArmed\(this\.builder\)\) return 'cell';\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| insertsCity\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/,
         'which is a crosshair for a tool that drops, and for the lasso and the stroke tools, which draw on it - and a cell while the eye dropper is armed');
 });
 
@@ -4356,7 +4356,7 @@ test('a press with the lasso draws, never orbits, and the cursor says so', () =>
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);/,
         'shift and alt included, which are how a shape meets the selection');
-    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/);
+    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| insertsCity\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/);
 });
 
 test('the lasso\'s tiles and its deselect are drawn as the artwork draws them', () => {

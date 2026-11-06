@@ -743,7 +743,7 @@ test('the canvas places the start point at a click with Insert Plane, and turns 
 
     assert.match(methodBody(mainSource, 'onCanvasDrag'), /if \(this\.startTurning && e\.pointerId === this\.startTurning\.pointer\) \{\s*this\.turnStartAt\(e\.clientX, e\.clientY\);\s*return;/);
     assert.match(methodBody(mainSource, 'onCanvasRelease'), /if \(this\.startTurning && e\.pointerId === this\.startTurning\.pointer\) \{\s*this\.startTurning = null;/);
-    assert.match(methodBody(mainSource, 'canvasCursor'), /insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\|/);
+    assert.match(methodBody(mainSource, 'canvasCursor'), /insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| insertsCity\(tool\) \|\|/);
 });
 
 test('the overlay draws the start point whatever tool is live, and its knob only with Insert Plane', () => {

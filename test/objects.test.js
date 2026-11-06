@@ -405,7 +405,7 @@ test('every tile stands the objects on its own ground once it is settled, and le
     assert.match(add, /const objects = standingObjects\(this\.built\.elements \?\? \[\], \{\s*groundAt: \(x, z\) => sampleHeight\(field, x, z\),\s*originX: middle\.x,\s*originZ: middle\.z,\s*size: this\.size\s*\}\);/);
     const joined = add.indexOf('const settled = this.joinTile(field, index);');
     assert.ok(joined >= 0 && joined < add.indexOf('standingObjects('), 'on ground already matched to its neighbours');
-    assert.match(add, /objects, objectMesh: objectGroup\(objects\)/);
+    assert.match(add, /objects, objectMesh: objectGroup\(objects, \{ groundAt: \(x, z\) => sampleHeight\(field, x, z\) \}\)/);
     assert.match(add, /if \(tile\.objectMesh\) this\.scene\.add\(tile\.objectMesh\);/);
     assert.match(methodBody(terrain, 'dropTile'), /if \(tile\.objectMesh\) \{\s*this\.scene\.remove\(tile\.objectMesh\);\s*disposeObjectGroup\(tile\.objectMesh\);/);
     const top = methodBody(terrain, 'obstacleTopAt');
@@ -420,6 +420,6 @@ test('each recipe is one instanced mesh, lit and fogged by the ground\'s own mat
     assert.match(mesh, /byRecipe\.get\(object\.key\)\.push\(object\)/, 'one mesh to a recipe');
     assert.match(mesh, /return holdGroundColor\(new THREE\.MeshLambertMaterial\(\{ vertexColors: true \}\)\);/);
     assert.match(mesh, /matrix\.compose\(position\.set\(object\.x, object\.stand, object\.z\), turn, scale\.setScalar\(object\.scale\)\);/);
-    assert.match(mesh, /const plinths = objects\.filter\(object => object\.stand - object\.base > 0\.05\);/);
+    assert.match(mesh, /const plinths = objects\.filter\(object => !object\.drape && object\.stand - object\.base > 0\.05\);/);
     assert.match(mesh, /scale\.set\(footprint\.width, object\.stand - object\.base \+ PLINTH_DEPTH, footprint\.depth\)/);
 });

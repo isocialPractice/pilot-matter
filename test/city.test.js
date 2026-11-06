@@ -10,17 +10,27 @@ import { placeObject, standingObjects, obstacleTop } from '../js/objects.js';
 
 const meshSource = readFileSync(fileURLToPath(new URL('../js/object-mesh.js', import.meta.url)), 'utf8');
 
-/** The counts Insert City was asked for, as the request gave them. Roads are the next run's, under INFRASTRUCTURE too. */
+/**
+ * The counts Insert City was asked for, as the request gave them: the
+ * infrastructure category's buildings, and its roads, asked for apart.
+ */
 const ASKED = Object.freeze({
     skylines: [4, 6], factory: [2, 4], residential: [8, 10], commercial: [4, 6], infrastructure: [4, 6], parks: [6, 8]
 });
+const ROADS_ASKED = [5, 6];
+const buildingsIn = category => prefabsIn(category).filter(prefab => prefab.kind !== 'road');
+const roads = () => PREFABS.filter(prefab => prefab.kind === 'road');
 
 test('every category holds as many as were asked for', () => {
     assert.deepEqual(Object.keys(ASKED), PREFAB_CATEGORIES.map(category => category.id));
     for (const [category, [low, high]] of Object.entries(ASKED)) {
-        const count = prefabsIn(category).length;
+        const count = buildingsIn(category).length;
         assert.ok(count >= low && count <= high, `${category}: ${count}, asked ${low} to ${high}`);
     }
+    assert.ok(roads().length >= ROADS_ASKED[0] && roads().length <= ROADS_ASKED[1], `${roads().length} roads`);
+    assert.ok(roads().every(prefab => prefab.category === 'infrastructure'), 'the roads are infrastructure, after its buildings');
+    const infrastructure = prefabsIn('infrastructure');
+    assert.ok(infrastructure.findIndex(prefab => prefab.kind === 'road') > infrastructure.findLastIndex(prefab => prefab.kind !== 'road'));
     assert.equal(PREFABS.length, Object.keys(ASKED).reduce((sum, category) => sum + prefabsIn(category).length, 0), 'none outside a category');
 });
 
@@ -30,7 +40,8 @@ test('the catalogue is the plan\'s, card for card', () => {
     assert.deepEqual(names('factory'), ['SAWTOOTH MILL', 'STACK WORKS', 'TANK YARD']);
     assert.deepEqual(names('residential'), ['COTTAGE', 'BUNGALOW', 'TWO-STOREY HOUSE', 'TERRACE ROW', 'DUPLEX', 'TOWNHOUSES', 'LOW-RISE FLATS', 'APARTMENT BLOCK', 'HIGH-RISE FLATS']);
     assert.deepEqual(names('commercial'), ['CORNER SHOP', 'HIGH STREET ROW', 'OFFICE BLOCK', 'SHOPPING CENTRE', 'HOTEL']);
-    assert.deepEqual(names('infrastructure'), ['POWER STATION', 'WATER TOWER', 'SUBSTATION', 'FIRE STATION', 'HOSPITAL']);
+    assert.deepEqual(names('infrastructure'), ['POWER STATION', 'WATER TOWER', 'SUBSTATION', 'FIRE STATION', 'HOSPITAL',
+        'STRAIGHT', 'CURVE', 'T-JUNCTION', 'CROSSROADS', 'ROUNDABOUT', 'DEAD END']);
     assert.deepEqual(names('parks'), ['LAWN', 'WOODLAND', 'POND PARK', 'PLAYGROUND', 'SPORTS FIELD', 'PLAZA', 'FORMAL GARDEN']);
     assert.equal(new Set(PREFABS.map(prefab => prefab.label)).size, PREFABS.length, 'no name twice');
     for (const prefab of PREFABS) {
@@ -61,7 +72,11 @@ test('a skyline is a block of two to five towers, reaching up past every block o
 
 test('every building is solid, and every park is flown over, laid on a lawn of its own over a plinth of its own colour', () => {
     for (const prefab of PREFABS) {
-        if (prefab.category === 'parks') {
+        if (prefab.kind === 'road') {
+            assert.equal(recipeSolid(prefab.recipe), false, `${prefab.id} is flown over`);
+            assert.equal(prefab.recipe.drape, true, `${prefab.id} is laid over the ground`);
+            assert.ok(prefab.recipe.connectors.length >= 1, `${prefab.id} joins`);
+        } else if (prefab.category === 'parks') {
             assert.equal(recipeSolid(prefab.recipe), false, `${prefab.id} is not in the way`);
             assert.ok(Number.isInteger(prefab.recipe.plinth), `${prefab.id} names its plinth's colour`);
             const [ground] = prefab.recipe.parts;

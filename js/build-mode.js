@@ -22,7 +22,7 @@
 
 import {
     SELECT_TOOL, FILES_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool, isEraseTool,
-    isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate, dropsAtClick
+    isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate, dropsAtClick, insertsCity
 } from './build-tools.js';
 import {
     DEFAULT_EXTRUDE_TOOL, extrudeTool, EXTRUDE_DRAWING, EXTRUDE_EXTRUDING, EXTRUDE_SURFACES, EXTRUDE_STAGES,
@@ -33,6 +33,9 @@ import {
 } from './templates.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
 import { cleanStartPoint, placeStartPoint, turnStartPoint } from './start-point.js';
+import { placeObject, objectConfig, keepObjectOnCanvas } from './objects.js';
+import { prefabById, PREFAB_CATEGORIES } from './prefabs.js';
+import { isRoad, snapRoad } from './roads.js';
 import { isPlaneId } from './planes.js';
 import { isErase, eraseConfig } from './environment/erase.js';
 import {
@@ -169,6 +172,11 @@ export function createBuildState() {
         // The template Insert Runway is armed with, or null until a card is
         // chosen: the pointer carries nothing and a click places nothing.
         runwayTemplate: null,
+        // The card Insert City is armed with, or null until one is chosen, and
+        // the one category its panel has open - one at a time, so a phone does
+        // not scroll past six grids to reach the one it wants.
+        cityPrefab: null,
+        citySection: PREFAB_CATEGORIES[0].id,
         // The world's own flight, which Insert Plane sets: where a flight on it
         // starts, as `js/start-point.js` holds one, and which plane it is flown
         // in, by id - each null for none. One of each per world, so they are
@@ -828,6 +836,91 @@ export function chooseRunwayTemplate(state, id) {
     return true;
 }
 
+// --- Insert City -----------------------------------------------------------------
+
+/** The card Insert City is armed with, or null while none is chosen. */
+export function buildCityPrefab(state) {
+    return prefabById(state?.cityPrefab) ? state.cityPrefab : null;
+}
+
+/** The category Insert City's panel has open, or null with every one shut. */
+export function buildCitySection(state) {
+    return state?.citySection ?? null;
+}
+
+/**
+ * Opens one of Insert City's categories, shutting whichever was open - or,
+ * pressed again, shuts it. Refused for a category there is not.
+ */
+export function openCitySection(state, id) {
+    if (!PREFAB_CATEGORIES.some(category => category.id === id)) return false;
+    state.citySection = state.citySection === id ? null : id;
+    return true;
+}
+
+/**
+ * Arms Insert City with a card. With the piece it placed still in hand, that
+ * piece becomes the new card, where it stood and facing the way it faced.
+ * Refused off a canvas, with a confirm open, with Insert City not live, and
+ * for a card there is not.
+ */
+export function chooseCityPrefab(state, id) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsCity(state.tool) || prefabById(id) == null) return false;
+    state.cityPrefab = id;
+    const draft = state.draft;
+    if (draftPending(state) && draft.tool === state.tool && draft.replaces == null) {
+        const { at, heading, scale } = objectConfig(draft.placement);
+        state.draft = { ...draft, placement: placeObject(id, at, { heading, scale }) };
+    }
+    return true;
+}
+
+/**
+ * Where the armed card would be placed by a click at a point: the prefab there,
+ * facing `heading` - the way the view looks, to the nearest ten degrees - kept
+ * on a canvas `size` wide; a road snapped end to end to the open end of a road
+ * already committed within reach, unless `free` - `shift` held - says to place
+ * it where it is. `{ placement, snapped }`, or null with no card armed or no
+ * ground under the point.
+ */
+export function cityPlacement(state, point, heading = 0, { size = 0, free = false, scale = 1 } = {}) {
+    const id = buildCityPrefab(state);
+    if (id == null || !Number.isFinite(point?.x) || !Number.isFinite(point?.z)) return null;
+    // Held to a tenth of a metre, so a file carries the point a pilot put it
+    // at rather than the last digits of a ray through the ground.
+    const at = keepObjectOnCanvas([point.x, point.z], size).map(value => Math.round(value * 10) / 10 || 0);
+    const placement = placeObject(id, at, { heading, scale });
+    if (free || !isRoad(placement)) return { placement, snapped: false };
+    const snap = snapRoad(placement, committedPlacements(state));
+    return snap ? { placement: snap.placement, snapped: true } : { placement, snapped: false };
+}
+
+/**
+ * A click on the ground with Insert City armed: the card placed there as the
+ * edit in hand - or, with the one it placed still in hand, that one put down
+ * there instead, facing the way it was turned - and a road snapped to the open
+ * end it comes near, unless `free`. Refused off a canvas, with a confirm open,
+ * with Insert City not live or not armed, for a point that is not on the
+ * ground, and with an edit in hand this tool did not begin.
+ */
+export function insertObject(state, point, heading = 0, { size = 0, free = false } = {}) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || !insertsCity(state.tool)) return false;
+    if (buildCityPrefab(state) == null) return false;
+
+    if (draftPending(state)) {
+        const draft = state.draft;
+        if (draft.tool !== state.tool || draft.replaces != null) return false;
+        const held = objectConfig(draft.placement);
+        const moved = cityPlacement(state, point, held.heading, { size, free, scale: held.scale });
+        if (moved == null) return false;
+        draft.placement = own(moved.placement);
+        return true;
+    }
+
+    const placed = cityPlacement(state, point, heading, { size, free });
+    return placed != null && startDraft(state, placed.placement, state.tool);
+}
+
 /**
  * A click on the ground with Insert Runway armed: the template placed there,
  * facing `heading` to the nearest ten degrees - the way the view looks, which
@@ -1235,6 +1328,8 @@ function openCanvas(state, environmentId, kept, world, flight = null) {
     state.lassoTool = DEFAULT_LASSO_TOOL;
     state.lassoValues = {};
     state.runwayTemplate = null;
+    state.cityPrefab = null;
+    state.citySection = PREFAB_CATEGORIES[0].id;
     state.dropper = false;
     state.popup = null;
     state.extrudeTool = DEFAULT_EXTRUDE_TOOL;
@@ -1440,7 +1535,7 @@ export function drawAgain(state) {
     if (!autoAccepts(state, 'draw') || !draftPending(state) || confirmOpen(state) || toolSuspended(state)) return false;
     if (eyeDropperArmed(state)) return false;
 
-    const draws = isStrokeTool(tool) || dropsAtClick(tool) || insertsTemplate(tool)
+    const draws = isStrokeTool(tool) || dropsAtClick(tool) || insertsTemplate(tool) || insertsCity(tool)
         || (isExtrudeTool(tool) && state.draft.stage === EXTRUDE_EXTRUDING);
     if (!draws) return false;
 

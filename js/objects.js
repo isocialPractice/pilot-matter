@@ -29,13 +29,17 @@
  * scaled - the region Select picks it by, its outline is drawn round, and the
  * aircraft is tested against.
  *
+ * A recipe marked `drape` - a road - is laid over the ground instead: every
+ * corner of it set on the ground under that corner, `DRAPE_LIFT` over it, so
+ * it runs with the land. It stands on no plinth, and `drapedGeometry` lays it.
+ *
  * Pure module with no DOM or Three.js dependency.
  */
 
 import { scalar, wrapOffset } from './environment/elements.js';
 import { footprintWeight } from './environment/footprints.js';
 import { isErase, eraseConfig, eraseRegion, ERASE_ALL } from './environment/erase.js';
-import { recipeBounds, recipeKey, recipeSolid, copyRecipe, prefabById } from './prefabs.js';
+import { recipeBounds, recipeKey, recipeSolid, copyRecipe, prefabById, recipeGeometry } from './prefabs.js';
 
 /** The placement type an object is. */
 export const OBJECT_TYPE = 'object';
@@ -52,6 +56,9 @@ export const OBJECT_RANGES = Object.freeze({
  * thins the ground it crosses, but a building is there or it is not.
  */
 export const OBJECT_ERASE_STRENGTH = 0.5;
+
+/** How far over the ground a draped object's corners are set, in metres: enough to clear the ground's own triangles between them. */
+export const DRAPE_LIFT = 0.25;
 
 /** How many points across and along its footprint the ground under an object is read at. */
 export const STAND_SAMPLES = 5;
@@ -200,11 +207,58 @@ export function standingObjects(placements = [], { groundAt = () => 0, originX =
             top: stand + objectHeight(placement),
             footprint: world,
             solid: recipeSolid(placement.recipe),
-            plinth: Number.isInteger(placement.recipe?.plinth) ? placement.recipe.plinth : null
+            plinth: Number.isInteger(placement.recipe?.plinth) ? placement.recipe.plinth : null,
+            drape: placement.recipe?.drape === true
         });
     });
 
     return standing;
+}
+
+/**
+ * The draped objects among those standing - roads - laid over the ground as one
+ * list of triangles: every corner of every recipe turned to its object's
+ * heading, scaled, carried to its point, and set `DRAPE_LIFT` over the ground
+ * under it with its own height on top. Each triangle's normal is worked again
+ * from its corners as they lie. `{ positions, normals, colors, count }`.
+ */
+export function drapedGeometry(objects = [], groundAt = () => 0, lift = DRAPE_LIFT) {
+    const draped = (objects ?? []).filter(object => object.drape);
+    const shapes = new Map();
+    const positions = [], normals = [], colors = [];
+
+    for (const object of draped) {
+        if (!shapes.has(object.key)) shapes.set(object.key, recipeGeometry(object.recipe));
+        const shape = shapes.get(object.key);
+        const cos = Math.cos(object.yaw), sin = Math.sin(object.yaw);
+        const corners = [];
+        for (let i = 0; i < shape.count; i++) {
+            const lx = shape.positions[i * 3] * object.scale;
+            const ly = shape.positions[i * 3 + 1] * object.scale;
+            const lz = shape.positions[i * 3 + 2] * object.scale;
+            const x = object.x + lx * cos + lz * sin;
+            const z = object.z - lx * sin + lz * cos;
+            corners.push([x, (Number(groundAt(x, z)) || 0) + lift + ly, z]);
+        }
+        for (let t = 0; t < shape.count; t += 3) {
+            const [a, b, c] = [corners[t], corners[t + 1], corners[t + 2]];
+            const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+            const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+            const length = Math.hypot(...n) || 1;
+            for (let k = 0; k < 3; k++) {
+                positions.push(...corners[t + k]);
+                normals.push(n[0] / length, n[1] / length, n[2] / length);
+                colors.push(shape.colors[(t + k) * 3], shape.colors[(t + k) * 3 + 1], shape.colors[(t + k) * 3 + 2]);
+            }
+        }
+    }
+
+    return {
+        positions: Float32Array.from(positions),
+        normals: Float32Array.from(normals),
+        colors: Float32Array.from(colors),
+        count: positions.length / 3
+    };
 }
 
 /** True for a point inside a standing object's footprint. */

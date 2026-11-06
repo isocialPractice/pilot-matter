@@ -24,7 +24,7 @@ import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
     brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface,
-    saveName, fileStatus, buildStartPoint, buildPlane
+    saveName, fileStatus, buildStartPoint, buildPlane, buildCityPrefab, buildCitySection
 } from './build-mode.js';
 import {
     EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, EXTRUDE_BACK, extrudeRows, extrudeTool,
@@ -35,11 +35,11 @@ import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from
 import {
     BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isEraseTool,
     isExtrudeTool, isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate, isPaletteBar,
-    choosesPlane, placesStartPoint, toolModes
+    choosesPlane, placesStartPoint, toolModes, insertsCity
 } from './build-tools.js';
 import { PLANES, DEFAULT_PLANE_ID } from './planes.js';
 import { isObject, objectConfig, OBJECT_RANGES } from './objects.js';
-import { prefabById } from './prefabs.js';
+import { prefabById, prefabsIn, PREFAB_CATEGORIES } from './prefabs.js';
 import { startRanges, startRowValues } from './start-point.js';
 import { modeIs } from './mode-types.js';
 import { defaultEnvironmentName, ENVIRONMENT_NAME_LIMIT } from './environment-file.js';
@@ -108,6 +108,57 @@ export const START_SECTION = 'start';
 
 /** The answer that takes the start point away, so the world starts where it always did. */
 export const DOCK_CLEAR_START = Object.freeze({ id: 'clear-start', label: 'CLEAR' });
+
+/** Insert City's panel, each of its categories a section of it. */
+export const DOCK_CITY = 'city';
+
+/** The id a category's section goes by on Insert City's panel. */
+export function citySection(category) {
+    return `city:${category}`;
+}
+
+/**
+ * Insert City's panel, `Insert asset<city>`: one folding section for each of
+ * the catalogue's categories, in the order the art lists them, each a grid of
+ * named cards - Infrastructure's buildings first, then its roads, a row of
+ * their own - with only the one category open that was opened last, so a
+ * phone is not scrolled past six grids to reach the one it wants. The card
+ * armed is pressed. With the piece it placed in hand, its `HEADING` and `SCALE`
+ * lead the panel, with the accept and cancel that settle it.
+ */
+function cityContent(state, holder, context) {
+    const tool = buildTool(buildModeTool(state));
+    const chosen = buildCityPrefab(state);
+    const open = buildCitySection(state);
+    const draft = draftPending(state) ? buildDraft(state) : null;
+    const held = draft ? holder ?? draftHolderFor(draft) : { config: {} };
+    const ranges = draft ? panelRanges(draft) : {};
+    const card = prefab => ({ id: prefab.id, label: prefab.label, name: prefab.label, art: null, live: prefab.id === chosen });
+
+    return {
+        kind: DOCK_CITY,
+        heading: tool?.heading ?? '',
+        ranges,
+        holder: held,
+        rows: panelRows(ranges, held, context),
+        nudges: [],
+        actions: draft ? [DOCK_ACCEPT, DOCK_CANCEL] : [],
+        sections: PREFAB_CATEGORIES.map(category => {
+            const all = prefabsIn(category.id);
+            const buildings = all.filter(prefab => prefab.kind !== 'road');
+            const roads = all.filter(prefab => prefab.kind === 'road');
+            const shown = category.id === open;
+            return {
+                id: citySection(category.id), kind: DOCK_CITY, category: category.id, heading: category.label,
+                folds: true, open: shown, holder: { config: {} }, rows: [],
+                shapes: shown ? [
+                    { row: category.id, tools: buildings.map(card) },
+                    ...(roads.length > 0 ? [{ row: 'roads', tools: roads.map(card) }] : [])
+                ] : []
+            };
+        })
+    };
+}
 
 /** What SELECT STARTING POINT says while there is no start point to write out. */
 export const START_HINT = 'click the ground to start a flight there';
@@ -422,6 +473,7 @@ function panelContent(state, { camera = null, fov, holder = null, context = {}, 
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
     if (isPaletteBar(buildModeTool(state))) return filesContent(state);
     if (choosesPlane(buildModeTool(state)) || placesStartPoint(buildModeTool(state))) return planeContent(state, context, altitude);
+    if (insertsCity(buildModeTool(state))) return cityContent(state, holder, context);
 
     if (draftPending(state) && !(select && picked)) {
         const draft = buildDraft(state);

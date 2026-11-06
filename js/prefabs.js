@@ -13,7 +13,16 @@
  *
  * A part may be turned about its own upright by `turn`, in degrees. A wedge's
  * ridge runs along its length, down the middle or - `ridge: 'edge'` - along its
- * `+x` side, for a single slope. A cylinder may narrow to a `top` radius.
+ * `+x` side, for a single slope. A cylinder may narrow to a `top` radius. A
+ * ribbon is a flat strip `width` wide along a line of `points` - round and
+ * back to its start when `closed` - cut every `RIBBON_STEP` metres so ground
+ * it is laid over can bend it.
+ *
+ * A recipe marked `drape` - a road - is laid over the ground rather than
+ * stood on it: each corner is set on the ground under it, so the road runs
+ * with the land instead of on a level. A road also names its `connectors`,
+ * each a point and the compass heading that leads out of the piece there,
+ * which `js/roads.js` joins pieces end to end by.
  *
  * The recipe is copied into a placement when one is placed, as a template's
  * members are, so a prefab changed later leaves a world already built as it
@@ -30,7 +39,14 @@
  */
 
 /** The shapes a part may be. */
-export const PREFAB_SHAPES = Object.freeze(['box', 'cylinder', 'cone', 'wedge']);
+export const PREFAB_SHAPES = Object.freeze(['box', 'cylinder', 'cone', 'wedge', 'ribbon']);
+
+/** How far apart a ribbon is cut, in metres, so the ground it is laid over can bend it. */
+export const RIBBON_STEP = 10;
+
+/** The most points a ribbon may run through, and the most connectors a road may have. */
+export const RIBBON_POINT_LIMIT = 200;
+export const CONNECTOR_LIMIT = 8;
 
 /** Where a wedge's ridge runs: down its middle, or along its `+x` edge. */
 export const WEDGE_RIDGES = Object.freeze(['middle', 'edge']);
@@ -47,8 +63,11 @@ export const MIN_SEGMENTS = 3;
 export const MAX_SEGMENTS = 32;
 
 /** The fields a part may carry, and a recipe. */
-export const PART_FIELDS = Object.freeze(['shape', 'at', 'color', 'turn', 'size', 'ridge', 'radius', 'top', 'height', 'segments']);
-export const RECIPE_FIELDS = Object.freeze(['parts', 'solid', 'plinth']);
+export const PART_FIELDS = Object.freeze(['shape', 'at', 'color', 'turn', 'size', 'ridge', 'radius', 'top', 'height', 'segments', 'points', 'width', 'closed']);
+export const RECIPE_FIELDS = Object.freeze(['parts', 'solid', 'plinth', 'drape', 'connectors']);
+
+/** The fields a road's connector has. */
+export const CONNECTOR_FIELDS = Object.freeze(['at', 'heading']);
 
 /** The categories a prefab is offered under, in the order Insert City folds them. */
 export const PREFAB_CATEGORIES = Object.freeze([
@@ -80,7 +99,8 @@ const PAINT = Object.freeze({
     glass: 0x5f7f99, glassLight: 0x9fbdd1, glassDark: 0x3e5568, window: 0x9cc3d6, door: 0x4a3426,
     steel: 0x8a9399, steelDark: 0x5d666c, rust: 0x8a5a3c, red: 0xb5332b, yellow: 0xe0b040, blue: 0x3f6fa8,
     green: 0x4f8a4a, grass: 0x6a9a48, grassDark: 0x56853c, hedge: 0x3f6b35, leaf: 0x4e7d3a, leafDark: 0x3c6630,
-    trunk: 0x6b4a32, water: 0x4f86b0, sand: 0xd8c38f, paving: 0xc8c2b4, gravel: 0xb3aa98, path: 0xc9b896, line: 0xf4f4f0
+    trunk: 0x6b4a32, water: 0x4f86b0, sand: 0xd8c38f, paving: 0xc8c2b4, gravel: 0xb3aa98, path: 0xc9b896, line: 0xf4f4f0,
+    asphalt: 0x45494d
 });
 
 const box = (size, at, color, extra = {}) => ({ shape: 'box', size, at, color, ...extra });
@@ -151,6 +171,50 @@ function lawn([w, d], color = PAINT.grass) {
 /** A strip of path laid over a park's lawn. */
 function strip([w, d], [x, z], color = PAINT.path, turn = 0) {
     return box([w, 0.05, d], [x, 0.15, z], color, turn ? { turn } : {});
+}
+
+/** A road's width, kerb to kerb, in metres. */
+export const ROAD_WIDTH = 12;
+
+/** A road's carriageway along a line. */
+function asphalt(points, width = ROAD_WIDTH, extra = {}) {
+    return { shape: 'ribbon', points, width, at: [0, 0, 0], color: PAINT.asphalt, ...extra };
+}
+
+/** Points round an arc about `centre`, from one angle to another in degrees, a step every ten degrees or `count` of them. */
+function arc([cx, cz], radius, from, to, count = Math.max(2, Math.round(Math.abs(to - from) / 10))) {
+    const points = [];
+    const closed = Math.abs(to - from) >= 360;
+    for (let i = 0; i <= count - (closed ? 1 : 0); i++) {
+        const angle = (from + (to - from) * i / count) * Math.PI / 180;
+        points.push([Number((cx + Math.cos(angle) * radius).toFixed(3)), Number((cz + Math.sin(angle) * radius).toFixed(3))]);
+    }
+    return points;
+}
+
+/** A dashed centre line along a line: three metres painted, three left bare, a hair over the carriageway. */
+function dashes(points, dash = 3, gap = 3) {
+    const parts = [];
+    let carried = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        const [ax, az] = points[i], [bx, bz] = points[i + 1];
+        const length = Math.hypot(bx - ax, bz - az);
+        for (let along = carried; along + dash <= length; along += dash + gap) {
+            const t0 = along / length, t1 = (along + dash) / length;
+            parts.push({
+                shape: 'ribbon', width: 0.3, at: [0, 0.03, 0], color: PAINT.line,
+                points: [[ax + (bx - ax) * t0, az + (bz - az) * t0], [ax + (bx - ax) * t1, az + (bz - az) * t1]].map(([x, z]) => [Number(x.toFixed(3)), Number(z.toFixed(3))])
+            });
+            carried = along + dash + gap - length;
+        }
+        if (carried < 0) carried = 0;
+    }
+    return parts;
+}
+
+/** A road piece: its parts laid over the ground, flown over, joined by its connectors - each `[[x, z], heading]`. */
+function road(parts, connectors) {
+    return { solid: false, drape: true, connectors: connectors.map(([at, heading]) => ({ at, heading })), parts };
 }
 
 /**
@@ -460,6 +524,56 @@ export const PREFABS = deepFreeze([
         ] }
     },
 
+    // --- Infrastructure: the roads, laid over the ground and joined end to end -------------------
+    {
+        id: 'road-straight', label: 'STRAIGHT', category: 'infrastructure', kind: 'road', footprint: [12, 40],
+        recipe: road([
+            asphalt([[0, -20], [0, 20]]),
+            ...dashes([[0, -20], [0, 20]])
+        ], [[[0, 20], 0], [[0, -20], 180]])
+    },
+    {
+        id: 'road-curve', label: 'CURVE', category: 'infrastructure', kind: 'road', footprint: [36.5, 36.5],
+        recipe: road([
+            asphalt(arc([-15, -15], 30, 0, 90)),
+            ...dashes(arc([-15, -15], 30, 0, 90))
+        ], [[[15, -15], 180], [[-15, 15], 90]])
+    },
+    {
+        id: 'road-t-junction', label: 'T-JUNCTION', category: 'infrastructure', kind: 'road', footprint: [40, 26],
+        recipe: road([
+            asphalt([[-20, 0], [20, 0]]),
+            asphalt([[0, 0], [0, 20]]),
+            ...dashes([[-20, 0], [-7, 0]]), ...dashes([[7, 0], [20, 0]]), ...dashes([[0, 7], [0, 20]])
+        ], [[[-20, 0], 90], [[20, 0], 270], [[0, 20], 0]])
+    },
+    {
+        id: 'road-crossroads', label: 'CROSSROADS', category: 'infrastructure', kind: 'road', footprint: [40, 40],
+        recipe: road([
+            asphalt([[-20, 0], [20, 0]]),
+            asphalt([[0, -20], [0, 20]]),
+            ...dashes([[-20, 0], [-7, 0]]), ...dashes([[7, 0], [20, 0]]),
+            ...dashes([[0, -20], [0, -7]]), ...dashes([[0, 7], [0, 20]])
+        ], [[[-20, 0], 90], [[20, 0], 270], [[0, 20], 0], [[0, -20], 180]])
+    },
+    {
+        id: 'road-roundabout', label: 'ROUNDABOUT', category: 'infrastructure', kind: 'road', footprint: [60, 60],
+        recipe: road([
+            asphalt(arc([0, 0], 16, 0, 360, 16), 10, { closed: true }),
+            cylinder(11, 0.4, [0, 0, 0], PAINT.grassDark, { segments: 16 }),
+            asphalt([[0, 20], [0, 30]]), asphalt([[0, -20], [0, -30]]),
+            asphalt([[20, 0], [30, 0]]), asphalt([[-20, 0], [-30, 0]])
+        ], [[[0, 30], 0], [[0, -30], 180], [[-30, 0], 90], [[30, 0], 270]])
+    },
+    {
+        id: 'road-dead-end', label: 'DEAD END', category: 'infrastructure', kind: 'road', footprint: [24, 42],
+        recipe: road([
+            asphalt([[0, -20], [0, 6]]),
+            cylinder(12, 0.05, [0, 0, 10], PAINT.asphalt, { segments: 16 }),
+            ...dashes([[0, -20], [0, 0]])
+        ], [[[0, -20], 180]])
+    },
+
     // --- Parks: nothing with a roof, so nothing the aircraft can hit -----------------------------
     {
         id: 'lawn', label: 'LAWN', category: 'parks', footprint: [60, 60],
@@ -595,6 +709,7 @@ export function recipeSolid(recipe) {
  * listed in either winding.
  */
 function partFaces(part) {
+    if (part.shape === 'ribbon') return ribbonFaces(part);
     if (part.shape === 'box' || part.shape === 'wedge') {
         const [w, h, d] = part.size;
         const x = w / 2, z = d / 2;
@@ -645,6 +760,51 @@ function partFaces(part) {
     return faces;
 }
 
+/**
+ * A ribbon's line cut so no piece of it is longer than `RIBBON_STEP` - and,
+ * closed, carried back round to its start.
+ */
+export function ribbonLine(points, closed = false) {
+    const line = [];
+    const ends = closed ? [...points, points[0]] : points;
+    for (let i = 0; i < ends.length - 1; i++) {
+        const [ax, az] = ends[i], [bx, bz] = ends[i + 1];
+        const pieces = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / RIBBON_STEP));
+        for (let k = 0; k < pieces; k++) line.push([ax + (bx - ax) * k / pieces, az + (bz - az) * k / pieces]);
+    }
+    if (!closed) line.push([...ends.at(-1)]);
+    return line;
+}
+
+/** A ribbon as the flat quads along its line: each point pushed out half its width either side, square to the way the line runs there. */
+function ribbonFaces(part) {
+    const closed = part.closed === true;
+    const line = ribbonLine(part.points, closed);
+    const count = line.length;
+    const half = part.width / 2;
+    const way = (from, to) => {
+        const dx = to[0] - from[0], dz = to[1] - from[1];
+        const length = Math.hypot(dx, dz) || 1;
+        return [dx / length, dz / length];
+    };
+    const edges = line.map((point, i) => {
+        const before = closed ? line[(i - 1 + count) % count] : line[Math.max(i - 1, 0)];
+        const after = closed ? line[(i + 1) % count] : line[Math.min(i + 1, count - 1)];
+        const [tx, tz] = i === 0 && !closed ? way(point, after) : i === count - 1 && !closed ? way(before, point) : (() => {
+            const a = way(before, point), b = way(point, after);
+            return way([0, 0], [a[0] + b[0], a[1] + b[1]]);
+        })();
+        return [[point[0] - tz * half, 0, point[1] + tx * half], [point[0] + tz * half, 0, point[1] - tx * half]];
+    });
+    const faces = [];
+    const last = closed ? count : count - 1;
+    for (let i = 0; i < last; i++) {
+        const [l0, r0] = edges[i], [l1, r1] = edges[(i + 1) % count];
+        faces.push([l0, r0, r1, l1]);
+    }
+    return faces;
+}
+
 /** A part's corner turned about its upright by `turn` degrees and stood at `at`. */
 function placeCorner(part, [x, y, z]) {
     const angle = (Number(part.turn) || 0) * Math.PI / 180;
@@ -687,7 +847,10 @@ export function recipeGeometry(recipe) {
         for (const face of faces) {
             const facing = cross(sub(face[1], face[0]), sub(face[2], face[0]));
             if (!(Math.hypot(...facing) > 1e-9)) continue;
-            const corners = dot(facing, sub(middleOf(face), centre)) < 0 ? [...face].reverse() : face;
+            // A face flat through the middle of its part - a ribbon, with no
+            // inside to face out of - is turned to face up.
+            const out = dot(facing, sub(middleOf(face), centre));
+            const corners = (Math.abs(out) < 1e-9 ? facing[1] < 0 : out < 0) ? [...face].reverse() : face;
             // Worked out again from the corners as they now run, and scaled by
             // its own length: a face turned round starts from another corner,
             // and a narrowing side is no parallelogram.
@@ -760,6 +923,25 @@ export function readRecipe(value, where = 'recipe') {
     if (value.plinth != null && !(Number.isInteger(value.plinth) && value.plinth >= 0 && value.plinth <= 0xffffff)) {
         problems.push(`${where}: plinth is not a colour`);
     }
+    if (value.drape != null && typeof value.drape !== 'boolean') problems.push(`${where}: drape is not true or false`);
+    if (value.connectors != null) {
+        if (!Array.isArray(value.connectors) || value.connectors.length > CONNECTOR_LIMIT) {
+            problems.push(`${where}: connectors is not a list of up to ${CONNECTOR_LIMIT}`);
+        } else {
+            value.connectors.forEach((connector, at) => {
+                const here = `${where}.connectors[${at}]`;
+                if (connector == null || typeof connector !== 'object' || Array.isArray(connector)) {
+                    problems.push(`${here}: not a connector`);
+                    return;
+                }
+                for (const key of Object.keys(connector)) {
+                    if (!CONNECTOR_FIELDS.includes(key)) problems.push(`${here}: ${key} is not a field a connector has`);
+                }
+                if (!Array.isArray(connector.at) || connector.at.length !== 2 || !connector.at.every(within)) problems.push(`${here}: at is not a point`);
+                if (!Number.isFinite(connector.heading)) problems.push(`${here}: heading is not a number`);
+            });
+        }
+    }
     if (!Array.isArray(value.parts) || value.parts.length === 0) {
         problems.push(`${where}: parts is not a list of parts`);
         return refuse();
@@ -786,7 +968,15 @@ export function readRecipe(value, where = 'recipe') {
         if (!Number.isInteger(part.color) || part.color < 0 || part.color > 0xffffff) problems.push(`${here}: color is not a colour`);
         if (part.turn != null && !Number.isFinite(part.turn)) problems.push(`${here}: turn is not a number`);
 
-        if (part.shape === 'box' || part.shape === 'wedge') {
+        if (part.shape === 'ribbon') {
+            const points = Array.isArray(part.points) ? part.points : [];
+            if (points.length < 2 || points.length > RIBBON_POINT_LIMIT
+                || !points.every(point => Array.isArray(point) && point.length === 2 && point.every(within))) {
+                problems.push(`${here}: points is not a line of 2 to ${RIBBON_POINT_LIMIT} points`);
+            }
+            if (!positive(part.width)) problems.push(`${here}: width is not a length`);
+            if (part.closed != null && typeof part.closed !== 'boolean') problems.push(`${here}: closed is not true or false`);
+        } else if (part.shape === 'box' || part.shape === 'wedge') {
             if (!Array.isArray(part.size) || part.size.length !== 3 || !part.size.every(positive)) problems.push(`${here}: size is not three lengths`);
             if (part.ridge != null && (part.shape !== 'wedge' || !WEDGE_RIDGES.includes(part.ridge))) problems.push(`${here}: ridge is not where a ridge runs`);
         } else {

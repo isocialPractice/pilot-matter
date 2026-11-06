@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { recipeGeometry } from './prefabs.js';
+import { drapedGeometry } from './objects.js';
 import { holdGroundColor } from './ground-material.js';
 
 /**
@@ -10,15 +11,22 @@ import { holdGroundColor } from './ground-material.js';
  * the same material with the same hold on its colour, so fog takes a building
  * as it takes the hill behind it.
  *
+ * A road is laid over the ground rather than stood on it, so it cannot be one
+ * instance of many: every road a tile carries is laid over its ground into one
+ * mesh of its own, pulled toward the camera by a polygon offset so it never
+ * flickers against the ground it follows. `groundAt(x, z)` is the tile's
+ * ground.
+ *
  * Returns a group to add to the scene, or null for a tile standing nothing.
  */
-export function objectGroup(objects = []) {
+export function objectGroup(objects = [], { groundAt = () => 0 } = {}) {
     if (!objects?.length) return null;
     const group = new THREE.Group();
     group.name = 'objects';
 
     const byRecipe = new Map();
     for (const object of objects) {
+        if (object.drape) continue;
         if (!byRecipe.has(object.key)) byRecipe.set(object.key, []);
         byRecipe.get(object.key).push(object);
     }
@@ -50,7 +58,7 @@ export function objectGroup(objects = []) {
 
     // A plinth under every object standing on ground that falls away under it:
     // its footprint, from the highest ground under it down past the lowest.
-    const plinths = objects.filter(object => object.stand - object.base > 0.05);
+    const plinths = objects.filter(object => !object.drape && object.stand - object.base > 0.05);
     if (plinths.length > 0) {
         const block = new THREE.BoxGeometry(1, 1, 1);
         block.translate(0, -0.5, 0);
@@ -72,6 +80,20 @@ export function objectGroup(objects = []) {
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         mesh.computeBoundingSphere();
         group.add(mesh);
+    }
+
+    const draped = drapedGeometry(objects, groundAt);
+    if (draped.count > 0) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(draped.positions, 3));
+        geometry.setAttribute('normal', new THREE.BufferAttribute(draped.normals, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(draped.colors, 3));
+        geometry.computeBoundingSphere();
+        const material = objectMaterial();
+        material.polygonOffset = true;
+        material.polygonOffsetFactor = -2;
+        material.polygonOffsetUnits = -2;
+        group.add(new THREE.Mesh(geometry, material));
     }
 
     return group;

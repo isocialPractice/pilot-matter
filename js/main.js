@@ -33,11 +33,12 @@ import {
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE,
     confirmEntries, requestLoad, loadCanvas, sessionWorld, saveName, setSaveName, setFileStatus,
-    buildStartPoint, setBuildStartPoint, turnBuildStartPoint, writeBuildStartPoint, clearBuildStartPoint, chooseBuildPlane
+    buildStartPoint, setBuildStartPoint, turnBuildStartPoint, writeBuildStartPoint, clearBuildStartPoint, chooseBuildPlane,
+    chooseCityPrefab, openCitySection, cityPlacement, insertObject, buildCityPrefab
 } from './build-mode.js';
 import {
     paletteTools, BUILT_TOOLS, isPaletteBar, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
-    insertsTemplate, placesStartPoint, ACCEPT_TOOL, SELECT_TOOL
+    insertsTemplate, placesStartPoint, insertsCity, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
 import { placeTemplate, groupStrips, groupLots, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
 import {
@@ -49,7 +50,8 @@ import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
     regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL,
-    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM, surfaceEdges, strokeStartPoint, START_KNOB_HIT
+    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM, surfaceEdges, strokeStartPoint, START_KNOB_HIT,
+    SNAPPED_OUTLINE
 } from './build-overlay.js';
 import {
     boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle, handleBinding,
@@ -68,7 +70,7 @@ import {
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
     DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH,
-    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD, DOCK_PLANE, DOCK_START, DOCK_CLEAR_START
+    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD, DOCK_PLANE, DOCK_START, DOCK_CLEAR_START, DOCK_CITY
 } from './build-panel.js';
 import {
     lassoTool, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -123,6 +125,7 @@ import { headingDegrees, altitudeToFeet, feetToAltitude, directionToBearing } fr
 import { nearestRunway } from './environment/elements.js';
 import { planeById, chaseFor } from './planes.js';
 import { startAtPoint, startFromRows, startKnobPoint, startDiscLoop } from './start-point.js';
+import { objectFootprint } from './objects.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
@@ -2550,7 +2553,7 @@ class FlightSimulator {
         if (this.gumballHover != null) return 'grab';
         const tool = buildModeTool(this.builder);
         if (eyeDropperArmed(this.builder)) return 'cell';
-        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool) || placesStartPoint(tool) || extrudeDrawing(this.builder)) return 'crosshair';
+        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool) || placesStartPoint(tool) || insertsCity(tool) || extrudeDrawing(this.builder)) return 'crosshair';
         return this.hovered != null ? 'pointer' : '';
     }
 
@@ -2647,6 +2650,14 @@ class FlightSimulator {
             for (const loop of this.insertPreview() ?? []) {
                 strokePaths(ctx, this.screenRegion(loop, true, width, height), DRAWING_OUTLINE);
             }
+        }
+
+        // The card Insert City carries, outlined where a click would put it -
+        // green where a road would snap to the open end it meets.
+        if (insertsCity(live) && !confirmOpen(this.builder) && !cameraHeld(this.builder)
+            && this.gumballHover == null && this.gumballDrag == null) {
+            const preview = this.cityPreview();
+            if (preview) strokePaths(ctx, this.screenRegion(preview.loop, true, width, height), preview.snapped ? SNAPPED_OUTLINE : DRAWING_OUTLINE);
         }
 
         const picked  = pickedIndex(this.builder);
@@ -2922,6 +2933,7 @@ class FlightSimulator {
             else if (e.button === 0 && isStrokeTool(tool)) this.strokePress(e);
             else if (e.button === 0 && insertsTemplate(tool)) this.insertAt(e);
             else if (e.button === 0 && placesStartPoint(tool)) this.startPointAt(e);
+            else if (e.button === 0 && insertsCity(tool)) this.cityAt(e);
             return;
         }
 
@@ -2993,6 +3005,39 @@ class FlightSimulator {
         e.preventDefault();
         this.redrawCanvas();
         this.syncOverlays();
+    }
+
+    /**
+     * A click with Insert City armed: the chosen card placed on the ground under
+     * the pointer, lined up with the view to the nearest ten degrees - or the
+     * one in hand put down there instead - a road snapped to the open end it
+     * comes near unless `shift` is held, and the ground drawn again with it.
+     */
+    cityAt(e) {
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        if (!point || !insertObject(this.builder, point, arrivalHeading(viewBearing(this.buildCamera)), {
+            size: this.terrain.size, free: e.shiftKey
+        })) return;
+
+        e.preventDefault();
+        this.redrawCanvas();
+        this.syncOverlays();
+    }
+
+    /**
+     * The card Insert City is armed with, as a click would place it under a
+     * pointer that can hover: its footprint on the canvas's frame, and whether
+     * a road would be snapped there. Null with no card armed, or over the sky.
+     */
+    cityPreview() {
+        const pointer = this.canvasPointer;
+        if (buildCityPrefab(this.builder) == null || pointer == null || pointer.type === 'touch') return null;
+        const ground = this.pickCanvasPoint(pointer.x, pointer.y);
+        if (ground == null) return null;
+        const placed = cityPlacement(this.builder, ground, arrivalHeading(viewBearing(this.buildCamera)), {
+            size: this.terrain.size, free: pointer.shift === true
+        });
+        return placed ? { loop: footprintLoop(objectFootprint(placed.placement)), snapped: placed.snapped } : null;
     }
 
     /**
@@ -3079,7 +3124,7 @@ class FlightSimulator {
      */
     onCanvasDrag(e) {
         if (!buildModeDrawing(this.builder)) return;
-        this.canvasPointer = { x: e.clientX, y: e.clientY, type: e.pointerType };
+        this.canvasPointer = { x: e.clientX, y: e.clientY, type: e.pointerType, shift: e.shiftKey };
 
         if (this.gumballDrag && e.pointerId === this.gumballDrag.pointer) {
             this.dragGumball(e);
@@ -3704,6 +3749,12 @@ class FlightSimulator {
             if (chooseBuildPlane(this.builder, id)) this.syncOverlays();
             return;
         }
+        if (this.dockShown?.kind === DOCK_CITY) {
+            if (!chooseCityPrefab(this.builder, id)) return;
+            if (draftPending(this.builder)) this.redrawCanvas();
+            this.syncOverlays();
+            return;
+        }
         if (this.dockShown?.kind === DOCK_RUNWAY) {
             if (!chooseRunwayTemplate(this.builder, id)) return;
             if (draftPending(this.builder)) this.redrawCanvas();
@@ -3786,6 +3837,12 @@ class FlightSimulator {
     onDockFold(id) {
         const section = this.dockShown?.sections?.find(each => each.id === id);
         if (!section?.folds) return;
+
+        // Insert City's categories: one open at a time, the session's to hold.
+        if (section.kind === DOCK_CITY) {
+            if (openCitySection(this.builder, section.category)) this.syncDock();
+            return;
+        }
 
         if (this.worldOpen.has(section.index)) this.worldOpen.delete(section.index);
         else this.worldOpen.add(section.index);
@@ -3885,7 +3942,7 @@ class FlightSimulator {
                 this.camera.fov = fov;
                 this.camera.updateProjectionMatrix();
             }
-        } else if (kind === DOCK_DRAFT || kind === DOCK_RUNWAY) {
+        } else if (kind === DOCK_DRAFT || kind === DOCK_RUNWAY || kind === DOCK_CITY) {
             reviseDraft(this.builder, { config: holder.config });
             this.redrawCanvas();
             // A picked placement changed, or changed back, turns the accept

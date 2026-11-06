@@ -1593,8 +1593,12 @@
            groups them into: each the tool's icon, cut from the art's panel, over
            its name, on the navy the art draws them on, the chosen one ringed in
            the art's green. */
+        /* A row of tiles wraps once its cards will not fit across the dock -
+           Insert City's roads are six - rather than running off both edges,
+           where the canvas takes a press meant for the card. */
         .dock-shapes {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
             gap: 6px;
             margin: 6px 0;

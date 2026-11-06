@@ -11,13 +11,18 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Roads that snap**: six road pieces laid over the ground, each with
-  connectors at its open ends, snapping end to end to an open connector within
-  30 metres while previewed, and placed free with `shift`
+- [ ] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
+  never sent anywhere, then a step that sets its scale, up and facing and says
+  which insert menus it fits, from its bounds, with the reason where it does
+  not
   - From: Post Interactive Build
-- [ ] **Insert City**: the tool and its mark, a folding section per category
-  of named cards, a chosen card previewed under the pointer and placed by a
-  click, and turned by the gumball
+- [ ] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
+  listed with what each is used as and removable, and carried inside an
+  environment file that uses them so it opens on another computer
+  - From: Post Interactive Build
+- [ ] **Inserting loaded assets**: a loaded plane flown as a card of Insert
+  Plane, a loaded building placed as an object in its Insert City section, and
+  a loaded runway placed over a real strip of its size
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -100,12 +105,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Roads that snap**: six road pieces laid over the ground, each with
-  connectors at its open ends, snapping end to end to an open connector within
-  30 metres while previewed, and placed free with `shift`
-- [ ] **Insert City**: the tool and its mark, a folding section per category
-  of named cards, a chosen card previewed under the pointer and placed by a
-  click, and turned by the gumball
 - [ ] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
   never sent anywhere, then a step that sets its scale, up and facing and says
   which insert menus it fits, from its bounds, with the reason where it does
@@ -172,48 +171,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 390 earlier items in `TODO-archive.md`, newest last.
+> 392 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **The environment file**: a built world written as one JSON file with a
-  committed schema - format, version, name, base, rows, placements, and later
-  the start, the plane and the assets - read back by a function that never
-  throws and refuses a bad file whole with its first problem named
-  - **Settled**: `js/environment-file.js` writes a kept world - `builtWorld`'s
-    `{ environment, placements, world }` - as `{ format, version, name,
-    savedAt, base, elements, placements }`, a row as its id, type, config,
-    base and shades, its label and note read back off the element through
-    `elementRow`, now exported by `js/element-editor.js`. `readEnvironmentDocument`
-    never throws, lists every problem with the first first, refuses a file
-    whole, holds every range a file sets to its bounds and adds none it leaves
-    out, and never takes what a footprint settled for the generator. The
-    schema is `schemas/environment.schema.json`: a test validates hand-made
-    documents against it with a validator for the vocabulary it uses, and the
-    module refuses what it refuses - but for a region's arithmetic and a
-    point's numbers, which the schema has no words for. A placement may carry
-    fields the format does not name, the builder adding them as it needs to;
-    the top of a file and an element's row may not. Measured in Chromium, a
-    world with every kind of placement reads back the world it was and draws
-    the same ground.
-  - From: Post Interactive Build
-- [x] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
-  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
-  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
-  first, and each action's outcome written under its answer
-  - **Settled**: SAVE / LOAD is the `files` tool, now built, and its dock is
-    `DOCK_FILES`: under `ENVIRONMENT` a `NAME` - the environment's own as its
-    placeholder until one is typed - and a status line, over `LOAD
-    ENVIRONMENT…` and `SAVE ENVIRONMENT…`. A save writes `sessionWorld` - the
-    committed placements and the world's rows - through `js/environment-io.js`,
-    which asks where through the browser's save dialog where there is one and
-    downloads elsewhere; a dialog closed says `not saved`. A load over a build -
-    `replacesBuild`, a placement or the world's rows changed since the canvas
-    opened - asks `REPLACE THE BUILT WORLD` with `YES` and `CANCEL` only,
-    `confirmEntries` giving each question its buttons, and the file dialog
-    opens from `YES`; over nothing it opens at once. `loadCanvas` opens the
-    file's world in place of the canvas, SAVE / LOAD still live and the file's
-    name carried, and the file becomes the world the browser keeps. A refused
-    file says why under the name, the canvas as it was.
-  - From: Post Interactive Build
 - [x] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
   `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
   the pause menu, a loaded world becoming a chosen entry of the list that is
@@ -353,4 +312,38 @@ how the simulator got here rather than as a list still to be worked.
     by the file and the schema, and `js/object-mesh.js` colours each plinth
     instance with it, so a park on falling ground reads as a grassy terrace
     rather than a concrete one.
+  - From: Post Interactive Build
+- [x] **Roads that snap**: six road pieces laid over the ground, each with
+  connectors at its open ends, snapping end to end to an open connector within
+  30 metres while previewed, and placed free with `shift`
+  - **Settled**: a recipe gains a `ribbon` part - a flat strip along a
+    line, cut every `RIBBON_STEP` (10 m), turned to face up - and two fields:
+    `drape`, which lays every corner on the ground under it `DRAPE_LIFT` over
+    it rather than standing the recipe on a plinth, and `connectors`, each a
+    point and the heading leading out. Six road pieces under INFRASTRUCTURE,
+    after its buildings - STRAIGHT, CURVE, T-JUNCTION, CROSSROADS, ROUNDABOUT
+    and DEAD END - 12 m wide with a dashed centre line, flown over. A tile lays
+    its roads into one mesh with `drapedGeometry`, pulled toward the camera by
+    a polygon offset. `js/roads.js` is the pure arithmetic: a connector where
+    its piece's heading and scale put it, two joined when they meet face to
+    face, the open ones those no other meets, and `snapRoad`, which moves and
+    turns a piece so its nearest end meets the nearest open one within 30 m.
+    The file and the schema read ribbons, drapes and connectors.
+  - From: Post Interactive Build
+- [x] **Insert City**: the tool and its mark, a folding section per category
+  of named cards, a chosen card previewed under the pointer and placed by a
+  click, and turned by the gumball
+  - **Settled**: `city` joins `BUILT_TOOLS`, so every tool declared is built.
+    Its dock, `DOCK_CITY`, is a folding section for each category with only
+    the last opened open, each a grid of named cards, Infrastructure's roads a
+    row of their own. A card arms it; the pointer carries the card's footprint
+    lined up with the view, outlined green where a road would snap; a click
+    places it as the edit in hand with `HEADING` and `SCALE` over `ACCEPT` and
+    `CANCEL`, a second click moves it - snapping again - and another card
+    swaps the piece in hand. `shift` places a road free. A free point is held
+    to a tenth of a metre. Auto accept for drawing keeps the piece in hand at
+    the next click. The control list gains `Click (Insert city)` and
+    `Shift+Click (Insert city)`, which needed the list to write a held key
+    before a click. The browser check found a row of six cards running off
+    both sides of the dock under the canvas, so a row of tiles now wraps.
   - From: Post Interactive Build

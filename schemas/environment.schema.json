@@ -174,16 +174,31 @@
       "properties": {
         "parts": { "type": "array", "minItems": 1, "maxItems": 400, "items": { "$ref": "#/$defs/part" } },
         "solid": { "description": "False for something the aircraft flies over rather than into, such as a park.", "type": "boolean" },
-        "plinth": { "description": "The colour of the plinth it stands on where the ground falls away under it, as a number, 0xrrggbb.", "type": "integer", "minimum": 0, "maximum": 16777215 }
+        "plinth": { "description": "The colour of the plinth it stands on where the ground falls away under it, as a number, 0xrrggbb.", "type": "integer", "minimum": 0, "maximum": 16777215 },
+        "drape": { "description": "True for something laid over the ground, every corner on the ground under it, rather than stood on it: a road.", "type": "boolean" },
+        "connectors": {
+          "description": "Where a road joins another: each a point in its own frame and the compass heading that leads out of the piece there.",
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["at", "heading"],
+            "additionalProperties": false,
+            "properties": {
+              "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+              "heading": { "type": "number" }
+            }
+          }
+        }
       }
     },
     "part": {
-      "description": "One part of a recipe - a box, a wedge (a roof's triangular prism), a cylinder or a cone - its base standing on the point it names.",
+      "description": "One part of a recipe - a box, a wedge (a roof's triangular prism), a cylinder, a cone, or a ribbon (a flat strip along a line, such as a road) - its base standing on the point it names.",
       "type": "object",
       "required": ["shape", "at", "color"],
       "additionalProperties": false,
       "properties": {
-        "shape": { "enum": ["box", "cylinder", "cone", "wedge"] },
+        "shape": { "enum": ["box", "cylinder", "cone", "wedge", "ribbon"] },
         "at": { "description": "Where the part's base stands, in metres: x, y and z.", "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
         "color": { "description": "The colour as a number, 0xrrggbb.", "type": "integer", "minimum": 0, "maximum": 16777215 },
         "turn": { "description": "A turn about the part's upright, in degrees.", "type": "number" },
@@ -192,7 +207,10 @@
         "radius": { "type": "number", "exclusiveMinimum": 0 },
         "top": { "description": "A cylinder's radius at its top, where it narrows.", "type": "number", "minimum": 0 },
         "height": { "type": "number", "exclusiveMinimum": 0 },
-        "segments": { "description": "How many sides a cylinder or a cone is drawn with.", "type": "integer", "minimum": 3, "maximum": 32 }
+        "segments": { "description": "How many sides a cylinder or a cone is drawn with.", "type": "integer", "minimum": 3, "maximum": 32 },
+        "points": { "description": "A ribbon's line, as [x, z] points in metres.", "type": "array", "minItems": 2, "maxItems": 200, "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } },
+        "width": { "description": "A ribbon's width, in metres.", "type": "number", "exclusiveMinimum": 0 },
+        "closed": { "description": "True for a ribbon carried round and back to its start.", "type": "boolean" }
       }
     }
   }

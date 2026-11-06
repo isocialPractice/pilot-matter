@@ -37,6 +37,9 @@ export const FILES_TOOL = 'files';
 /** Insert Plane: which plane a world is flown in, and where a flight on it starts. */
 export const PLANE_TOOL = 'plane';
 
+/** Insert City: buildings, roads and parks, placed from the catalogue's cards. */
+export const CITY_TOOL = 'city';
+
 /**
  * The twelve, in the tour's order, each with the name its tile carries, the
  * line a pointer resting on the tile reads, and whether it minds the lasso.
@@ -104,7 +107,7 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true,  element: 'paint', heading: 'FREE PAINT', paint: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true,  element: ERASE_TYPE, heading: 'ERASE', erase: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true,  element: 'extrude', heading: 'EXTRUDE SHAPE', extrudes: true },
-    { id: 'city',      label: 'INSERT CITY',     hint: 'Place buildings, roads and parks',            mindsLasso: false, heading: 'INSERT CITY', modes: Object.freeze([mode('insert', 'asset', 'city')]) },
+    { id: CITY_TOOL,   label: 'INSERT CITY',     hint: 'Place buildings, roads and parks',            mindsLasso: false, heading: 'INSERT CITY', modes: Object.freeze([mode('insert', 'asset', 'city')]) },
     { id: PLANE_TOOL,  label: 'INSERT PLANE',    hint: 'Choose the plane, and where a flight starts', mindsLasso: false, heading: 'INSERT PLANE', modes: Object.freeze([mode('insert', 'asset', 'flight:plane'), mode('insert', 'config', 'flight:start-point')]) },
     { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false },
     { id: FILES_TOOL,  label: 'SAVE / LOAD',     hint: 'Save this world to a file, or load one',      mindsLasso: false, heading: 'SAVE / LOAD', bar: true, modes: Object.freeze([mode('save', 'data', 'file'), mode('load', 'data', 'file'), mode('load', 'data', 'asset')]) }
@@ -172,7 +175,7 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * elements away through it. Extrude lifts a region drawn from its shapes, or
  * the selection, in stages - see `js/extrude.js`.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', PLANE_TOOL, ACCEPT_TOOL, FILES_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', CITY_TOOL, PLANE_TOOL, ACCEPT_TOOL, FILES_TOOL]);
 
 /** True for one of the builder's tools. */
 export function isBuildTool(id) {
@@ -251,6 +254,11 @@ export const COVER_ELEMENT_ROWS = Object.freeze(['density', 'color']);
 /** True for Insert Runway, which places a template chosen on its panel. */
 export function insertsTemplate(id) {
     return toolDoes(id, 'insert', 'asset', 'runway');
+}
+
+/** True for the tool a chosen card of the catalogue is placed with - `Insert asset<city>`. */
+export function insertsCity(id) {
+    return toolDoes(id, 'insert', 'asset', 'city');
 }
 
 /** True for the tool a click on the canvas places the start point with - `Insert config<flight:start-point>`. */

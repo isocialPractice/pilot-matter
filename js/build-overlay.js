@@ -346,6 +346,13 @@ export const DRAWING_OUTLINE = Object.freeze({
     under: Object.freeze({ width: 4, colour: 'rgba(6, 29, 67, 0.5)' })
 });
 
+/** A road previewed snapped to the open end it will join: outlined green, as the start point is, rather than the blue of a piece placed free. */
+export const SNAPPED_OUTLINE = Object.freeze({
+    width: 2.5,
+    colour: '#00db95',
+    under: Object.freeze({ width: 5, colour: 'rgba(6, 29, 67, 0.5)' })
+});
+
 /**
  * A region's edge as one closed loop of `[x, z]` points in the canvas's frame,
  * traced from what it is rather than contoured from its weight: the corners of

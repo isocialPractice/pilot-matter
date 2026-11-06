@@ -297,6 +297,18 @@
 
 <p>Each card says its footprint, across by along, and the recipe is held to it: the smallest is a cottage at about 9 by 11 metres, the largest a sports field at 110 by 74.</p>
 
+<h4 id="roads">Roads</h4>
+
+<p>Infrastructure also offers six road pieces, after its buildings: <code>STRAIGHT</code>, <code>CURVE</code>, <code>T-JUNCTION</code>, <code>CROSSROADS</code>, <code>ROUNDABOUT</code> and <code>DEAD END</code>. A road is 12 metres wide with a dashed centre line, and it is laid over the ground rather than stood on it: every ten metres along it is set on the ground there, so it runs with the land instead of on a level, and it stands on no plinth. It is flown over and landed across as the ground it lies on.</p>
+
+<p>Each piece joins at its open ends - a straight and a curve at two, a T-junction at three, a crossroads and a roundabout at four, a dead end at one. While a piece is previewed under the pointer, if one of its ends comes within 30 metres of an open end of a road already placed, the piece is moved and turned so the two meet end to end, and the preview is outlined green; a click places it there. With <kbd>Shift</kbd> held it is placed where it is instead. An end another road already meets is not open, so a road is joined on at the end that is free.</p>
+
+<h3 id="insert-city">Insert City</h3>
+
+<p>Insert City, <code>Insert asset&lt;city&gt;</code>, is the tile beside Extrude. Its panel, headed <code>INSERT CITY</code>, is a folding section for each category - <code>SKYLINES</code>, <code>FACTORY</code>, <code>RESIDENTIAL</code>, <code>COMMERCIAL</code>, <code>INFRASTRUCTURE</code> and <code>PARKS</code> - each a grid of named cards, with Infrastructure's roads a row of their own under its buildings. Only one section is open at a time, so a phone is not scrolled past six grids to reach the one it wants; opening one shuts the other.</p>
+
+<p>A card chosen is armed, and pressed. The pointer carries its footprint, outlined where a click would put it, lined up with the view to the nearest ten degrees. A click places it as the edit in hand, with its <code>HEADING</code> and <code>SCALE</code> leading the panel over <code>ACCEPT</code> and <code>CANCEL</code>; a second click moves it, facing the way it was turned, and another card chosen becomes the piece in hand where it stood. Once placed it is an object like any other: Select picks it up again, the gumball moves, turns and scales it, and Erase takes it whole. With auto accept on for drawing, the next click keeps the piece in hand and places another.</p>
+
 <h2 id="the-element-editor">The element editor</h2>
 
 <p>Because an environment is a description rather than a mesh, there is nothing to re-author when a range moves: the ground is generated again from the algorithm. The panel opens the world being flown as the elements it was assembled from, one row each, and choosing an element opens the ranges it declared underneath it. <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> step the range under the cursor, and the ground is drawn again the moment it moves. <kbd>L</kbd> opens the builder, which carries these rows now: in Select with nothing picked, each element is a <code>WORLD:</code> section on the dock, and what is changed there is kept with what was built.</p>

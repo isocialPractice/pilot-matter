@@ -5,6 +5,83 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.64.0] - 2026-11-05
+
+Insert City, and roads that snap end to end.
+
+### Added
+
+- **Insert City.** The city tile beside Extrude is a tool now, headed
+  `INSERT CITY`: a folding section for each category - skylines, factory,
+  residential, commercial, infrastructure and parks - each a grid of named
+  cards, one open at a time. A card chosen follows the pointer as an
+  outline, lined up with the view; a click places it, with `HEADING` and
+  `SCALE` to set before `ACCEPT`, and a second click moves it. Once placed it
+  is picked, moved, turned, scaled and erased like any object.
+- **Roads.** Six pieces under Infrastructure, after its buildings: a straight,
+  a curve, a T-junction, a crossroads, a roundabout and a dead end, 12 metres
+  wide with a dashed centre line. A road is laid over the ground, following it
+  every ten metres, rather than stood on a plinth, and is flown over.
+- **Snapping.** A road previewed within 30 metres of an open end of a road
+  already placed is moved and turned to meet it end to end, and outlined
+  green; a click places it there. `Shift` places it where it is. An end
+  another road already meets is not open.
+- **The control list** carries `Click (Insert city) - Place the Chosen
+  Building, Road or Park` and `Shift+Click (Insert city) - Place a Road
+  Without Snapping`.
+- **The environment file** carries a road's strips, its laying over the
+  ground and its ends, and the schema describes them.
+
+### Fixed
+
+- A row of tiles on the builder's panel wraps once it will not fit across,
+  rather than running off both sides of the panel where the canvas took the
+  press meant for a card.
+
+Held in Node by `test/roads.test.js` - a strip's line cut every ten metres and
+a closed one brought round, a strip flat and facing up its width across, a
+road's recipe read whole or refused, every piece joining at the ends asked
+for, every connector at an end of the carriageway leading out, a road laid
+over the ground corner by corner where its footprint is with no plinth and
+flown over, connectors carried round with their piece and joined face to face,
+an end already met not open, a piece snapped to the nearest open end within
+reach end to end and not otherwise, four curves snapped one to the next
+closing a loop, Insert City's panel one category open at a time with the roads
+a row of their own, a card placed and moved and swapped, a road snapped or
+placed free and a point held to a tenth of a metre, auto accept keeping the
+piece in hand, the control list, the cards wrapping, and the page's wiring -
+and by `test/city.test.js`, `test/objects.test.js`,
+`test/controls-help.test.js` and `test/build-tools.test.js`. Each rejected the
+defect it names when that was put back, 42 in all: a ribbon never cut, a
+closed ribbon left open, a ribbon facing down, a ribbon half its width, a
+ribbon read with one point, a connector read with a field it does not have, a
+road stood on the ground, a road in the way, a T-junction joining at two, a
+curve's end facing back in, a road laid with no lift, a road never marked
+laid, a road instanced like a house, a road flickering against the ground, a
+road on a plinth, a road laid on no ground, a connector not carried round with
+its piece, a connector's heading not turned with its piece, two ends side by
+side counted joined, an end already met still open, a piece snapped from
+anywhere, a piece snapped to the farthest end, a snapped piece facing along
+the end it meets, a snapped piece left where it was, the piece handed over
+moved, shift ignored, a moved piece turned to the view, a second click placing
+nothing, another card leaving the piece in hand as it was, a category never
+shut, a click with Insert City never kept by auto accept, a free point carried
+unrounded, every category open, the roads among the buildings, the armed card
+not pressed, shift not read off the pointer, a click placing a road free
+whatever is held, a snapped preview drawn like any, a category heading opening
+a world row, shift never written before a click, a row of cards running off
+the dock, a road laid unturned.
+
+Settled in Chromium in 10 checks: Insert City on the palette with its mark;
+its panel of six folding categories with the first open; opening
+Infrastructure shutting the first and showing its buildings then its roads; a
+click placing a straight as the edit in hand; the preview near its open end
+snapping and with `shift` free; the click placing the second end to end with
+two ends left open; the roads laid over the ground as one mesh a hair above it
+at every corner; a cottage placed beside them; kept, on every tile, the road
+flown over and the cottage not; and on a phone the open category's cards
+inside the panel.
+
 ## [1.0.0-alpha.1.63.0] - 2026-11-05
 
 The city's buildings and its parks: 34 prefabs to build with.

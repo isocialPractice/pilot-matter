@@ -5250,3 +5250,43 @@ still be found by name.
     the palette is three tiles across at 52 pixels, and the dock never reaches
     up past its foot: every tile above the dock at 390x844 and at 375x548.
   - From: Post Interactive Build
+- [x] **The environment file**: a built world written as one JSON file with a
+  committed schema - format, version, name, base, rows, placements, and later
+  the start, the plane and the assets - read back by a function that never
+  throws and refuses a bad file whole with its first problem named
+  - **Settled**: `js/environment-file.js` writes a kept world - `builtWorld`'s
+    `{ environment, placements, world }` - as `{ format, version, name,
+    savedAt, base, elements, placements }`, a row as its id, type, config,
+    base and shades, its label and note read back off the element through
+    `elementRow`, now exported by `js/element-editor.js`. `readEnvironmentDocument`
+    never throws, lists every problem with the first first, refuses a file
+    whole, holds every range a file sets to its bounds and adds none it leaves
+    out, and never takes what a footprint settled for the generator. The
+    schema is `schemas/environment.schema.json`: a test validates hand-made
+    documents against it with a validator for the vocabulary it uses, and the
+    module refuses what it refuses - but for a region's arithmetic and a
+    point's numbers, which the schema has no words for. A placement may carry
+    fields the format does not name, the builder adding them as it needs to;
+    the top of a file and an element's row may not. Measured in Chromium, a
+    world with every kind of placement reads back the world it was and draws
+    the same ground.
+  - From: Post Interactive Build
+- [x] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
+  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
+  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
+  first, and each action's outcome written under its answer
+  - **Settled**: SAVE / LOAD is the `files` tool, now built, and its dock is
+    `DOCK_FILES`: under `ENVIRONMENT` a `NAME` - the environment's own as its
+    placeholder until one is typed - and a status line, over `LOAD
+    ENVIRONMENT…` and `SAVE ENVIRONMENT…`. A save writes `sessionWorld` - the
+    committed placements and the world's rows - through `js/environment-io.js`,
+    which asks where through the browser's save dialog where there is one and
+    downloads elsewhere; a dialog closed says `not saved`. A load over a build -
+    `replacesBuild`, a placement or the world's rows changed since the canvas
+    opened - asks `REPLACE THE BUILT WORLD` with `YES` and `CANCEL` only,
+    `confirmEntries` giving each question its buttons, and the file dialog
+    opens from `YES`; over nothing it opens at once. `loadCanvas` opens the
+    file's world in place of the canvas, SAVE / LOAD still live and the file's
+    name carried, and the file becomes the world the browser keeps. A refused
+    file says why under the name, the canvas as it was.
+  - From: Post Interactive Build

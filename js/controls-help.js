@@ -135,6 +135,10 @@ export const BUILD_HELP_ROWS = Object.freeze([
     // The cover tool, named for each ground cover it is built for.
     ...(COVER_TOOLS.length ? [{ id: 'cover', label: 'Lay a Stroke', drag: COVER_TOOLS }] : []),
     ...(isBuiltTool('runway') ? [{ id: 'insert', label: 'Place the Chosen Runway', click: 'runway' }] : []),
+    ...(isBuiltTool('city') ? [
+        { id: 'city', label: 'Place the Chosen Building, Road or Park', click: 'city' },
+        { id: 'city-free', label: 'Place a Road Without Snapping', click: 'city', held: 'Shift' }
+    ] : []),
     ...(isBuiltTool('plane') ? [
         { id: 'start-point', label: 'Put the Start Point There', click: 'plane' },
         { id: 'start-turn',  label: 'Turn the Start Point by Its Knob', drag: 'plane' }
@@ -201,7 +205,7 @@ export function buildHelpLines() {
     return BUILD_HELP_ROWS.map(row => {
         const input = row.keys ? keysText(row.keys)
             : row.presses ? pressText(row.presses)
-            : row.click ? `Click${forTools([row.click])}`
+            : row.click ? `${row.held ? `${row.held}+` : ''}Click${forTools([row.click])}`
             : row.drag ? `${row.held ? `${row.held}+` : ''}Drag${forTools([row.drag].flat())}${row.then ? `, then ${row.then}` : ''}`
             : row.handle ? 'Drag a Handle'
             : row.rightClick ? 'Right Click'

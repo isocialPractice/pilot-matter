@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BUILD_TOOLS, BUILD_TOOL_IDS, BUILT_TOOLS, SELECT_TOOL, ACCEPT_TOOL, FILES_TOOL, PLANE_TOOL,
+    BUILD_TOOLS, BUILD_TOOL_IDS, BUILT_TOOLS, SELECT_TOOL, ACCEPT_TOOL, FILES_TOOL, PLANE_TOOL, CITY_TOOL,
     isBuildTool, isBuiltTool, isChoosableTool, paletteTools, isPaletteBar, toolMark,
     toolModes, toolDoes, insertsTemplate, placesStartPoint, choosesPlane,
     buildTool, dropsAtClick, derivedValues, droppedPlacement, toolPlacement
@@ -86,11 +86,10 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is the tour\'s twelve, SAVE / LOAD and Insert Plane, with Insert City joining once it works', () => {
-    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', PLANE_TOOL, ACCEPT_TOOL, FILES_TOOL]);
-    assert.deepEqual(BUILD_TOOL_IDS.filter(id => !BUILT_TOOLS.includes(id)), ['city'],
-        'Insert City declared, and drawn once it works');
-    assert.equal(isChoosableTool('city'), false, 'city cannot be chosen yet');
+test('today the palette is the tour\'s twelve, Insert City, Insert Plane and SAVE / LOAD - every tool declared, built', () => {
+    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', CITY_TOOL, PLANE_TOOL, ACCEPT_TOOL, FILES_TOOL]);
+    assert.deepEqual(BUILD_TOOL_IDS.filter(id => !BUILT_TOOLS.includes(id)), [], 'nothing declared and left undrawn');
+    assert.equal(isChoosableTool(CITY_TOOL), true, 'and Insert City is a tool a canvas can be worked with: its panel is the catalogue');
     assert.equal(isChoosableTool(PLANE_TOOL), true, 'and Insert Plane is a tool a canvas can be worked with: its panel is the plane and the start point');
     assert.equal(isChoosableTool(FILES_TOOL), true, 'and SAVE / LOAD is a tool a canvas can be worked with: its panel is the files');
     assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');

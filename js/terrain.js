@@ -256,7 +256,7 @@ export class Terrain {
 
         const tile = {
             index, field, mesh: buildMesh(field), water: waterSurface(field), watered: false,
-            objects, objectMesh: objectGroup(objects)
+            objects, objectMesh: objectGroup(objects, { groundAt: (x, z) => sampleHeight(field, x, z) })
         };
         this.scene.add(tile.mesh);
         if (tile.objectMesh) this.scene.add(tile.objectMesh);
