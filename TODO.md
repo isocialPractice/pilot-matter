@@ -11,12 +11,13 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **City buildings**: five skylines, three factories, nine residential,
-  five commercial and five infrastructure buildings, original and generic, in
-  the catalogue a test holds to the counts asked
+- [ ] **Roads that snap**: six road pieces laid over the ground, each with
+  connectors at its open ends, snapping end to end to an open connector within
+  30 metres while previewed, and placed free with `shift`
   - From: Post Interactive Build
-- [ ] **Parks**: seven parks of trees, paths, water and fields, drawn as
-  objects with no roof
+- [ ] **Insert City**: the tool and its mark, a folding section per category
+  of named cards, a chosen card previewed under the pointer and placed by a
+  click, and turned by the gumball
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -99,11 +100,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **City buildings**: five skylines, three factories, nine residential,
-  five commercial and five infrastructure buildings, original and generic, in
-  the catalogue a test holds to the counts asked
-- [ ] **Parks**: seven parks of trees, paths, water and fields, drawn as
-  objects with no roof
 - [ ] **Roads that snap**: six road pieces laid over the ground, each with
   connectors at its open ends, snapping end to end to an open connector within
   30 metres while previewed, and placed free with `shift`
@@ -176,39 +172,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 388 earlier items in `TODO-archive.md`, newest last.
+> 390 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Mode types**: what an insert, load or save section does declared on it
-  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
-  config<flight:start-point>`, `Load data<file>` - written and read back by one
-  pair of functions and dispatched on, with Insert Runway marked and unchanged
-  - **Settled**: `js/mode-types.js` holds the verbs and the kinds, and writes
-    and reads a mode type back - `mode`, `modeType`, `parseModeType` and
-    `modeIs` - a declaration that is no mode type throwing as the module
-    loads. A tool's `modes` are its sections' types, in the order its panel
-    draws them. Insert Runway's `Insert asset<runway>` replaced the `inserts`
-    flag, and `insertsTemplate` reads it through `toolDoes`; Insert City's,
-    Insert Plane's two and SAVE / LOAD's three are declared beside it. The
-    tools that build, paint, erase and extrude declare none.
-  - From: Post Interactive Build
-- [x] **The palette redrawn**: the seven rows of `panel-updated.svg` with
-  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
-  a text button in the art's colours, the new marks copied by the sync list,
-  each tile shown once its tool works, the gear kept, and both screens measured
-  - **Settled**: `BUILD_TOOLS` is the tour's twelve and the art's later three
-    in the art's order - Insert City after Extrude, Insert Plane before the way
-    out, and `FILES_TOOL`, the bar, after it - with only the twelve built. The
-    two marks are copied as `city.svg` and `plane.svg`; the copy also brought
-    the way out's mark as the designer exported it again beside them, the same
-    check on the 31.1 tile the later art is drawn on, so the art test takes
-    either tile. `isPaletteBar` marks the bar: a text button in the art's navy
-    and blue across every column, with no mark. Measured with every tile drawn:
-    at 1280x800 the palette ends at 640 and the list starts at 654. On a phone
-    the art's eight rows of two stood under the dock - and a short phone's had
-    already put the way out there with today's twelve - so below 641 pixels
-    the palette is three tiles across at 52 pixels, and the dock never reaches
-    up past its foot: every tile above the dock at 390x844 and at 375x548.
-  - From: Post Interactive Build
 - [x] **The environment file**: a built world written as one JSON file with a
   committed schema - format, version, name, base, rows, placements, and later
   the start, the plane and the assets - read back by a function that never
@@ -363,4 +328,29 @@ how the simulator got here rather than as a list still to be worked.
     naming where. The catalogue starts with two - COTTAGE and WATER TOWER -
     under the six categories Insert City will fold; the city's own buildings
     are the next run's.
+  - From: Post Interactive Build
+- [x] **City buildings**: five skylines, three factories, nine residential,
+  five commercial and five infrastructure buildings, original and generic, in
+  the catalogue a test holds to the counts asked
+  - **Settled**: the catalogue in `js/prefabs.js` holds 27 buildings - five
+    skylines, three factories, nine residential, five commercial and five
+    infrastructure - generic and original, built with small helpers: `block`
+    and `drum` give a box or a round tower a band of windows at every floor,
+    `front` puts a house's door and windows on its `+z` wall. Every card's
+    footprint was measured off its recipe and is held to it; a skyline is two
+    to five towers by the places something 25 metres tall stands. A test holds
+    each category's count to the range asked and the names to the plan's, every
+    building solid on the usual plinth, nothing below the ground it stands on,
+    and no recipe past 3000 triangles. Roads, the infrastructure category's
+    second half, are the next run's.
+  - From: Post Interactive Build
+- [x] **Parks**: seven parks of trees, paths, water and fields, drawn as
+  objects with no roof
+  - **Settled**: seven parks - LAWN, WOODLAND, POND PARK, PLAYGROUND, SPORTS
+    FIELD, PLAZA and FORMAL GARDEN - each `solid: false`, laid on a lawn of its
+    own the size of its card, with trees, paths, benches, water and a pitch's
+    lines as meshes. A recipe may now name its `plinth` colour, read and held
+    by the file and the schema, and `js/object-mesh.js` colours each plinth
+    instance with it, so a park on falling ground reads as a grassy terrace
+    rather than a concrete one.
   - From: Post Interactive Build

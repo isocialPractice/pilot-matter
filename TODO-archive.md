@@ -5219,3 +5219,34 @@ still be found by name.
     its last value to its first, where its marks stop at the ends. The goal's
     mixed-case `Off` is the mockup's lettering; the panel keeps its own.
   - From: Post Interactive Build
+- [x] **Mode types**: what an insert, load or save section does declared on it
+  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
+  config<flight:start-point>`, `Load data<file>` - written and read back by one
+  pair of functions and dispatched on, with Insert Runway marked and unchanged
+  - **Settled**: `js/mode-types.js` holds the verbs and the kinds, and writes
+    and reads a mode type back - `mode`, `modeType`, `parseModeType` and
+    `modeIs` - a declaration that is no mode type throwing as the module
+    loads. A tool's `modes` are its sections' types, in the order its panel
+    draws them. Insert Runway's `Insert asset<runway>` replaced the `inserts`
+    flag, and `insertsTemplate` reads it through `toolDoes`; Insert City's,
+    Insert Plane's two and SAVE / LOAD's three are declared beside it. The
+    tools that build, paint, erase and extrude declare none.
+  - From: Post Interactive Build
+- [x] **The palette redrawn**: the seven rows of `panel-updated.svg` with
+  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
+  a text button in the art's colours, the new marks copied by the sync list,
+  each tile shown once its tool works, the gear kept, and both screens measured
+  - **Settled**: `BUILD_TOOLS` is the tour's twelve and the art's later three
+    in the art's order - Insert City after Extrude, Insert Plane before the way
+    out, and `FILES_TOOL`, the bar, after it - with only the twelve built. The
+    two marks are copied as `city.svg` and `plane.svg`; the copy also brought
+    the way out's mark as the designer exported it again beside them, the same
+    check on the 31.1 tile the later art is drawn on, so the art test takes
+    either tile. `isPaletteBar` marks the bar: a text button in the art's navy
+    and blue across every column, with no mark. Measured with every tile drawn:
+    at 1280x800 the palette ends at 640 and the list starts at 654. On a phone
+    the art's eight rows of two stood under the dock - and a short phone's had
+    already put the way out there with today's twelve - so below 641 pixels
+    the palette is three tiles across at 52 pixels, and the dock never reaches
+    up past its foot: every tile above the dock at 390x844 and at 375x548.
+  - From: Post Interactive Build

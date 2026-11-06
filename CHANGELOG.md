@@ -5,6 +5,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.63.0] - 2026-11-05
+
+The city's buildings and its parks: 34 prefabs to build with.
+
+### Added
+
+- **City buildings.** 27 original buildings, from a cottage to a skyline of
+  towers: five skylines, three factories, nine homes from a bungalow to
+  high-rise flats, five shops and offices, and five pieces of infrastructure -
+  a power station, a water tower, a substation, a fire station and a
+  hospital. A skyline is a block of two to five towers, and every block of
+  storeys carries a band of windows at each floor.
+- **Parks.** Seven parks - a lawn, a woodland, a pond park, a playground, a
+  sports field, a plaza and a formal garden - of trees, paths, benches,
+  water and a pitch's lines, each laid on a lawn of its own. A park has no
+  roof, so it is flown over rather than into.
+- **A plinth in a recipe's own colour.** A recipe may name the colour of the
+  plinth it stands on where the ground falls away under it, so a park on a
+  slope reads as a grassy terrace. The file and the schema carry it.
+
+Held in Node by `test/city.test.js` - each category holding as many as were
+asked for, the catalogue the plan's card for card, a skyline two to five
+towers reaching past the high-rise flats, every building solid on the usual
+plinth and every park flown over on a lawn the size of its card over a plinth
+of its own colour, every card a size a city is built of and cheap enough to
+draw by the hundred with nothing below its ground, and a park's plinth drawn
+in its colour - with `test/objects.test.js` holding every card's footprint to
+its recipe and every recipe to building and reading back. Each rejected the
+defect it names when that was put back, 13 in all: a park solid, a park on the
+usual plinth, a building marked not solid, a building on a coloured plinth, a
+skyline of one tower, a factory missing, a card the wrong size, a building's
+windows never banded, a park's lawn smaller than its card, a part below the
+ground, a plinth colour read whatever it is, a park's plinth colour not
+carried, every plinth drawn in concrete.
+
+Settled in Chromium in 4 checks: the whole catalogue standing on every tile,
+one instanced mesh to a recipe and one for the plinths; the seven parks not
+solid, their plinths drawn in their own colours; the world laid with all 34 on
+it quickly; and flown low through a woodland and over a sports field no crash,
+into a terrace or a hotel a crash.
+
 ## [1.0.0-alpha.1.62.0] - 2026-11-05
 
 Objects on the ground: buildings drawn as meshes standing on the ground, built

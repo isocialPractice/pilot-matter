@@ -159,12 +159,13 @@ function footprintPoints(footprint) {
  * The objects a tile draws, standing on its ground: every object placement in
  * `placements` that no later batch erased, each laid out as
  *
- *     { key, recipe, prefab, x, z, yaw, scale, stand, base, top, footprint, solid }
+ *     { key, recipe, prefab, x, z, yaw, scale, stand, base, top, footprint, solid, plinth }
  *
  * where `x` and `z` are the point it stands at in the world, `yaw` the turn
  * that faces it along its heading, `stand` the highest ground under its
  * footprint and `base` the lowest - the plinth runs between them - `top` the
- * height of its highest part, and `footprint` its rectangle in the world.
+ * height of its highest part, `footprint` its rectangle in the world, and
+ * `plinth` the colour its recipe asks its plinth be, or null for the usual.
  *
  * `groundAt(x, z)` is the tile's ground, in the world; `originX` and `originZ`
  * are where the tile's middle is, which every canvas point is measured from;
@@ -198,7 +199,8 @@ export function standingObjects(placements = [], { groundAt = () => 0, originX =
             base,
             top: stand + objectHeight(placement),
             footprint: world,
-            solid: recipeSolid(placement.recipe)
+            solid: recipeSolid(placement.recipe),
+            plinth: Number.isInteger(placement.recipe?.plinth) ? placement.recipe.plinth : null
         });
     });
 

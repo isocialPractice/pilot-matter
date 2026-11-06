@@ -173,7 +173,8 @@
       "additionalProperties": false,
       "properties": {
         "parts": { "type": "array", "minItems": 1, "maxItems": 400, "items": { "$ref": "#/$defs/part" } },
-        "solid": { "description": "False for something the aircraft flies over rather than into, such as a park.", "type": "boolean" }
+        "solid": { "description": "False for something the aircraft flies over rather than into, such as a park.", "type": "boolean" },
+        "plinth": { "description": "The colour of the plinth it stands on where the ground falls away under it, as a number, 0xrrggbb.", "type": "integer", "minimum": 0, "maximum": 16777215 }
       }
     },
     "part": {

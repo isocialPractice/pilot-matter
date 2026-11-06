@@ -54,8 +54,12 @@ export function objectGroup(objects = []) {
     if (plinths.length > 0) {
         const block = new THREE.BoxGeometry(1, 1, 1);
         block.translate(0, -0.5, 0);
-        const mesh = new THREE.InstancedMesh(block, holdGroundColor(new THREE.MeshLambertMaterial({ color: PLINTH_COLOR })), plinths.length);
+        // Each plinth in its recipe's own colour - a park's is grass, so it
+        // reads as a terrace - or the usual concrete.
+        const mesh = new THREE.InstancedMesh(block, holdGroundColor(new THREE.MeshLambertMaterial({ color: 0xffffff })), plinths.length);
+        const colour = new THREE.Color();
         plinths.forEach((object, i) => {
+            mesh.setColorAt(i, colour.setHex(object.plinth ?? PLINTH_COLOR));
             const { footprint } = object;
             turn.setFromAxisAngle(up, -footprint.angle);
             matrix.compose(
@@ -65,6 +69,7 @@ export function objectGroup(objects = []) {
             mesh.setMatrixAt(i, matrix);
         });
         mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         mesh.computeBoundingSphere();
         group.add(mesh);
     }
