@@ -11,20 +11,15 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Start point**: one point and heading per environment, placed by a
-  click with Insert Plane live, turned by its arrow, written out as typed rows,
-  saved with the world, and flown from - over it at its height above the ground
-  when flying, on the runway nearest it for a takeoff - with the settings rows
-  it overrides locked
+- [ ] **Objects on the ground**: a placement drawn as a mesh standing on the
+  ground rather than as ground, repeated on every tile on that tile's own
+  ground, fogged like the ground, solid to the aircraft - any touch on one a
+  crash, roofs included, while an extrusion's top is still landed on as
+  ground - picked by Select and taken whole by Erase
   - From: Post Interactive Build
-- [ ] **Pre-built planes**: five original planes drawn from primitives as the
-  trainer is, each with the flight figures the aircraft already takes, each
-  leaving the ground within BASIC RUNWAY, swapped between flights by
-  `setPlane`, the trainer the default
-  - From: Post Interactive Build
-- [ ] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
-  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
-  the world and flown on it
+- [ ] **Prefabs**: a building as a recipe of primitives in its own frame,
+  copied into the placement as a template's members are, merged and instanced
+  per prefab
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -107,18 +102,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Start point**: one point and heading per environment, placed by a
-  click with Insert Plane live, turned by its arrow, written out as typed rows,
-  saved with the world, and flown from - over it at its height above the ground
-  when flying, on the runway nearest it for a takeoff - with the settings rows
-  it overrides locked
-- [ ] **Pre-built planes**: five original planes drawn from primitives as the
-  trainer is, each with the flight figures the aircraft already takes, each
-  leaving the ground within BASIC RUNWAY, swapped between flights by
-  `setPlane`, the trainer the default
-- [ ] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
-  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
-  the world and flown on it
 - [ ] **Objects on the ground**: a placement drawn as a mesh standing on the
   ground rather than as ground, repeated on every tile on that tile's own
   ground, fogged like the ground, solid to the aircraft - any touch on one a
@@ -204,47 +187,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 383 earlier items in `TODO-archive.md`, newest last.
+> 386 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Turn with the right button**: a right drag orbiting the view in every
-  tool and in Select, as the camera override from inside a tool, with `shift`
-  and a right drag still panning, a right click that did not travel still
-  opening `DESELECT` - decided on the button's release rather than on
-  `contextmenu` - and a second button ignored while a drag is in hand
-  - **Settled**: a right drag orbits in every tool and in Select, one more
-    row in `CAMERA_GESTURES`, so the list's orbit line reads `Drag (Select) or
-    Right Drag`. A right press waits until it travels past a click before it
-    turns, as Select's left press always has, through `pressMayClick`; one let
-    go of before then is the right click, and opens the popup through `menuAt`
-    on the release, while `contextmenu` only keeps the browser's menu off the
-    canvas. The tool is suspended only once the press travels, so a right
-    click does not put it away and back. A press while a stroke or a lasso
-    drag is in hand starts nothing; a second mouse button pressed during a
-    drag never reaches the press at all, pointer events sending it as a move.
-  - From: Post Interactive Build
-- [x] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
-  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
-  changed, never the default, and fitting the card on a phone
-  - **Settled**: `CANCEL` is the third of `CONFIRM_ENTRIES`, answering
-    `CONFIRM_STAY`, on both confirms, and outlined as the dock's `CANCEL` is.
-    The card is 360 pixels wide so the three stand on one row on a 390-pixel
-    phone; on anything narrower they wrap, `CANCEL` alone under `YES` and
-    `NO`, measured at 320.
-  - From: Post Interactive Build
-- [x] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
-  percentage moved a tenth at a press wherever it is stepped, still written and
-  typed to the hundredth through a precision of its own
-  - **Settled**: `rangeStep` gives a fraction - a range from 0 to 1 not read
-    as a percentage - `FRACTION_STEP`, a tenth, wherever a range is stepped,
-    the element editor's arrows among them. How finely a range is written and
-    typed came apart from how far a press moves it: `rangePlaces` keeps the
-    old fiftieth's places, and is read by the reading, the field, a typed
-    figure, the element editor's commit and a gumball drag, with `moveValue`
-    rounding to it, so 0.25 stepped up is 0.35. Paint's opacity and erase's
-    strength, read as percentages, still step in points, and a range naming
-    its own step keeps it. Ten presses on a fraction is the whole of it, so
-    `shift` takes one to the end its arrow points at.
-  - From: Post Interactive Build
 - [x] **The dock's own spin buttons**: the browser's spinner, which moves a
   field by 1, replaced by the panel's own up and down inside the field, with
   `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
@@ -362,4 +306,56 @@ how the simulator got here rather than as a list still to be worked.
     which needed `MenuList.render` to draw a changed note again, and a refusal
     is drawn in amber. A save writes the world the settings would fly, under
     the loaded world's name when that is the one chosen.
+  - From: Post Interactive Build
+- [x] **Start point**: one point and heading per environment, placed by a
+  click with Insert Plane live, turned by its arrow, written out as typed rows,
+  saved with the world, and flown from - over it at its height above the ground
+  when flying, on the runway nearest it for a takeoff - with the settings rows
+  it overrides locked
+  - **Settled**: the start point is `js/start-point.js`, held as `{ at,
+    heading, heightFeet }` and cleaned to the world, the compass and 100 to
+    10000 ft. The session holds one on `state.start`, set by a click with
+    Insert Plane live (`placesStartPoint`, `Insert config<flight:start-point>`),
+    moved by a second click with its heading and height kept, and turned by
+    dragging the white knob at the end of its arrow on the overlay - a press
+    the canvas takes before an orbit, a pick or a drop. It rides
+    `sessionWorld`, the SAVE AND EXIT answer, `replacesBuild` and the canvas
+    reopened, is kept on the editor by `keepBuiltWorld`'s new `flight`, and is
+    written to the file as `start`. A free flight on a world with one opens
+    through `startAtPoint` - over it, on its heading, at its height above the
+    ground there - and a takeoff on `nearestRunway` to it. While it is flown,
+    `holdStartFields` holds START HEADING and START ALTITUDE, drawn locked with
+    "set by this environment", refusing a step and a typed figure.
+  - From: Post Interactive Build
+- [x] **Pre-built planes**: five original planes drawn from primitives as the
+  trainer is, each with the flight figures the aircraft already takes, each
+  leaving the ground within BASIC RUNWAY, swapped between flights by
+  `setPlane`, the trainer the default
+  - **Settled**: `js/planes.js` holds the five as recipes of boxes,
+    cylinders and cones - the trainer part for part the old `bundledModel`,
+    which is now `planeModel(trainer)` - each with the three speeds, the two
+    arrival speeds and a `handling` share of the pilot's sensitivity, set
+    against the trainer. `Aircraft.setPlane` swaps the figures and, unless the
+    host flies its own model, the meshes; `CameraController.setChase` takes
+    `chaseFor(plane)`, the trainer's 30 and 10 scaled by size. A test runs the
+    pure flight model from a standstill at full throttle and holds every plane
+    to leaving the ground inside BASIC RUNWAY above its stall; another holds
+    the opening throttle to asking no plane for less than its stall, which
+    raised the twin's top speed to 240. A preset world and every game mode fly
+    the trainer.
+  - From: Post Interactive Build
+- [x] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
+  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
+  the world and flown on it
+  - **Settled**: `plane` joins `BUILT_TOOLS`, and its dock is `DOCK_PLANE`
+    headed `INSERT PLANE`: SELECT PLANE, five named cards with the chosen one
+    pressed, and SELECT STARTING POINT, `AT X`, `AT Z`, `HEADING` and `HEIGHT
+    FEET` or `HEIGHT METERS` in the settings' altitude unit, or a line saying
+    to click the ground while there is none, with `CLEAR` pinned under them
+    and not pressable until there is something to take. Each section carries
+    its mode type off the tool. The plane chosen rides the world as the start
+    point does, as `plane` in the file, and `refreshWorld` puts the pilot in it
+    through `flyPlane`. The control list gains `Click (Insert plane) - Put the
+    Start Point There` and `Drag (Insert plane) - Turn the Start Point by Its
+    Knob`.
   - From: Post Interactive Build

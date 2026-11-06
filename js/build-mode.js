@@ -32,6 +32,8 @@ import {
     templateBuilt, placeTemplate, groupConfig, groupReach, keepStripOnCanvas
 } from './templates.js';
 import { getElement, isElementId, resolveConfig } from './environment/elements.js';
+import { cleanStartPoint, placeStartPoint, turnStartPoint } from './start-point.js';
+import { isPlaneId } from './planes.js';
 import { isErase, eraseConfig } from './environment/erase.js';
 import {
     footprintWeight, isFootprint, combineFootprints, placeFootprint, addToPlaced
@@ -167,6 +169,12 @@ export function createBuildState() {
         // The template Insert Runway is armed with, or null until a card is
         // chosen: the pointer carries nothing and a click places nothing.
         runwayTemplate: null,
+        // The world's own flight, which Insert Plane sets: where a flight on it
+        // starts, as `js/start-point.js` holds one, and which plane it is flown
+        // in, by id - each null for none. One of each per world, so they are
+        // the session's rather than placements, and kept and saved with it.
+        start: null,
+        plane: null,
         // While an eye dropper is armed, what it fills: true for Free Paint's
         // brush, or the name of the colour an extrusion's surface is painted;
         // the next click on the ground takes the colour there for it.
@@ -218,7 +226,7 @@ export function openBuildMode(state, from = BUILD_FROM_TITLE, built = null) {
     state.tool = null;
     state.confirm = null;
 
-    if (built != null) beginCanvas(state, built.environment, built.placements, built.world);
+    if (built != null) beginCanvas(state, built.environment, built.placements, built.world, built);
     return state;
 }
 
@@ -377,7 +385,8 @@ export function answerConfirm(state, answer) {
             keep: answer === CONFIRM_YES,
             environment: state.environment,
             placements: committedPlacements(state),
-            world: worldRows(state)
+            world: worldRows(state),
+            ...sessionFlight(state)
         };
     }
 
@@ -400,19 +409,39 @@ export function answerConfirm(state, answer) {
 
 /**
  * The world the canvas holds as a file is written from it - the environment,
- * the committed placements and the environment's own rows - in the shape the
- * builder keeps a world in. An edit in hand is not part of it: choosing
- * SAVE / LOAD asks about one first.
+ * the committed placements and the environment's own rows, and its start point
+ * and plane when it has them - in the shape the builder keeps a world in. An
+ * edit in hand is not part of it: choosing SAVE / LOAD asks about one first.
  */
 export function sessionWorld(state) {
     if (!buildModeDrawing(state)) return null;
-    return { environment: state.environment, placements: committedPlacements(state), world: worldRows(state) };
+    return {
+        environment: state.environment, placements: committedPlacements(state), world: worldRows(state),
+        ...sessionFlight(state)
+    };
 }
 
-/** True while what is on the canvas is something a file loaded over it would take away: something built, or the world's rows changed. */
+/** The canvas's own flight as a world carries it: `start` and `plane`, each left out while there is none. */
+function sessionFlight(state) {
+    return {
+        ...(state.start ? { start: { ...state.start, at: [...state.start.at] } } : {}),
+        ...(state.plane ? { plane: state.plane } : {})
+    };
+}
+
+/** What a canvas opened with, written down, so a change since can be told from none. */
+function openedKey(state) {
+    return JSON.stringify({ world: state.world ?? [], start: state.start ?? null, plane: state.plane ?? null });
+}
+
+/**
+ * True while what is on the canvas is something a file loaded over it would
+ * take away: something built, or the world's rows, its start point or its
+ * plane changed.
+ */
 export function replacesBuild(state) {
     if (!buildModeDrawing(state)) return false;
-    return (state.placements ?? []).length > 0 || JSON.stringify(state.world ?? []) !== state.openedWorld;
+    return (state.placements ?? []).length > 0 || openedKey(state) !== state.openedWorld;
 }
 
 /**
@@ -443,9 +472,71 @@ export function loadCanvas(state, world, name = '') {
     if (!buildModeDrawing(state) || confirmOpen(state) || draftPending(state)) return false;
     if (typeof world?.environment !== 'string' || world.environment === '') return false;
 
-    openCanvas(state, world.environment, world.placements ?? [], world.world ?? []);
+    openCanvas(state, world.environment, world.placements ?? [], world.world ?? [], world);
     if (isChoosableTool(FILES_TOOL)) state.tool = FILES_TOOL;
     state.saveName = typeof name === 'string' ? name : '';
+    return true;
+}
+
+// --- Insert Plane ----------------------------------------------------------------
+
+/** Where a flight on the canvas's world starts, or null while it has no start point. */
+export function buildStartPoint(state) {
+    return buildModeDrawing(state) ? state.start ?? null : null;
+}
+
+/** The plane the canvas's world is flown in, as an id, or null for none chosen - the trainer. */
+export function buildPlane(state) {
+    return buildModeDrawing(state) ? state.plane ?? null : null;
+}
+
+/** True while the world's flight may be changed: on a canvas, with nothing asked. */
+function flightEditable(state) {
+    return buildModeDrawing(state) && !confirmOpen(state);
+}
+
+/**
+ * Puts the start point at a point on the ground - there is only ever one, so a
+ * second click moves it - keeping the heading and height it had. Refused off a
+ * canvas, under a question, and for a point that is not one.
+ */
+export function setBuildStartPoint(state, at) {
+    if (!flightEditable(state)) return false;
+    const point = placeStartPoint(at, state.start);
+    if (point == null) return false;
+    state.start = point;
+    return true;
+}
+
+/** Points the start point another way, as its knob is dragged round it. Refused with no start point. */
+export function turnBuildStartPoint(state, heading) {
+    if (!flightEditable(state) || state.start == null) return false;
+    const turned = turnStartPoint(state.start, heading);
+    if (turned.heading === state.start.heading) return false;
+    state.start = turned;
+    return true;
+}
+
+/** The start point as its rows on the dock now say it, held to what a start point may be. Refused with none. */
+export function writeBuildStartPoint(state, point) {
+    if (!flightEditable(state) || state.start == null) return false;
+    const written = cleanStartPoint(point);
+    if (written == null) return false;
+    state.start = written;
+    return true;
+}
+
+/** Takes the start point away, so the world starts where it always did. False with none to take. */
+export function clearBuildStartPoint(state) {
+    if (!flightEditable(state) || state.start == null) return false;
+    state.start = null;
+    return true;
+}
+
+/** Chooses the plane the world is flown in. Refused for a plane there is not, and for the one already chosen. */
+export function chooseBuildPlane(state, id) {
+    if (!flightEditable(state) || !isPlaneId(id) || state.plane === id) return false;
+    state.plane = id;
     return true;
 }
 
@@ -1109,19 +1200,22 @@ export function buildModeEnvironment(state) {
  * holds - its preset, or the preset as it was changed and kept - which the
  * canvas is drawn from beneath what is built, and Select's panel changes.
  *
+ * `flight` is the world's own flight kept with it - `{ start, plane }`, either
+ * missing for none - which the canvas opens with set.
+ *
  * Refused for a session that is not open, so a canvas can never be begun from
  * under a screen that is not the picker.
  */
-export function beginCanvas(state, environmentId, kept = [], world = []) {
+export function beginCanvas(state, environmentId, kept = [], world = [], flight = null) {
     if (!buildModePicking(state)) return false;
     if (typeof environmentId !== 'string' || environmentId === '') return false;
 
-    openCanvas(state, environmentId, kept, world);
+    openCanvas(state, environmentId, kept, world, flight);
     return true;
 }
 
 /** Everything a canvas opens with, whether from the picker or over another from a file. */
-function openCanvas(state, environmentId, kept, world) {
+function openCanvas(state, environmentId, kept, world, flight = null) {
     state.screen = BUILD_CANVAS;
     state.environment = environmentId;
     // Select is the navigation state, so a canvas opens on looking at it.
@@ -1148,9 +1242,12 @@ function openCanvas(state, environmentId, kept, world) {
     state.camera = null;
     state.settingsOver = null;
     state.kept = null;
-    // The environment's own rows as the canvas opened with them, so a change
-    // made to them since is something a file loaded over it would replace.
-    state.openedWorld = JSON.stringify(state.world);
+    state.start = cleanStartPoint(flight?.start);
+    state.plane = isPlaneId(flight?.plane) ? flight.plane : null;
+    // The environment's own rows and flight as the canvas opened with them,
+    // so a change made to them since is something a file loaded over it would
+    // replace.
+    state.openedWorld = openedKey(state);
     // The name a save writes the world under, and what the last save or load
     // came to - see `saveName` and `fileStatus`.
     state.saveName = '';

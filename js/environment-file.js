@@ -13,8 +13,14 @@
  *       "savedAt": "2026-11-05T12:00:00.000Z",
  *       "base": "highlands",
  *       "elements": [ { "id": "mountain-0", "type": "mountain", "config": {} } ],
- *       "placements": [ { "type": "mountain", "config": { "at": [0, 0] }, "seed": 7 } ]
+ *       "placements": [ { "type": "mountain", "config": { "at": [0, 0] }, "seed": 7 } ],
+ *       "start": { "at": [1200, -800], "heading": 90, "heightFeet": 1000 },
+ *       "plane": "bush"
  *     }
+ *
+ * `start` and `plane` are the world's own flight, and either may be left out:
+ * a world with no start point opens where every world does, and one with no
+ * plane is flown in the trainer.
  *
  * `schemas/environment.schema.json` is the same format as JSON Schema, for
  * whoever writes one of these by hand or by another program.
@@ -38,6 +44,8 @@ import { isFootprint } from './environment/footprints.js';
 import { GROUP_TYPE } from './templates.js';
 import { elementRow } from './element-editor.js';
 import { SHADE_RANGE } from './properties-panel.js';
+import { cleanStartPoint } from './start-point.js';
+import { isPlaneId } from './planes.js';
 
 /** What a file says it is, so a JSON file that is something else is refused by name. */
 export const ENVIRONMENT_FORMAT = 'pilot-matter.environment';
@@ -59,8 +67,13 @@ export const ENVIRONMENT_FILE_LIMIT = 50 * 1024 * 1024;
 export const ENVIRONMENT_NAME_LIMIT = 60;
 
 /** The fields a file may carry at its top, the first three of which it must. */
-export const DOCUMENT_FIELDS = Object.freeze(['$schema', 'format', 'version', 'name', 'savedAt', 'base', 'elements', 'placements']);
+export const DOCUMENT_FIELDS = Object.freeze([
+    '$schema', 'format', 'version', 'name', 'savedAt', 'base', 'elements', 'placements', 'start', 'plane'
+]);
 export const DOCUMENT_REQUIRED = Object.freeze(['format', 'version', 'base']);
+
+/** The fields a start point carries in a file. */
+export const START_FIELDS = Object.freeze(['at', 'heading', 'heightFeet']);
 
 /** The fields an element's row carries in a file. Its label and note are read off the element. */
 export const ROW_FIELDS = Object.freeze(['id', 'type', 'config', 'base', 'shades']);
@@ -92,10 +105,12 @@ export function defaultEnvironmentName(base) {
  * The document a built world is saved as. `world` is what the builder keeps -
  * `{ environment, placements, world }`, as `builtWorld` hands it back: the
  * environment built on, the committed placements, and the environment's own
- * rows. Every part is copied, so the document shares nothing with the world.
+ * rows - and its `start` and `plane` when it has them. Every part is copied, so
+ * the document shares nothing with the world.
  */
 export function environmentDocument(world, { name = '', savedAt = new Date().toISOString() } = {}) {
     const base = getEnvironment(world?.environment).id;
+    const start = cleanStartPoint(world?.start);
     return {
         format: ENVIRONMENT_FORMAT,
         version: ENVIRONMENT_VERSION,
@@ -109,7 +124,9 @@ export function environmentDocument(world, { name = '', savedAt = new Date().toI
             base: withoutDrawn(structuredClone(row.base ?? row.config ?? {})),
             shades: structuredClone(row.shades ?? {})
         })),
-        placements: (world?.placements ?? []).map(placement => withoutDrawnDeep(structuredClone(placement)))
+        placements: (world?.placements ?? []).map(placement => withoutDrawnDeep(structuredClone(placement))),
+        ...(start ? { start } : {}),
+        ...(isPlaneId(world?.plane) ? { plane: world.plane } : {})
     };
 }
 
@@ -129,7 +146,8 @@ export function environmentFileName(name) {
 /**
  * A file's text read back as a world: `{ ok, world, name, savedAt, problems }`.
  * `world` is `{ environment, placements, world }`, the shape the builder keeps
- * a world in, or null for a file refused. `problems` says why, first problem
+ * a world in - with `start` and `plane` when the file has them - or null for a
+ * file refused. `problems` says why, first problem
  * first. Never throws.
  */
 export function readEnvironmentDocument(text) {
@@ -189,11 +207,19 @@ export function readEnvironmentDocument(text) {
 
         const rows = readRows(document.elements, problems);
         const placements = readPlacements(document.placements, 'placements', problems, true);
+        const start = readStart(document.start, problems);
+        if (document.plane != null && !isPlaneId(document.plane)) {
+            problems.push(`plane: no plane is called ${JSON.stringify(document.plane)}`);
+        }
 
         if (problems.length > 0) return refused();
         return {
             ok: true,
-            world: { environment: document.base, placements, world: rows },
+            world: {
+                environment: document.base, placements, world: rows,
+                ...(start ? { start } : {}),
+                ...(document.plane != null ? { plane: document.plane } : {})
+            },
             name: cleanName(name) || defaultEnvironmentName(document.base),
             savedAt,
             problems
@@ -202,6 +228,30 @@ export function readEnvironmentDocument(text) {
         problems.push(`the file could not be read: ${error?.message ?? error}`);
         return refused();
     }
+}
+
+/**
+ * The world's start point, held to where a start point may be, or null for a
+ * file with none. Refused for one that is not a point with a heading and a
+ * height - a start somewhere nobody said is no start at all.
+ */
+function readStart(start, problems) {
+    if (start == null) return null;
+    if (!isObject(start)) {
+        problems.push('start: not a start point');
+        return null;
+    }
+    for (const key of Object.keys(start)) {
+        if (!START_FIELDS.includes(key)) problems.push(`start: ${key} is not a field a start point has`);
+    }
+    if (!Array.isArray(start.at) || start.at.length !== 2 || !start.at.every(Number.isFinite)) {
+        problems.push('start: at is not a point');
+        return null;
+    }
+    for (const key of ['heading', 'heightFeet']) {
+        if (start[key] != null && !Number.isFinite(start[key])) problems.push(`start: ${key} is not a number`);
+    }
+    return cleanStartPoint(start);
 }
 
 /** The environment's own rows, each rebuilt as the editor builds one, or [] for none. */

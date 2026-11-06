@@ -5152,3 +5152,42 @@ still be found by name.
     way from the start, and a saturated paint was the first colour to show
     it.
   - From: Post Interactive Build
+- [x] **Turn with the right button**: a right drag orbiting the view in every
+  tool and in Select, as the camera override from inside a tool, with `shift`
+  and a right drag still panning, a right click that did not travel still
+  opening `DESELECT` - decided on the button's release rather than on
+  `contextmenu` - and a second button ignored while a drag is in hand
+  - **Settled**: a right drag orbits in every tool and in Select, one more
+    row in `CAMERA_GESTURES`, so the list's orbit line reads `Drag (Select) or
+    Right Drag`. A right press waits until it travels past a click before it
+    turns, as Select's left press always has, through `pressMayClick`; one let
+    go of before then is the right click, and opens the popup through `menuAt`
+    on the release, while `contextmenu` only keeps the browser's menu off the
+    canvas. The tool is suspended only once the press travels, so a right
+    click does not put it away and back. A press while a stroke or a lasso
+    drag is in hand starts nothing; a second mouse button pressed during a
+    drag never reaches the press at all, pointer events sending it as a move.
+  - From: Post Interactive Build
+- [x] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
+  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
+  changed, never the default, and fitting the card on a phone
+  - **Settled**: `CANCEL` is the third of `CONFIRM_ENTRIES`, answering
+    `CONFIRM_STAY`, on both confirms, and outlined as the dock's `CANCEL` is.
+    The card is 360 pixels wide so the three stand on one row on a 390-pixel
+    phone; on anything narrower they wrap, `CANCEL` alone under `YES` and
+    `NO`, measured at 320.
+  - From: Post Interactive Build
+- [x] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
+  percentage moved a tenth at a press wherever it is stepped, still written and
+  typed to the hundredth through a precision of its own
+  - **Settled**: `rangeStep` gives a fraction - a range from 0 to 1 not read
+    as a percentage - `FRACTION_STEP`, a tenth, wherever a range is stepped,
+    the element editor's arrows among them. How finely a range is written and
+    typed came apart from how far a press moves it: `rangePlaces` keeps the
+    old fiftieth's places, and is read by the reading, the field, a typed
+    figure, the element editor's commit and a gumball drag, with `moveValue`
+    rounding to it, so 0.25 stepped up is 0.35. Paint's opacity and erase's
+    strength, read as percentages, still step in points, and a range naming
+    its own step keeps it. Ten presses on a fraction is the whole of it, so
+    `shift` takes one to the end its arrow points at.
+  - From: Post Interactive Build

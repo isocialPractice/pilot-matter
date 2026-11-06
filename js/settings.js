@@ -22,6 +22,7 @@ import {
     START_FIELDS, START_FIELD_IDS, CHOICE_FIELD, TOGGLE_FIELD, resolveStart, runwayForced
 } from './config.js';
 import { ORBIT_RATE, ORBIT_RATES } from './camera-math.js';
+import { HELD_START_FIELDS, HELD_START_NOTE } from './start-point.js';
 import { DEFAULT_PRECIPITATION } from './weather-math.js';
 import {
     typedCharacter, startsTypedValue, readTypedKey, typedValueLabel
@@ -482,6 +483,9 @@ export function createSettingsState(storage = null, environments = ENVIRONMENTS,
         files: worlds.files !== false,
         // What the last file row pressed came to, written where its note is.
         fileNotice: null,
+        // The start rows a world's own start point is setting while it is
+        // flown, which the panel draws held. See `holdStartFields`.
+        held: [],
         // Which row is being typed into, what has been typed, and the range a
         // refused press was measured against. Not remembered between sessions:
         // a panel that opened half way through a figure would read the first
@@ -551,6 +555,28 @@ export function setFileNotice(state, id, text, { refused = false } = {}) {
 }
 
 /**
+ * Holds the start rows a world's own start point sets - `START HEADING` and
+ * `START ALTITUDE` - while a world with one is flown, or lets them go. A held
+ * row is drawn locked, with the note "set by this environment", and neither a
+ * step nor a typed figure moves it: the start point has already answered it.
+ *
+ * Returns true when what is held changed.
+ */
+export function holdStartFields(state, held = true) {
+    const next = held ? [...HELD_START_FIELDS] : [];
+    if (JSON.stringify(next) === JSON.stringify(state.held ?? [])) return false;
+    state.held = next;
+    if (state.typing && next.includes(state.typing.id)) state.typing = null;
+    syncSettingsEntries(state);
+    return true;
+}
+
+/** True while a world's own start point is setting a start row. */
+export function startFieldHeld(state, id) {
+    return (state?.held ?? []).includes(id);
+}
+
+/**
  * Redraws the list from the choices behind it: the environment being flown is
  * marked, and every option carries the setting it is currently on.
  */
@@ -571,6 +597,8 @@ export function syncSettingsEntries(state) {
         }
 
         if (entry.kind === OPTION_ENTRY) {
+            entry.locked = startFieldHeld(state, entry.id);
+            entry.note = entry.locked ? HELD_START_NOTE : settingsOption(entry.id, options)?.note ?? entry.note;
             entry.value = state.values[entry.id];
             entry.typing = state.typing?.id === entry.id;
             entry.valueLabel = entry.typing
@@ -686,7 +714,7 @@ export function adjustSetting(state, id, step) {
     if (entry?.kind === TOGGLE_ENTRY) return flipToggle(state, entry);
 
     const options = state.options ?? SETTINGS_OPTIONS;
-    if (!settingsOption(id, options)) return null;
+    if (!settingsOption(id, options) || startFieldHeld(state, id)) return null;
 
     return applySetting(state, id, cycleOptionValue(id, state.values[id], step, options));
 }
@@ -778,7 +806,7 @@ export function chooseSetting(state, id, step = 1) {
  */
 export function isTypedSettingRow(state, id) {
     const entry = settingsEntry(state, id);
-    if (entry?.kind !== OPTION_ENTRY) return false;
+    if (entry?.kind !== OPTION_ENTRY || startFieldHeld(state, id)) return false;
     return isRangeOption(settingsOption(id, state.options ?? SETTINGS_OPTIONS));
 }
 

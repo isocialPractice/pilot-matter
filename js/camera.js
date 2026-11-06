@@ -55,6 +55,19 @@ export class CameraController {
         return this.orbitRate;
     }
 
+    /**
+     * How far behind and above the aircraft the chase view stands, for the
+     * plane being flown: `chaseFor` in js/planes.js scales the trainer's by
+     * each plane's size. A figure that is not a number leaves the one in force.
+     *
+     * Returns the distances now in force.
+     */
+    setChase({ distance, height } = {}) {
+        if (Number.isFinite(distance) && distance > 0) this.distance = distance;
+        if (Number.isFinite(height) && height >= 0) this.height = height;
+        return { distance: this.distance, height: this.height };
+    }
+
     update(dt = 0) {
         const pos  = this.aircraft.getPosition();
         const quat = this.aircraft.getQuaternion();

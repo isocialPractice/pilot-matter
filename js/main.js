@@ -32,11 +32,12 @@ import {
     setAutoAccept, drawAgain, editPending,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE,
-    confirmEntries, requestLoad, loadCanvas, sessionWorld, saveName, setSaveName, setFileStatus
+    confirmEntries, requestLoad, loadCanvas, sessionWorld, saveName, setSaveName, setFileStatus,
+    buildStartPoint, setBuildStartPoint, turnBuildStartPoint, writeBuildStartPoint, clearBuildStartPoint, chooseBuildPlane
 } from './build-mode.js';
 import {
     paletteTools, BUILT_TOOLS, isPaletteBar, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
-    insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
+    insertsTemplate, placesStartPoint, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
 import { placeTemplate, groupStrips, groupLots, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
 import {
@@ -48,7 +49,7 @@ import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
     regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL,
-    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM, surfaceEdges
+    EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM, surfaceEdges, strokeStartPoint, START_KNOB_HIT
 } from './build-overlay.js';
 import {
     boundHandles, gumballCentre, gumballLayout, gumballHit, pressHandle, dragHandle, handleBinding,
@@ -67,7 +68,7 @@ import {
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
     DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH,
-    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD
+    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD, DOCK_PLANE, DOCK_START, DOCK_CLEAR_START
 } from './build-panel.js';
 import {
     lassoTool, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -96,7 +97,7 @@ import {
     isSettingsCloseKey, isSettingsOpenKey,
     SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP, BUILDER_GROUP, BUILDER_SETTINGS_ID,
     FILE_GROUP, LOADED_ENVIRONMENT_ID, LOAD_ENVIRONMENT_ID, SAVE_ENVIRONMENT_ID,
-    setSettingsWorlds, loadedChosen, chooseLoadedWorld, setFileNotice,
+    setSettingsWorlds, loadedChosen, chooseLoadedWorld, setFileNotice, holdStartFields,
     SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION, WEATHER_OPTION,
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
@@ -118,7 +119,10 @@ import {
 } from './builder-settings.js';
 import { aircraftBindings } from './key-bindings.js';
 import { runwayWanted } from './config.js';
-import { headingDegrees, altitudeToFeet, feetToAltitude } from './units.js';
+import { headingDegrees, altitudeToFeet, feetToAltitude, directionToBearing } from './units.js';
+import { nearestRunway } from './environment/elements.js';
+import { planeById, chaseFor } from './planes.js';
+import { startAtPoint, startFromRows, startKnobPoint, startDiscLoop } from './start-point.js';
 import {
     createRunState, startRun, isRunning, runningMode, currentStage, advanceStage,
     restartStage, recordLanding, flyStep, nextGate, runObjective, runStatus,
@@ -149,7 +153,7 @@ import {
     typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
     setEditorClearance, isEditorCloseKey, keepBuiltWorld, keptPlacements, builtWorld,
-    flownEnvironment, canvasWorld, releaseBuiltWorld, EDITOR_BACK_ID
+    flownEnvironment, canvasWorld, releaseBuiltWorld, keptFlight, flownStartPoint, flownPlane, EDITOR_BACK_ID
 } from './element-editor.js';
 import {
     environmentDocument, environmentText, environmentFileName, cleanName, defaultEnvironmentName
@@ -426,6 +430,11 @@ class FlightSimulator {
         this.gumballHover = null;
         this.gumballDrag  = null;
         this.groundStale  = false;
+
+        // The start point's knob as the last frame drew it, which a press is
+        // hit-tested against, and the press turning it - null for neither.
+        this.startKnob    = null;
+        this.startTurning = null;
         this.groundDrawnAt = 0;
 
         // Which of the world's own elements are open on Select's panel, by
@@ -792,6 +801,10 @@ class FlightSimulator {
      */
     refreshWorld({ restored = false } = {}) {
         const rebuilt = this.buildWorld();
+        this.flyPlane();
+        // The start rows a world's own start point sets are drawn held while
+        // it is the world being flown.
+        holdStartFields(this.settings, this.worldStartPoint() != null);
         const flight  = this.buildStart();
         const changed = !sameStart(flight, this.start);
 
@@ -1014,6 +1027,35 @@ class FlightSimulator {
         return leg >= 0 ? (this.runways?.[leg] ?? null) : null;
     }
 
+    /**
+     * Where a free flight on the world being flown starts, or null for where
+     * every world's does: the start point kept with a build on it. A mode
+     * brings its own world and its own start, so a run has none.
+     */
+    worldStartPoint() {
+        if (isRunning(this.run)) return null;
+        return flownStartPoint(this.editor, currentEnvironment(this.settings));
+    }
+
+    /** The plane the world being flown is flown in, as an id, or null for the trainer - which every mode flies. */
+    worldPlane() {
+        if (isRunning(this.run)) return null;
+        return flownPlane(this.editor, currentEnvironment(this.settings));
+    }
+
+    /**
+     * Puts the pilot in the plane the world is flown in, and the chase view
+     * where it stands behind that plane. Nothing changes for the plane already
+     * flown, so a setting applied for any other reason swaps no model.
+     */
+    flyPlane() {
+        const plane = planeById(this.worldPlane());
+        if (this.aircraft.plane?.id === plane.id) return false;
+        this.aircraft.setPlane(plane);
+        this.camera2.setChase(chaseFor(plane));
+        return true;
+    }
+
     /** The condition the next flight opens in, in the units the model works in. */
     buildStart() {
         const runway = this.terrain.getRunway();
@@ -1035,7 +1077,17 @@ class FlightSimulator {
             return opening.position ? { ...start, ...opening.position } : start;
         }
 
-        return flightStart(startSettings(this.settings), { runway });
+        // A world's own start point says where, and the settings say how: a
+        // flying start opens over it, on its heading, at its height above the
+        // ground there, and a takeoff on the strip nearest it.
+        const point = this.worldStartPoint();
+        if (point == null) return flightStart(startSettings(this.settings), { runway });
+
+        const strip = nearestRunway(this.terrain.getRunways(), point.at[0], point.at[1]) ?? runway;
+        return startAtPoint(
+            flightStart(startSettings(this.settings), { runway: strip }), point,
+            (x, z) => this.terrain.getTerrainHeightAt(x, z)
+        );
     }
 
     /**
@@ -1579,7 +1631,7 @@ class FlightSimulator {
         const world = this.loadedWorld?.world;
         if (!world) return false;
         keepBuiltWorld(this.editor, world.environment, runwayWanted(startSettings(this.settings)), world.placements,
-            currentEnvironment(this.settings), world.world);
+            currentEnvironment(this.settings), world.world, world);
         // The editor's panel is drawn once the page is up; before then there
         // is nothing to draw it again on.
         if (redraw) this.redrawEditor();
@@ -2286,7 +2338,7 @@ class FlightSimulator {
      * Returns true when the world a flight is drawn from is now a different
      * one, which a canvas kept exactly as the flight already had it is not.
      */
-    saveBuiltWorld(environment, placements, world = null) {
+    saveBuiltWorld(environment, placements, world = null, flight = null) {
         const before = this.flightWorldKey();
 
         // Chosen in the settings first, so the editor is told which world the
@@ -2296,7 +2348,7 @@ class FlightSimulator {
         chooseLoadedWorld(this.settings, false);
         chooseSetting(this.settings, environment);
         keepBuiltWorld(this.editor, environment, runwayWanted(startSettings(this.settings)), placements,
-            currentEnvironment(this.settings), world);
+            currentEnvironment(this.settings), world, flight);
         this.redrawEditor();
 
         return this.flightWorldKey() !== before;
@@ -2307,7 +2359,9 @@ class FlightSimulator {
         return JSON.stringify({
             environment: flownEnvironment(this.editor, currentEnvironment(this.settings)),
             runway: runwayWanted(startSettings(this.settings)),
-            elements: editorPlacements(this.editor)
+            elements: editorPlacements(this.editor),
+            start: flownStartPoint(this.editor, currentEnvironment(this.settings)),
+            plane: flownPlane(this.editor, currentEnvironment(this.settings))
         });
     }
 
@@ -2322,7 +2376,7 @@ class FlightSimulator {
      */
     startCanvas(environmentId) {
         if (!beginCanvas(this.builder, environmentId, keptPlacements(this.editor, environmentId),
-            canvasWorld(this.editor, environmentId))) return false;
+            canvasWorld(this.editor, environmentId), keptFlight(this.editor, environmentId))) return false;
         this.showCanvas(environmentId);
         return true;
     }
@@ -2496,7 +2550,7 @@ class FlightSimulator {
         if (this.gumballHover != null) return 'grab';
         const tool = buildModeTool(this.builder);
         if (eyeDropperArmed(this.builder)) return 'cell';
-        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool) || extrudeDrawing(this.builder)) return 'crosshair';
+        if (dropsAtClick(tool) || tool === LASSO_PALETTE_TOOL || isStrokeTool(tool) || insertsTemplate(tool) || placesStartPoint(tool) || extrudeDrawing(this.builder)) return 'crosshair';
         return this.hovered != null ? 'pointer' : '';
     }
 
@@ -2618,6 +2672,19 @@ class FlightSimulator {
         const held = chosen && (!extruding || buildDraft(this.builder) == null || stage === EXTRUDE_EXTRUDING || this.builder.draft?.replaces != null);
         this.gumball = held ? this.gumballFor(chosen, width, height) : null;
         if (this.gumball) strokeGumball(ctx, this.gumball, this.gumballDrag?.handle ?? this.gumballHover);
+
+        // The start point, whatever tool is live: a green disc on the ground
+        // and an arrow out along its heading - with, while Insert Plane is
+        // live and nothing is asked, the knob that turns it, kept so a press
+        // can be hit-tested against it.
+        this.startKnob = null;
+        const start = buildStartPoint(this.builder);
+        const layout = start ? this.startLayout(start, width, height) : null;
+        if (layout) {
+            const knob = placesStartPoint(live) && !confirmOpen(this.builder) && layout.knob != null;
+            strokeStartPoint(ctx, layout, { knob, lit: this.startTurning != null });
+            if (knob) this.startKnob = layout.knob;
+        }
     }
 
     /**
@@ -2808,7 +2875,7 @@ class FlightSimulator {
      * during one starts nothing of its own.
      */
     onCanvasPress(e) {
-        if (!buildModeDrawing(this.builder) || this.canvasDrag || this.gumballDrag) return;
+        if (!buildModeDrawing(this.builder) || this.canvasDrag || this.gumballDrag || this.startTurning) return;
         if (this.strokeDrawing || this.lassoDrawing?.gesture === LASSO_DRAG) return;
 
         // A press anywhere off the popup shuts it, and does nothing else: it
@@ -2830,6 +2897,16 @@ class FlightSimulator {
             return;
         }
 
+        // The start point's knob, with Insert Plane live, is dragged round to
+        // turn it - before a click there could move the point instead.
+        if (e.button === 0 && this.startKnobHit(e.clientX, e.clientY)) {
+            e.preventDefault();
+            this.renderer.domElement.setPointerCapture(e.pointerId);
+            this.startTurning = { pointer: e.pointerId };
+            this.syncOverlays();
+            return;
+        }
+
         const tool    = buildModeTool(this.builder);
         const gesture = cameraGesture(e, tool);
         if (!gesture) {
@@ -2844,6 +2921,7 @@ class FlightSimulator {
             else if (e.button === 0 && extrudeStage(this.builder) === EXTRUDE_SURFACES) this.surfacePress(e);
             else if (e.button === 0 && isStrokeTool(tool)) this.strokePress(e);
             else if (e.button === 0 && insertsTemplate(tool)) this.insertAt(e);
+            else if (e.button === 0 && placesStartPoint(tool)) this.startPointAt(e);
             return;
         }
 
@@ -2918,6 +2996,62 @@ class FlightSimulator {
     }
 
     /**
+     * A click with Insert Plane live: the start point put on the ground under
+     * the pointer - or moved there, there being only one - and written out on
+     * the dock. A click over the sky puts it nowhere.
+     */
+    startPointAt(e) {
+        const point = this.pickCanvasPoint(e.clientX, e.clientY);
+        if (!point || !setBuildStartPoint(this.builder, [point.x, point.z])) return;
+        e.preventDefault();
+        this.syncOverlays();
+    }
+
+    /** True for a press on the start point's knob as the last frame drew it, which is only drawn with Insert Plane live. */
+    startKnobHit(clientX, clientY) {
+        const knob = this.startKnob;
+        return knob != null && Math.hypot(clientX - knob.x, clientY - knob.y) <= START_KNOB_HIT;
+    }
+
+    /** The knob dragged: the start point turned to face the ground under the pointer. */
+    turnStartAt(clientX, clientY) {
+        const start = buildStartPoint(this.builder);
+        const point = start ? this.pickCanvasPoint(clientX, clientY) : null;
+        if (!point) return;
+        const dx = point.x - start.at[0];
+        const dz = point.z - start.at[1];
+        if (Math.hypot(dx, dz) < 1) return;
+        if (turnBuildStartPoint(this.builder, directionToBearing(dx, dz))) this.syncOverlays();
+    }
+
+    /**
+     * The start point as it falls on a screen `width` by `height`: its centre
+     * and the ring of its disc stood on the ground and projected, and the
+     * knob at the end of its heading arrow - each sized to how far off the
+     * camera is, so it reads the same at every zoom. Null when the camera
+     * cannot see its centre.
+     */
+    startLayout(start, width, height) {
+        const point = this.overlayPoint;
+        const onScreen = (x, z) => {
+            point.set(x, this.terrain.getTerrainHeightAt(x, z), z).project(this.camera);
+            if (!(point.z >= -1 && point.z <= 1)) return null;
+            return { x: (point.x + 1) / 2 * width, y: (1 - point.y) / 2 * height };
+        };
+
+        const centre = onScreen(start.at[0], start.at[1]);
+        if (centre == null) return null;
+        const y = this.terrain.getTerrainHeightAt(start.at[0], start.at[1]);
+        const radius = Math.max(this.camera.position.distanceTo(point.set(start.at[0], y, start.at[1])) * 0.025, 20);
+        const tip = startKnobPoint(start, radius * 2.6);
+        return {
+            centre,
+            disc: startDiscLoop(start, radius).map(([x, z]) => onScreen(x, z)).filter(Boolean),
+            knob: onScreen(tip.x, tip.z)
+        };
+    }
+
+    /**
      * The template Insert Runway is armed with, as it would land under a
      * pointer that can hover - lined up with the view, held on the canvas - as
      * the outlines of its strips, on the canvas's frame. Null with no card
@@ -2949,6 +3083,11 @@ class FlightSimulator {
 
         if (this.gumballDrag && e.pointerId === this.gumballDrag.pointer) {
             this.dragGumball(e);
+            return;
+        }
+
+        if (this.startTurning && e.pointerId === this.startTurning.pointer) {
+            this.turnStartAt(e.clientX, e.clientY);
             return;
         }
 
@@ -2994,6 +3133,12 @@ class FlightSimulator {
     onCanvasRelease(e) {
         if (this.gumballDrag && e.pointerId === this.gumballDrag.pointer) {
             this.endGumballDrag();
+            return;
+        }
+
+        if (this.startTurning && e.pointerId === this.startTurning.pointer) {
+            this.startTurning = null;
+            this.syncOverlays();
             return;
         }
 
@@ -3494,7 +3639,8 @@ class FlightSimulator {
                 fov: this.camera.fov,
                 size: this.terrain.size,
                 holder: isStrokeTool(buildModeTool(this.builder)) ? this.currentStrokeHolder() : this.currentDraftHolder(),
-                open: [...this.worldOpen]
+                open: [...this.worldOpen],
+                altitude: currentOption(this.settings, ALTITUDE_UNIT_OPTION)
             })
             : null;
         this.dockView.render(this.dockShown);
@@ -3552,6 +3698,10 @@ class FlightSimulator {
             this.draftHolder = null;
             if (lifted) this.redrawCanvas();
             this.syncOverlays();
+            return;
+        }
+        if (this.dockShown?.kind === DOCK_PLANE) {
+            if (chooseBuildPlane(this.builder, id)) this.syncOverlays();
             return;
         }
         if (this.dockShown?.kind === DOCK_RUNWAY) {
@@ -3692,6 +3842,15 @@ class FlightSimulator {
             return;
         }
 
+        // The start point's rows, read back in the altitude unit they were
+        // written out in.
+        if (kind === DOCK_START) {
+            const unit = currentOption(this.settings, ALTITUDE_UNIT_OPTION);
+            writeBuildStartPoint(this.builder, startFromRows(buildStartPoint(this.builder), holder.config, unit));
+            this.syncOverlays();
+            return;
+        }
+
         // Extrude's rows: the next shape's fields while drawing, and once the
         // region is lifted, the extrusion's own, which draw the ground again.
         if (kind === DOCK_EXTRUDE) {
@@ -3780,6 +3939,12 @@ class FlightSimulator {
     onDockAction(id) {
         if (id === DOCK_DESELECT.id) {
             if (deselect(this.builder)) this.syncOverlays();
+            return;
+        }
+
+        // Insert Plane's `CLEAR`: the world starts where it always did.
+        if (id === DOCK_CLEAR_START.id) {
+            if (clearBuildStartPoint(this.builder)) this.syncOverlays();
             return;
         }
 
@@ -4053,7 +4218,7 @@ class FlightSimulator {
         this.overlays.confirmPanel.blur();
 
         if (answered.leave) {
-            const changed = answered.keep && this.saveBuiltWorld(answered.environment, answered.placements, answered.world);
+            const changed = answered.keep && this.saveBuiltWorld(answered.environment, answered.placements, answered.world, answered);
             this.leaveBuilder(changed);
         } else if (answered.load) {
             // `YES` on REPLACE THE BUILT WORLD is the press the file dialog

@@ -3440,7 +3440,7 @@ test('a canvas stands the flight down rather than being drawn behind it', () => 
 test('opening a canvas draws one tile of it, with no strip and the camera held over it', () => {
     const start = methodBody(mainSource, 'startCanvas');
     assert.ok(start, 'js/main.js should define startCanvas()');
-    assert.match(start, /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\),\s*canvasWorld\(this\.editor, environmentId\)\)/,
+    assert.match(start, /beginCanvas\(this\.builder, environmentId, keptPlacements\(this\.editor, environmentId\),\s*canvasWorld\(this\.editor, environmentId\), keptFlight\(this\.editor, environmentId\)\)/,
         'which opens with what an earlier session kept on it already committed, over the rows of the world as they were kept');
     assert.match(start, /this\.showCanvas\(environmentId\);/,
         'and draws it the way a builder reopening onto its built world does');
@@ -3608,7 +3608,7 @@ test('every pointer handler on the canvas stands down unless a canvas is open', 
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /const tool\s*= buildModeTool\(this\.builder\);\s*const gesture = cameraGesture\(e, tool\);/,
         'a press is the camera\'s only when the press and the live tool make a gesture');
-    assert.match(press, /if \(!gesture\) \{\s*(\/\/[^\n]*\n\s*)*if \(e\.button === 0 && !\(e\.shiftKey && dropsAtClick\(tool\)\) && drawAgain\(this\.builder\)\) this\.draftKept\(\);\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*return;\s*\}/,
+    assert.match(press, /if \(!gesture\) \{\s*(\/\/[^\n]*\n\s*)*if \(e\.button === 0 && !\(e\.shiftKey && dropsAtClick\(tool\)\) && drawAgain\(this\.builder\)\) this\.draftKept\(\);\s*if \(e\.button === 0 && !e\.shiftKey && dropsAtClick\(tool\)\) this\.dropAt\(e\);\s*else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);\s*else if \(e\.button === 0 && eyeDropperArmed\(this\.builder\)\) this\.dropperAt\(e\);\s*else if \(e\.button === 0 && extrudeStage\(this\.builder\) === EXTRUDE_SURFACES\) this\.surfacePress\(e\);\s*else if \(e\.button === 0 && isStrokeTool\(tool\)\) this\.strokePress\(e\);\s*else if \(e\.button === 0 && insertsTemplate\(tool\)\) this\.insertAt\(e\);\s*else if \(e\.button === 0 && placesStartPoint\(tool\)\) this\.startPointAt\(e\);\s*return;\s*\}/,
         'and a plain press of the main button is a tool\'s that drops at a click, the lasso\'s, the eye dropper\'s, an extrusion\'s surface\'s, a stroke tool\'s or Insert Runway\'s');
     assert.match(press, /setPointerCapture\(e\.pointerId\)/,
         'and is captured, so a drag over the palette stays the drag it began as');
@@ -3929,13 +3929,13 @@ test('an answer leaves, keeping the built world on YES, or settles the edit and 
     const answer = methodBody(mainSource, 'answerBuildConfirm');
     assert.match(answer, /const answered = answerConfirm\(this\.builder, answer\);/);
     assert.match(answer,
-        /if \(answered\.leave\) \{\s*const changed = answered\.keep && this\.saveBuiltWorld\(answered\.environment, answered\.placements, answered\.world\);\s*this\.leaveBuilder\(changed\);/);
+        /if \(answered\.leave\) \{\s*const changed = answered\.keep && this\.saveBuiltWorld\(answered\.environment, answered\.placements, answered\.world, answered\);\s*this\.leaveBuilder\(changed\);/);
     assert.match(answer, /else if \(answered\.settled\) \{\s*this\.draftHolder = null;\s*this\.redrawCanvas\(\);/);
 
     const save = methodBody(mainSource, 'saveBuiltWorld');
     assert.match(save, /chooseSetting\(this\.settings, environment\);/, 'the canvas\'s environment becomes the one flown');
-    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements,\s*currentEnvironment\(this\.settings\), world\);/,
-        'with what was built held where an edited world already lives, under the world the settings now hold, over the world\'s own rows as the canvas left them');
+    assert.match(save, /keepBuiltWorld\(this\.editor, environment, runwayWanted\(startSettings\(this\.settings\)\), placements,\s*currentEnvironment\(this\.settings\), world, flight\);/,
+        'with what was built held where an edited world already lives, under the world the settings now hold, over the world\'s own rows as the canvas left them, with its own flight');
     assert.ok(save.indexOf('chooseSetting(') < save.indexOf('keepBuiltWorld('),
         'which is read after the canvas\'s world is chosen there');
     assert.match(save, /return this\.flightWorldKey\(\) !== before;/, 'and says whether the flight\'s world changed');
@@ -3950,7 +3950,7 @@ test('a click with a tool that drops picks the ground and drops there', () => {
         /this\.renderer\.domElement\.style\.cursor = canvas \? this\.canvasCursor\(\) : '';/,
         'over ground marked as somewhere to click');
     assert.match(methodBody(mainSource, 'canvasCursor'),
-        /const tool = buildModeTool\(this\.builder\);\s*if \(eyeDropperArmed\(this\.builder\)\) return 'cell';\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/,
+        /const tool = buildModeTool\(this\.builder\);\s*if \(eyeDropperArmed\(this\.builder\)\) return 'cell';\s*if \(dropsAtClick\(tool\) \|\| tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/,
         'which is a crosshair for a tool that drops, and for the lasso and the stroke tools, which draw on it - and a cell while the eye dropper is armed');
 });
 
@@ -4356,7 +4356,7 @@ test('a press with the lasso draws, never orbits, and the cursor says so', () =>
     const press = methodBody(mainSource, 'onCanvasPress');
     assert.match(press, /else if \(e\.button === 0 && \(tool === LASSO_PALETTE_TOOL \|\| extrudeDrawing\(this\.builder\)\)\) this\.lassoPress\(e\);/,
         'shift and alt included, which are how a shape meets the selection');
-    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/);
+    assert.match(methodBody(mainSource, 'canvasCursor'), /tool === LASSO_PALETTE_TOOL \|\| isStrokeTool\(tool\) \|\| insertsTemplate\(tool\) \|\| placesStartPoint\(tool\) \|\| extrudeDrawing\(this\.builder\)\) return 'crosshair';/);
 });
 
 test('the lasso\'s tiles and its deselect are drawn as the artwork draws them', () => {
@@ -4947,7 +4947,7 @@ test('the loaded world chosen is kept on the editor as a build and flown as a ne
     const chosen = methodBody(mainSource, 'chooseLoaded');
     assert.match(chosen, /chooseLoadedWorld\(this\.settings, true, this\.loadedWorld\.base\);\s*this\.keepLoadedWorld\(\);\s*this\.applySettings\(\);/);
     assert.match(methodBody(mainSource, 'keepLoadedWorld'),
-        /keepBuiltWorld\(this\.editor, world\.environment, runwayWanted\(startSettings\(this\.settings\)\), world\.placements,\s*currentEnvironment\(this\.settings\), world\.world\);/);
+        /keepBuiltWorld\(this\.editor, world\.environment, runwayWanted\(startSettings\(this\.settings\)\), world\.placements,\s*currentEnvironment\(this\.settings\), world\.world, world\);/);
     assert.match(methodBody(mainSource, 'saveBuiltWorld'), /chooseLoadedWorld\(this\.settings, false\);\s*chooseSetting\(this\.settings, environment\);/,
         'a build kept from the builder is the world flown, not the file it may have been opened from');
 });

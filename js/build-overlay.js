@@ -238,6 +238,51 @@ export function strokeGumball(ctx, layout, hovered = null, colours = AXIS_COLOUR
 /** The edge a hovered handle is drawn over. */
 export const GUMBALL_LIT = '#ffffff';
 
+/** The start point's green, as Insert Plane's art draws it, and the disc's fill. */
+export const START_COLOUR = '#00db95';
+export const START_FILL   = 'rgba(0, 219, 149, 0.3)';
+
+/** The knob's radius on the screen, and how near a press has to land to take it, in pixels. */
+export const START_KNOB_RADIUS = 7;
+export const START_KNOB_HIT    = 14;
+
+/**
+ * Draws the start point laid out on the screen: `disc`, the ring round it on
+ * the ground, filled in its green; an arrow from `centre` out along its heading
+ * to `knob`; and, with `knob` asked for, the white knob at the arrow's end that
+ * is dragged round to turn it - green while it is held.
+ */
+export function strokeStartPoint(ctx, layout, { knob = true, lit = false } = {}) {
+    if (layout?.centre == null) return;
+    const { centre, disc = [], knob: tip = null } = layout;
+    ctx.setLineDash([]);
+    ctx.lineCap = 'round';
+
+    if (disc.length > 2) {
+        ctx.beginPath();
+        disc.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+        ctx.closePath();
+        ctx.fillStyle = START_FILL;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = START_COLOUR;
+        ctx.stroke();
+    }
+
+    if (tip == null) return;
+    strokePath(ctx, [centre, tip], 3, START_COLOUR);
+    fillHead(ctx, centre, tip, START_COLOUR, false);
+    if (!knob) return;
+
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, START_KNOB_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = lit ? START_COLOUR : '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = lit ? GUMBALL_LIT : START_COLOUR;
+    ctx.stroke();
+}
+
 function strokePath(ctx, points, width, colour) {
     ctx.lineWidth = width;
     ctx.strokeStyle = colour;

@@ -5,6 +5,118 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.61.0] - 2026-11-05
+
+Insert Plane: five planes to fly a built world in, and a start point of the
+world's own.
+
+### Added
+
+- **Insert Plane.** The plane tile beside the way out is a tool now, headed
+  `INSERT PLANE`. `SELECT PLANE` is a card for each of five planes - a
+  trainer, a bush plane, a twin, a jet and a biplane - the chosen one pressed,
+  the trainer until another is. `SELECT STARTING POINT` writes the start point
+  out as `AT X`, `AT Z`, `HEADING` and its height above the ground, in feet or
+  metres as the settings read altitude, with `CLEAR` under it.
+- **Pre-built planes.** Each of the five is drawn by code from boxes,
+  cylinders and cones, as the trainer always was, and flies on its own
+  figures: the speed it stalls below, the speed it cruises at, its top speed,
+  the arrivals it takes, and how quickly it answers the controls. The chase
+  view stands back from each by its size.
+- **A start point for a world.** With Insert Plane live, a click on the ground
+  puts the start point there, and a second click moves it. It is drawn as a
+  green disc with an arrow along its heading, and the knob at the arrow's end
+  is dragged round to turn it. A flight on the world opens over it, on its
+  heading, at its height above the ground there, at the settings' airspeed,
+  climb and throttle; a takeoff opens on the strip nearest it.
+- **The environment file** carries `start` and `plane`, both optional, and
+  the schema names them.
+- **The control list** carries `Click (Insert plane) - Put the Start Point
+  There` and `Drag (Insert plane) - Turn the Start Point by Its Knob`.
+
+### Changed
+
+- While a world with a start point is flown, `START HEADING` and `START
+  ALTITUDE` are held on the settings, drawn faded with the note "set by this
+  environment".
+- The plane and the start point are kept with a build on the way out, and the
+  builder reopens on them.
+- A preset world, and every game mode, flies the trainer from where every
+  world starts.
+
+Held in Node by `test/insert-plane.test.js` - the five planes and their order,
+the trainer the old model part for part, every part a shape with a size, a
+place, a turn and a colour, a plane's span and length its recipe's own, the
+trainer on the figures the flight model and the crash rules were tuned at,
+every plane's figures hanging together and flying as its card says, every
+plane leaving the ground inside BASIC RUNWAY from a standstill above its
+stall, the opening throttle asking none for less than its stall, the chase
+scaled by size, the handling a bounded share of the pilot's sensitivity, the
+aircraft building and flying a plane and keeping a host's model; the start
+point held to the world, the compass and its heights, placed again keeping its
+heading and height, written out in either unit and read back without drift,
+flown over at its height above the ground, a takeoff left on its strip, and
+its knob along its heading; the session placing, moving, turning, writing and
+clearing it and choosing a plane, neither changed off a canvas or under a
+question, both saved, kept on the way out and counted a build a load would
+take, and a canvas opening with them; the panel's sections, cards, rows,
+hint and `CLEAR`; the editor keeping the flight with a build and letting it go
+with another world; the file writing, reading, holding and refusing them; the
+held settings rows; the marker drawn with its knob only when asked; and the
+page's wiring - by `test/build-tools.test.js` and `test/controls-help.test.js`
+for the tool and its rows. Each rejected the defect it names when that was put
+back, 71 in all: the trainer flown on another figure, the twin asked for less
+than its stall at the opening throttle, the bush plane stalling no slower than
+the trainer, an unknown plane answered by nothing, the chase never scaled, the
+handling unbounded, the trainer's nose turned the new way, a plane longer than
+it says, a heading not read round the compass, a start point off the world, a
+height not held to its range, a moved start point losing its heading, the
+height measured from the sea, a takeoff moved off its strip, a height in
+metres drifting a rounding at a time, the knob pointing the other way, a
+height in metres labelled feet, the flight changed under a question, the saved
+start point the canvas's own, the plane not saved with the world, the way out
+without the world's flight, a start point not a change a load would take, a
+canvas opened without its flight, the plane chosen again a change, a turn to
+the same heading a turn, the built world reopened without its flight, a file
+loaded over the canvas without its flight, the chosen card never pressed,
+CLEAR pressable with nothing to take, the hint left over the rows, the height
+in feet whatever the settings read, the start section declaring no mode type,
+another world keeping the flight, a start point alone no build, the plane
+flown on a world the editor is not on, the build let go of keeping its plane,
+a kept flight taken however it reads, a plane the simulator does not have
+read, a start point with a field it does not have read, the start point not
+written, the start point read back unheld, a held row stepped, a held row
+typed into, a held row not drawn locked, a held row saying nothing of why, a
+figure left being typed into a held row, the plane's stall never flown, the
+plane's handling ignored, a host's own model swapped, the chase distance never
+set, a mode flown from the world's start point, the plane swapped on every
+refresh, the chase left where the trainer had it, the start rows never held, a
+takeoff on the strip the world searched for, the knob not taken before
+anything else, a click with Insert Plane placing nothing, the rows read in
+feet whatever they were drawn in, CLEAR taking nothing, the knob offered with
+any tool, the canvas reopened without its flight, a build kept with only its
+flight changed no new world, the knob dragged turning nothing, a card choosing
+no plane, the build kept without its flight, the loaded world kept without its
+flight, the knob drawn when not asked for, the start point's help row missing,
+Insert Plane not built, the start point placed by any insert, the held knob
+not lit.
+
+Settled in Chromium in 29 checks: a flight opening in the trainer;
+Insert Plane on the palette, its panel, its five cards with the trainer
+pressed, and the hint and an unpressable `CLEAR` with no start point; a click
+putting the start point down with its rows written in feet, its knob drawn, a
+second click moving it, the knob dragged turning it without moving the camera,
+a typed heading turning it, the height in metres with the settings in metres;
+a card choosing the jet; `CLEAR` taking it and a click putting it back; the
+knob not offered with another tool live; the way out keeping both; the flight
+flown in the jet on its figures, model and chase, opening over the start
+point on its heading at its height above the ground there with the aircraft
+put there, and the two start rows held and refusing a step; the builder
+reopening on both and the file saved carrying both; a preset after flying the
+trainer from the middle of the world with nothing held; that file loaded
+flying the jet from its start point; and on a phone the five cards inside the
+dock.
+
 ## [1.0.0-alpha.1.60.0] - 2026-11-05
 
 A built world saved to a file and loaded back, from the builder and from the

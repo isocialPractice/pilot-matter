@@ -20,6 +20,7 @@ import {
 } from './crash.js';
 import { isOnRunway, nearestRunway } from './environment/elements.js';
 import { wrapPosition } from './world-edge.js';
+import { planeById, planeSensitivity, DEFAULT_PLANE_ID } from './planes.js';
 
 /**
  * The aircraft: a model in a scene, and the frame loop the flight model drives
@@ -53,6 +54,11 @@ export class Aircraft {
         // otherwise, which is every flight but the ones a game mode has taken
         // the engine away from.
         this.engine = options.engine !== false;
+
+        // The plane being flown, which is the trainer until something chooses
+        // another - and whose figures are the ones above, so a host that names
+        // none of its own flies exactly what it always flew.
+        this.plane = planeById(DEFAULT_PLANE_ID);
 
         this.setSensitivity(flight.sensitivity ?? CONTROL_SENSITIVITY);
 
@@ -191,11 +197,47 @@ export class Aircraft {
      * How hard the controls bite, as a multiplier on every control rate. The
      * rates are worked out here rather than every frame, because a setting is
      * changed far less often than a frame is drawn.
+     *
+     * The setting is the pilot's and is held as it was given; the rates are
+     * that setting times the plane's own handling, so a biplane answers quicker
+     * than a twin at whatever the pilot has chosen.
      */
     setSensitivity(sensitivity) {
         this.sensitivity = sensitivity;
-        this.rates = controlRates(sensitivity);
+        this.rates = controlRates(planeSensitivity(sensitivity, this.plane));
         return this.rates;
+    }
+
+    /**
+     * Flies another of the planes in `js/planes.js`: its figures - the three
+     * speeds the flight model reads, the two a touchdown is judged against, and
+     * its handling - and, unless the host flies a model of its own, its model.
+     * The flight in hand carries on in it, at the speed it had, and settles to
+     * what the new plane's throttle asks for; the next reset is a start in it.
+     *
+     * Returns the plane now flown.
+     */
+    setPlane(plane = planeById(DEFAULT_PLANE_ID)) {
+        const chosen = typeof plane === 'string' ? planeById(plane) : plane ?? planeById(DEFAULT_PLANE_ID);
+        const figures = chosen.flight ?? {};
+        this.plane = chosen;
+
+        this.minSpeed    = figures.minSpeed    ?? MIN_SPEED;
+        this.cruiseSpeed = figures.cruiseSpeed ?? CRUISE_SPEED;
+        this.maxSpeed    = figures.maxSpeed    ?? MAX_SPEED;
+        this.impactSpeed = figures.impactSpeed ?? CRASH_IMPACT_SPEED;
+        this.runwayImpactSpeed = figures.runwayImpactSpeed ?? RUNWAY_IMPACT_SPEED;
+        this.setSensitivity(this.sensitivity);
+
+        if (this.group && !this.external) {
+            for (const part of [...this.group.children]) {
+                this.group.remove(part);
+                part.geometry?.dispose?.();
+                part.material?.dispose?.();
+            }
+            this.group.add(...planeModel(chosen));
+        }
+        return this.plane;
     }
 
     /**
@@ -270,6 +312,9 @@ export class Aircraft {
 
     createModel(external = null, anchor = null) {
         this.group = new THREE.Group();
+        // A host's own model is the host's: choosing a plane changes how it
+        // flies and leaves what it looks like alone.
+        this.external = external != null;
 
         if (external) {
             // An external aircraft is flown from the control anchor it
@@ -756,29 +801,29 @@ export class Aircraft {
 
 /**
  * The bundled aircraft, built nose-first along +Z with its control anchor at
- * the origin, which is the same contract an external model has to meet.
+ * the origin, which is the same contract an external model has to meet. It is
+ * the trainer's recipe, which is the plane the simulator has always flown.
  */
 export function bundledModel() {
-    const mat     = new THREE.MeshPhongMaterial({ color: 0x4477aa });
-    const wingMat = new THREE.MeshPhongMaterial({ color: 0x3366aa });
+    return planeModel(planeById(DEFAULT_PLANE_ID));
+}
 
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.5, 8, 8), mat);
-    body.rotation.x = Math.PI / 2;
+/**
+ * A plane's meshes from its recipe in `js/planes.js`: each part a box, a
+ * cylinder or a cone in the plane's own frame, at its place, turned, in its
+ * colour.
+ */
+export function planeModel(plane) {
+    return (plane?.parts ?? []).map(part => {
+        const mesh = new THREE.Mesh(partGeometry(part), new THREE.MeshPhongMaterial({ color: part.color }));
+        mesh.position.set(...part.at);
+        mesh.rotation.set(...part.turn);
+        return mesh;
+    });
+}
 
-    const wings = new THREE.Mesh(new THREE.BoxGeometry(14, 0.15, 2), wingMat);
-
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(5, 0.1, 1), wingMat);
-    tail.position.set(0, 0, -3.5);
-
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2, 1.5), wingMat);
-    fin.position.set(0, 1, -3.5);
-
-    const nose = new THREE.Mesh(
-        new THREE.ConeGeometry(0.5, 1.5, 8),
-        new THREE.MeshPhongMaterial({ color: 0xdddddd })
-    );
-    nose.rotation.x = -Math.PI / 2;
-    nose.position.set(0, 0, 4.5);
-
-    return [body, wings, tail, fin, nose];
+function partGeometry(part) {
+    if (part.shape === 'cylinder') return new THREE.CylinderGeometry(part.top, part.bottom, part.length, part.segments);
+    if (part.shape === 'cone') return new THREE.ConeGeometry(part.radius, part.length, part.segments);
+    return new THREE.BoxGeometry(...part.size);
 }

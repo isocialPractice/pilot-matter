@@ -22,6 +22,8 @@ import {
     ELEMENTS_BY_ID, getElement, orderPlacements, resolveConfig
 } from './environment/elements.js';
 import { getEnvironment, environmentElements } from './environment/presets.js';
+import { cleanStartPoint } from './start-point.js';
+import { isPlaneId } from './planes.js';
 import {
     rangePlaces, label, rowValue, rangeEntryText,
     writeRowValue, stepRow, isTypedRow, typedRowValue, rangeNotice, panelRows, coarseStep
@@ -159,6 +161,11 @@ export function createEditorState(environmentId, runway = false) {
         // a placement with a point and a seed of its own rather than a row of
         // ranges the panel steps.
         built: [],
+        // The world's own flight, kept with what was built: where a flight on
+        // it starts and which plane it is flown in - each null for none, which
+        // is a start where every world's is, in the trainer.
+        start: null,
+        plane: null,
         // The element types the generated world had to hold off the strip, as
         // the strip itself reported them. Filled in by the caller after the
         // ground is built, because only the built ground knows.
@@ -205,6 +212,8 @@ export function setEditorWorld(state, environmentId, runway = false) {
 
     if (state.chosen !== wanted) {
         state.built = [];
+        state.start = null;
+        state.plane = null;
         state.environmentId = wanted;
     }
     state.chosen = wanted;
@@ -238,9 +247,12 @@ export function setEditorWorld(state, environmentId, runway = false) {
  * panel steps them across the whole world - and they become the editor's rows,
  * with the strip's row after them when the start wants one. Without them the
  * rows are the preset's again.
+ *
+ * `flight` is the world's own flight as the canvas left it - `{ start, plane }`,
+ * either missing for none - kept with the build and replaced with it.
  */
 export function keepBuiltWorld(
-    state, environmentId, runway = false, placements = [], chosen = environmentId, world = null
+    state, environmentId, runway = false, placements = [], chosen = environmentId, world = null, flight = null
 ) {
     const wanted = getEnvironment(environmentId).id;
 
@@ -255,6 +267,8 @@ export function keepBuiltWorld(
         ]
         : editorElements(getEnvironment(wanted), state.runway);
     state.built = (Array.isArray(placements) ? placements : []).map(placement => structuredClone(placement));
+    state.start = cleanStartPoint(flight?.start);
+    state.plane = isPlaneId(flight?.plane) ? flight.plane : null;
     state.typing = null;
     syncEditorEntries(state);
     return state;
@@ -269,6 +283,8 @@ export function keepBuiltWorld(
  */
 export function releaseBuiltWorld(state) {
     state.built = [];
+    state.start = null;
+    state.plane = null;
     state.chosen = null;
     state.runway = null;
     return state;
@@ -284,18 +300,50 @@ export function keptPlacements(state, environmentId) {
 }
 
 /**
+ * The world's own flight kept on a world, as `{ start, plane }` with either
+ * left out for none - and nothing for any other world, as `keptPlacements`
+ * hands nothing back for one.
+ */
+export function keptFlight(state, environmentId) {
+    if (state?.environmentId == null || state.environmentId !== getEnvironment(environmentId).id) return {};
+    return {
+        ...(state.start ? { start: structuredClone(state.start) } : {}),
+        ...(state.plane ? { plane: state.plane } : {})
+    };
+}
+
+/**
  * The built world the builder goes back to - the canvas a build was kept on,
- * every placement kept on it, and its own rows as they were kept, as copies -
- * or null while nothing built is kept, which is when the builder opens on its
- * picker instead.
+ * every placement kept on it, its own rows as they were kept, and its own
+ * flight, as copies - or null while nothing built is kept, which is when the
+ * builder opens on its picker instead. A start point or a plane chosen is
+ * something built, as a placement is.
  */
 export function builtWorld(state) {
-    if (state?.environmentId == null || !(state.built?.length > 0)) return null;
+    if (state?.environmentId == null) return null;
+    if (!(state.built?.length > 0) && state.start == null && state.plane == null) return null;
     return {
         environment: state.environmentId,
         placements: keptPlacements(state, state.environmentId),
-        world: canvasWorld(state, state.environmentId)
+        world: canvasWorld(state, state.environmentId),
+        ...keptFlight(state, state.environmentId)
     };
+}
+
+/**
+ * Where a free flight on the settings' chosen world starts, or null for where
+ * every world's does: the start point kept with a build on it, and none on a
+ * world the editor has not been put on yet.
+ */
+export function flownStartPoint(state, chosen) {
+    if (state?.chosen !== getEnvironment(chosen).id) return null;
+    return state.start ?? null;
+}
+
+/** The plane a free flight on the settings' chosen world is flown in, as an id, or null for the trainer. */
+export function flownPlane(state, chosen) {
+    if (state?.chosen !== getEnvironment(chosen).id) return null;
+    return state.plane ?? null;
 }
 
 /**

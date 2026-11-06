@@ -135,6 +135,10 @@ export const BUILD_HELP_ROWS = Object.freeze([
     // The cover tool, named for each ground cover it is built for.
     ...(COVER_TOOLS.length ? [{ id: 'cover', label: 'Lay a Stroke', drag: COVER_TOOLS }] : []),
     ...(isBuiltTool('runway') ? [{ id: 'insert', label: 'Place the Chosen Runway', click: 'runway' }] : []),
+    ...(isBuiltTool('plane') ? [
+        { id: 'start-point', label: 'Put the Start Point There', click: 'plane' },
+        { id: 'start-turn',  label: 'Turn the Start Point by Its Knob', drag: 'plane' }
+    ] : []),
     ...(isBuiltTool('paint') ? [
         { id: 'paint',   label: 'Paint a Stroke', drag: 'paint' },
         { id: 'dropper', label: 'Take a Colour With the Eye Dropper', click: 'paint' }

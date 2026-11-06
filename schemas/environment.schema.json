@@ -44,6 +44,21 @@
       "description": "What was built over the environment, in the order it was committed.",
       "type": "array",
       "items": { "$ref": "#/$defs/placement" }
+    },
+    "start": {
+      "description": "Where a flight on this world begins: over the point, on the heading, at the height above the ground there. Left out, a flight opens where every world's does.",
+      "type": "object",
+      "required": ["at"],
+      "additionalProperties": false,
+      "properties": {
+        "at": { "$ref": "#/$defs/point" },
+        "heading": { "description": "A compass heading in degrees, read round the compass to 0 to 359.", "type": "number" },
+        "heightFeet": { "description": "The height above the ground under the point, in feet, held to 100 to 10000.", "type": "number" }
+      }
+    },
+    "plane": {
+      "description": "The plane this world is flown in. Left out, it is flown in the trainer.",
+      "enum": ["trainer", "bush", "twin", "jet", "biplane"]
     }
   },
   "$defs": {

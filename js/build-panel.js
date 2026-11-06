@@ -24,7 +24,7 @@ import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
     brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface,
-    saveName, fileStatus
+    saveName, fileStatus, buildStartPoint, buildPlane
 } from './build-mode.js';
 import {
     EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, EXTRUDE_BACK, extrudeRows, extrudeTool,
@@ -34,8 +34,12 @@ import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } 
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import {
     BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isEraseTool,
-    isExtrudeTool, isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate, isPaletteBar
+    isExtrudeTool, isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate, isPaletteBar,
+    choosesPlane, placesStartPoint, toolModes
 } from './build-tools.js';
+import { PLANES, DEFAULT_PLANE_ID } from './planes.js';
+import { startRanges, startRowValues } from './start-point.js';
+import { modeIs } from './mode-types.js';
 import { defaultEnvironmentName, ENVIRONMENT_NAME_LIMIT } from './environment-file.js';
 import { isErase, ERASE_RANGES } from './environment/erase.js';
 
@@ -88,6 +92,23 @@ export const DOCK_SAVE_ENVIRONMENT = Object.freeze({ id: 'save-environment', lab
 /** SAVE / LOAD's one section, `Save data<file>` and `Load data<file>`, and its name field. */
 export const FILES_SECTION = 'environment';
 export const FILES_NAME_FIELD = 'name';
+
+/** Insert Plane's panel, and the start point's section of it. */
+export const DOCK_PLANE = 'plane';
+export const DOCK_START = 'start';
+
+/**
+ * Insert Plane's two sections: SELECT PLANE, `Insert asset<flight:plane>`, and
+ * SELECT STARTING POINT, `Insert config<flight:start-point>`.
+ */
+export const PLANE_SECTION = 'plane';
+export const START_SECTION = 'start';
+
+/** The answer that takes the start point away, so the world starts where it always did. */
+export const DOCK_CLEAR_START = Object.freeze({ id: 'clear-start', label: 'CLEAR' });
+
+/** What SELECT STARTING POINT says while there is no start point to write out. */
+export const START_HINT = 'click the ground to start a flight there';
 
 /**
  * Free Paint's three sections, in the artwork's order, and the ranges each
@@ -153,6 +174,53 @@ function filesContent(state) {
             },
             status: fileStatus(state)
         }]
+    };
+}
+
+/**
+ * Insert Plane's panel. SELECT PLANE is a card for each plane, the chosen one
+ * pressed - the trainer until another is chosen. SELECT STARTING POINT is the
+ * start point written out - where it stands, which way it points and how high
+ * above the ground, in the altitude unit the settings read in - or, with none
+ * placed yet, a line saying how to place one. `CLEAR` takes it away, and is
+ * there to see but not pressed while there is nothing to take.
+ *
+ * Each section carries the mode type it is, off the tool's declaration.
+ */
+function planeContent(state, context, altitude) {
+    const tool = buildTool(buildModeTool(state));
+    const modes = toolModes(tool?.id);
+    const chosen = buildPlane(state) ?? DEFAULT_PLANE_ID;
+    const point = buildStartPoint(state);
+    const holder = { config: point ? startRowValues(point, altitude) : {} };
+
+    const start = dockSection(START_SECTION, DOCK_START, 'SELECT STARTING POINT', point ? startRanges(altitude) : {}, holder, context);
+    start.mode = modes.find(type => modeIs(type, 'insert', 'config', 'flight:start-point')) ?? null;
+    start.status = { text: point ? '' : START_HINT };
+
+    return {
+        kind: DOCK_PLANE,
+        heading: tool?.heading ?? '',
+        ranges: {},
+        holder: { config: {} },
+        rows: [],
+        nudges: [],
+        actions: [{ ...DOCK_CLEAR_START, disabled: point == null }],
+        sections: [
+            {
+                id: PLANE_SECTION, kind: DOCK_PLANE, heading: 'SELECT PLANE', folds: false, open: true,
+                holder: { config: {} }, rows: [],
+                mode: modes.find(type => modeIs(type, 'insert', 'asset', 'flight:plane')) ?? null,
+                shapes: [{
+                    row: 'planes',
+                    tools: PLANES.map(plane => ({
+                        id: plane.id, label: plane.label, name: `${plane.label} - ${plane.note}`, art: null,
+                        live: plane.id === chosen
+                    }))
+                }]
+            },
+            start
+        ]
     };
 }
 
@@ -333,7 +401,7 @@ export function dockContent(state, options = {}) {
 }
 
 /** What the dock shows before the answer every panel gets while something is selected - see `dockContent`. */
-function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [], size = 0 } = {}) {
+function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [], size = 0, altitude = 'feet' } = {}) {
     if (!buildModeDrawing(state)) return null;
 
     const select = buildModeTool(state) === SELECT_TOOL && camera != null;
@@ -345,6 +413,7 @@ function panelContent(state, { camera = null, fov, holder = null, context = {}, 
     if (isExtrudeTool(buildModeTool(state))) return extrudeContent(state, holder, context, size);
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
     if (isPaletteBar(buildModeTool(state))) return filesContent(state);
+    if (choosesPlane(buildModeTool(state)) || placesStartPoint(buildModeTool(state))) return planeContent(state, context, altitude);
 
     if (draftPending(state) && !(select && picked)) {
         const draft = buildDraft(state);
