@@ -23,7 +23,7 @@ import {
 } from './environment/elements.js';
 import { getEnvironment, environmentElements } from './environment/presets.js';
 import {
-    rangeStep, stepPlaces, label, rowValue, rangeEntryText,
+    rangePlaces, label, rowValue, rangeEntryText,
     writeRowValue, stepRow, isTypedRow, typedRowValue, rangeNotice, panelRows, coarseStep
 } from './properties-panel.js';
 import {
@@ -35,7 +35,7 @@ import {
 // drawn from one place. It is published from here as well, under the names it
 // always had, so nothing that read it off the editor has to know it moved.
 export {
-    RANGE_STEPS, rangeStep, stepPlaces, SHADE_RANGE, shadeColor,
+    RANGE_STEPS, FRACTION_STEP, rangeStep, rangePlaces, stepPlaces, SHADE_RANGE, shadeColor,
     GATE_RANGE, GATE_ON_LABEL, GATE_OFF_LABEL, gateOn,
     rangeRows, label, rowValue, rowValueLabel, rangeEntryText, typedRowValue, rangeNotice
 } from './properties-panel.js';
@@ -662,7 +662,7 @@ export function applyTypedEditorKey(state, code) {
             return { result: 'cancelled', element: null, value: null };
         }
 
-        const places = stepPlaces(rangeStep(range));
+        const places = rangePlaces(range);
         const held   = rowValue(element, entry.name, row);
         const taken  = Number(value.toFixed(places));
 

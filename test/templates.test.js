@@ -77,9 +77,23 @@ test('the element editor takes shift and an arrow the way the dock takes shift a
     chooseEditorEntry(state, element.id);
     const id = rowId(element.id, 'coverage', 'value');
     const before = editorEntry(state, id).value;
-    const step = rangeStep(getElement('snow').ranges.coverage);
+    const range = getElement('snow').ranges.coverage;
+    const step = rangeStep(range);
     adjustEditorRange(state, id, -1, { coarse: true });
-    assert.ok(near(editorEntry(state, id).value, before - COARSE_STEPS * step, 1e-9), `${before} -> ${editorEntry(state, id).value}`);
+    // Coverage is a fraction, a tenth a press, so ten of them from where it
+    // stands carry it to its lower bound - further than one press would.
+    const expected = Math.max(range.low, before - COARSE_STEPS * step);
+    assert.ok(near(editorEntry(state, id).value, expected, 1e-9), `${before} -> ${editorEntry(state, id).value}`);
+    assert.ok(editorEntry(state, id).value < before - step, 'more than one press');
+});
+
+test('a fraction stepped coarse goes to the end its arrow points at', () => {
+    const row = { part: 'value', range: { kind: 'scalar', low: 0, high: 1, default: 0.5 } };
+    const holder = { config: { n: 0.35 } };
+    stepRow(holder, 'n', row, coarseStep(row, 1));
+    assert.equal(holder.config.n, 1);
+    stepRow(holder, 'n', row, coarseStep(row, -1));
+    assert.equal(holder.config.n, 0);
 });
 
 test('the dock passes shift with a spinner pressed, and steps by it', () => {

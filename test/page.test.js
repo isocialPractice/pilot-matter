@@ -2148,6 +2148,7 @@ test('the card is floated by the run that floats the rest of them', () => {
  * rest of what it does with a panel is.
  */
 const mainSource = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
+import { FIELD_STEP_KEYS } from '../js/panel-view.js';
 const panelViewSource = readFileSync(fileURLToPath(new URL('../js/panel-view.js', import.meta.url)), 'utf8');
 
 const TYPING_HANDLERS = [
@@ -3742,7 +3743,74 @@ test('a key typed into a dock field reaches nothing but the field', () => {
     const guard = wired.indexOf('if (this.editingDockField(e)) {');
     const first = wired.indexOf('if (e.ctrlKey || e.altKey || e.metaKey) return;');
     assert.ok(guard >= 0 && guard < first, 'the field is asked about before anything else reads the key');
-    assert.match(wired.slice(guard), /^if \(this\.editingDockField\(e\)\) \{\s*if \(e\.code === 'Escape'\) e\.target\.blur\(\);\s*e\.stopPropagation\(\);\s*return;/);
+    assert.match(wired.slice(guard), /^if \(this\.editingDockField\(e\)\) \{\s*if \(e\.code === 'Escape'\) e\.target\.blur\(\);\s*else this\.dockView\.onKey\(e\);\s*e\.stopPropagation\(\);\s*return;/,
+        'Escape lets go of it, and every other key is handed to the dock - which never sees one of its own, the key being stopped on its way down');
+});
+
+// --- The dock's fields: figures and their own up and down, switches and choices ------
+
+/**
+ * The browser's spinner moved a figure by 1 whatever the row allowed - a girth
+ * of 0 to 1 went to 2 and was refused - ignored shift, and on a phone was not
+ * drawn. A figure's field carries the panel's own up and down instead, on the
+ * same path the marks stepped by, and no marks either side; a switch or a
+ * choice keeps its marks, with its reading a box that steps it on.
+ */
+test('a figure is a field with the panel\'s own up and down, and no marks either side', () => {
+    const draw = methodBody(panelViewSource, 'drawRow');
+    const typedAt = draw.indexOf('if (typed(entry.row)) {');
+    const otherAt = draw.indexOf('} else {', typedAt);
+    const figure = draw.slice(typedAt, otherAt);
+    const other  = draw.slice(otherAt, draw.indexOf('// A value set by eye'));
+
+    assert.match(figure, /reading\.step = 'any';/, 'no step for the browser to hold a typed figure to');
+    assert.match(figure, /reading\.min = String\(fieldFigure\(entry\.row, entry\.row\.range\.low\)\);\s*reading\.max = String\(fieldFigure\(entry\.row, entry\.row\.range\.high\)\);/,
+        'and the bounds, in the figure\'s own units');
+    assert.match(figure, /down = spinButton\(-1, `\$\{entry\.row\.label\} down`\);\s*up\s*= spinButton\(1, `\$\{entry\.row\.label\} up`\);/);
+    assert.match(figure, /spin\.className = 'dock-spin';\s*spin\.append\(up, down\);/);
+    assert.match(figure, /field\.append\(reading, spin\);\s*line\.append\(name, field\);/, 'the label and the field, nothing between');
+    assert.doesNotMatch(figure, /stepButton\(/, 'and no marks');
+
+    assert.match(other, /down = stepButton\(-1, `\$\{entry\.row\.label\} down`\);\s*up\s*= stepButton\(1, `\$\{entry\.row\.label\} up`\);/,
+        'a switch or a choice keeps its two marks');
+    assert.match(other, /reading = document\.createElement\('button'\);[\s\S]*reading\.className = 'dock-value dock-pick';\s*reading\.dataset\.cycle = 'true';\s*line\.append\(name, down, reading, up\);/,
+        'with its reading a box between them');
+
+    const spin = panelViewSource.slice(panelViewSource.indexOf('function spinButton('));
+    assert.match(spin, /button\.dataset\.step = String\(step\);/, 'pressed, a spin button steps the row the way a mark did');
+    assert.match(spin, /button\.tabIndex = -1;/, 'out of the tab order, the field\'s own keys standing for it');
+});
+
+test('a switch\'s or a choice\'s box steps it on, round from its last value to its first', () => {
+    const click = methodBody(panelViewSource, 'onClick');
+    assert.match(click, /if \(button\.dataset\.cycle\) \{\s*const entry = this\.entryFor\(button\.closest\('\.dock-row'\)\?\.dataset\.row\);\s*if \(entry\?\.live\) this\.handlers\.onStep\?\.\(entry, cycleStep\(entry\.row, entry\.value\), false\);\s*return;\s*\}/);
+    assert.ok(click.indexOf('button.dataset.cycle') < click.indexOf('const step = Number(button.dataset.step);'), 'before a mark\'s step is read');
+    assert.match(methodBody(panelViewSource, 'update'), /drawn\.reading\.disabled = held;/, 'and is held with the row, as its marks are');
+});
+
+test('a field\'s arrows and page keys step its row, and the wheel over it lets go of it', () => {
+    assert.deepEqual(Object.fromEntries(Object.entries(FIELD_STEP_KEYS).map(([key, press]) => [key, [press.step, press.coarse]])),
+        { ArrowUp: [1, false], ArrowDown: [-1, false], PageUp: [1, true], PageDown: [-1, true] });
+
+    const key = methodBody(panelViewSource, 'onKey');
+    assert.match(key, /const press = FIELD_STEP_KEYS\[event\.key\];\s*if \(!press\) return;\s*event\.preventDefault\(\);/,
+        'in place of the browser\'s own step by 1');
+    assert.match(key, /this\.handlers\.onStep\?\.\(entry, press\.step, press\.coarse \|\| event\.shiftKey === true\);/);
+    assert.match(key, /field\.value = String\(fieldFigure\(stepped\.row, stepped\.value\)\);/,
+        'and the figure written into the field it keeps the focus in, which `update` leaves alone');
+
+    assert.match(methodBody(panelViewSource, 'onWheel'),
+        /if \(field instanceof HTMLInputElement && field\.type === 'number' && document\.activeElement === field\) field\.blur\(\);/);
+    assert.match(panelViewSource, /root\.addEventListener\('wheel', \(event\) => this\.onWheel\(event\), \{ passive: true \}\);/);
+});
+
+test('the browser\'s spinner is taken off a field, and its own shown under a pointer or always under a finger', () => {
+    assert.match(indexHtml, /\.dock-field \{[^}]*grid-column: 3;/, 'the field in the column the readings stand in');
+    assert.match(indexHtml, /\.dock-field \.dock-value \{[^}]*appearance: textfield;/);
+    assert.match(indexHtml, /\.dock-field \.dock-value::-webkit-inner-spin-button,\s*\.dock-field \.dock-value::-webkit-outer-spin-button \{\s*-webkit-appearance: none;/);
+    assert.match(indexHtml, /\.dock-spin \{[^}]*opacity: 0;/, 'hidden at rest, as the goal draws a field');
+    assert.match(indexHtml, /\.dock-field:hover \.dock-spin,\s*\.dock-field:focus-within \.dock-spin \{\s*opacity: 1;/);
+    assert.match(indexHtml, /@media \(pointer: coarse\) \{\s*\.dock-spin \{[^}]*opacity: 1;/, 'and always under a finger, which cannot hover');
 });
 
 test('an edit in hand redraws the canvas from what it holds, and is settled from the dock', () => {

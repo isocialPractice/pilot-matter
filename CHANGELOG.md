@@ -5,6 +5,75 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.58.0] - 2026-11-05
+
+The dock's rows patched: a fraction moves a tenth at a press, a figure's field
+carries an up and a down of the panel's own, and only a switch or a choice
+keeps the marks either side.
+
+### Added
+
+- **The dock's own spin buttons.** A field holding a figure carries an up and
+  a down inside its right edge, a press each, ten with `Shift` - shown under
+  the pointer or while the field has the focus, and always on a touch screen.
+  `↑` and `↓` in the field are a press, ten with `Shift`, and `Page Up` and
+  `Page Down` always ten. The wheel over a focused field lets go of it rather
+  than moving the figure.
+- A switch's or a choice's reading is a box that steps it on when clicked,
+  round from its last value to its first.
+
+### Changed
+
+- **Fractions step a tenth.** A range from 0 to 1 that is not read as a
+  percentage - a mountain's girth, a river's windiness, a cover's density -
+  moves a tenth at a press rather than a fiftieth, on the dock and in the
+  element editor alike, and is still written and typed to the hundredth.
+  Ranges read as percentages step in points as they did.
+- **Marks on switches and choices only.** A row holding a figure is its label
+  and its field, with no `‹ ›`; a switch, a choice and the camera's nudges keep
+  theirs. The readings stand in one column whatever kind each row is.
+
+### Fixed
+
+- The browser's spinner on a dock field moved it by 1 whatever the row
+  allowed, so a girth of 0 to 1 went to 2 and was refused; it ignored `Shift`,
+  and on a phone was not drawn at all. It is taken off for the panel's own.
+- The arrow keys in a dock field never reached the panel: the page's key
+  listener stopped them on their way down, leaving the browser's step by 1 to
+  happen. The page now hands a field's keys to the dock.
+
+Held in Node by `test/element-editor.test.js` - a fraction stepped a tenth and
+written to the hundredth, a percentage and a range with its own step left as
+they were, every fraction the registry declares stepped a tenth, and a walk
+down and back inside the bounds the number it started as - `test/templates.test.js`
+- a coarse press on a fraction carried to the end it points at -
+`test/properties-panel.test.js` - a switch's box turning it either way and a
+choice's going round, a list of one going nowhere - and `test/page.test.js`,
+which holds the field and its up and down, the marks on switches and choices
+only, the box's click, the key table and its handing over, the wheel, and the
+styles that take the browser's spinner off and show the panel's. Each rejected
+the defect it names when that was put back, 29 in all: a fraction stepped
+by its fiftieth or a fifth, a percentage stepped as a fraction, a range, a
+stepped row, a move or a reading rounded to its press, a field held to the
+browser's step or with no bounds, no up and down or one in the tab order, the
+marks back beside a figure, an arrow coarse, the browser's step left to happen
+too, `Shift` ignored, a stepped figure not written into its field, the keys
+never handed to the dock, the wheel left to move a focused figure, the
+browser's spinner left on or drawn in Chromium, the up and down always drawn
+under a mouse or hidden from a finger, a field out of the column, a switch's
+box stepping nothing or only on, a choice's stopping at the end, a list of one
+gone round, a held row's box still pressed, and the marks taken off a switch.
+
+Settled in Chromium in 19 checks: on a mountain in hand, every figure a field
+with its own up and down and no marks, every switch its marks and a box, and
+the readings in one column; the girth field's bounds 0 to 1; the up and down
+hidden at rest and shown under the pointer; girth up a tenth, with `Shift` to
+1, and down a tenth; 0.25 typed and stepped to 0.35; `↑` a press kept in the
+focused field, `Shift`+`↓` and `Page Up` coarse; the wheel moving nothing; a
+height stepped by its fiftieth; a switch's box turning it and back, its mark
+stopping at on; Free Paint's `BLEND` going round; and on a phone the up and
+down always shown, 22 pixels wide, a tap moving girth a tenth.
+
 ## [1.0.0-alpha.1.57.0] - 2026-11-05
 
 The first of the builder's polish: the view turned with the right button from

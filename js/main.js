@@ -77,7 +77,7 @@ import {
 } from './extrude.js';
 import { PanelView } from './panel-view.js';
 import {
-    stepRow, writeRowValue, typedRowValue, rangeNotice, rangeStep, stepPlaces, coarseStep
+    stepRow, writeRowValue, typedRowValue, rangeNotice, rangePlaces, coarseStep
 } from './properties-panel.js';
 import { getEnvironment } from './environment/presets.js';
 import { pickGround, canvasPickBounds, pickStep, pointerDevice } from './build-picking.js';
@@ -1080,9 +1080,12 @@ class FlightSimulator {
             // builder's keys - the moves, H, Escape leaving - and none of the
             // aircraft's reach anything while it has the focus, and the field's
             // own keys go on doing what a field does. Escape gives the focus
-            // back, which is the innermost thing it can step out of.
+            // back, which is the innermost thing it can step out of. The keys
+            // that step a figure are the dock's own, handed to it here, since
+            // the key is stopped on its way down before the dock could see it.
             if (this.editingDockField(e)) {
                 if (e.code === 'Escape') e.target.blur();
+                else this.dockView.onKey(e);
                 e.stopPropagation();
                 return;
             }
@@ -3448,7 +3451,7 @@ class FlightSimulator {
         }
 
         field.setCustomValidity('');
-        writeRowValue(holder, entry.name, entry.row, Number(value.toFixed(stepPlaces(rangeStep(range)))));
+        writeRowValue(holder, entry.name, entry.row, Number(value.toFixed(rangePlaces(range))));
         // A slider is let go of by the pointer, not by the panel: taking the
         // focus off it would end the drag it is in the middle of.
         if (field.type !== 'range') field.blur();

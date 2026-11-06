@@ -280,3 +280,35 @@ test('a switch is written as the boolean it is, whatever the row reads in', () =
     writeRowValue(holder, 'bulk', row, 1);
     assert.equal(holder.config.bulk, true);
 });
+
+// --- A switch's or a choice's box ------------------------------------------------
+
+/**
+ * The marks either side of a switch or a choice stop at the ends, as a list
+ * walked by keys does; the box between them, pressed again and again, goes
+ * through every value and round - so it is the one target that needs no aim.
+ */
+test('a switch\'s box turns it either way, and a choice\'s goes on and round', () => {
+    const [gate] = rangeRows('bulk', toggle(false));
+    assert.equal(panel.cycleStep(gate, 0), 1, 'off goes on');
+    assert.equal(panel.cycleStep(gate, 1), -1, 'on goes off');
+
+    const range = choice(['tint', 'normal', 'screen'], 'tint');
+    const [row] = rangeRows('blend', range);
+    assert.equal(panel.cycleStep(row, 'tint'), 1);
+    assert.equal(panel.cycleStep(row, 'normal'), 1);
+    assert.equal(panel.cycleStep(row, 'screen'), -2, 'from the last back to the first');
+    assert.equal(panel.cycleStep(row, 'gone'), 1, 'and from a value the list does not hold, on from the default');
+
+    // Stepped by what it says, the box goes round.
+    const holder = { config: { blend: 'tint' } };
+    const seen = [];
+    for (let i = 0; i < 4; i++) {
+        stepRow(holder, 'blend', row, panel.cycleStep(row, holder.config.blend));
+        seen.push(holder.config.blend);
+    }
+    assert.deepEqual(seen, ['normal', 'screen', 'tint', 'normal']);
+
+    const [one] = rangeRows('only', choice(['alone'], 'alone'));
+    assert.equal(panel.cycleStep(one, 'alone'), 1, 'a list of one has nowhere to go round to');
+});

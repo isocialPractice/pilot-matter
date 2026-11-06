@@ -15,6 +15,8 @@ import {
     label,
     rangeStep,
     stepPlaces,
+    rangePlaces,
+    FRACTION_STEP,
     rangeRows,
     shadeColor,
     editorElements,
@@ -52,6 +54,7 @@ import {
 // does *not* export without the import itself failing to resolve.
 import * as editor from '../js/element-editor.js';
 import { TYPED_CARET, TYPED_MAX, typedValueLabel } from '../js/typed-value.js';
+import { stepRow } from '../js/properties-panel.js';
 import { isMenuControlKey } from '../js/menu.js';
 import {
     ELEMENTS, ELEMENT_ORDER, getElement, resolveConfig, createField, applyElement, createRandom,
@@ -95,10 +98,49 @@ test('a range reads as words rather than as the name it is declared with', () =>
 // A step read off the bounds is a step that stays right when the bounds move,
 // which is what keeps it from being a second number to maintain.
 test('a step is a readable fraction of what the range allows', () => {
-    assert.equal(rangeStep({ low: 0, high: 1 }), 0.02);
     assert.equal(rangeStep({ low: 50, high: 2000 }), 50);
     assert.equal(rangeStep({ low: 0, high: 100 }), 2);
     assert.equal(rangeStep({ low: 0, high: 5 }), 0.1);
+    assert.equal(rangeStep({ low: 0, high: 2 }), 0.05, 'a range wider than one is no fraction, and steps by its fiftieth');
+});
+
+/**
+ * A fraction stepped by its fiftieth took fifty presses to cross, and the
+ * dock's own up arrow moved one a whole 1 past its end. A press moves it a
+ * tenth; it is still written and typed to the hundredth.
+ */
+test('a fraction moves a tenth at a press, and is still written to the hundredth', () => {
+    assert.equal(FRACTION_STEP, 0.1);
+    assert.equal(rangeStep({ low: 0, high: 1 }), 0.1);
+    assert.equal(rangePlaces({ low: 0, high: 1 }), 2, 'written to the hundredth a fiftieth of it was');
+    assert.equal(rangeStep({ low: 0, high: 1, percent: true }), 0.02, 'a fraction read as a percentage steps in its points as it did');
+    assert.equal(rangePlaces({ low: 0, high: 1, percent: true }), 2);
+    assert.equal(rangeStep({ low: 0, high: 1, step: 0.5 }), 0.5, 'and a range naming its own step steps by that');
+    assert.equal(rangePlaces({ low: 0, high: 1, step: 0.5 }), 1);
+    assert.equal(rangePlaces({ low: 50, high: 2000 }), 0, 'every other range is written to its own step');
+
+    // A press from a hundredth keeps the hundredth.
+    const girth = rangeRows('girth', getElement('mountain').ranges.girth)[0];
+    const holder = { config: { girth: 0.25 } };
+    assert.equal(stepRow(holder, 'girth', girth, 1), true);
+    assert.equal(holder.config.girth, 0.35);
+    assert.equal(rowValueLabel(girth, holder.config.girth), '0.35');
+    stepRow(holder, 'girth', girth, -1);
+    stepRow(holder, 'girth', girth, -1);
+    assert.equal(holder.config.girth, 0.15);
+});
+
+test('every fraction the registry declares is stepped a tenth, and every percentage in points', () => {
+    let fractions = 0;
+    for (const element of ELEMENTS) {
+        for (const [name, range] of Object.entries(element.ranges)) {
+            if (range.low !== 0 || range.high !== 1 || range.step > 0) continue;
+            const expected = range.percent ? 0.02 : 0.1;
+            assert.equal(rangeStep(range), expected, `${element.id}.${name}`);
+            if (!range.percent) fractions++;
+        }
+    }
+    assert.ok(fractions >= 10, `girth, windiness, densities, flattens and coverage among them - ${fractions}`);
 });
 
 test('a range with no width to it still has a step to move by', () => {
@@ -229,15 +271,16 @@ test('stepping a range moves it by the step its bounds declare', () => {
     assert.equal(editorEntry(state, id).value, before);
 });
 
-// Walked twenty times, a step of a hundredth is a fifth and not a fifth plus
-// the arithmetic's dust, or the readout grows a tail nobody can read.
+// Walked five tenths down and back inside its bounds, a fraction is the number
+// it started as and not that number plus the arithmetic's dust, or the readout
+// grows a tail nobody can read.
 test('a range walked and walked back is the number it started as', () => {
     const { state, element } = openedOn('highlands', 'snow');
     const id = rowId(element.id, 'coverage', 'value');
     const before = editorEntry(state, id).value;
 
-    for (let i = 0; i < 20; i++) adjustEditorRange(state, id, -1);
-    for (let i = 0; i < 20; i++) adjustEditorRange(state, id, 1);
+    for (let i = 0; i < 5; i++) adjustEditorRange(state, id, -1);
+    for (let i = 0; i < 5; i++) adjustEditorRange(state, id, 1);
 
     assert.equal(editorEntry(state, id).value, before);
 });
@@ -1013,7 +1056,7 @@ test('the switch moves between off and on in one press', () => {
 
     // Which is a property of the range declaring one, not of this range: every
     // range that declares no step is still measured off its bounds.
-    assert.equal(rangeStep({ low: 0, high: 1 }), 0.02);
+    assert.equal(rangeStep({ low: 0, high: 3 }), 0.1);
     assert.equal(rangeStep({ low: 0, high: 1, step: 0.5 }), 0.5);
 });
 

@@ -1390,6 +1390,109 @@
             background: none;
         }
 
+        /* A row holding a figure: the label, and the field in the column the
+           readings stand in, with no marks either side. Its own up and down sit
+           inside its right edge where the browser's spinner was, which is taken
+           off - shown under a pointer that hovers or while the field has the
+           focus, and always under a finger, which cannot hover. */
+        .dock-field {
+            grid-column: 3;
+            position: relative;
+            display: block;
+        }
+
+        .dock-field .dock-value {
+            padding-right: 16px;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .dock-field .dock-value::-webkit-inner-spin-button,
+        .dock-field .dock-value::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .dock-spin {
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            bottom: 1px;
+            width: 14px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+
+        .dock-field:hover .dock-spin,
+        .dock-field:focus-within .dock-spin {
+            opacity: 1;
+        }
+
+        .dock-spin button {
+            flex: 1;
+            min-height: 0;
+            padding: 0;
+            color: #f0f2f3;
+            font-size: 8px;
+            line-height: 1;
+            background: rgba(0, 255, 0, 0.08);
+            border: none;
+            cursor: pointer;
+        }
+
+        .dock-spin-up::before {
+            content: '\25B4';
+        }
+
+        .dock-spin-down::before {
+            content: '\25BE';
+        }
+
+        .dock-spin button:hover:not(:disabled) {
+            background: rgba(0, 255, 0, 0.3);
+        }
+
+        .dock-spin button:disabled {
+            cursor: default;
+            opacity: 0.4;
+        }
+
+        @media (pointer: coarse) {
+            .dock-spin {
+                width: 22px;
+                opacity: 1;
+            }
+
+            .dock-field .dock-value {
+                min-height: 32px;
+                padding-right: 24px;
+            }
+
+            .dock-spin button {
+                font-size: 11px;
+            }
+        }
+
+        /* A switch's or a choice's reading: a box the width of a field, between
+           the marks that step it, pressed to step it on - round from its last
+           value to its first. */
+        .dock-pick {
+            min-height: 24px;
+            text-align: center;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+
+        .dock-pick:hover:not(:disabled) {
+            border-color: #0f0;
+        }
+
+        .dock-pick:disabled {
+            cursor: default;
+        }
+
         .dock-action {
             flex: 1;
             min-height: 36px;

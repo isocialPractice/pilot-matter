@@ -11,19 +11,20 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
-  percentage moved a tenth at a press wherever it is stepped, still written and
-  typed to the hundredth through a precision of its own
+- [ ] **Mode types**: what an insert, load or save section does declared on it
+  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
+  config<flight:start-point>`, `Load data<file>` - written and read back by one
+  pair of functions and dispatched on, with Insert Runway marked and unchanged
   - From: Post Interactive Build
-- [ ] **The dock's own spin buttons**: the browser's spinner, which moves a
-  field by 1, replaced by the panel's own up and down inside the field, with
-  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
-  and `Page Down` always coarse, and the wheel over a field moving nothing
+- [ ] **The palette redrawn**: the seven rows of `panel-updated.svg` with
+  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
+  a text button in the art's colours, the new marks copied by the sync list,
+  each tile shown once its tool works, the gear kept, and both screens measured
   - From: Post Interactive Build
-- [ ] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
-  with no figure to type, a number row the label and its field with the column
-  of figures kept in line, and a switch's or choice's reading drawn as a box a
-  click steps
+- [ ] **The environment file**: a built world written as one JSON file with a
+  committed schema - format, version, name, base, rows, placements, and later
+  the start, the plane and the assets - read back by a function that never
+  throws and refuses a bad file whole with its first problem named
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -106,17 +107,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
-  percentage moved a tenth at a press wherever it is stepped, still written and
-  typed to the hundredth through a precision of its own
-- [ ] **The dock's own spin buttons**: the browser's spinner, which moves a
-  field by 1, replaced by the panel's own up and down inside the field, with
-  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
-  and `Page Down` always coarse, and the wheel over a field moving nothing
-- [ ] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
-  with no figure to type, a number row the label and its field with the column
-  of figures kept in line, and a switch's or choice's reading drawn as a box a
-  click steps
 - [ ] **Mode types**: what an insert, load or save section does declared on it
   as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
   config<flight:start-point>`, `Load data<file>` - written and read back by one
@@ -234,58 +224,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 375 earlier items in `TODO-archive.md`, newest last.
+> 378 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Builder settings**: a settings screen for the builder's own
-  preferences, declared and stored the way the game's two settings screens are,
-  with a reset to defaults, and read by nothing that generates ground, so a
-  built world comes out the same whoever's preferences were on
-  - **Settled**: `js/builder-settings.js` is the third settings screen, made
-    as `js/settings.js` and `js/control-settings.js` are and stored under
-    `pilot-matter.builder-settings`: under `AUTO ACCEPT`, `ALL`, `WHEN
-    DRAWING AGAIN`, `WHEN LEAVING` and `WHEN CHANGING TOOL`; under `VIEW`,
-    `CAMERA SPEED` - slow, normal or fast, scaling the orbit, the pan and the
-    wheel together; then `RESET TO DEFAULTS` and `BACK`. With `ALL` on the
-    three moments read on and are held, and turning it off gives back what
-    they were. The session is handed the moments through `setAutoAccept`
-    rather than reading the screen, nothing under `js/environment/` reads it,
-    and a test builds the same ground with every row changed.
-  - From: Interactive Build Mode
-- [x] **Builder settings from the builder**: a gear in the palette's header and
-  the `O` key opening the screen over the canvas, suspending the live tool the
-  way a pan does so a stroke still pending is not committed by it
-  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
-    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
-    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
-    repository goes in `assets/builder/` beside the copied art -
-    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
-  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
-    a tool is held as `state.camera = { overriding, resumes }` by
-    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
-    nothing is committed; the screen opened over the canvas suspends the tool
-    the same way, rather than through `chooseBuildTool`.
-  - **Settled**: the gear is drawn in the repository as
-    `assets/builder/builder-settings.svg`, on the tool marks' square in their
-    navy and tan, and named by `BUILDER_DRAWN` in the sync script, so the
-    suite holds it tracked and off the copy's list. It sits at the right of
-    the band and goes with the tools when the palette folds. `O` in the
-    builder opens the screen too. Over a canvas `suspendForSettings` holds
-    `state.settingsOver = { resumes }`, under which no tool is chosen and no
-    pan held, and the screen is a full-window layer between the dock and the
-    confirms, so nothing behind it takes a press. Whatever was being dragged
-    ends, a shape drawn a click at a time is kept, and closing gives the same
-    draft back on the same tool.
-  - From: Interactive Build Mode
-- [x] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
-  settings screen opening the same screen, with `BACK` returning to whichever
-  screen opened it
-  - **Settled**: `js/settings.js` gains `SCREEN_ENTRY`, a row that opens a
-    screen: `BUILDER SETTINGS`, in a `BUILDER` group of its own with `BACK`,
-    drawn under a `BUILDER` heading so the two are drawn in the order they
-    are walked. Choosing it closes the panel and the builder's screen opens
-    in its place; its `BACK` brings the panel back with the cursor on the
-    row. Stepping it changes nothing, and it stays while a mode is played.
-  - From: Interactive Build Mode
 - [x] **Auto accept**: a setting that commits a pending draft at the next press
   and at the accept tool instead of asking, never on release, so the stroke just
   drawn stays editable and leaving asks only whether to save, switched on the
@@ -408,4 +348,46 @@ how the simulator got here rather than as a list still to be worked.
     The card is 360 pixels wide so the three stand on one row on a 390-pixel
     phone; on anything narrower they wrap, `CANCEL` alone under `YES` and
     `NO`, measured at 320.
+  - From: Post Interactive Build
+- [x] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
+  percentage moved a tenth at a press wherever it is stepped, still written and
+  typed to the hundredth through a precision of its own
+  - **Settled**: `rangeStep` gives a fraction - a range from 0 to 1 not read
+    as a percentage - `FRACTION_STEP`, a tenth, wherever a range is stepped,
+    the element editor's arrows among them. How finely a range is written and
+    typed came apart from how far a press moves it: `rangePlaces` keeps the
+    old fiftieth's places, and is read by the reading, the field, a typed
+    figure, the element editor's commit and a gumball drag, with `moveValue`
+    rounding to it, so 0.25 stepped up is 0.35. Paint's opacity and erase's
+    strength, read as percentages, still step in points, and a range naming
+    its own step keeps it. Ten presses on a fraction is the whole of it, so
+    `shift` takes one to the end its arrow points at.
+  - From: Post Interactive Build
+- [x] **The dock's own spin buttons**: the browser's spinner, which moves a
+  field by 1, replaced by the panel's own up and down inside the field, with
+  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
+  and `Page Down` always coarse, and the wheel over a field moving nothing
+  - **Settled**: a figure's field carries `.dock-spin`, an up and a down of
+    the panel's own inside its right edge, on the path the marks stepped by,
+    `shift` coarse; the browser's spinner is taken off, and the field has
+    `step="any"` and the row's bounds. They show under a pointer that hovers
+    or while the field has the focus, as the goal draws a field at rest, and
+    always under a coarse pointer, 22 pixels wide. The arrows and page keys in
+    a field are `FIELD_STEP_KEYS`, read by the dock's `onKey`. Found in
+    Chromium: the page's key listener runs on the way down and stopped every
+    key a field had before the dock could see one, so the browser's own step
+    by 1 went on regardless - the page now hands the field's keys to the dock.
+    The wheel over a focused field lets go of it rather than moving the figure.
+  - From: Post Interactive Build
+- [x] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
+  with no figure to type, a number row the label and its field with the column
+  of figures kept in line, and a switch's or choice's reading drawn as a box a
+  click steps
+  - **Settled**: `‹ ›` are drawn beside a switch and a choice only - and a
+    nudge, which holds no figure either - and a figure's row is its label and
+    its field, the field standing in the readings' column so every reading
+    lines up. A switch's or a choice's reading is a button, `.dock-pick`, that
+    steps it by `cycleStep`: a switch either way, a choice on and round from
+    its last value to its first, where its marks stop at the ends. The goal's
+    mixed-case `Off` is the mockup's lettering; the panel keeps its own.
   - From: Post Interactive Build

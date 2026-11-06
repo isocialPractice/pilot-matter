@@ -5004,3 +5004,53 @@ still be found by name.
     `blend` is on it and read. A wall's band can fall between the vertices of
     a coarse sampling, so the check draws at half the game's density.
   - From: Interactive Build Mode
+- [x] **Builder settings**: a settings screen for the builder's own
+  preferences, declared and stored the way the game's two settings screens are,
+  with a reset to defaults, and read by nothing that generates ground, so a
+  built world comes out the same whoever's preferences were on
+  - **Settled**: `js/builder-settings.js` is the third settings screen, made
+    as `js/settings.js` and `js/control-settings.js` are and stored under
+    `pilot-matter.builder-settings`: under `AUTO ACCEPT`, `ALL`, `WHEN
+    DRAWING AGAIN`, `WHEN LEAVING` and `WHEN CHANGING TOOL`; under `VIEW`,
+    `CAMERA SPEED` - slow, normal or fast, scaling the orbit, the pan and the
+    wheel together; then `RESET TO DEFAULTS` and `BACK`. With `ALL` on the
+    three moments read on and are held, and turning it off gives back what
+    they were. The session is handed the moments through `setAutoAccept`
+    rather than reading the screen, nothing under `js/environment/` reads it,
+    and a test builds the same ground with every row changed.
+  - From: Interactive Build Mode
+- [x] **Builder settings from the builder**: a gear in the palette's header and
+  the `O` key opening the screen over the canvas, suspending the live tool the
+  way a pan does so a stroke still pending is not committed by it
+  - **The header is there.** Since `1.0.0-alpha.1.45.0` the palette is headed
+    by a white band carrying the chevrons that fold it, drawn by `drawPalette`
+    in `js/main.js`; the gear goes on it beside them. A gear drawn in the
+    repository goes in `assets/builder/` beside the copied art -
+    `tools/sync-builder-assets.mjs` never prunes, so a later sync leaves it.
+  - **The suspension is there.** Since `1.0.0-alpha.1.54.0` a pan from inside
+    a tool is held as `state.camera = { overriding, resumes }` by
+    `holdCamera` in `js/build-mode.js`, under which no tool is chosen and
+    nothing is committed; the screen opened over the canvas suspends the tool
+    the same way, rather than through `chooseBuildTool`.
+  - **Settled**: the gear is drawn in the repository as
+    `assets/builder/builder-settings.svg`, on the tool marks' square in their
+    navy and tan, and named by `BUILDER_DRAWN` in the sync script, so the
+    suite holds it tracked and off the copy's list. It sits at the right of
+    the band and goes with the tools when the palette folds. `O` in the
+    builder opens the screen too. Over a canvas `suspendForSettings` holds
+    `state.settingsOver = { resumes }`, under which no tool is chosen and no
+    pan held, and the screen is a full-window layer between the dock and the
+    confirms, so nothing behind it takes a press. Whatever was being dragged
+    ends, a shape drawn a click at a time is kept, and closing gives the same
+    draft back on the same tool.
+  - From: Interactive Build Mode
+- [x] **Builder settings from Settings**: a `BUILDER SETTINGS` row on the game's
+  settings screen opening the same screen, with `BACK` returning to whichever
+  screen opened it
+  - **Settled**: `js/settings.js` gains `SCREEN_ENTRY`, a row that opens a
+    screen: `BUILDER SETTINGS`, in a `BUILDER` group of its own with `BACK`,
+    drawn under a `BUILDER` heading so the two are drawn in the order they
+    are walked. Choosing it closes the panel and the builder's screen opens
+    in its place; its `BACK` brings the panel back with the cursor on the
+    row. Stepping it changes nothing, and it stays while a mode is played.
+  - From: Interactive Build Mode

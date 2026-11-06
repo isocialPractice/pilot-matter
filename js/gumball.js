@@ -30,7 +30,7 @@
 
 import { bearingToDirection } from './units.js';
 import { getElement, isElementId, wrapOffset } from './environment/elements.js';
-import { rangeStep, stepPlaces } from './properties-panel.js';
+import { rangePlaces } from './properties-panel.js';
 import { GROUP_TYPE, GROUP_RANGES, isGroup, groupReach, keepStripOnCanvas } from './templates.js';
 import { ERASE_TYPE } from './environment/erase.js';
 
@@ -254,7 +254,7 @@ export const MIN_EXTENT = 20;
 
 /** A number kept to the precision a range is stepped in, so a dragged value reads as a typed one would. */
 function stepped(range, value) {
-    return Number(value.toFixed(stepPlaces(rangeStep(range))));
+    return Number(value.toFixed(rangePlaces(range)));
 }
 
 function clamp(value, low, high) {

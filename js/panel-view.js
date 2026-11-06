@@ -26,10 +26,21 @@
  */
 
 import {
-    isTypedRow, rangeStep, stepPlaces, readsAsPercent, COLOR_SWATCHES, PICKER_STOPS, PICKER_SHADES,
+    isTypedRow, rangePlaces, readsAsPercent, cycleStep, COLOR_SWATCHES, PICKER_STOPS, PICKER_SHADES,
     pickerColor, hexColor, parseHex, sameColor, rangeNotice
 } from './properties-panel.js';
 import { OPTION_LEFT_MARK, OPTION_RIGHT_MARK } from './settings.js';
+
+/**
+ * The keys a field holding a figure steps its row by, in place of the browser's
+ * own: the arrows a press, the page keys a coarse one.
+ */
+export const FIELD_STEP_KEYS = Object.freeze({
+    ArrowUp:   Object.freeze({ step: 1,  coarse: false }),
+    ArrowDown: Object.freeze({ step: -1, coarse: false }),
+    PageUp:    Object.freeze({ step: 1,  coarse: true }),
+    PageDown:  Object.freeze({ step: -1, coarse: true })
+});
 
 /**
  * The key a row is found by: its range's name and which part of the range it
@@ -49,7 +60,7 @@ export function dockRows(content) {
 /** The figure a typed field shows for a row, in the units the row reads in. */
 export function fieldFigure(row, value) {
     if (readsAsPercent(row)) return Math.round(value * 100);
-    return Number(Number(value).toFixed(stepPlaces(rangeStep(row.range))));
+    return Number(Number(value).toFixed(rangePlaces(row.range)));
 }
 
 /** The CSS a picker band is painted with: the strip's stops at `shade` of their strength, the rest white. */
@@ -105,6 +116,48 @@ export class PanelView {
         root.addEventListener('click', (event) => this.onClick(event));
         root.addEventListener('change', (event) => this.onChange(event));
         root.addEventListener('input', (event) => this.onSlide(event));
+        root.addEventListener('wheel', (event) => this.onWheel(event), { passive: true });
+    }
+
+    /**
+     * A key in a field holding a figure: the up and down arrows step the row a
+     * press, a coarse one with `shift`, and Page Up and Page Down a coarse one
+     * always - the convention for a spin button - in place of the browser's own
+     * step by 1. The field has the focus, which `update` leaves alone, so the
+     * figure the step came to is written into it here.
+     *
+     * Called by the page, whose listener takes every key on its way down and
+     * keeps a key typed into a field from the flight and the builder - so the
+     * key never reaches a listener of the dock's own.
+     */
+    onKey(event) {
+        const field = event.target;
+        if (!(field instanceof HTMLInputElement) || field.type !== 'number' || this.content == null) return;
+
+        const press = FIELD_STEP_KEYS[event.key];
+        if (!press) return;
+        event.preventDefault();
+
+        const key = field.closest('.dock-row')?.dataset.row;
+        const entry = this.entryFor(key);
+        if (!entry?.live) return;
+
+        this.handlers.onStep?.(entry, press.step, press.coarse || event.shiftKey === true);
+        const stepped = this.entryFor(key);
+        if (stepped) {
+            field.value = String(fieldFigure(stepped.row, stepped.value));
+            field.setCustomValidity('');
+        }
+    }
+
+    /**
+     * The wheel over a field with the focus scrolls the dock rather than the
+     * figure: the field lets go of the focus before the wheel reaches it, which
+     * is what a browser moves a focused figure by.
+     */
+    onWheel(event) {
+        const field = event.target;
+        if (field instanceof HTMLInputElement && field.type === 'number' && document.activeElement === field) field.blur();
     }
 
     /** Draws what the dock shows, or takes it off the screen for nothing. */
@@ -272,7 +325,18 @@ export class PanelView {
         this.drawn.set(key, { line, reading: hex, swatches, dropper, color: true });
     }
 
-    /** Draws one row: its label, the two steps either side of its reading, and the reading itself. */
+    /**
+     * Draws one row: its label and its reading.
+     *
+     * A row holding a figure is the label and the field the figure is typed
+     * into, the field carrying its own up and down inside its right edge - the
+     * panel's, not the browser's, which moved a field by 1 whatever the row
+     * allowed, ignored `shift`, and on a phone was not drawn at all. A row with
+     * no figure to type - a switch or a choice - is the label and its reading
+     * between the two marks that step it, the reading itself a box that steps
+     * it on. The marks' cells stay in the grid either way, so the column of
+     * readings is one column whichever kind each row is.
+     */
     drawRow(entry) {
         if (entry.row.color) {
             this.drawColorRow(entry);
@@ -288,22 +352,39 @@ export class PanelView {
         name.className = 'dock-label';
         name.textContent = entry.row.label;
 
-        const down = stepButton(-1, `${entry.row.label} down`);
-        const up   = stepButton(1, `${entry.row.label} up`);
-
-        let reading;
+        let reading, down, up;
         if (typed(entry.row)) {
             reading = document.createElement('input');
             reading.type = 'number';
             reading.inputMode = 'decimal';
             reading.className = 'dock-value';
             reading.setAttribute('aria-label', entry.row.label);
-        } else {
-            reading = document.createElement('span');
-            reading.className = 'dock-value';
-        }
+            // The bounds, for whatever reads the field out, and no step: the
+            // panel steps the row, and a figure typed between two presses is
+            // never one the browser should call off its step.
+            reading.step = 'any';
+            reading.min = String(fieldFigure(entry.row, entry.row.range.low));
+            reading.max = String(fieldFigure(entry.row, entry.row.range.high));
 
-        line.append(name, down, reading, up);
+            down = spinButton(-1, `${entry.row.label} down`);
+            up   = spinButton(1, `${entry.row.label} up`);
+            const spin = document.createElement('span');
+            spin.className = 'dock-spin';
+            spin.append(up, down);
+
+            const field = document.createElement('span');
+            field.className = 'dock-field';
+            field.append(reading, spin);
+            line.append(name, field);
+        } else {
+            down = stepButton(-1, `${entry.row.label} down`);
+            up   = stepButton(1, `${entry.row.label} up`);
+            reading = document.createElement('button');
+            reading.type = 'button';
+            reading.className = 'dock-value dock-pick';
+            reading.dataset.cycle = 'true';
+            line.append(name, down, reading, up);
+        }
 
         // A value set by eye has a slider beside its figure, across the
         // row's whole range, moving the same value the steps and the figure do.
@@ -357,14 +438,15 @@ export class PanelView {
             drawn.down.disabled = held;
             drawn.up.disabled = held;
 
+            drawn.reading.disabled = held;
             if (drawn.reading instanceof HTMLInputElement) {
-                drawn.reading.disabled = held;
                 if (document.activeElement !== drawn.reading) {
                     drawn.reading.value = String(fieldFigure(entry.row, entry.value));
                     drawn.reading.setCustomValidity('');
                 }
             } else {
                 drawn.reading.textContent = entry.valueLabel;
+                drawn.reading.setAttribute('aria-label', `${entry.row.label} ${entry.valueLabel}`);
             }
 
             if (drawn.slider) {
@@ -444,6 +526,14 @@ export class PanelView {
             return;
         }
 
+        // A switch's or a choice's reading is a box that steps it on, from
+        // the last value back round to the first.
+        if (button.dataset.cycle) {
+            const entry = this.entryFor(button.closest('.dock-row')?.dataset.row);
+            if (entry?.live) this.handlers.onStep?.(entry, cycleStep(entry.row, entry.value), false);
+            return;
+        }
+
         const step = Number(button.dataset.step);
         if (!step) return;
 
@@ -496,6 +586,17 @@ export class PanelView {
     entryFor(key) {
         return dockRows(this.content).find(entry => rowKey(entry) === key) ?? null;
     }
+}
+
+/** The panel's own up and down inside a field, stepping the row the way its arrows did. */
+function spinButton(step, name) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = step < 0 ? 'dock-spin-down' : 'dock-spin-up';
+    button.dataset.step = String(step);
+    button.tabIndex = -1;
+    button.setAttribute('aria-label', name);
+    return button;
 }
 
 function stepButton(step, name) {

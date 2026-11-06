@@ -32,19 +32,46 @@ import { CHOICE_FIELD, TOGGLE_FIELD } from './config.js';
 /**
  * How far one press moves a range: a fiftieth of what the range allows, put on
  * the nearest of 1, 2, or 5 times a power of ten, so a peak height in the
- * hundreds moves by fifties and a ratio between nothing and one moves by
- * hundredths. Read off the declared bounds rather than configured, because a
- * step is a property of the range rather than another thing to keep in sync
- * with it.
+ * hundreds moves by fifties. Read off the declared bounds rather than
+ * configured, because a step is a property of the range rather than another
+ * thing to keep in sync with it.
  */
 export const RANGE_STEPS = 50;
+
+/**
+ * How far one press moves a fraction - a range from nothing to one that is not
+ * read as a percentage. A fiftieth of it is a fiftieth of the way, and fifty
+ * presses to cross a girth or a density is a crawl; ten is a walk. It is still
+ * written and typed to the hundredth: see `rangePlaces`.
+ */
+export const FRACTION_STEP = 0.1;
+
+/** True for a range from nothing to one that is read as itself rather than as a percentage. */
+export function isFraction(range) {
+    return range?.low === 0 && range?.high === 1 && range?.percent !== true;
+}
 
 export function rangeStep(range) {
     // A range may name its own step, for a row where a fiftieth of the bounds
     // is the wrong press: a switch is two values and has to move between them
     // in one, rather than crawl from off to on in fifty hundredths.
     if (range.step > 0) return range.step;
+    if (isFraction(range)) return FRACTION_STEP;
+    return fiftieth(range);
+}
 
+/**
+ * How finely a range is written and typed: to the places a fiftieth of it is
+ * written to - or its own step, where it names one - whatever a press moves it
+ * by. A fraction moves a tenth at a press and still reads 0.25 when 0.25 is
+ * what was typed, rather than being rounded to the press.
+ */
+export function rangePlaces(range) {
+    return stepPlaces(range.step > 0 ? range.step : fiftieth(range));
+}
+
+/** A fiftieth of what a range allows, on the nearest of 1, 2 or 5 times a power of ten. */
+function fiftieth(range) {
     const raw = Math.abs(range.high - range.low) / RANGE_STEPS;
     if (!(raw > 0)) return 1;
 
@@ -69,9 +96,13 @@ function clamp(value, low, high) {
     return Math.min(Math.max(value, low), high);
 }
 
-/** A number moved by a step, held to its bounds and put back on the step's own scale. */
-export function moveValue(value, step, low, high) {
-    return Number(clamp(value + step, low, high).toFixed(stepPlaces(step)));
+/**
+ * A number moved by a step, held to its bounds and put back on a scale: the
+ * step's own, or the finer `places` a range is written to, so a fraction typed
+ * to the hundredth and moved a tenth keeps its hundredth.
+ */
+export function moveValue(value, step, low, high, places = stepPlaces(step)) {
+    return Number(clamp(value + step, low, high).toFixed(Math.max(places, stepPlaces(step))));
 }
 
 // --- Colour ----------------------------------------------------------------
@@ -292,7 +323,7 @@ export function rowValueLabel(row, value) {
     if (row.gate) return gateOn(value) ? GATE_ON_LABEL : GATE_OFF_LABEL;
     if (row.choice) return label(String(value));
     if (row.color) return hexColor(value);
-    return value.toFixed(stepPlaces(rangeStep(row.range)));
+    return value.toFixed(rangePlaces(row.range));
 }
 
 /**
@@ -408,11 +439,27 @@ export function stepRow(holder, name, row, step) {
 
     const next = row.choice
         ? stepChoice(row.range, held, step)
-        : moveValue(held, step * rangeStep(row.range), row.range.low, row.range.high);
+        : moveValue(held, step * rangeStep(row.range), row.range.low, row.range.high, rangePlaces(row.range));
     if (next === held) return false;
 
     writeRowValue(holder, name, row, next);
     return true;
+}
+
+/**
+ * The step a press on a switch's or a choice's reading makes: on to the next
+ * value, and from the last back round to the first. The marks either side stop
+ * at the ends, as a list walked by keys does; the reading pressed again and
+ * again goes through every value, so it is the one target that needs no aim.
+ */
+export function cycleStep(row, value) {
+    if (row?.gate) return gateOn(value) ? -1 : 1;
+    if (row?.choice) {
+        const values = row.range?.values ?? [];
+        const at = values.indexOf(value);
+        return values.length > 1 && at === values.length - 1 ? -(values.length - 1) : 1;
+    }
+    return 1;
 }
 
 /**

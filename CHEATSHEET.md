@@ -309,8 +309,12 @@ is for in brackets.
 
 Down the right is the dock: `SELECTION MODE`, the camera written out as
 fields to read and type into, or the edit in hand with `ACCEPT` and `CANCEL`
-under it. Only its fields scroll, and the wheel over it scrolls them. In
-Select the camera stays on top: beneath it is the placement picked, under
+under it. Only its fields scroll, and the wheel over it scrolls them. A
+figure's field has its own up and down inside it, a press each - a tenth for a
+fraction from 0 to 1, a fiftieth of the range otherwise - and ten with `Shift`;
+`↑`/`↓` in the field do the same, and `Page Up`/`Page Down` are always ten. A
+switch or a choice keeps its `‹ ›`, and a click on its reading steps it on,
+round to the first. In Select the camera stays on top: beneath it is the placement picked, under
 `SELECTED` and its name, or with nothing picked each of the world's own
 elements under `WORLD:`, folded until its heading is pressed. A value changed
 there changes every one of that element across the world, and `YES` on
