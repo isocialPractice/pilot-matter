@@ -50,7 +50,7 @@ test('the art is read from one tracked folder beside the scripts', () => {
 });
 
 test('every tool has its mark in the repository, named for the tool', () => {
-    for (const tool of BUILD_TOOLS) {
+    for (const tool of BUILD_TOOLS.filter(each => !each.bar)) {
         assert.equal(toolMark(tool.id), `assets/builder/${tool.id}.svg`);
         assert.ok(tracked.has(toolMark(tool.id)), `${tool.id}: tracked, so a tool joining the palette brings no art with it`);
     }
@@ -80,7 +80,7 @@ test('every file the page names under the art folder is tracked', () => {
 test('the copy step\'s list and the repository agree', () => {
     const targets = Object.keys(BUILDER_ASSETS).map(name => `${TARGET}/${name}`);
     for (const path of targets) assert.ok(tracked.has(path), `${path} is on the list and not tracked`);
-    for (const tool of BUILD_TOOLS) assert.ok(targets.includes(toolMark(tool.id)), `${tool.id}'s mark is on the list`);
+    for (const tool of BUILD_TOOLS.filter(each => !each.bar)) assert.ok(targets.includes(toolMark(tool.id)), `${tool.id}'s mark is on the list`);
     for (const environment of BUILDER_ENVIRONMENTS) {
         assert.ok(targets.includes(cardThumbnail(environment.id)), `${environment.id}'s thumbnail is on the list`);
     }
@@ -141,9 +141,16 @@ test('a shipped drawing links nothing outside itself', () => {
     }
 });
 
+/**
+ * The art has been exported two ways: on a tile 31.13 across, and - the
+ * palette's later marks, and the way out exported again with them - on one
+ * 31.1 across. Either is the same square tile, drawn the same size by the page.
+ */
 test('every tool mark is drawn on the art\'s own square tile', () => {
-    for (const tool of BUILD_TOOLS) {
-        assert.match(read(toolMark(tool.id)), /viewBox="0 0 31\.13 31\.13"/, tool.id);
+    for (const tool of BUILD_TOOLS.filter(each => !each.bar)) {
+        const [, across, down] = read(toolMark(tool.id)).match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/) ?? [];
+        assert.equal(across, down, `${tool.id} is square`);
+        assert.ok(['31.13', '31.1'].includes(across), `${tool.id} is on the art's tile, not ${across}`);
     }
 });
 

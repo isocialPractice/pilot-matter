@@ -1,20 +1,75 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BUILD_TOOLS, BUILD_TOOL_IDS, BUILT_TOOLS, SELECT_TOOL, ACCEPT_TOOL,
-    isBuildTool, isBuiltTool, isChoosableTool, paletteTools,
+    BUILD_TOOLS, BUILD_TOOL_IDS, BUILT_TOOLS, SELECT_TOOL, ACCEPT_TOOL, FILES_TOOL,
+    isBuildTool, isBuiltTool, isChoosableTool, paletteTools, isPaletteBar, toolMark,
+    toolModes, toolDoes, insertsTemplate,
     buildTool, dropsAtClick, derivedValues, droppedPlacement, toolPlacement
 } from '../js/build-tools.js';
+import { modeType } from '../js/mode-types.js';
 import { getElement } from '../js/environment/elements.js';
 
-// The twelve, in the order the tour walks them and the palette stacks them.
-test('the twelve tools are the tour\'s, in its order', () => {
+/**
+ * The tour's twelve, in the order it walks them and the palette stacks them,
+ * with the palette's later art's three: Insert City beside Extrude, Insert
+ * Plane beside the way out, and the SAVE / LOAD bar across the foot.
+ */
+test('the tools are the tour\'s twelve and the later art\'s three, in the palette\'s order', () => {
     assert.deepEqual(BUILD_TOOL_IDS, [
         'select', 'lasso', 'mountain', 'grass', 'sand', 'water',
-        'snow', 'runway', 'paint', 'erase', 'extrude', 'accept'
+        'snow', 'runway', 'paint', 'erase', 'extrude', 'city', 'plane', 'accept', 'files'
     ]);
     assert.equal(BUILD_TOOL_IDS[0], SELECT_TOOL, 'Select is the first');
-    assert.equal(BUILD_TOOL_IDS.at(-1), ACCEPT_TOOL, 'and the way out is the last');
+    assert.equal(BUILD_TOOLS.filter(tool => !tool.bar).at(-1).id, ACCEPT_TOOL, 'the way out is the last tile');
+    assert.deepEqual(BUILD_TOOLS.filter(tool => tool.bar).map(tool => tool.id), [FILES_TOOL], 'and the one bar is after it');
+});
+
+test('the bar has no mark - it is its words - and every tile has one', () => {
+    assert.equal(isPaletteBar(FILES_TOOL), true);
+    assert.equal(toolMark(FILES_TOOL), null);
+    for (const tool of BUILD_TOOLS.filter(each => !each.bar)) {
+        assert.equal(isPaletteBar(tool.id), false);
+        assert.equal(toolMark(tool.id), `assets/builder/${tool.id}.svg`);
+    }
+    assert.equal(isPaletteBar('hammer'), false);
+});
+
+test('a built bar is drawn after the way out, and never before it', () => {
+    assert.deepEqual(paletteTools([FILES_TOOL, ACCEPT_TOOL, 'plane', SELECT_TOOL]).map(tool => tool.id),
+        [SELECT_TOOL, 'plane', ACCEPT_TOOL, FILES_TOOL]);
+});
+
+// --- Mode types ----------------------------------------------------------------------
+
+/**
+ * What a section that inserts, loads or saves does is declared on it, and read
+ * back from the declaration: Insert Runway's click is the one that places a
+ * template because it is `Insert asset<runway>`, not because of a flag.
+ */
+test('every tool that inserts, loads or saves declares what each of its sections does', () => {
+    const written = Object.fromEntries(BUILD_TOOLS.filter(tool => tool.modes).map(tool => [tool.id, tool.modes.map(modeType)]));
+    assert.deepEqual(written, {
+        runway: ['Insert asset<runway>'],
+        city:   ['Insert asset<city>'],
+        plane:  ['Insert asset<flight:plane>', 'Insert config<flight:start-point>'],
+        files:  ['Save data<file>', 'Load data<file>', 'Load data<asset>']
+    });
+    for (const tool of BUILD_TOOLS) {
+        for (const type of toolModes(tool.id)) assert.ok(Object.isFrozen(type), `${tool.id}: ${modeType(type)} cannot be rewritten`);
+        assert.ok(!('inserts' in tool), `${tool.id}: no flag beside the declaration`);
+    }
+    assert.deepEqual(toolModes('mountain'), [], 'a tool that builds declares none');
+    assert.deepEqual(toolModes('hammer'), []);
+});
+
+test('Insert Runway places a template because of what it is declared to do', () => {
+    assert.deepEqual(BUILD_TOOLS.filter(tool => insertsTemplate(tool.id)).map(tool => tool.id), ['runway']);
+    assert.equal(toolDoes('runway', 'insert', 'asset', 'runway'), true);
+    assert.equal(toolDoes('runway', 'insert', 'asset'), true, 'an asset of any subject');
+    assert.equal(toolDoes('city', 'insert', 'asset', 'runway'), false, 'an asset of another subject is not a runway');
+    assert.equal(toolDoes('plane', 'insert', 'config', 'flight:start-point'), true);
+    assert.equal(toolDoes('files', 'load', 'data', 'asset'), true);
+    assert.equal(toolDoes('files', 'insert', 'asset'), false);
 });
 
 test('every tool carries a name for its tile and a line for the pointer', () => {
@@ -31,9 +86,11 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is every one of the twelve', () => {
+test('today the palette is the tour\'s twelve, the later three joining as they work', () => {
     assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL]);
-    assert.deepEqual(BUILT_TOOLS, BUILD_TOOL_IDS, 'all twelve, in the tour\'s order');
+    assert.deepEqual(BUILD_TOOL_IDS.filter(id => !BUILT_TOOLS.includes(id)), ['city', 'plane', FILES_TOOL],
+        'Insert City, Insert Plane and SAVE / LOAD declared, and drawn once each works');
+    for (const id of ['city', 'plane', FILES_TOOL]) assert.equal(isChoosableTool(id), false, `${id} cannot be chosen yet`);
     assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');
     assert.equal(isChoosableTool('lasso'), true, 'and so is the lasso, which draws the selection');
     assert.equal(isChoosableTool('water'), true, 'and the cover tool, pointed at any of its four');

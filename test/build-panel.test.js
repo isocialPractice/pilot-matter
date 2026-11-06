@@ -234,7 +234,7 @@ test('the panels the artwork heads are headed the artwork\'s way', () => {
     assert.deepEqual(headings, {
         select: 'SELECTION MODE', mountain: 'BUILD MOUNTAINS', grass: 'BUILD GRASS', sand: 'BUILD SAND',
         water: 'BUILD WATER', snow: 'BUILD SNOW', runway: 'INSERT RUNWAY', paint: 'FREE PAINT', erase: 'ERASE',
-        extrude: 'EXTRUDE SHAPE'
+        extrude: 'EXTRUDE SHAPE', city: 'INSERT CITY', plane: 'INSERT PLANE', files: 'SAVE / LOAD'
     });
     assert.equal(toolForElement('water').id, 'water');
     assert.equal(toolForElement('forest'), null);

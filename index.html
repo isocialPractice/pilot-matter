@@ -1102,6 +1102,23 @@
             grid-column: 2;
         }
 
+        /* The bar across the palette's foot, under the way out: SAVE / LOAD,
+           set in the page's type in the art's colours - its navy, its blue edge
+           - rather than drawn from the art, whose words are in a font the page
+           does not load and a screen reader cannot read. */
+        #build-palette button[data-tool].palette-bar {
+            grid-column: 1 / -1;
+            width: auto;
+            height: 34px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            letter-spacing: 2px;
+            background: #1e375b;
+            border: 2px solid #3c6482;
+            border-radius: 4px;
+        }
+
         /* The band across the head of the column, and the chevrons on it that
            fold the tools away. The art draws them pointing in, as the tab the
            folded palette leaves points out, so the one mark serves both. */
@@ -1830,19 +1847,36 @@
            tall the palette grows as tools join it. It scrolls rather than
            running down into the dock. */
         @media (max-width: 640px) {
+            /* The dock takes the foot of the screen up to 40% of it, and never
+               up past the palette's foot: on a short phone it gives up height,
+               its fields scrolling, rather than covering a tool. */
             #build-dock {
-                top: auto;
+                top: max(60vh, calc(var(--build-palette-bottom, 0px) + 10px));
                 bottom: 10px;
                 left: 10px;
                 right: 10px;
                 width: auto;
-                max-height: 40vh;
+            }
+
+            /* Three tiles across rather than two, a little smaller and still a
+               fingertip's width, so every tile - the way out and the bar under
+               it among them - stands above the dock rather than under it. Two
+               across, the palette's art is eight rows, which a phone's height
+               above the dock cannot hold. */
+            #build-palette {
+                grid-template-columns: repeat(3, 52px);
+                gap: 10px;
+            }
+
+            #build-palette button[data-tool] {
+                width: 52px;
+                height: 52px;
             }
 
             #build-help {
                 bottom: auto;
                 top: 20px;
-                left: 196px;
+                left: 244px;
                 right: 10px;
                 max-height: calc(60vh - 40px);
                 overflow-y: auto;

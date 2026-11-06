@@ -54,7 +54,9 @@ export const TARGET = 'assets/builder';
  * art names, and the art is the reference for how it should look.
  */
 export const BUILDER_ASSETS = Object.freeze({
-    // The twelve tool marks.
+    // The tool marks: the tour's twelve, then Insert City and Insert Plane
+    // from the palette's later art. The SAVE / LOAD bar has none - it is its
+    // words, set in the page's type.
     'select.svg':   'assets/select-built-area.svg',
     'lasso.svg':    'assets/selct-area-to-build.svg',
     'mountain.svg': 'assets/select-build-mountains.svg',
@@ -67,6 +69,8 @@ export const BUILDER_ASSETS = Object.freeze({
     'erase.svg':    'assets/select-erase-free-paints.svg',
     'extrude.svg':  'assets/select-draw-and-extrude-rectangle-tool.svg',
     'accept.svg':   'assets/complete-build-mode.svg',
+    'city.svg':     'assets/insert-city.svg',
+    'plane.svg':    'assets/insert-plane.svg',
 
     // The palette folded away: the chevrons that bring it back.
     'palette-folded.svg': 'assets/ToolPanel-Hidden.svg',

@@ -3518,7 +3518,7 @@ test('the palette is drawn from the tools that work rather than written into the
 
     const drawn = methodBody(mainSource, 'drawPalette');
     assert.ok(drawn, 'js/main.js should define drawPalette()');
-    assert.match(drawn, /for \(const tool of paletteTools\(\)\)/, 'one tile per tool that works');
+    assert.match(drawn, /for \(const tool of paletteTools\(built\)\)/, 'one tile per tool that works');
     assert.match(drawn, /document\.createElement\('button'\)/,
         'each a button, which focus and a screen reader can find as well as a pointer');
     assert.match(drawn, /tile\.type = 'button'/);
@@ -3833,11 +3833,31 @@ test('a canvas\'s field of view is put back as the flight had it', () => {
 });
 
 test('on a narrow screen the dock runs across the foot and the list moves clear of it', () => {
-    const narrow = indexHtml.match(/@media \(max-width: 640px\) \{\s*#build-dock \{([^}]*)\}\s*#build-help \{([^}]*)\}/);
-    assert.ok(narrow, 'index.html should lay the dock out for a narrow screen');
+    const block = indexHtml.slice(indexHtml.indexOf('@media (max-width: 640px) {\n            /* The dock takes the foot'));
+    const narrow = block.match(/#build-dock \{([^}]*)\}[\s\S]*?#build-palette \{([^}]*)\}\s*#build-palette button\[data-tool\] \{([^}]*)\}\s*#build-help \{([^}]*)\}/);
+    assert.ok(narrow, 'index.html should lay the dock, the palette and the list out for a narrow screen');
     assert.match(narrow[1], /bottom:\s*10px/, 'across the foot');
-    assert.match(narrow[1], /max-height:\s*40vh/, 'leaving most of the canvas to be seen');
-    assert.match(narrow[2], /top:\s*20px/, 'and the list moved up into the corner the dock left');
+    assert.match(narrow[1], /top: max\(60vh, calc\(var\(--build-palette-bottom, 0px\) \+ 10px\)\);/,
+        'up to 40% of the screen, leaving most of the canvas to be seen, and never up past the palette\'s foot');
+    assert.doesNotMatch(narrow[1], /max-height/, 'its height is what is left between those');
+    assert.match(narrow[2], /grid-template-columns: repeat\(3, 52px\);/,
+        'the palette three tiles across, so the art\'s eight rows of two are five of three above the dock');
+    assert.match(narrow[3], /width: 52px;\s*height: 52px;/, 'each still a fingertip\'s width');
+    assert.match(narrow[4], /top:\s*20px/, 'and the list moved up into the corner the dock left');
+    assert.match(narrow[4], /left: 244px;/, 'beside the wider palette');
+});
+
+/**
+ * The palette's later art: SAVE / LOAD across the foot, under the way out, as
+ * its words in the art's colours - drawn once it works, as every tile is.
+ */
+test('the palette draws the bar across its foot as words, and every tile as its mark', () => {
+    const draw = methodBody(mainSource, 'drawPalette');
+    assert.match(draw, /drawPalette\(built = BUILT_TOOLS\)|for \(const tool of paletteTools\(built\)\) \{/);
+    assert.match(mainSource, /drawPalette\(built = BUILT_TOOLS\) \{/, 'the built tools by default');
+    assert.match(draw, /if \(isPaletteBar\(tool\.id\)\) \{\s*tile\.className = 'palette-bar';\s*tile\.textContent = tool\.label;\s*\} else \{\s*tile\.append\(markImage\(toolMark\(tool\.id\)\)\);\s*\}/);
+    assert.match(indexHtml, /#build-palette button\[data-tool\]\.palette-bar \{[^}]*grid-column: 1 \/ -1;[^}]*background: #1e375b;[^}]*border: 2px solid #3c6482;/,
+        'across both columns, in the art\'s navy and blue');
 });
 
 // --- The two confirms, and a mountain dropped at a click -----------------------------
@@ -4191,7 +4211,9 @@ test('each tile carries its tool\'s mark as an image, and its name where a point
     assert.match(drawn, /tile\.append\(markImage\(toolMark\(tool\.id\)\)\);/);
     assert.match(drawn, /tile\.setAttribute\('aria-label', toolName\(tool\.id\)\);/);
     assert.match(drawn, /tile\.title = `\$\{toolName\(tool\.id\)\} - \$\{tool\.hint\}`;/);
-    assert.doesNotMatch(drawn, /tile\.textContent/, 'the name moved off the face of the tile onto its title and label');
+    const tiles = drawn.slice(drawn.indexOf('} else {'));
+    assert.doesNotMatch(tiles, /tile\.textContent/, 'the name moved off the face of the tile onto its title and label');
+    assert.equal((drawn.match(/tile\.textContent/g) ?? []).length, 1, 'the one face carrying words is the bar\'s, which its words are');
 
     const image = mainSource.match(/function markImage\(src\) \{[\s\S]*?\n\}/)?.[0] ?? '';
     assert.match(image, /document\.createElement\('img'\)/, 'an image, never the drawing written into the page');
@@ -4200,7 +4222,7 @@ test('each tile carries its tool\'s mark as an image, and its name where a point
 
 test('the palette is headed by the chevrons that fold it away, which are no tool', () => {
     const drawn = methodBody(mainSource, 'drawPalette');
-    assert.ok(drawn.indexOf("fold.dataset.palette = 'fold';") < drawn.indexOf('for (const tool of paletteTools())'), 'first, across the head');
+    assert.ok(drawn.indexOf("fold.dataset.palette = 'fold';") < drawn.indexOf('for (const tool of paletteTools(built))'), 'first, across the head');
     assert.match(drawn, /fold\.append\(markImage\(PALETTE_FOLD_MARK\)\);/);
     assert.match(drawn, /this\.onPaletteFold\(\);/);
     assert.match(methodBody(mainSource, 'onPaletteFold'), /togglePalette\(this\.paletteState\);\s*this\.syncOverlays\(\);/);
@@ -4796,7 +4818,7 @@ test('the gear on the palette\'s band and O inside the builder open the builder\
     assert.match(palette, /if \(this\.openBuilderSettingsPanel\(BUILDER_SETTINGS_FROM_BUILDER\)\) this\.syncOverlays\(\);/);
     const appended = palette.indexOf('palette.append(gear);');
     assert.ok(appended > 0, 'the gear is put on the palette');
-    assert.ok(appended < palette.indexOf('for (const tool of paletteTools())'), 'on the band, not among the tiles');
+    assert.ok(appended < palette.indexOf('for (const tool of paletteTools(built))'), 'on the band, not among the tiles');
     assert.match(indexHtml, /#build-palette\.folded \.palette-gear \{\s*display: none;/, 'a folded palette is the tab alone');
 
     const keys = methodBody(mainSource, 'onBuilderKey');

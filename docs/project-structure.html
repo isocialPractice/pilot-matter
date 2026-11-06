@@ -132,7 +132,9 @@
 │   ├── shapes.js       # Pure shape vocabulary: every shape a pointer draws on the ground, the kind of region and the gesture each is, and what a drag or a click per vertex comes to, written once for the lasso and Extrude to offer
 │   ├── lasso.js        # Pure lasso: the ten shapes it offers in the art's rows, and when a shape closes; how a shape meets the selection by the key held at its press, a figure reshaped by its fields, and shift in a drag squaring it
 │   ├── extrude.js      # Pure Extrude: the seven shapes it offers in the art's rows, cut from its panel's art, and the stages an extrusion goes through - drawing, extruding, surfaces - with the one button they share, its two surfaces and which one a point is, and the rows a surface clicked narrows the panel to
-│   ├── build-tools.js  # Pure tool registry: the twelve in palette order, the built ones the palette draws, the placement a click drops, and the stroke tools - the cover tool, Free Paint and Erase, each brush in screen pixels and the stamp a stroke is laid with
+│   ├── build-tools.js  # Pure tool registry: the tour's twelve and the palette art's later three in palette order, the built ones the palette draws, the SAVE / LOAD bar across its foot, what each insert, load or save section is declared to do, the placement a click drops, and the stroke tools - the cover tool, Free Paint and Erase, each brush in screen pixels and the stamp a stroke is laid with
+│   ├── mode-types.js   # Pure mode types: what a section does as a verb, a kind and a subject - Insert asset&lt;runway&gt;, Load data&lt;file&gt; - written and read back
+│   ├── environment-file.js # Pure environment file: a built world written as one JSON document and read back, refused whole with its first problem named, every range it sets held to its bounds
 │   ├── templates.js    # Pure runway templates: the cards Insert Runway offers - two runways and two airports - a template placed as one group of the registry's own elements, an airport's apron and buildings laid out as lots from its strip's paving, and the group expanded, turned and kept on the canvas when the ground is built
 │   ├── build-picker.js # Pure picker: the six canvases a session can start from, and which is chosen
 │   ├── build-camera.js # Pure orbit camera over a canvas: the hold, every gesture, the air cleared over it, the ground a screen pixel spans, and the bearing the view looks along
@@ -181,6 +183,8 @@
 │   ├── assets/         # The site's stylesheet and its one script
 │   ├── api.md          # The whole API surface, and its stability guarantee
 │   └── api-reference.html # The same document as a page, built from it
+├── schemas/
+│   └── environment.schema.json # The environment file as JSON Schema 2020-12, held to js/environment-file.js by its tests
 ├── examples/
 │   ├── host.html       # A host page working both halves of the API side by side
 │   └── host.js         # The Pilot API over host ground, the Matter API under a host aircraft

@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "environment.schema.json",
+  "title": "Pilot Matter environment",
+  "description": "A world built in Pilot Matter's interactive builder: the environment it was built on, that environment's own elements as they were kept, and the placements committed over them. Read by js/environment-file.js, which refuses a file this schema refuses and clamps every range a file sets to the bounds its element declares.",
+  "type": "object",
+  "required": ["format", "version", "base"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "Where this schema is, for an editor that reads one.",
+      "type": "string"
+    },
+    "format": {
+      "description": "What the file is, so a JSON file that is something else is refused by name.",
+      "const": "pilot-matter.environment"
+    },
+    "version": {
+      "description": "The version of the format the file was written in.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "name": {
+      "description": "The world's name, as the builder and the settings list show it.",
+      "type": "string",
+      "maxLength": 60
+    },
+    "savedAt": {
+      "description": "When the file was written.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "base": {
+      "description": "The environment the world was built on: one of the builder's canvases.",
+      "enum": ["highlands", "river-basin", "canyon-country", "dune-sea", "lakeside", "blank-canvas"]
+    },
+    "elements": {
+      "description": "The environment's own elements, as they were kept - their ranges as the pilot left them.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "placements": {
+      "description": "What was built over the environment, in the order it was committed.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/placement" }
+    }
+  },
+  "$defs": {
+    "elementType": {
+      "enum": ["mountain", "canyon", "desert", "grass", "sand", "water", "river", "forest", "town", "extrude", "snow", "paint", "runway"]
+    },
+    "point": {
+      "description": "A point on the canvas, east and south of its middle, in world units.",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "shade": {
+      "type": "object",
+      "required": ["light", "dark"],
+      "properties": {
+        "light": { "type": "number" },
+        "dark": { "type": "number" }
+      }
+    },
+    "row": {
+      "description": "One of the environment's own elements. Its label and its note are read off the element.",
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "$ref": "#/$defs/elementType" },
+        "config": {
+          "description": "The element's ranges as the world draws them.",
+          "type": "object"
+        },
+        "base": {
+          "description": "The ranges a gradient's shade is measured from.",
+          "type": "object"
+        },
+        "shades": {
+          "description": "How far either end of each gradient is drawn from its base colour.",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/shade" }
+        }
+      }
+    },
+    "region": {
+      "description": "A region a placement covers: one of the kinds the builder draws - disc, ring, stroke, rect, ellipse, polygon, path - or two combined, or one set down moved, turned and stretched.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["disc", "ring", "stroke", "rect", "ellipse", "polygon", "path", "combine", "placed"] }
+      }
+    },
+    "placement": {
+      "description": "Something the builder placed: an element, an erase batch, or a runway template's group of members. A placement may carry more than the fields named here, which the builder adds as it needs to.",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "anyOf": [
+            { "$ref": "#/$defs/elementType" },
+            { "enum": ["erase", "group"] }
+          ]
+        },
+        "config": {
+          "description": "The element's ranges, each held to its bounds when the file is read, and the point it was dropped at.",
+          "type": "object",
+          "properties": {
+            "at": { "$ref": "#/$defs/point" }
+          }
+        },
+        "footprint": { "$ref": "#/$defs/region" },
+        "clip": { "$ref": "#/$defs/region" },
+        "seed": { "type": "number" },
+        "template": {
+          "description": "A group's template, by its id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "members": {
+          "description": "A group's members: placements of their own, never another group.",
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/placement" },
+              { "properties": { "type": { "not": { "const": "group" } } } }
+            ]
+          }
+        }
+      },
+      "if": { "properties": { "type": { "const": "group" } } },
+      "then": { "required": ["template"] }
+    }
+  }
+}

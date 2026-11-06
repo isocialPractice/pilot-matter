@@ -1,7 +1,8 @@
 /**
- * Build tools - the twelve tools the builder's palette is drawn from, in the
- * order the tour gives them, which of them are built, and the mark each tile
- * carries.
+ * Build tools - the tools the builder's palette is drawn from, in the order the
+ * palette's art stacks them, which of them are built, and the mark each tile
+ * carries. The tour gave twelve; the palette's art since adds Insert City,
+ * Insert Plane and the SAVE / LOAD bar across its foot.
  *
  * The palette draws only tools that work. A tile that does nothing is a row
  * that does nothing with a picture on it, and the pause menu already drops the
@@ -16,15 +17,22 @@
 import { scalar, choice } from './environment/elements.js';
 import { DEFAULT_FEATHER } from './environment/footprints.js';
 import { ERASE_TYPE, placementRanges } from './environment/erase.js';
+import { mode, modeIs } from './mode-types.js';
 
 /** The navigation state, and the tool a canvas opens on. */
 export const SELECT_TOOL = 'select';
 
 /**
- * The twelfth tool, which is a way out rather than a mode: choosing it asks to
+ * The last tile, which is a way out rather than a mode: choosing it asks to
  * leave, and it never becomes the live tool.
  */
 export const ACCEPT_TOOL = 'accept';
+
+/**
+ * The bar across the palette's foot, under its tiles: SAVE / LOAD, where a
+ * built world is written to a file and a saved one or a model is read back.
+ */
+export const FILES_TOOL = 'files';
 
 /**
  * The twelve, in the tour's order, each with the name its tile carries, the
@@ -59,9 +67,15 @@ export const ACCEPT_TOOL = 'accept';
  * the walkthroughs': clumps of grass and sand at a half, and water and snow
  * whole, so a line of either is not drawn with gaps.
  *
- * `inserts` marks Insert Runway: a tool that places a template, chosen on its
- * panel as a card, at a click - a whole strip or airport rather than one
- * element - see `js/templates.js`.
+ * `modes` is what each of a tool's sections does, as a mode type - see
+ * `js/mode-types.js`. Insert Runway's is `Insert asset<runway>`: it places a
+ * template, chosen on its panel as a card, at a click - a whole strip or
+ * airport rather than one element - see `js/templates.js`. Insert City and
+ * Insert Plane insert, and the SAVE / LOAD bar loads and saves.
+ *
+ * `bar` marks the SAVE / LOAD bar: drawn across both of the palette's columns
+ * at its foot, under the way out, as text in the art's colours rather than as
+ * a mark - the art draws its words in a font the page does not load.
  *
  * `extrudes` marks Extrude, the one tool whose draft is not finished by a
  * single gesture: shapes are drawn into a region, which is then lifted - see
@@ -83,11 +97,14 @@ export const BUILD_TOOLS = Object.freeze([
     { id: 'sand',      label: 'SAND',            hint: 'Lay sand by dragging',                        mindsLasso: true,  element: 'sand', heading: 'BUILD SAND', cover: true, starts: Object.freeze({ density: 0.5 }) },
     { id: 'water',     label: 'WATER',           hint: 'Lay water by dragging',                       mindsLasso: true,  element: 'water', heading: 'BUILD WATER', cover: true, starts: Object.freeze({ density: 1 }) },
     { id: 'snow',      label: 'SNOW',            hint: 'Lay snow by dragging',                        mindsLasso: true,  element: 'snow', heading: 'BUILD SNOW', cover: true, starts: Object.freeze({ density: 1 }) },
-    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY', inserts: true },
+    { id: 'runway',    label: 'RUNWAY',          hint: 'Place a runway or an airport',                mindsLasso: false, element: 'runway', heading: 'INSERT RUNWAY', modes: Object.freeze([mode('insert', 'asset', 'runway')]) },
     { id: 'paint',     label: 'FREE PAINT',      hint: 'Brush a colour onto the ground',              mindsLasso: true,  element: 'paint', heading: 'FREE PAINT', paint: true },
     { id: 'erase',     label: 'ERASE',           hint: 'Take an element away through a stroke',       mindsLasso: true,  element: ERASE_TYPE, heading: 'ERASE', erase: true },
     { id: 'extrude',   label: 'EXTRUDE',         hint: 'Draw a shape and pull it up',                 mindsLasso: true,  element: 'extrude', heading: 'EXTRUDE SHAPE', extrudes: true },
-    { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false }
+    { id: 'city',      label: 'INSERT CITY',     hint: 'Place buildings, roads and parks',            mindsLasso: false, heading: 'INSERT CITY', modes: Object.freeze([mode('insert', 'asset', 'city')]) },
+    { id: 'plane',     label: 'INSERT PLANE',    hint: 'Choose the plane, and where a flight starts', mindsLasso: false, heading: 'INSERT PLANE', modes: Object.freeze([mode('insert', 'asset', 'flight:plane'), mode('insert', 'config', 'flight:start-point')]) },
+    { id: ACCEPT_TOOL, label: 'ACCEPT AND EXIT', hint: 'Leave the builder (Esc)',                     mindsLasso: false },
+    { id: FILES_TOOL,  label: 'SAVE / LOAD',     hint: 'Save this world to a file, or load one',      mindsLasso: false, heading: 'SAVE / LOAD', bar: true, modes: Object.freeze([mode('save', 'data', 'file'), mode('load', 'data', 'file'), mode('load', 'data', 'asset')]) }
 ].map(tool => Object.freeze(tool)));
 
 /**
@@ -99,12 +116,27 @@ export const BUILDER_ART = 'assets/builder';
 
 /**
  * The mark a tool's tile carries: the artwork's own, copied into the
- * repository under the tool's id. Every one of the twelve has one, built or
- * not, so a tool joining the palette brings no art with it. Null for a name
- * that is no tool.
+ * repository under the tool's id. Every tile has one, built or not, so a tool
+ * joining the palette brings no art with it. Null for a name that is no tool,
+ * and for the SAVE / LOAD bar, which is its words.
  */
 export function toolMark(id) {
-    return isBuildTool(id) ? `${BUILDER_ART}/${id}.svg` : null;
+    return isBuildTool(id) && !isPaletteBar(id) ? `${BUILDER_ART}/${id}.svg` : null;
+}
+
+/** True for the bar drawn across the palette's foot rather than as a tile. */
+export function isPaletteBar(id) {
+    return buildTool(id)?.bar === true;
+}
+
+/** What each of a tool's sections does, as mode types, in the order its panel draws them. */
+export function toolModes(id) {
+    return buildTool(id)?.modes ?? [];
+}
+
+/** True for a tool one of whose sections is the verb, the kind and, where one is asked, the subject given. */
+export function toolDoes(id, verb, kind, subject = null) {
+    return toolModes(id).some(type => modeIs(type, verb, kind, subject));
 }
 
 /**
@@ -139,7 +171,7 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  */
 export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL]);
 
-/** True for one of the twelve. */
+/** True for one of the builder's tools. */
 export function isBuildTool(id) {
     return BUILD_TOOL_IDS.includes(id);
 }
@@ -159,9 +191,9 @@ export function isChoosableTool(id, built = BUILT_TOOLS) {
 }
 
 /**
- * The tiles the palette draws: the built tools, in the twelve's order. The
- * accept tool is last of the twelve, so it is last here too, at the foot of the
- * column, wherever the tools between are added.
+ * The tiles the palette draws: the built tools, in the art's order. The accept
+ * tool is the last tile, at the foot of the column, wherever the tools between
+ * are added; the SAVE / LOAD bar, once built, comes after it, across the foot.
  */
 export function paletteTools(built = BUILT_TOOLS) {
     return BUILD_TOOLS.filter(tool => built.includes(tool.id));
@@ -215,7 +247,7 @@ export const COVER_ELEMENT_ROWS = Object.freeze(['density', 'color']);
 
 /** True for Insert Runway, which places a template chosen on its panel. */
 export function insertsTemplate(id) {
-    return buildTool(id)?.inserts === true;
+    return toolDoes(id, 'insert', 'asset', 'runway');
 }
 
 /** True for the cover tool, pointed at whichever ground cover it lays. */

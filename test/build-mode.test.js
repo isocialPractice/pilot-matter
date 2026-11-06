@@ -516,16 +516,22 @@ test('a canvas begun from the picker begins from nothing built', () => {
     assert.equal(draftPending(state), false);
 });
 
-// --- The twelve, and which of them mind the lasso ---------------------------------
+// --- The tools, and which of them mind the lasso ---------------------------------
 
-/** The tour's own table, written out once here so the declarations are held to it. */
+/**
+ * The tour's own table, written out once here so the declarations are held to
+ * it, with the palette's later three after it: what Insert City and Insert
+ * Plane put down is placed whole, and SAVE / LOAD places nothing, so none of
+ * them is clipped to a selection.
+ */
 const TOUR_MINDS_LASSO = {
     select: false, lasso: false, mountain: true, grass: true, sand: true, water: true,
-    snow: true, runway: false, paint: true, erase: true, extrude: true, accept: false
+    snow: true, runway: false, paint: true, erase: true, extrude: true,
+    city: false, plane: false, accept: false, files: false
 };
 
 test('which tools mind the lasso is the tour\'s own column', () => {
-    assert.deepEqual(Object.keys(TOUR_MINDS_LASSO), BUILD_TOOL_IDS, 'the twelve, in the tour\'s order');
+    assert.deepEqual(Object.keys(TOUR_MINDS_LASSO), BUILD_TOOL_IDS, 'every tool, in the palette\'s order');
     for (const tool of BUILD_TOOLS) {
         assert.equal(tool.mindsLasso, TOUR_MINDS_LASSO[tool.id], `${tool.id}`);
         assert.equal(mindsLasso(tool.id), TOUR_MINDS_LASSO[tool.id]);

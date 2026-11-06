@@ -5,6 +5,86 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.59.0] - 2026-11-05
+
+The ground the builder's new tools stand on: what each section does declared
+as a mode type, the palette laid out for the art's three later tiles, and a
+built world written as one JSON file and read back.
+
+### Added
+
+- **Mode types.** What a tool's section does is declared as a verb, a kind
+  and a subject - `Insert asset<runway>`, `Insert config<flight:start-point>`,
+  `Load data<file>` - and written and read back in that form. Insert Runway
+  places a template because it is declared `Insert asset<runway>`; Insert
+  City, Insert Plane and `SAVE / LOAD` are declared with theirs.
+- **The environment file.** A built world can be written as one JSON file -
+  the environment it was built on, that environment's own elements as kept,
+  and the placements committed over them - and read back whole. A file that
+  is not one, or was saved by a newer version, or names an environment or a
+  placement the builder does not know, is refused with every problem listed
+  and the first named; every range a file sets is held to its bounds. Its
+  schema is `schemas/environment.schema.json`, JSON Schema 2020-12.
+- Insert City's and Insert Plane's marks, copied from the palette's art.
+
+### Changed
+
+- **The palette redrawn.** The tools are the tour's twelve and the art's
+  later three in the art's order - Insert City beside Extrude, Insert Plane
+  beside the way out, and a `SAVE / LOAD` bar across the foot, set in the
+  page's type - each drawn once it works. The way out's mark is the art's
+  re-export, the same tick.
+- On a narrow screen the palette is three tiles across rather than two, so
+  every tile stands above the dock, and the dock never reaches up past the
+  palette's foot.
+
+### Fixed
+
+- On a short phone the dock covered the foot of the palette, the way out
+  among it.
+
+Held in Node by `test/mode-types.test.js` - a mode type written and read back,
+anything else refused, a declaration that is none refused when it is made and
+one that is frozen - `test/build-tools.test.js` - the tools in the art's order,
+the bar after the way out and the only tile with no mark, the later three
+declared and not yet built, every section that inserts, loads or saves
+declared, and Insert Runway's template read off its declaration -
+`test/environment-file.test.js` - a world with every kind of placement written
+and read back the world it was on every canvas, the document's fields, what a
+footprint settled never kept, a world's name and its file's, ranges held and
+none added, shades held, thirty-two broken files refused with their first
+problem named, every problem listed, a read that never throws, a file too
+large refused unread, and the schema held to the module field by field and by
+a validator over every hand-made document - `test/build-art.test.js`, and
+`test/page.test.js`, which holds the bar, the palette three across and the
+dock under it. Each rejected the defect it names when that was put back,
+34 in all: a verb written in lower case, any subject at all, a declaration that is none taken or left open
+to rewriting, a subject asked about and not looked at, every asset insert
+taken for a template, Insert Runway declared to insert something else, the
+bar drawn as a mark or in one column, a mark asked for the bar, every tool a
+bar, a later tool drawn before it works, the palette drawn from the built list
+whatever it is handed, two across on a phone, the dock up over the palette, the
+control list over it, Insert City's mark off the copy list, a later mark on no
+tile, another format or a newer version read, a field the format has not
+taken, an environment the builder does not offer taken, a range read past its
+bounds, ranges left out filled in, a region that is no region taken, a group
+inside a group, what a footprint settled kept, half a file read, a file of any
+size parsed, a shade past what a shade may be, a row's stray field taken, a
+row's own id lost, and the schema without Blank Canvas or taking a field the
+module refuses.
+
+Settled in Chromium in 28 checks: at 1280x800, 390x844 and 375x548, today's
+palette the twelve with the way out clear of the dock, and every tile the art
+draws in its order, the bar under every tile across every column reading
+`SAVE / LOAD` with no mark, Insert City and Insert Plane drawn with their
+marks, Insert Plane left of the way out on its row, and the whole palette
+above the control list on a desktop and above the dock, three across, on a
+phone; Insert Runway placing a template at a click; a world built with every
+kind of placement kept, written as one file of 7765 characters and read back
+the world it was, the ground drawn from both the same, saved as
+`sample-valley.pilot-matter.json`; and the schema served beside the page as
+JSON.
+
 ## [1.0.0-alpha.1.58.0] - 2026-11-05
 
 The dock's rows patched: a fraction moves a tenth at a press, a figure's field

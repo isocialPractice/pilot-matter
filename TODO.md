@@ -11,20 +11,15 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Mode types**: what an insert, load or save section does declared on it
-  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
-  config<flight:start-point>`, `Load data<file>` - written and read back by one
-  pair of functions and dispatched on, with Insert Runway marked and unchanged
+- [ ] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
+  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
+  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
+  first, and each action's outcome written under its answer
   - From: Post Interactive Build
-- [ ] **The palette redrawn**: the seven rows of `panel-updated.svg` with
-  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
-  a text button in the art's colours, the new marks copied by the sync list,
-  each tile shown once its tool works, the gear kept, and both screens measured
-  - From: Post Interactive Build
-- [ ] **The environment file**: a built world written as one JSON file with a
-  committed schema - format, version, name, base, rows, placements, and later
-  the start, the plane and the assets - read back by a function that never
-  throws and refuses a bad file whole with its first problem named
+- [ ] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
+  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
+  the pause menu, a loaded world becoming a chosen entry of the list that is
+  kept across a reload, and both rows gone while a game mode runs
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -107,18 +102,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Mode types**: what an insert, load or save section does declared on it
-  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
-  config<flight:start-point>`, `Load data<file>` - written and read back by one
-  pair of functions and dispatched on, with Insert Runway marked and unchanged
-- [ ] **The palette redrawn**: the seven rows of `panel-updated.svg` with
-  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
-  a text button in the art's colours, the new marks copied by the sync list,
-  each tile shown once its tool works, the gear kept, and both screens measured
-- [ ] **The environment file**: a built world written as one JSON file with a
-  committed schema - format, version, name, base, rows, placements, and later
-  the start, the plane and the assets - read back by a function that never
-  throws and refuses a bad file whole with its first problem named
 - [ ] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
   ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
   a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
@@ -224,62 +207,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 378 earlier items in `TODO-archive.md`, newest last.
+> 381 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Auto accept**: a setting that commits a pending draft at the next press
-  and at the accept tool instead of asking, never on release, so the stroke just
-  drawn stays editable and leaving asks only whether to save, switched on the
-  builder's settings screen as a group with `ALL` over it
-  - **Settled**: the session holds `autoAccept = { all, draw, exit, tool }`,
-    and `autoAccepts` reads `all` over each moment. `drawAgain` keeps the
-    draft at a press that draws - a stroke tool's, a drop at a click, Insert
-    Runway's, and a lifted extrusion's while it is extruding - never at a
-    release, under a held pan, with the dropper armed or under a question;
-    the page calls it before the press is routed, so what the press draws
-    starts a draft of its own. `requestLeave` keeps the edit and asks only
-    `SAVE AND EXIT MODE`, the accept tool named for that question, and
-    `chooseBuildTool` keeps it and changes the tool. Each stroke is now a
-    placement of its own; joining the ones nothing changed between is the
-    next item's.
-  - From: Interactive Build Mode
-- [x] **Auto accept merges**: a draft the setting commits joined to the
-  placement before it when nothing about it changed, so auto accept adds a
-  placement only where the pilot changed something
-  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
-    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
-    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
-    already compares two placements' resolved configs. What is left is the
-    join: the same element and config as the placement committed just before,
-    with nothing between, its footprint added to that one's as a union.
-  - **Settled**: a draft auto accept keeps goes through `autoKeep` in
-    `js/build-mode.js`, which joins a stroke tool's batch to the placement
-    auto accept kept just before it - `state.kept`, cleared by any other
-    commit - when the element, its resolved configuration and its clip
-    match, its footprint added to that one's with `addToPlaced`. The world
-    is then exactly what a batch accepted by hand draws, which a test
-    builds both ways and compares. Only a stroke tool's are joined: a
-    mountain or a runway is one thing where it stands, and an extrusion is
-    levelled to the mean of the ground it covers, which a union would
-    change. A pick kept by a tool change starts no run.
-  - From: Interactive Build Mode
-- [x] **Re-seat the aircraft**: a flight resumed over ground that changed under
-  it put back on top of that ground before the first frame is scored, so a
-  mountain built where it was parked is not a crash on resume
-  - **Until then a changed world starts the flight again.** Since
-    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
-    passes `changed` to `leaveBuilder`, and the flight goes back to its start
-    rather than resuming in moved ground. This item is what lets it resume.
-  - **Settled**: leaving the builder over a paused flight keeps that flight
-    whatever was kept, and `reseatAircraft` puts it back over the new ground
-    through `reseatHeight` in `js/crash.js`: on the ground at its clearance
-    if it was on the ground; in the air left where it is while the new ground
-    clears it by `RESEAT_HEADROOM`, and otherwise lifted to the height it had
-    over the old ground, never less than that headroom. Found on the way:
-    the frame loop went on updating the aircraft against the canvas's ground
-    while a canvas was open, which set it down on a block built under it and
-    lost the height it was flying at - the aircraft is now not flown or
-    measured while a canvas is open.
-  - From: Interactive Build Mode
 - [x] **Build mode controls help**: the builder's control list, grown by each
   item as it added a binding, carried into the docs and the cheat sheet beside
   the flight's and held to the code there the way the flight's is
@@ -390,4 +319,56 @@ how the simulator got here rather than as a list still to be worked.
     steps it by `cycleStep`: a switch either way, a choice on and round from
     its last value to its first, where its marks stop at the ends. The goal's
     mixed-case `Off` is the mockup's lettering; the panel keeps its own.
+  - From: Post Interactive Build
+- [x] **Mode types**: what an insert, load or save section does declared on it
+  as a verb, a kind and a subject - `Insert asset<runway>`, `Insert
+  config<flight:start-point>`, `Load data<file>` - written and read back by one
+  pair of functions and dispatched on, with Insert Runway marked and unchanged
+  - **Settled**: `js/mode-types.js` holds the verbs and the kinds, and writes
+    and reads a mode type back - `mode`, `modeType`, `parseModeType` and
+    `modeIs` - a declaration that is no mode type throwing as the module
+    loads. A tool's `modes` are its sections' types, in the order its panel
+    draws them. Insert Runway's `Insert asset<runway>` replaced the `inserts`
+    flag, and `insertsTemplate` reads it through `toolDoes`; Insert City's,
+    Insert Plane's two and SAVE / LOAD's three are declared beside it. The
+    tools that build, paint, erase and extrude declare none.
+  - From: Post Interactive Build
+- [x] **The palette redrawn**: the seven rows of `panel-updated.svg` with
+  Insert City and Insert Plane above Accept, and SAVE / LOAD across the foot as
+  a text button in the art's colours, the new marks copied by the sync list,
+  each tile shown once its tool works, the gear kept, and both screens measured
+  - **Settled**: `BUILD_TOOLS` is the tour's twelve and the art's later three
+    in the art's order - Insert City after Extrude, Insert Plane before the way
+    out, and `FILES_TOOL`, the bar, after it - with only the twelve built. The
+    two marks are copied as `city.svg` and `plane.svg`; the copy also brought
+    the way out's mark as the designer exported it again beside them, the same
+    check on the 31.1 tile the later art is drawn on, so the art test takes
+    either tile. `isPaletteBar` marks the bar: a text button in the art's navy
+    and blue across every column, with no mark. Measured with every tile drawn:
+    at 1280x800 the palette ends at 640 and the list starts at 654. On a phone
+    the art's eight rows of two stood under the dock - and a short phone's had
+    already put the way out there with today's twelve - so below 641 pixels
+    the palette is three tiles across at 52 pixels, and the dock never reaches
+    up past its foot: every tile above the dock at 390x844 and at 375x548.
+  - From: Post Interactive Build
+- [x] **The environment file**: a built world written as one JSON file with a
+  committed schema - format, version, name, base, rows, placements, and later
+  the start, the plane and the assets - read back by a function that never
+  throws and refuses a bad file whole with its first problem named
+  - **Settled**: `js/environment-file.js` writes a kept world - `builtWorld`'s
+    `{ environment, placements, world }` - as `{ format, version, name,
+    savedAt, base, elements, placements }`, a row as its id, type, config,
+    base and shades, its label and note read back off the element through
+    `elementRow`, now exported by `js/element-editor.js`. `readEnvironmentDocument`
+    never throws, lists every problem with the first first, refuses a file
+    whole, holds every range a file sets to its bounds and adds none it leaves
+    out, and never takes what a footprint settled for the generator. The
+    schema is `schemas/environment.schema.json`: a test validates hand-made
+    documents against it with a validator for the vocabulary it uses, and the
+    module refuses what it refuses - but for a region's arithmetic and a
+    point's numbers, which the schema has no words for. A placement may carry
+    fields the format does not name, the builder adding them as it needs to;
+    the top of a file and an element's row may not. Measured in Chromium, a
+    world with every kind of placement reads back the world it was and draws
+    the same ground.
   - From: Post Interactive Build

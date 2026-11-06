@@ -96,19 +96,31 @@ export function editorElements(environment, runway = false) {
     const placed = orderPlacements(environmentElements(environment, runway))
         .filter(placement => ELEMENTS_BY_ID.has(placement.type));
 
-    return placed.map((placement, at) => {
-        const element = getElement(placement.type);
-        return {
-            id: `${placement.type}-${at}`,
-            type: placement.type,
-            label: label(placement.type),
-            note: elementNote(element),
-            open: false,
-            config: resolveConfig(element, placement.config),
-            base: resolveConfig(element, placement.config),
-            shades: shadeDefaults(element)
-        };
-    });
+    return placed.map((placement, at) => elementRow(placement.type, at, placement.config));
+}
+
+/**
+ * One of an environment's elements as the editor holds it: what is read off
+ * the element - its label and its note - and the configuration it is drawn
+ * with, every range resolved, beside the configuration a gradient's shade is
+ * measured from and the shades either end is drawn at. A saved world's rows
+ * are read back through this, so a row from a file is a row the editor made.
+ *
+ * `id` is the row's own, kept where it has one, so a world saved and read back
+ * is the rows it was; `at` names it where it has none.
+ */
+export function elementRow(type, at, config, { base = config, shades = null, id = null } = {}) {
+    const element = getElement(type);
+    return {
+        id: typeof id === 'string' && id !== '' ? id : `${type}-${at}`,
+        type,
+        label: label(type),
+        note: elementNote(element),
+        open: false,
+        config: resolveConfig(element, config),
+        base: resolveConfig(element, base),
+        shades: { ...shadeDefaults(element), ...(shades ?? {}) }
+    };
 }
 
 /** What an element's row says about it: the ranges it can be moved along. */

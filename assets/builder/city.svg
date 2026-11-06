@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="ToolPanel" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 31.1 31.1">
+  <!-- Generator: Adobe Illustrator 30.1.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 136)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #0f825d;
+      }
+
+      .st1 {
+        fill: #3c6482;
+      }
+
+      .st2 {
+        fill: #061d43;
+      }
+
+      .st3 {
+        fill: #2e3439;
+      }
+
+      .st4 {
+        fill: #3b444a;
+      }
+
+      .st5 {
+        fill: #b3b3b3;
+      }
+
+      .st6 {
+        fill: #fff;
+        stroke: #3c6482;
+        stroke-miterlimit: 10;
+      }
+    </style>
+  </defs>
+  <g id="ToolPanel-2">
+    <g id="buttons">
+      <g id="complete-build-mode">
+        <rect id="button" class="st6" x=".5" y=".5" width="30.1" height="30.1" rx="2" ry="2"/>
+        <g id="insert-city">
+          <path id="imply_skyline" class="st2" d="M25.8,14.8v4.9H6.6v-.4c0,0,2.3-1.2,2.3-1.2v-5c0-.6,2.1,0,2.1,0v3.3h2.1V4.2h5.5v7.6h1.5v-3h1.8v5.3s4.1.7,4.1.7Z"/>
+          <path id="imply_infrastructure" class="st5" d="M25.8,19.7v1.2l-9.4,5.5c-1,.6-2.2.7-3.3.3l-2-.8-2.6-4.8h-2.2l.2-1.4s19.2,0,19.2,0Z"/>
+          <polygon id="imply_factory" class="st4" points="15.5 21.6 14.6 22.6 16.5 24.3 20.2 21.2 18.9 20.3 15.9 21 15.5 21.6"/>
+          <polygon id="imply_commercial" class="st3" points="9.9 21.6 11.6 20.7 12.5 21.6 10.9 22.7 9.9 21.6"/>
+          <polygon id="imply_residential" class="st1" points="11.9 24.4 13.6 23.1 15.1 24.9 13.5 25.8 11.9 24.4"/>
+          <path id="imply_park" class="st0" d="M11.1,25.9l-3.4-1.3c-1.1-.4-1.7-1.5-1.5-2.6l.2-.8h2.2l2.6,4.8Z"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

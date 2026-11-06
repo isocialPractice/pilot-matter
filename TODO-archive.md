@@ -5054,3 +5054,57 @@ still be found by name.
     in its place; its `BACK` brings the panel back with the cursor on the
     row. Stepping it changes nothing, and it stays while a mode is played.
   - From: Interactive Build Mode
+- [x] **Auto accept**: a setting that commits a pending draft at the next press
+  and at the accept tool instead of asking, never on release, so the stroke just
+  drawn stays editable and leaving asks only whether to save, switched on the
+  builder's settings screen as a group with `ALL` over it
+  - **Settled**: the session holds `autoAccept = { all, draw, exit, tool }`,
+    and `autoAccepts` reads `all` over each moment. `drawAgain` keeps the
+    draft at a press that draws - a stroke tool's, a drop at a click, Insert
+    Runway's, and a lifted extrusion's while it is extruding - never at a
+    release, under a held pan, with the dropper armed or under a question;
+    the page calls it before the press is routed, so what the press draws
+    starts a draft of its own. `requestLeave` keeps the edit and asks only
+    `SAVE AND EXIT MODE`, the accept tool named for that question, and
+    `chooseBuildTool` keeps it and changes the tool. Each stroke is now a
+    placement of its own; joining the ones nothing changed between is the
+    next item's.
+  - From: Interactive Build Mode
+- [x] **Auto accept merges**: a draft the setting commits joined to the
+  placement before it when nothing about it changed, so auto accept adds a
+  placement only where the pilot changed something
+  - **The keeping is there.** Since `1.0.0-alpha.1.55.0` a draft auto accept
+    keeps goes through `acceptDraft` from three places in `js/build-mode.js`,
+    `drawAgain`, `requestLeave` and `chooseBuildTool`, and `samePlacement`
+    already compares two placements' resolved configs. What is left is the
+    join: the same element and config as the placement committed just before,
+    with nothing between, its footprint added to that one's as a union.
+  - **Settled**: a draft auto accept keeps goes through `autoKeep` in
+    `js/build-mode.js`, which joins a stroke tool's batch to the placement
+    auto accept kept just before it - `state.kept`, cleared by any other
+    commit - when the element, its resolved configuration and its clip
+    match, its footprint added to that one's with `addToPlaced`. The world
+    is then exactly what a batch accepted by hand draws, which a test
+    builds both ways and compares. Only a stroke tool's are joined: a
+    mountain or a runway is one thing where it stands, and an extrusion is
+    levelled to the mean of the ground it covers, which a union would
+    change. A pick kept by a tool change starts no run.
+  - From: Interactive Build Mode
+- [x] **Re-seat the aircraft**: a flight resumed over ground that changed under
+  it put back on top of that ground before the first frame is scored, so a
+  mountain built where it was parked is not a crash on resume
+  - **Until then a changed world starts the flight again.** Since
+    `1.0.0-alpha.1.42.0`, leaving from the pause menu with a built world kept
+    passes `changed` to `leaveBuilder`, and the flight goes back to its start
+    rather than resuming in moved ground. This item is what lets it resume.
+  - **Settled**: leaving the builder over a paused flight keeps that flight
+    whatever was kept, and `reseatAircraft` puts it back over the new ground
+    through `reseatHeight` in `js/crash.js`: on the ground at its clearance
+    if it was on the ground; in the air left where it is while the new ground
+    clears it by `RESEAT_HEADROOM`, and otherwise lifted to the height it had
+    over the old ground, never less than that headroom. Found on the way:
+    the frame loop went on updating the aircraft against the canvas's ground
+    while a canvas was open, which set it down on a block built under it and
+    lost the height it was flying at - the aircraft is now not flown or
+    measured while a canvas is open.
+  - From: Interactive Build Mode

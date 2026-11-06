@@ -34,7 +34,7 @@ import {
     BUILD_FROM_TITLE, BUILD_FROM_PAUSE
 } from './build-mode.js';
 import {
-    paletteTools, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
+    paletteTools, BUILT_TOOLS, isPaletteBar, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
     insertsTemplate, ACCEPT_TOOL, SELECT_TOOL
 } from './build-tools.js';
 import { placeTemplate, groupStrips, groupLots, groupReach, keepStripOnCanvas, arrivalHeading } from './templates.js';
@@ -3845,7 +3845,7 @@ class FlightSimulator {
      * are built does not change while the page is open; which one is live is
      * marked on them by `syncOverlays`.
      */
-    drawPalette() {
+    drawPalette(built = BUILT_TOOLS) {
         const palette = this.overlays.palette;
         palette.replaceChildren();
 
@@ -3879,13 +3879,19 @@ class FlightSimulator {
         });
         palette.append(gear);
 
-        for (const tool of paletteTools()) {
+        for (const tool of paletteTools(built)) {
             const tile = document.createElement('button');
             tile.type = 'button';
             tile.dataset.tool = tool.id;
             // The tool's own mark, and its name where a pointer resting on it
-            // and a screen reader find it.
-            tile.append(markImage(toolMark(tool.id)));
+            // and a screen reader find it - or, for the bar across the foot,
+            // its words, which are its name.
+            if (isPaletteBar(tool.id)) {
+                tile.className = 'palette-bar';
+                tile.textContent = tool.label;
+            } else {
+                tile.append(markImage(toolMark(tool.id)));
+            }
             tile.setAttribute('aria-label', toolName(tool.id));
             tile.title = `${toolName(tool.id)} - ${tool.hint}`;
             tile.addEventListener('click', (event) => {
