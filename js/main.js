@@ -31,7 +31,8 @@ import {
     holdCamera, cameraHeld, releaseCamera, suspendForSettings, settingsOver, resumeFromSettings,
     setAutoAccept, drawAgain, editPending,
     isBuilderOpenKey, BUILDER_ENTRY_ID, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_STAY,
-    BUILD_FROM_TITLE, BUILD_FROM_PAUSE
+    BUILD_FROM_TITLE, BUILD_FROM_PAUSE,
+    confirmEntries, requestLoad, loadCanvas, sessionWorld, saveName, setSaveName, setFileStatus
 } from './build-mode.js';
 import {
     paletteTools, BUILT_TOOLS, isPaletteBar, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
@@ -65,7 +66,8 @@ import {
 } from './build-camera.js';
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
-    DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH
+    DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH,
+    DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD
 } from './build-panel.js';
 import {
     lassoTool, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -93,6 +95,8 @@ import {
     chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
     isSettingsCloseKey, isSettingsOpenKey,
     SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP, BUILDER_GROUP, BUILDER_SETTINGS_ID,
+    FILE_GROUP, LOADED_ENVIRONMENT_ID, LOAD_ENVIRONMENT_ID, SAVE_ENVIRONMENT_ID,
+    setSettingsWorlds, loadedChosen, chooseLoadedWorld, setFileNotice,
     SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION, WEATHER_OPTION,
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
@@ -145,8 +149,13 @@ import {
     typedEditorRow, beginTypedEditorValue, applyTypedEditorKey, cancelTypedEditorValue,
     editorEntries, editorPlacements, chooseEditorEntry, adjustEditorRange,
     setEditorClearance, isEditorCloseKey, keepBuiltWorld, keptPlacements, builtWorld,
-    flownEnvironment, canvasWorld, EDITOR_BACK_ID
+    flownEnvironment, canvasWorld, releaseBuiltWorld, EDITOR_BACK_ID
 } from './element-editor.js';
+import {
+    environmentDocument, environmentText, environmentFileName, cleanName, defaultEnvironmentName
+} from './environment-file.js';
+import { saveEnvironmentText, pickEnvironmentFile } from './environment-io.js';
+import { readLoadedWorld, writeLoadedWorld, loadedWorldOf, loadedWorldEntry } from './loaded-world.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
 import { ApproachGuidance } from './guidance.js';
@@ -263,7 +272,10 @@ class FlightSimulator {
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
         this.loaded('scene');
 
-        this.settings = createSettingsState(defaultStorage());
+        // The world a file brought that the browser keeps, if any: listed by
+        // the settings under its own name, and flown when it is the one chosen.
+        this.loadedWorld = readLoadedWorld(defaultStorage());
+        this.settings = createSettingsState(defaultStorage(), undefined, undefined, { loaded: loadedWorldEntry(this.loadedWorld) });
 
         // What the keys mean and how far the attitude may go, which is the
         // Control Settings entry's panel. Held apart from the settings panel
@@ -283,6 +295,15 @@ class FlightSimulator {
             currentEnvironment(this.settings),
             runwayWanted(startSettings(this.settings))
         );
+        if (loadedChosen(this.settings)) this.keepLoadedWorld(false);
+
+        // The one file dialog the page opens, for a world loaded from the
+        // settings or into the builder. Never drawn: a row or an answer opens it.
+        this.environmentFileInput = document.createElement('input');
+        this.environmentFileInput.type = 'file';
+        this.environmentFileInput.hidden = true;
+        this.environmentFileInput.setAttribute('aria-hidden', 'true');
+        document.body.append(this.environmentFileInput);
 
         // Free flight is the run every session opens in, so the first world is
         // the settings panel's rather than a mode's.
@@ -595,7 +616,7 @@ class FlightSimulator {
         // world is flown under the last, all walked as though they were one.
         this.settingsMenu = new MenuList(
             document.getElementById('settings-menu'), this.settingsState,
-            entry => entry.kind === ENVIRONMENT_ENTRY
+            entry => entry.kind === ENVIRONMENT_ENTRY || entry.group === FILE_GROUP
         );
         this.settingsStart = new MenuList(
             document.getElementById('settings-start'), this.settingsState,
@@ -603,7 +624,7 @@ class FlightSimulator {
         );
         this.settingsOptions = new MenuList(
             document.getElementById('settings-options'), this.settingsState,
-            entry => entry.kind !== ENVIRONMENT_ENTRY && entry.group !== START_GROUP && entry.group !== BUILDER_GROUP
+            entry => entry.kind !== ENVIRONMENT_ENTRY && entry.group !== START_GROUP && entry.group !== BUILDER_GROUP && entry.group !== FILE_GROUP
         );
         this.settingsBuilder = new MenuList(
             document.getElementById('settings-builder'), this.settingsState,
@@ -696,7 +717,8 @@ class FlightSimulator {
             onFold:   (id) => this.onDockFold(id),
             onShape:  (id) => this.onDockShape(id),
             onColor:  (entry, rgb) => this.onDockColor(entry, rgb),
-            onDropper: entry => this.onDockDropper(entry)
+            onDropper: entry => this.onDockDropper(entry),
+            onText:   (id, text) => this.onDockText(id, text)
         });
 
         // The confirm is worked with the mouse as every menu here is, and a
@@ -1399,7 +1421,26 @@ class FlightSimulator {
         closeControlSettings(this.controlSettings);
         this.leaveBuilder();
         openSettings(this.settings);
+        setFileNotice(this.settings, null, null);
+        this.refreshSettingsWorlds();
         resetSelection(this.settingsState);
+    }
+
+    /**
+     * Puts the settings on the worlds they list now - the one a file brought,
+     * under its name - and draws the two file rows only while no game mode is
+     * running, a mode bringing its own world. The lists are drawn again from
+     * the entries made, the cursor kept on the row it was on.
+     */
+    refreshSettingsWorlds() {
+        const on = selectedId(this.settingsState);
+        setSettingsWorlds(this.settings, { loaded: loadedWorldEntry(this.loadedWorld), files: !runningMode(this.run) });
+        setMenuEntries(this.settingsState, this.settings.entries);
+        const at = this.settings.entries.findIndex(entry => entry.id === on);
+        if (at >= 0) this.settingsState.index = at;
+        for (const menu of [this.settingsMenu, this.settingsStart, this.settingsOptions, this.settingsBuilder]) {
+            menu.rebuild(this.settingsState);
+        }
     }
 
     /**
@@ -1493,8 +1534,30 @@ class FlightSimulator {
     }
 
     chooseSettingsEntry(id, step = 1) {
+        const loaded  = loadedChosen(this.settings);
         const applied = chooseSetting(this.settings, id, step);
         if (!applied || applied === SETTINGS_BACK_ID) return;
+
+        // The two file rows, worked from the press that chose them - which a
+        // file dialog needs - with the panel left open for what they come to.
+        if (applied === LOAD_ENVIRONMENT_ID) {
+            this.loadEnvironmentFromSettings();
+            return;
+        }
+        if (applied === SAVE_ENVIRONMENT_ID) {
+            this.saveEnvironmentFromSettings();
+            return;
+        }
+
+        // The world a file brought, chosen: flown as a kept build is.
+        if (applied === LOADED_ENVIRONMENT_ID) {
+            this.chooseLoaded();
+            return;
+        }
+
+        // A preset chosen over it is that preset as it is - so even the one it
+        // was built on lets go of what the file built there.
+        if (loaded && !loadedChosen(this.settings)) releaseBuiltWorld(this.editor);
 
         // The builder's own settings, opened in this panel's place.
         if (applied === BUILDER_SETTINGS_ID) {
@@ -1507,6 +1570,151 @@ class FlightSimulator {
         // together, so a new world resets the flight, a new start waits for
         // one, and nothing here has to know which kind of choice was made.
         this.applySettings();
+    }
+
+    // --- Saving and loading a world -----------------------------------------
+
+    /** The world a file brought, kept on the editor as a build on the environment it was built on. */
+    keepLoadedWorld(redraw = true) {
+        const world = this.loadedWorld?.world;
+        if (!world) return false;
+        keepBuiltWorld(this.editor, world.environment, runwayWanted(startSettings(this.settings)), world.placements,
+            currentEnvironment(this.settings), world.world);
+        // The editor's panel is drawn once the page is up; before then there
+        // is nothing to draw it again on.
+        if (redraw) this.redrawEditor();
+        return true;
+    }
+
+    /** The world a file brought made the one chosen and flown - a new world, so the flight starts over it. */
+    chooseLoaded() {
+        if (!this.loadedWorld) return false;
+        chooseLoadedWorld(this.settings, true, this.loadedWorld.base);
+        this.keepLoadedWorld();
+        this.applySettings();
+        return true;
+    }
+
+    /**
+     * A file's text taken as the world the browser keeps: listed by the
+     * settings, and stored for the next session - which a storage too full for
+     * it refuses, the world staying in use until the page is reloaded.
+     *
+     * Returns whether it was stored.
+     */
+    adoptLoadedWorld(loaded) {
+        this.loadedWorld = loaded;
+        const kept = writeLoadedWorld(defaultStorage(), loaded.text);
+        this.refreshSettingsWorlds();
+        return kept;
+    }
+
+    /**
+     * A file chosen in the dialog, read: `{ loaded }` for a world, `{ refused }`
+     * with why for anything else, or null for a dialog closed with nothing in it.
+     */
+    async chooseEnvironmentFile() {
+        const picked = await pickEnvironmentFile(this.environmentFileInput);
+        if (!picked) return null;
+        if (picked.tooLarge) return { name: picked.name, refused: 'the file is larger than an environment file may be' };
+        if (picked.text == null) return { name: picked.name, refused: 'the file could not be read' };
+        const read = loadedWorldOf(picked.text);
+        return read.loaded ? { name: picked.name, loaded: read.loaded } : { name: picked.name, refused: read.problems[0] };
+    }
+
+    /** A world written to a file under its name, as the browser offers: `{ saved, name }`, `{ cancelled }` or `{ error }`. */
+    writeEnvironment(world, name) {
+        const document = environmentDocument(world, { name });
+        return saveEnvironmentText(environmentFileName(document.name), environmentText(document));
+    }
+
+    /** What a save came to, as the line that says so, and whether it is a refusal. */
+    saveOutcome(saved) {
+        if (saved.saved) return { text: `saved ${saved.name}`, refused: false };
+        if (saved.cancelled) return { text: 'not saved', refused: false };
+        return { text: `could not save: ${saved.error?.message ?? 'the browser refused the file'}`, refused: true };
+    }
+
+    /**
+     * LOAD ENVIRONMENT on the settings: the file chosen, read, kept and
+     * flown - from the pause menu, the flight put on it as another world
+     * chosen there is - or refused with why, nothing changed.
+     */
+    async loadEnvironmentFromSettings() {
+        const chosen = await this.chooseEnvironmentFile();
+        if (!chosen) return;
+        if (chosen.refused) {
+            setFileNotice(this.settings, LOAD_ENVIRONMENT_ID, `could not load ${chosen.name}: ${chosen.refused}`, { refused: true });
+            this.syncOverlays();
+            return;
+        }
+        const kept = this.adoptLoadedWorld(chosen.loaded);
+        this.chooseLoaded();
+        setFileNotice(this.settings, LOAD_ENVIRONMENT_ID,
+            `loaded ${chosen.loaded.name}${kept ? '' : ' - too large to keep after a reload'}`);
+        this.syncOverlays();
+    }
+
+    /**
+     * SAVE ENVIRONMENT on the settings: the world they would fly written to a
+     * file - the build kept on it, or the preset as it is - under the loaded
+     * world's name when that is the one chosen, and the environment's otherwise.
+     */
+    async saveEnvironmentFromSettings() {
+        const environment = flownEnvironment(this.editor, currentEnvironment(this.settings));
+        const world = builtWorld(this.editor) ?? { environment, placements: [], world: canvasWorld(this.editor, environment) };
+        const name = loadedChosen(this.settings) ? this.loadedWorld.name : defaultEnvironmentName(world.environment);
+        const outcome = this.saveOutcome(await this.writeEnvironment(world, name));
+        setFileNotice(this.settings, SAVE_ENVIRONMENT_ID, outcome.text, { refused: outcome.refused });
+        this.syncOverlays();
+    }
+
+    /** SAVE ENVIRONMENT on the builder's dock: what the canvas holds, under the name on the panel. */
+    async saveEnvironmentFromBuilder() {
+        const world = sessionWorld(this.builder);
+        if (!world) return;
+        const name = cleanName(saveName(this.builder)) || defaultEnvironmentName(world.environment);
+        const outcome = this.saveOutcome(await this.writeEnvironment(world, name));
+        setFileStatus(this.builder, outcome.text, { refused: outcome.refused });
+        this.syncOverlays();
+    }
+
+    /**
+     * LOAD ENVIRONMENT on the builder's dock: with something built on the
+     * canvas, `REPLACE THE BUILT WORLD` first, whose `YES` goes on to the file;
+     * with nothing, the file at once.
+     */
+    loadEnvironmentFromBuilder() {
+        const asked = requestLoad(this.builder);
+        if (asked?.confirm) this.confirmOpened();
+        else if (asked?.load) this.loadIntoCanvas();
+        this.syncOverlays();
+    }
+
+    /**
+     * The file chosen and read into the canvas in place of what was there,
+     * kept as the world the browser holds, and the ground drawn from it - or
+     * refused with why, the canvas as it was.
+     */
+    async loadIntoCanvas() {
+        const chosen = await this.chooseEnvironmentFile();
+        if (!chosen || !buildModeDrawing(this.builder)) return;
+        if (chosen.refused) {
+            setFileStatus(this.builder, `could not load ${chosen.name}: ${chosen.refused}`, { refused: true });
+            this.syncOverlays();
+            return;
+        }
+        if (!loadCanvas(this.builder, chosen.loaded.world, chosen.loaded.name)) return;
+        const kept = this.adoptLoadedWorld(chosen.loaded);
+        this.draftHolder = null;
+        this.showCanvas(chosen.loaded.base);
+        setFileStatus(this.builder, `loaded ${chosen.loaded.name}${kept ? '' : ' - too large to keep after a reload'}`);
+        this.syncOverlays();
+    }
+
+    /** The name typed on SAVE / LOAD's panel, taken as the one a save writes the world under. */
+    onDockText(id, text) {
+        if (id === FILES_NAME_FIELD && setSaveName(this.builder, text)) this.syncDock();
     }
 
     // --- The builder's settings ------------------------------------------
@@ -2085,6 +2293,7 @@ class FlightSimulator {
         // settings now hold: the canvas's own, or for a canvas they do not
         // offer, the one they held - which the build is kept under until
         // another is chosen there.
+        chooseLoadedWorld(this.settings, false);
         chooseSetting(this.settings, environment);
         keepBuiltWorld(this.editor, environment, runwayWanted(startSettings(this.settings)), placements,
             currentEnvironment(this.settings), world);
@@ -3574,6 +3783,17 @@ class FlightSimulator {
             return;
         }
 
+        // SAVE / LOAD's two answers, worked from the press - which a file
+        // dialog needs.
+        if (id === DOCK_SAVE_ENVIRONMENT.id) {
+            this.saveEnvironmentFromBuilder();
+            return;
+        }
+        if (id === DOCK_LOAD_ENVIRONMENT.id) {
+            this.loadEnvironmentFromBuilder();
+            return;
+        }
+
         // Extrude's one button: the region lifted - and the ground drawn with
         // it - the surfaces opened, or come back from.
         if (id === EXTRUDE_STAGE_ACTION) {
@@ -3771,6 +3991,10 @@ class FlightSimulator {
      * a drag or a held key from moving the view behind it.
      */
     confirmOpened() {
+        // Each question has its own buttons - replacing the built world has no
+        // NO - so the menu is put on the ones this one is answered by.
+        setMenuEntries(this.confirmState, confirmEntries(buildConfirm(this.builder)));
+        this.confirmMenu.rebuild(this.confirmState);
         resetSelection(this.confirmState);
         this.endCanvasDrag();
         this.endGumballDrag();
@@ -3831,6 +4055,10 @@ class FlightSimulator {
         if (answered.leave) {
             const changed = answered.keep && this.saveBuiltWorld(answered.environment, answered.placements, answered.world);
             this.leaveBuilder(changed);
+        } else if (answered.load) {
+            // `YES` on REPLACE THE BUILT WORLD is the press the file dialog
+            // opens from.
+            this.loadIntoCanvas();
         } else if (answered.settled) {
             this.draftHolder = null;
             this.redrawCanvas();

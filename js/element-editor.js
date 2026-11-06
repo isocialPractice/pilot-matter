@@ -261,6 +261,20 @@ export function keepBuiltWorld(
 }
 
 /**
+ * Lets go of what the builder kept, and of the world it was kept under, so the
+ * next `setEditorWorld` puts the editor on the settings' world afresh - its
+ * preset's rows, nothing built - even the world the build was made on. Which is
+ * what choosing a preset over a world loaded from a file asks: that preset as
+ * it is.
+ */
+export function releaseBuiltWorld(state) {
+    state.built = [];
+    state.chosen = null;
+    state.runway = null;
+    return state;
+}
+
+/**
  * What the builder kept on a world, as a copy, and nothing for any other world
  * - which is what a canvas opened on that world starts with already committed.
  */

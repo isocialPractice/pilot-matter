@@ -207,6 +207,12 @@ its own, and the reference list is written from it.
 Five more are built for the modes and kept out of the panel: `OPEN COUNTRY`,
 `LOOP VALLEY`, `BACK COUNTRY`, `CANYON REACH` and `SURVEY COUNTRY`.
 
+Under the worlds, `LOAD ENVIRONMENT…` opens a saved environment file, whose
+world joins the list under its own name and is flown, and `SAVE ENVIRONMENT…`
+writes the world as it would be flown to `<name>.pilot-matter.json`. A refused
+file says why and changes nothing. The browser keeps the last world loaded
+across a reload. Neither row is offered while a game mode runs.
+
 ## Elements
 
 | Element | Configured through |

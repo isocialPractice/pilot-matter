@@ -5108,3 +5108,47 @@ still be found by name.
     lost the height it was flying at - the aircraft is now not flown or
     measured while a canvas is open.
   - From: Interactive Build Mode
+- [x] **Build mode controls help**: the builder's control list, grown by each
+  item as it added a binding, carried into the docs and the cheat sheet beside
+  the flight's and held to the code there the way the flight's is
+  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
+    `js/controls-help.js` names every tool's bindings and `O - Builder
+    Settings`, each held by `test/controls-help.test.js` to a key a builder
+    handler reads; the cheat sheet's builder table was written by hand
+    beside it. What is left is the docs page and the cheat sheet read from
+    the list and held to it.
+  - **Settled**: `buildHelpLines` hands each line's `input` and `action`
+    beside its text, and the controls page, `docs/cheatsheet.html` and
+    `CHEATSHEET.md` carry the list as a table, `builder-control-list` on the
+    two pages and `### The control list` in the markdown, held by
+    `test/controls-help.test.js` to the list exactly - every line in its
+    order, nothing more - so a binding added, renamed or taken off fails
+    each document until it follows.
+  - From: Interactive Build Mode
+- [x] **Colours the fog can reach**: a patch of built ground seen saturated
+  through fog that hides everything around it, measured in Chromium before
+  anything is changed, fixed where the colour is made, with the ground's colour
+  attribute held to 0 to 1 as a backstop and every vertex of every preset and
+  of the measured build tested to lie in it
+  - **Settled**: measured first, and the colours were not out of range.
+    Every vertex colour of every build tried - water, extrusions, snow and
+    paint in five orders, pairs straddling every seam, the water animating
+    over several frames - lay in 0 to 1. The patch was the colour as
+    interpolated at the pixel: with antialiasing on, a pixel the edge of a
+    triangle crosses is shaded once at its middle, which can lie outside the
+    triangle, and there the colour is carried on past the triangle's corners.
+    Far off, the ground is nearly edge-on and its triangles slivers, so a
+    channel a saturated paint holds near 0 came out below it; the frame's
+    sRGB encoding raised that to a fractional power, which the shader the
+    browser hands the GPU on Windows made no number at all, written as 0 after
+    the fog - red 97 where the fog alone gives 194, 8000 units off. The fix
+    holds the interpolated colour to 0 and 1 in the ground's shader:
+    `holdGroundColor` in the new `js/ground-material.js`, a string edit on
+    three's `color_fragment` chunk, used by the flight's ground and the Matter
+    API's. The attribute copy is not clamped, never having been out of range;
+    instead every world's generated colours, and the measured build's, are
+    tested to lie in 0 to 1, since the held shader would hide a generator
+    that broke that. It reopens no archived item: the ground was drawn this
+    way from the start, and a saturated paint was the first colour to show
+    it.
+  - From: Post Interactive Build

@@ -53,14 +53,31 @@ export const SETTINGS_CLOSE_KEYS = ['Escape', 'Backspace'];
 // setting can be changed without first pausing to go looking for it.
 export const SETTINGS_OPEN_KEYS = ['KeyO'];
 
+// The world a file loaded from the pilot's computer brought, which the panel
+// lists after the presets under its own name for as long as it is the one the
+// browser keeps. Its id is no preset's, so it can be told from every one.
+export const LOADED_ENVIRONMENT_ID = 'loaded';
+
+// The two rows that end the worlds: a saved world opened from a file, and the
+// world as it would be flown written to one. Each is a verb and an object, and
+// the ellipsis that says a file dialog comes next.
+export const LOAD_ENVIRONMENT_ID    = 'loadEnvironment';
+export const LOAD_ENVIRONMENT_LABEL = 'LOAD ENVIRONMENT…';
+export const LOAD_ENVIRONMENT_NOTE  = 'open a saved environment file';
+export const SAVE_ENVIRONMENT_ID    = 'saveEnvironment';
+export const SAVE_ENVIRONMENT_LABEL = 'SAVE ENVIRONMENT…';
+export const SAVE_ENVIRONMENT_NOTE  = 'write the world as it would be flown to a file';
+
 // What an entry in the panel is: a world, a value with settings of its own, one
 // of a set of conditions only one of which can be in force, something that is
-// simply on or off, a screen it opens, or the way out.
+// simply on or off, a screen it opens, a file it reads or writes, or the way
+// out.
 export const ENVIRONMENT_ENTRY = 'environment';
 export const OPTION_ENTRY      = 'option';
 export const CHOICE_ENTRY      = 'choice';
 export const TOGGLE_ENTRY      = 'toggle';
 export const SCREEN_ENTRY      = 'screen';
+export const FILE_ENTRY        = 'file';
 export const BACK_ENTRY        = 'back';
 
 // Which heading an option is drawn under. The cursor walks every option as one
@@ -68,6 +85,8 @@ export const BACK_ENTRY        = 'back';
 export const START_GROUP   = 'start';
 export const OPTION_GROUP  = 'options';
 export const BUILDER_GROUP = 'builder';
+// The two file rows are drawn under the worlds, which they act on.
+export const FILE_GROUP    = 'files';
 
 // The options by name, so what a setting drives is looked up by an id both
 // sides agree on rather than by a string typed twice.
@@ -260,7 +279,10 @@ function clamp(value, low, high) {
 }
 
 export function defaultSettings(options = SETTINGS_OPTIONS) {
-    const settings = { environment: DEFAULT_ENVIRONMENT_ID };
+    // `loaded` is whether the world a file brought is the one chosen. It is
+    // held beside the environment rather than in its place, so the environment
+    // is always one of the presets and every reader of it can draw it.
+    const settings = { environment: DEFAULT_ENVIRONMENT_ID, loaded: false };
     for (const option of options) settings[option.id] = option.default;
     return settings;
 }
@@ -280,6 +302,7 @@ export function readSettings(storage, options = SETTINGS_OPTIONS) {
         if (!stored || typeof stored !== 'object') return settings;
 
         if (isEnvironmentId(stored.environment)) settings.environment = stored.environment;
+        settings.loaded = stored.loaded === true;
         for (const option of options) {
             if (isOptionValue(option.id, stored[option.id], options)) {
                 settings[option.id] = stored[option.id];
@@ -377,7 +400,7 @@ function optionEntries(option, options) {
  * filtered by group: a row drawn under the options while it is walked after
  * the builder's would be drawn above a row it comes after.
  */
-export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_OPTIONS) {
+export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_OPTIONS, { loaded = null, files = true } = {}) {
     return [
         ...environments.map(environment => ({
             kind: ENVIRONMENT_ENTRY,
@@ -386,6 +409,21 @@ export function settingsEntries(environments = ENVIRONMENTS, options = SETTINGS_
             note: environment.description,
             current: false
         })),
+        // The world a file brought, after the presets, under its own name.
+        ...(loaded ? [{
+            kind: ENVIRONMENT_ENTRY,
+            id: LOADED_ENVIRONMENT_ID,
+            label: loaded.label,
+            note: loaded.note,
+            current: false
+        }] : []),
+        // Load first and save second, as the panel's art orders them, under
+        // the worlds they act on. Not while a game mode is running, which
+        // brings its own world - the same reason the builder's entry goes.
+        ...(files ? [
+            { kind: FILE_ENTRY, group: FILE_GROUP, id: LOAD_ENVIRONMENT_ID, label: LOAD_ENVIRONMENT_LABEL, note: LOAD_ENVIRONMENT_NOTE, current: false },
+            { kind: FILE_ENTRY, group: FILE_GROUP, id: SAVE_ENVIRONMENT_ID, label: SAVE_ENVIRONMENT_LABEL, note: SAVE_ENVIRONMENT_NOTE, current: false }
+        ] : []),
         ...options.flatMap(option => optionEntries(option, options)),
         // A row that opens a screen rather than holding a value. It stays on
         // the panel while a game mode is running: the builder's settings open
@@ -431,22 +469,85 @@ export function optionEntryText(entry) {
     return `${entry.label}  ${OPTION_LEFT_MARK} ${entry.valueLabel} ${OPTION_RIGHT_MARK}`;
 }
 
-export function createSettingsState(storage = null, environments = ENVIRONMENTS, options = SETTINGS_OPTIONS) {
+export function createSettingsState(storage = null, environments = ENVIRONMENTS, options = SETTINGS_OPTIONS, worlds = {}) {
     const state = {
         open: false,
         storage,
         options,
+        environments,
         values: readSettings(storage, options),
+        // The world a file brought - `{ label, note }` - or null for none, and
+        // whether the two file rows are on the panel. See `setSettingsWorlds`.
+        loaded: worlds.loaded ?? null,
+        files: worlds.files !== false,
+        // What the last file row pressed came to, written where its note is.
+        fileNotice: null,
         // Which row is being typed into, what has been typed, and the range a
         // refused press was measured against. Not remembered between sessions:
         // a panel that opened half way through a figure would read the first
         // digit pressed at it as the rest of one.
         typing: null,
-        entries: settingsEntries(environments, options)
+        entries: settingsEntries(environments, options, { loaded: worlds.loaded ?? null, files: worlds.files !== false })
     };
+
+    // A world chosen last session that the browser no longer keeps is no
+    // world to fly, so the choice goes back to the preset it was beside.
+    if (state.loaded == null) state.values.loaded = false;
 
     syncSettingsEntries(state);
     return state;
+}
+
+/**
+ * Puts the panel on the worlds it lists now: the world a file brought, or
+ * none - `{ label, note }` - and whether the two file rows are drawn, which
+ * they are not while a game mode is running. The entries are made again, so a
+ * caller drawing them has to draw them again too.
+ *
+ * With no loaded world, the choice of one goes back to the preset beside it.
+ */
+export function setSettingsWorlds(state, { loaded = state.loaded, files = state.files } = {}) {
+    state.loaded = loaded ?? null;
+    state.files = files !== false;
+    state.entries = settingsEntries(state.environments ?? ENVIRONMENTS, state.options ?? SETTINGS_OPTIONS, { loaded: state.loaded, files: state.files });
+    if (state.loaded == null && state.values.loaded) {
+        state.values.loaded = false;
+        writeSettings(state.storage, state.values);
+    }
+    syncSettingsEntries(state);
+    return state;
+}
+
+/** True while the world a file brought is the one chosen - and so the one flown. */
+export function loadedChosen(state) {
+    return state?.values?.loaded === true && state.loaded != null;
+}
+
+/**
+ * Chooses the world a file brought, or lets go of it, and stores the choice.
+ * `base` is the preset it was built on, which the settings then hold beside
+ * it - for one the panel offers - so the environment is always a preset.
+ *
+ * Returns true when the choice changed.
+ */
+export function chooseLoadedWorld(state, chosen = true, base = null) {
+    const wanted = chosen === true && state.loaded != null;
+    if (wanted && isEnvironmentId(base)) state.values.environment = base;
+    const changed = state.values.loaded !== wanted;
+    state.values.loaded = wanted;
+    writeSettings(state.storage, state.values);
+    syncSettingsEntries(state);
+    return changed;
+}
+
+/**
+ * What a file row pressed came to - a file saved, a world loaded, or why one
+ * was refused - written in place of the row's note until the next is pressed,
+ * so it is read rather than missed. `refused` marks a refusal.
+ */
+export function setFileNotice(state, id, text, { refused = false } = {}) {
+    state.fileNotice = text ? { id, text: String(text), refused: refused === true } : null;
+    syncSettingsEntries(state);
 }
 
 /**
@@ -457,8 +558,17 @@ export function syncSettingsEntries(state) {
     const options = state.options ?? SETTINGS_OPTIONS;
     const start   = startSettings(state);
 
+    const loaded = loadedChosen(state);
     for (const entry of state.entries) {
-        entry.current = entry.kind === ENVIRONMENT_ENTRY && entry.id === state.values.environment;
+        entry.current = entry.kind === ENVIRONMENT_ENTRY
+            && (entry.id === LOADED_ENVIRONMENT_ID ? loaded : !loaded && entry.id === state.values.environment);
+
+        // A file row reads what it last came to, in place of what it does.
+        if (entry.kind === FILE_ENTRY) {
+            const notice = state.fileNotice?.id === entry.id ? state.fileNotice : null;
+            entry.note = notice ? notice.text : entry.id === LOAD_ENVIRONMENT_ID ? LOAD_ENVIRONMENT_NOTE : SAVE_ENVIRONMENT_NOTE;
+            entry.refused = notice?.refused === true;
+        }
 
         if (entry.kind === OPTION_ENTRY) {
             entry.value = state.values[entry.id];
@@ -627,7 +737,31 @@ export function chooseSetting(state, id, step = 1) {
     // its next setting - the same thing the arrow keys do to it.
     if (settingsOption(id, state.options ?? SETTINGS_OPTIONS)) return adjustSetting(state, id, step);
 
-    if (!isEnvironmentId(id) || state.values.environment === id) return null;
+    // A file row does its work outside the panel - a file dialog, a download -
+    // and answers as itself, the panel staying open for what it comes to.
+    if (id === LOAD_ENVIRONMENT_ID || id === SAVE_ENVIRONMENT_ID) {
+        return settingsEntry(state, id) ? id : null;
+    }
+
+    // The world a file brought: chosen, or already the one being flown.
+    if (id === LOADED_ENVIRONMENT_ID) {
+        if (state.loaded == null || loadedChosen(state)) return null;
+        return LOADED_ENVIRONMENT_ID;
+    }
+
+    if (!isEnvironmentId(id)) return null;
+
+    // A preset chosen over the world a file brought is a different world, even
+    // the one it was built on - that preset as it is, without what was built.
+    if (loadedChosen(state)) {
+        state.values.loaded = false;
+        state.values.environment = id;
+        writeSettings(state.storage, state.values);
+        syncSettingsEntries(state);
+        return id;
+    }
+
+    if (state.values.environment === id) return null;
 
     // A world answers as itself rather than as the setting holding it, because
     // what a caller does about a new world depends on which world it is.

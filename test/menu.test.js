@@ -739,3 +739,30 @@ test('crossing onto a row moves the cursor and steps nothing', () => {
     assert.deepEqual(crossed, [[2, false, undefined]],
         'a pointer passing over a row is not a press on either half of it');
 });
+
+// A file row says what it came to in place of what it does, under a row that
+// stays, so the note is written again whenever the list is drawn - and a
+// refusal is marked to be drawn as one.
+test('a row\'s note is drawn again when it changes, and a refusal is marked', () => {
+    const list = fakeList();
+    const state = createMenuState([
+        { id: 'load', label: 'LOAD', note: 'open a file' },
+        { id: 'save', label: 'SAVE' }
+    ]);
+    const menu = new MenuList(list, state);
+    assert.equal(list.children[0].dataset.note, 'open a file');
+
+    state.entries[0].note = 'could not load: the file is not JSON';
+    state.entries[0].refused = true;
+    state.entries[1].note = 'saved';
+    menu.render(state);
+    assert.equal(list.children[0].dataset.note, 'could not load: the file is not JSON');
+    assert.equal(list.children[0].classes.has('refused'), true);
+    assert.equal(list.children[1].dataset.note, 'saved', 'a note a row had none of is added');
+
+    delete state.entries[1].note;
+    state.entries[0].refused = false;
+    menu.render(state);
+    assert.equal('note' in list.children[1].dataset, false, 'and one taken off is taken off');
+    assert.equal(list.children[0].classes.has('refused'), false);
+});

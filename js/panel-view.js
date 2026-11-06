@@ -86,6 +86,8 @@ function shapeOf(content) {
         ...(content.nudges ?? []).map(nudge => `nudge:${nudge.id}`),
         ...(content.sections ?? []).flatMap(section => [
             `section:${section.id}:${section.heading}:${section.open ? 'open' : 'shut'}`,
+            ...(section.text ? [`text:${section.id}/${section.text.id}`] : []),
+            ...('status' in section ? [`status:${section.id}`] : []),
             ...(section.shapes ?? []).flatMap(row => row.tools.map(tool => `shape:${tool.id}`)),
             ...(section.rows ?? []).map(rowKey)
         ]),
@@ -100,8 +102,9 @@ export class PanelView {
      * `onStep(entry, step, coarse)`, `onType(entry, figure, field)`,
      * `onNudge(id, sign)`, `onAction(id)`, `onFold(id)` for a section's
      * heading pressed, `onShape(id)` for one of a mode's own tools,
-     * `onColor(entry, rgb)` for a colour chosen at a colour row and
-     * `onDropper(entry)` for its eye dropper pressed.
+     * `onColor(entry, rgb)` for a colour chosen at a colour row,
+     * `onDropper(entry)` for its eye dropper pressed, and
+     * `onText(id, text, section)` for a section's line of text let go of.
      */
     constructor(root, handlers = {}) {
         this.root     = root;
@@ -216,6 +219,8 @@ export class PanelView {
             this.fields.append(heading);
             this.drawShapes(section.shapes);
             for (const entry of section.rows ?? []) this.drawRow(entry);
+            if (section.text) this.drawText(section);
+            if ('status' in section) this.drawStatus(section);
         }
 
         for (const action of content.actions ?? []) {
@@ -226,6 +231,49 @@ export class PanelView {
             this.answers.append(answer);
         }
         this.answers.style.display = (content.actions ?? []).length ? 'flex' : 'none';
+    }
+
+    /**
+     * A section's one line of text to type - the name SAVE / LOAD writes a
+     * world under - as a label and a field, the field showing what it will
+     * be written under until something is typed.
+     */
+    drawText(section) {
+        const text = section.text;
+        const line = document.createElement('label');
+        line.className = 'dock-row dock-text-row';
+
+        const name = document.createElement('span');
+        name.className = 'dock-label';
+        name.textContent = text.label;
+
+        const field = document.createElement('input');
+        field.type = 'text';
+        field.className = 'dock-value dock-text';
+        field.dataset.text = text.id;
+        field.dataset.section = section.id;
+        field.maxLength = text.max ?? 60;
+        field.placeholder = text.placeholder ?? '';
+        field.spellcheck = false;
+        field.autocomplete = 'off';
+
+        line.append(name, field);
+        this.fields.append(line);
+        this.drawn.set(`text:${section.id}/${text.id}`, { field });
+    }
+
+    /**
+     * A section's line saying what its last answer came to - a file saved, a
+     * world loaded, or why one was refused - read out as it changes, and held
+     * until the next, so it is not a notice that is gone before it is read.
+     */
+    drawStatus(section) {
+        const status = document.createElement('p');
+        status.className = 'dock-status';
+        status.setAttribute('role', 'status');
+        status.setAttribute('aria-live', 'polite');
+        this.fields.append(status);
+        this.drawn.set(`status:${section.id}`, { status });
     }
 
     /** Draws rows of tiles, one to each row the artwork groups them into. A tile with no art to it is a card: its name alone. */
@@ -424,6 +472,20 @@ export class PanelView {
             }
         }
 
+        for (const section of content.sections ?? []) {
+            const text = section.text ? this.drawn.get(`text:${section.id}/${section.text.id}`) : null;
+            if (text && document.activeElement !== text.field) {
+                text.field.value = section.text.value ?? '';
+                text.field.placeholder = section.text.placeholder ?? '';
+            }
+            const status = this.drawn.get(`status:${section.id}`);
+            if (status) {
+                const said = section.status?.text ?? '';
+                if (status.status.textContent !== said) status.status.textContent = said;
+                status.status.classList.toggle('refused', section.status?.refused === true);
+            }
+        }
+
         for (const entry of dockRows(content)) {
             const drawn = this.drawn.get(rowKey(entry));
             if (!drawn) continue;
@@ -552,6 +614,12 @@ export class PanelView {
         const field = event.target;
         if (!(field instanceof HTMLInputElement) || this.content == null) return;
         if (field.type === 'range') return;
+
+        // A section's line of text, taken as it stands when it is let go of.
+        if (field.classList.contains('dock-text')) {
+            this.handlers.onText?.(field.dataset.text, field.value, field.dataset.section);
+            return;
+        }
 
         // A hex figure typed at a colour row: taken when it is a colour, and
         // refused - the field keeping what was typed - when it is not.

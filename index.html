@@ -990,6 +990,13 @@
             opacity: 0.72;
         }
 
+        /* A file row that could not do what it was pressed for says why in the
+           amber the instruments warn in, whole rather than dimmed. */
+        #settings-menu li.refused::after {
+            color: #ffb000;
+            opacity: 1;
+        }
+
         /* The canvases are cards rather than rows: two columns of them, each a
            picture of the ground it starts from over a label band and the line
            that says what that ground is. The picture is a render the builder
@@ -1490,6 +1497,34 @@
             .dock-spin button {
                 font-size: 11px;
             }
+        }
+
+        /* SAVE / LOAD's name: a line of text across the readings' columns, read
+           from its start rather than right-aligned as a figure is. */
+        .dock-text-row .dock-text {
+            grid-column: 2 / -1;
+            min-height: 24px;
+            text-align: left;
+        }
+
+        .dock-text::placeholder {
+            color: rgba(240, 242, 243, 0.45);
+        }
+
+        /* What the last save or load came to, held under the answers until the
+           next one, and a refusal in the amber the instruments warn in. */
+        .dock-status {
+            min-height: 1.3em;
+            margin: 8px 0 2px;
+            color: #c9d1d6;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
+        }
+
+        .dock-status.refused {
+            color: #ffb000;
         }
 
         /* A switch's or a choice's reading: a box the width of a field, between

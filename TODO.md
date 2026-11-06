@@ -11,15 +11,20 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
-  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
-  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
-  first, and each action's outcome written under its answer
+- [ ] **Start point**: one point and heading per environment, placed by a
+  click with Insert Plane live, turned by its arrow, written out as typed rows,
+  saved with the world, and flown from - over it at its height above the ground
+  when flying, on the runway nearest it for a takeoff - with the settings rows
+  it overrides locked
   - From: Post Interactive Build
-- [ ] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
-  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
-  the pause menu, a loaded world becoming a chosen entry of the list that is
-  kept across a reload, and both rows gone while a game mode runs
+- [ ] **Pre-built planes**: five original planes drawn from primitives as the
+  trainer is, each with the flight figures the aircraft already takes, each
+  leaving the ground within BASIC RUNWAY, swapped between flights by
+  `setPlane`, the trainer the default
+  - From: Post Interactive Build
+- [ ] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
+  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
+  the world and flown on it
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -102,14 +107,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
-  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
-  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
-  first, and each action's outcome written under its answer
-- [ ] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
-  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
-  the pause menu, a loaded world becoming a chosen entry of the list that is
-  kept across a reload, and both rows gone while a game mode runs
 - [ ] **Start point**: one point and heading per environment, placed by a
   click with Insert Plane live, turned by its arrow, written out as typed rows,
   saved with the world, and flown from - over it at its height above the ground
@@ -207,52 +204,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 381 earlier items in `TODO-archive.md`, newest last.
+> 383 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Build mode controls help**: the builder's control list, grown by each
-  item as it added a binding, carried into the docs and the cheat sheet beside
-  the flight's and held to the code there the way the flight's is
-  - **The list is whole.** Since `1.0.0-alpha.1.55.0` `BUILD_HELP_ROWS` in
-    `js/controls-help.js` names every tool's bindings and `O - Builder
-    Settings`, each held by `test/controls-help.test.js` to a key a builder
-    handler reads; the cheat sheet's builder table was written by hand
-    beside it. What is left is the docs page and the cheat sheet read from
-    the list and held to it.
-  - **Settled**: `buildHelpLines` hands each line's `input` and `action`
-    beside its text, and the controls page, `docs/cheatsheet.html` and
-    `CHEATSHEET.md` carry the list as a table, `builder-control-list` on the
-    two pages and `### The control list` in the markdown, held by
-    `test/controls-help.test.js` to the list exactly - every line in its
-    order, nothing more - so a binding added, renamed or taken off fails
-    each document until it follows.
-  - From: Interactive Build Mode
-- [x] **Colours the fog can reach**: a patch of built ground seen saturated
-  through fog that hides everything around it, measured in Chromium before
-  anything is changed, fixed where the colour is made, with the ground's colour
-  attribute held to 0 to 1 as a backstop and every vertex of every preset and
-  of the measured build tested to lie in it
-  - **Settled**: measured first, and the colours were not out of range.
-    Every vertex colour of every build tried - water, extrusions, snow and
-    paint in five orders, pairs straddling every seam, the water animating
-    over several frames - lay in 0 to 1. The patch was the colour as
-    interpolated at the pixel: with antialiasing on, a pixel the edge of a
-    triangle crosses is shaded once at its middle, which can lie outside the
-    triangle, and there the colour is carried on past the triangle's corners.
-    Far off, the ground is nearly edge-on and its triangles slivers, so a
-    channel a saturated paint holds near 0 came out below it; the frame's
-    sRGB encoding raised that to a fractional power, which the shader the
-    browser hands the GPU on Windows made no number at all, written as 0 after
-    the fog - red 97 where the fog alone gives 194, 8000 units off. The fix
-    holds the interpolated colour to 0 and 1 in the ground's shader:
-    `holdGroundColor` in the new `js/ground-material.js`, a string edit on
-    three's `color_fragment` chunk, used by the flight's ground and the Matter
-    API's. The attribute copy is not clamped, never having been out of range;
-    instead every world's generated colours, and the measured build's, are
-    tested to lie in 0 to 1, since the held shader would hide a generator
-    that broke that. It reopens no archived item: the ground was drawn this
-    way from the start, and a saturated paint was the first colour to show
-    it.
-  - From: Post Interactive Build
 - [x] **Turn with the right button**: a right drag orbiting the view in every
   tool and in Select, as the camera override from inside a tool, with `shift`
   and a right drag still panning, a right click that did not travel still
@@ -371,4 +324,42 @@ how the simulator got here rather than as a list still to be worked.
     the top of a file and an element's row may not. Measured in Chromium, a
     world with every kind of placement reads back the world it was and draws
     the same ground.
+  - From: Post Interactive Build
+- [x] **Save and load in the builder**: the SAVE / LOAD tool's dock, an
+  ENVIRONMENT section with a name, `SAVE ENVIRONMENT…` and `LOAD ENVIRONMENT…`,
+  a load that replaces a committed world asking `REPLACE THE BUILT WORLD`
+  first, and each action's outcome written under its answer
+  - **Settled**: SAVE / LOAD is the `files` tool, now built, and its dock is
+    `DOCK_FILES`: under `ENVIRONMENT` a `NAME` - the environment's own as its
+    placeholder until one is typed - and a status line, over `LOAD
+    ENVIRONMENT…` and `SAVE ENVIRONMENT…`. A save writes `sessionWorld` - the
+    committed placements and the world's rows - through `js/environment-io.js`,
+    which asks where through the browser's save dialog where there is one and
+    downloads elsewhere; a dialog closed says `not saved`. A load over a build -
+    `replacesBuild`, a placement or the world's rows changed since the canvas
+    opened - asks `REPLACE THE BUILT WORLD` with `YES` and `CANCEL` only,
+    `confirmEntries` giving each question its buttons, and the file dialog
+    opens from `YES`; over nothing it opens at once. `loadCanvas` opens the
+    file's world in place of the canvas, SAVE / LOAD still live and the file's
+    name carried, and the file becomes the world the browser keeps. A refused
+    file says why under the name, the canvas as it was.
+  - From: Post Interactive Build
+- [x] **Save and load from Settings**: `LOAD ENVIRONMENT…` and
+  `SAVE ENVIRONMENT…` ending the ENVIRONMENT group from the title screen and
+  the pause menu, a loaded world becoming a chosen entry of the list that is
+  kept across a reload, and both rows gone while a game mode runs
+  - **Settled**: the two rows are `FILE_ENTRY`s in a `FILE_GROUP` of their
+    own, drawn under the worlds and walked after them, and gone while a game
+    mode runs. The loaded world is `js/loaded-world.js`: the last file's text,
+    kept under `pilot-matter.environment` and read back through the format each
+    time. The settings list it after the presets under its name, and its
+    choice is `values.loaded` beside the environment, which stays a preset -
+    the one it was built on, where the settings offer it - so every reader of
+    the environment can still draw it; it is kept on the editor as a build is,
+    through `keepBuiltWorld`. A preset chosen over it, even its own, is that
+    preset as it is, through the new `releaseBuiltWorld`; a build kept from the
+    builder lets go of it too. A row says what it came to in place of its note,
+    which needed `MenuList.render` to draw a changed note again, and a refusal
+    is drawn in amber. A save writes the world the settings would fly, under
+    the loaded world's name when that is the one chosen.
   - From: Post Interactive Build

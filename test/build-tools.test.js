@@ -86,11 +86,12 @@ test('the palette draws only the tools that work', () => {
     for (const tool of paletteTools()) assert.ok(isBuiltTool(tool.id));
 });
 
-test('today the palette is the tour\'s twelve, the later three joining as they work', () => {
-    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL]);
-    assert.deepEqual(BUILD_TOOL_IDS.filter(id => !BUILT_TOOLS.includes(id)), ['city', 'plane', FILES_TOOL],
-        'Insert City, Insert Plane and SAVE / LOAD declared, and drawn once each works');
-    for (const id of ['city', 'plane', FILES_TOOL]) assert.equal(isChoosableTool(id), false, `${id} cannot be chosen yet`);
+test('today the palette is the tour\'s twelve and SAVE / LOAD, Insert City and Insert Plane joining as they work', () => {
+    assert.deepEqual(BUILT_TOOLS, [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL, FILES_TOOL]);
+    assert.deepEqual(BUILD_TOOL_IDS.filter(id => !BUILT_TOOLS.includes(id)), ['city', 'plane'],
+        'Insert City and Insert Plane declared, and drawn once each works');
+    for (const id of ['city', 'plane']) assert.equal(isChoosableTool(id), false, `${id} cannot be chosen yet`);
+    assert.equal(isChoosableTool(FILES_TOOL), true, 'and SAVE / LOAD is a tool a canvas can be worked with: its panel is the files');
     assert.equal(isChoosableTool('mountain'), true, 'Mountain is a mode a canvas can be worked with');
     assert.equal(isChoosableTool('lasso'), true, 'and so is the lasso, which draws the selection');
     assert.equal(isChoosableTool('water'), true, 'and the cover tool, pointed at any of its four');

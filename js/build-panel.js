@@ -23,7 +23,8 @@
 import {
     buildModeDrawing, buildModeTool, draftPending, buildDraft, builtPlacements,
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
-    brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface
+    brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface,
+    saveName, fileStatus
 } from './build-mode.js';
 import {
     EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, EXTRUDE_BACK, extrudeRows, extrudeTool,
@@ -33,8 +34,9 @@ import { isGroup, groupConfig, GROUP_RANGES, offeredTemplates, runwayTemplate } 
 import { LASSO_HEADING, lassoRows, lassoTool, lassoToolArt, lassoToolName } from './lasso.js';
 import {
     BUILD_TOOLS, SELECT_TOOL, toolForElement, derivedValues, buildTool, isCoverTool, isPaintTool, isEraseTool,
-    isExtrudeTool, isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate
+    isExtrudeTool, isStrokeTool, toolRanges, COVER_BRUSH, PAINT_BRUSH, insertsTemplate, isPaletteBar
 } from './build-tools.js';
+import { defaultEnvironmentName, ENVIRONMENT_NAME_LIMIT } from './environment-file.js';
 import { isErase, ERASE_RANGES } from './environment/erase.js';
 
 /** The palette's lasso tile, whose panel is its own ten tools rather than an element's ranges. */
@@ -72,6 +74,21 @@ export const DOCK_TOOL = 'tool';
 /** What the dock shows with Extrude live: its shapes, and the rows and the one button of the stage its draft is at. */
 export const DOCK_EXTRUDE = 'extrude';
 
+/** What the dock shows with SAVE / LOAD live: the world's name, its two answers, and what the last of them came to. */
+export const DOCK_FILES = 'files';
+
+/**
+ * SAVE / LOAD's two answers, load first and save second as the art orders
+ * them, each a verb, an object and the ellipsis that says a file dialog comes
+ * next.
+ */
+export const DOCK_LOAD_ENVIRONMENT = Object.freeze({ id: 'load-environment', label: 'LOAD ENVIRONMENT\u2026' });
+export const DOCK_SAVE_ENVIRONMENT = Object.freeze({ id: 'save-environment', label: 'SAVE ENVIRONMENT\u2026' });
+
+/** SAVE / LOAD's one section, `Save data<file>` and `Load data<file>`, and its name field. */
+export const FILES_SECTION = 'environment';
+export const FILES_NAME_FIELD = 'name';
+
 /**
  * Free Paint's three sections, in the artwork's order, and the ranges each
  * holds: the colour under `COLOR SELECTION`; the brush's tip and edge under
@@ -101,6 +118,43 @@ export function worldSection(index) {
 /** The two answers an edit in hand is settled by, pinned under its rows. */
 export const DOCK_ACCEPT = Object.freeze({ id: 'accept', label: 'ACCEPT' });
 export const DOCK_CANCEL = Object.freeze({ id: 'cancel', label: 'CANCEL' });
+
+/**
+ * SAVE / LOAD's panel: under `ENVIRONMENT`, the name the world is written
+ * under - the environment's own until one is typed - and what the last save
+ * or load came to, with the two answers pinned under it. Nothing on it is a
+ * range: the work is files, started from the answers.
+ */
+function filesContent(state) {
+    const tool = buildTool(buildModeTool(state));
+    return {
+        kind: DOCK_FILES,
+        heading: tool?.heading ?? '',
+        ranges: {},
+        holder: { config: {} },
+        rows: [],
+        nudges: [],
+        actions: [DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT],
+        sections: [{
+            id: FILES_SECTION,
+            kind: DOCK_FILES,
+            heading: 'ENVIRONMENT',
+            folds: false,
+            open: true,
+            ranges: {},
+            holder: { config: {} },
+            rows: [],
+            text: {
+                id: FILES_NAME_FIELD,
+                label: 'NAME',
+                value: saveName(state),
+                placeholder: defaultEnvironmentName(state.environment),
+                max: ENVIRONMENT_NAME_LIMIT
+            },
+            status: fileStatus(state)
+        }]
+    };
+}
 
 /** Select's heading, which is the start tour's own: the camera is what Select edits. */
 export const SELECT_HEADING = BUILD_TOOLS.find(tool => tool.id === SELECT_TOOL).heading;
@@ -290,6 +344,7 @@ function panelContent(state, { camera = null, fov, holder = null, context = {}, 
     if (isPaintTool(buildModeTool(state))) return paintContent(state, holder, context);
     if (isExtrudeTool(buildModeTool(state))) return extrudeContent(state, holder, context, size);
     if (insertsTemplate(buildModeTool(state))) return runwayContent(state, holder, context);
+    if (isPaletteBar(buildModeTool(state))) return filesContent(state);
 
     if (draftPending(state) && !(select && picked)) {
         const draft = buildDraft(state);

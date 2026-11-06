@@ -347,6 +347,15 @@ export class MenuList {
             // An entry something other than the pilot is holding, which is
             // drawn as set rather than as changeable.
             item.classList.toggle('locked', entry?.locked === true);
+            // A note can change under a row that stays - a file row says what
+            // it came to in place of what it does - so it is written again, and
+            // a refusal is marked to be drawn as one.
+            if (entry?.note) {
+                if (item.dataset.note !== entry.note) item.dataset.note = entry.note;
+            } else if ('note' in item.dataset) {
+                delete item.dataset.note;
+            }
+            item.classList.toggle('refused', entry?.refused === true);
         }
 
         // A panel with more entries than a short window can hold scrolls, and a

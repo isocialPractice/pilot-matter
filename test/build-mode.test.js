@@ -9,6 +9,8 @@ import {
     reviseDraft, acceptDraft, cancelDraft, builtPlacements, ACCEPT_EDITS, SAVE_AND_EXIT,
     confirmOpen, buildConfirm, answerConfirm, acceptToolName, dropDraft, placementSeed,
     toolStartValues, CONFIRM_ENTRIES, CONFIRM_HEADINGS, CONFIRM_YES, CONFIRM_NO, CONFIRM_STAY,
+    REPLACE_WORLD, confirmEntries, requestLoad, loadCanvas, replacesBuild, sessionWorld,
+    saveName, setSaveName, fileStatus, setFileStatus,
     selectPlacement, pickedIndex, pickablePlacements, editPending, samePlacement,
     ACCEPTED, CANCELLED,
     BUILDER_LABEL, BUILDER_ENTRY_ID, BUILDER_OPEN_KEYS, PICKER_CLOSE_KEYS, CANVAS_LEAVE_KEYS,
@@ -550,7 +552,9 @@ function withMountainDropped() {
 }
 
 test('a confirm is headed in the artwork\'s words and opens on YES', () => {
-    assert.deepEqual(CONFIRM_HEADINGS, { [ACCEPT_EDITS]: 'ACCEPT EDITS', [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE' });
+    assert.deepEqual(CONFIRM_HEADINGS, {
+        [ACCEPT_EDITS]: 'ACCEPT EDITS', [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE', [REPLACE_WORLD]: 'REPLACE THE BUILT WORLD'
+    });
     assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.id), [CONFIRM_YES, CONFIRM_NO, CONFIRM_STAY],
         'YES first, so Enter on a confirm just opened keeps the work, and CANCEL last, never the default');
     assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.label), ['YES', 'NO', 'CANCEL']);

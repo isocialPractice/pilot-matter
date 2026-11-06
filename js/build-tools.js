@@ -169,7 +169,7 @@ export const BUILD_TOOL_IDS = Object.freeze(BUILD_TOOLS.map(tool => tool.id));
  * elements away through it. Extrude lifts a region drawn from its shapes, or
  * the selection, in stages - see `js/extrude.js`.
  */
-export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL]);
+export const BUILT_TOOLS = Object.freeze([SELECT_TOOL, 'lasso', 'mountain', 'grass', 'sand', 'water', 'snow', 'runway', 'paint', 'erase', 'extrude', ACCEPT_TOOL, FILES_TOOL]);
 
 /** True for one of the builder's tools. */
 export function isBuildTool(id) {

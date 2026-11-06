@@ -2635,7 +2635,8 @@ const terrainSource = readFileSync(fileURLToPath(new URL('../js/terrain.js', imp
  * than a `function` keyword.
  */
 function methodBody(source, name) {
-    const opened = source.search(new RegExp(`^\\s+${name}\\([^)]*\\)\\s*\\{`, 'm'));
+    // A method may be `async`, which is still the method its name says.
+    const opened = source.search(new RegExp(`^\\s+(?:async\\s+)?${name}\\([^)]*\\)\\s*\\{`, 'm'));
     if (opened < 0) return null;
 
     const from = source.indexOf('{', opened);
@@ -4900,4 +4901,123 @@ test('while a canvas is open the aircraft is neither flown nor measured against 
         'a frozen frame still meets the ground, and the canvas\'s is not the ground under the flight');
     assert.doesNotMatch(frame.replace('if (!canvas) this.aircraft.update(dt, groundH);', ''), /this\.aircraft\.update\(/,
         'and nothing else flies it there');
+});
+
+// --- Saving and loading a world ----------------------------------------------------------
+
+test('the settings draw the two file rows under the worlds, and keep them off the options', () => {
+    const menus = methodBody(mainSource, 'constructor') ?? mainSource;
+    assert.match(mainSource, /document\.getElementById\('settings-menu'\), this\.settingsState,\s*entry => entry\.kind === ENVIRONMENT_ENTRY \|\| entry\.group === FILE_GROUP/);
+    assert.match(mainSource, /entry => entry\.kind !== ENVIRONMENT_ENTRY && entry\.group !== START_GROUP && entry\.group !== BUILDER_GROUP && entry\.group !== FILE_GROUP/);
+    assert.ok(menus);
+});
+
+test('the world a file brought is read before the settings, and kept on the editor when it is the one chosen', () => {
+    const built = mainSource.indexOf('this.loadedWorld = readLoadedWorld(defaultStorage());');
+    const settings = mainSource.indexOf('this.settings = createSettingsState(defaultStorage(), undefined, undefined, { loaded: loadedWorldEntry(this.loadedWorld) });');
+    const editor = mainSource.indexOf('if (loadedChosen(this.settings)) this.keepLoadedWorld(false);');
+    const terrain = mainSource.indexOf('this.terrain = new Terrain(');
+    assert.ok(built >= 0 && built < settings, 'read first, so the settings can list it');
+    assert.ok(settings < editor && editor < terrain, 'and on the editor before the first ground is drawn');
+    assert.match(mainSource, /this\.environmentFileInput\.type = 'file';\s*this\.environmentFileInput\.hidden = true;/, 'one file dialog, never drawn');
+});
+
+test('the panel is put on the worlds it lists each time it opens, the file rows only off a game mode', () => {
+    assert.match(methodBody(mainSource, 'openSettingsPanel'), /openSettings\(this\.settings\);\s*setFileNotice\(this\.settings, null, null\);\s*this\.refreshSettingsWorlds\(\);\s*resetSelection\(this\.settingsState\);/);
+    const refresh = methodBody(mainSource, 'refreshSettingsWorlds');
+    assert.match(refresh, /setSettingsWorlds\(this\.settings, \{ loaded: loadedWorldEntry\(this\.loadedWorld\), files: !runningMode\(this\.run\) \}\);/);
+    assert.match(refresh, /setMenuEntries\(this\.settingsState, this\.settings\.entries\);/);
+    assert.match(refresh, /menu\.rebuild\(this\.settingsState\);/, 'every list drawn again from the entries made');
+});
+
+test('a file row and the loaded world are worked before a choice is applied as a world', () => {
+    const choose = methodBody(mainSource, 'chooseSettingsEntry');
+    const files = choose.indexOf('if (applied === LOAD_ENVIRONMENT_ID) {');
+    const apply = choose.indexOf('this.applySettings();');
+    assert.ok(files >= 0 && files < apply);
+    assert.match(choose, /if \(applied === LOAD_ENVIRONMENT_ID\) \{\s*this\.loadEnvironmentFromSettings\(\);\s*return;\s*\}/);
+    assert.match(choose, /if \(applied === SAVE_ENVIRONMENT_ID\) \{\s*this\.saveEnvironmentFromSettings\(\);\s*return;\s*\}/);
+    assert.match(choose, /if \(applied === LOADED_ENVIRONMENT_ID\) \{\s*this\.chooseLoaded\(\);\s*return;\s*\}/);
+    assert.match(choose, /const loaded  = loadedChosen\(this\.settings\);\s*const applied = chooseSetting\(this\.settings, id, step\);/);
+    assert.match(choose, /if \(loaded && !loadedChosen\(this\.settings\)\) releaseBuiltWorld\(this\.editor\);/,
+        'a preset chosen over the loaded world lets go of what the file built, even on its own preset');
+});
+
+test('the loaded world chosen is kept on the editor as a build and flown as a new world', () => {
+    const chosen = methodBody(mainSource, 'chooseLoaded');
+    assert.match(chosen, /chooseLoadedWorld\(this\.settings, true, this\.loadedWorld\.base\);\s*this\.keepLoadedWorld\(\);\s*this\.applySettings\(\);/);
+    assert.match(methodBody(mainSource, 'keepLoadedWorld'),
+        /keepBuiltWorld\(this\.editor, world\.environment, runwayWanted\(startSettings\(this\.settings\)\), world\.placements,\s*currentEnvironment\(this\.settings\), world\.world\);/);
+    assert.match(methodBody(mainSource, 'saveBuiltWorld'), /chooseLoadedWorld\(this\.settings, false\);\s*chooseSetting\(this\.settings, environment\);/,
+        'a build kept from the builder is the world flown, not the file it may have been opened from');
+});
+
+test('a file loaded from the settings is kept, chosen and said; one refused is said and changes nothing', () => {
+    const load = methodBody(mainSource, 'loadEnvironmentFromSettings');
+    const refused = load.indexOf('if (chosen.refused) {');
+    const adopt = load.indexOf('this.adoptLoadedWorld(chosen.loaded)');
+    assert.ok(refused >= 0 && refused < adopt, 'refused before anything is kept');
+    assert.match(load, /setFileNotice\(this\.settings, LOAD_ENVIRONMENT_ID, `could not load \$\{chosen\.name\}: \$\{chosen\.refused\}`, \{ refused: true \}\);\s*this\.syncOverlays\(\);\s*return;/);
+    assert.match(load, /const kept = this\.adoptLoadedWorld\(chosen\.loaded\);\s*this\.chooseLoaded\(\);/);
+    assert.match(methodBody(mainSource, 'adoptLoadedWorld'), /const kept = writeLoadedWorld\(defaultStorage\(\), loaded\.text\);\s*this\.refreshSettingsWorlds\(\);/);
+
+    const read = methodBody(mainSource, 'chooseEnvironmentFile');
+    assert.match(read, /const picked = await pickEnvironmentFile\(this\.environmentFileInput\);\s*if \(!picked\) return null;/, 'a dialog closed is nothing');
+    assert.match(read, /if \(picked\.tooLarge\) return/);
+    assert.match(read, /const read = loadedWorldOf\(picked\.text\);/);
+});
+
+test('the settings save the world they would fly, under the loaded world\'s name when it is the one chosen', () => {
+    const save = methodBody(mainSource, 'saveEnvironmentFromSettings');
+    assert.match(save, /const environment = flownEnvironment\(this\.editor, currentEnvironment\(this\.settings\)\);/);
+    assert.match(save, /const world = builtWorld\(this\.editor\) \?\? \{ environment, placements: \[\], world: canvasWorld\(this\.editor, environment\) \};/,
+        'the build kept on it, or the preset as it is');
+    assert.match(save, /const name = loadedChosen\(this\.settings\) \? this\.loadedWorld\.name : defaultEnvironmentName\(world\.environment\);/);
+    assert.match(methodBody(mainSource, 'writeEnvironment'),
+        /const document = environmentDocument\(world, \{ name \}\);\s*return saveEnvironmentText\(environmentFileName\(document\.name\), environmentText\(document\)\);/);
+});
+
+test('SAVE / LOAD\'s answers save the canvas under its name, and load through the question when something is built', () => {
+    const action = methodBody(mainSource, 'onDockAction');
+    assert.match(action, /if \(id === DOCK_SAVE_ENVIRONMENT\.id\) \{\s*this\.saveEnvironmentFromBuilder\(\);\s*return;\s*\}/);
+    assert.match(action, /if \(id === DOCK_LOAD_ENVIRONMENT\.id\) \{\s*this\.loadEnvironmentFromBuilder\(\);\s*return;\s*\}/);
+    assert.match(methodBody(mainSource, 'saveEnvironmentFromBuilder'), /const name = cleanName\(saveName\(this\.builder\)\) \|\| defaultEnvironmentName\(world\.environment\);/);
+    assert.match(methodBody(mainSource, 'loadEnvironmentFromBuilder'),
+        /const asked = requestLoad\(this\.builder\);\s*if \(asked\?\.confirm\) this\.confirmOpened\(\);\s*else if \(asked\?\.load\) this\.loadIntoCanvas\(\);/);
+    assert.match(methodBody(mainSource, 'answerBuildConfirm'), /\} else if \(answered\.load\) \{[\s\S]*?this\.loadIntoCanvas\(\);/,
+        'YES on REPLACE THE BUILT WORLD is the press the file dialog opens from');
+
+    const into = methodBody(mainSource, 'loadIntoCanvas');
+    const refused = into.indexOf('if (chosen.refused) {');
+    const replaced = into.indexOf('loadCanvas(this.builder, chosen.loaded.world, chosen.loaded.name)');
+    assert.ok(refused >= 0 && refused < replaced, 'a refused file leaves the canvas as it was');
+    assert.match(into, /this\.showCanvas\(chosen\.loaded\.base\);/, 'and a loaded one is drawn');
+    assert.match(methodBody(mainSource, 'onDockText'), /if \(id === FILES_NAME_FIELD && setSaveName\(this\.builder, text\)\) this\.syncDock\(\);/);
+});
+
+test('a confirm is drawn with its own question\'s buttons', () => {
+    assert.match(methodBody(mainSource, 'confirmOpened'),
+        /setMenuEntries\(this\.confirmState, confirmEntries\(buildConfirm\(this\.builder\)\)\);\s*this\.confirmMenu\.rebuild\(this\.confirmState\);\s*resetSelection\(this\.confirmState\);/);
+});
+
+test('what a save came to is said in the pilot\'s words, a refusal marked', () => {
+    const outcome = methodBody(mainSource, 'saveOutcome');
+    assert.match(outcome, /if \(saved\.saved\) return \{ text: `saved \$\{saved\.name\}`, refused: false \};/);
+    assert.match(outcome, /if \(saved\.cancelled\) return \{ text: 'not saved', refused: false \};/);
+    assert.match(outcome, /refused: true \};/);
+});
+
+test('a section\'s line of text and its status are drawn by the dock, the status read out as it changes', () => {
+    const text = methodBody(panelViewSource, 'drawText');
+    assert.match(text, /field\.type = 'text';/);
+    assert.match(text, /field\.maxLength = text\.max \?\? 60;/);
+    assert.match(text, /field\.placeholder = text\.placeholder \?\? '';/);
+    const status = methodBody(panelViewSource, 'drawStatus');
+    assert.match(status, /status\.setAttribute\('role', 'status'\);\s*status\.setAttribute\('aria-live', 'polite'\);/);
+    const update = methodBody(panelViewSource, 'update');
+    assert.match(update, /if \(text && document\.activeElement !== text\.field\) \{/, 'the name being typed is left alone');
+    assert.match(update, /status\.status\.classList\.toggle\('refused', section\.status\?\.refused === true\);/);
+    assert.match(methodBody(panelViewSource, 'onChange'), /if \(field\.classList\.contains\('dock-text'\)\) \{\s*this\.handlers\.onText\?\.\(field\.dataset\.text, field\.value, field\.dataset\.section\);\s*return;\s*\}/);
+    assert.match(indexHtml, /\.dock-status\.refused \{\s*color: #ffb000;/);
+    assert.match(indexHtml, /#settings-menu li\.refused::after \{\s*color: #ffb000;/, 'and a refused file row in the same amber');
 });

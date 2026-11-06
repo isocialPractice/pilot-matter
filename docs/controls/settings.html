@@ -99,6 +99,8 @@
 
 <p>Under <code>ENVIRONMENT</code> is the world being flown: every entry is one of the five <a href="../terrain.html#environments">assembled environments</a>, the one currently in force is marked, and choosing another regenerates the ground and puts the aircraft back at its starting condition, because a new world under an aircraft mid-flight is a mountain that was not there a moment ago.</p>
 
+<p>The list ends with two rows. <code>LOAD ENVIRONMENT&hellip;</code> opens a saved <a href="../terrain.html#the-environment-file">environment file</a> from the computer, and the world it holds joins the list under its own name - its note says what it was built on - chosen and flown, from the pause menu as another world chosen there is. <code>SAVE ENVIRONMENT&hellip;</code> writes the world as it would be flown, with whatever was built on it, to a file named for it, as <code>sample-valley.pilot-matter.json</code>: where the browser can ask where to put it, it asks, and elsewhere it is downloaded. Each row says what it came to in place of its note until the next is pressed, and a file that is refused says why in amber, with nothing changed. The browser keeps only the last world loaded, so it is still listed, and still chosen if it was, after a reload; a pilot's worlds are kept as files. A preset chosen over it - even the one it was built on - is that preset as it is. The two rows are not on the panel while a game mode is running, which brings its own world.</p>
+
 <h2 id="start-state">Start state</h2>
 
 <p>Under <code>START STATE</code> is the condition a flight opens in, which is the same condition <code>RESET FLIGHT</code> and <kbd>R</kbd> put it back into.</p>

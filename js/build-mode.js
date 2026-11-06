@@ -21,7 +21,7 @@
  */
 
 import {
-    SELECT_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool, isEraseTool,
+    SELECT_TOOL, FILES_TOOL, isChoosableTool, buildTool, droppedPlacement, mindsLasso, isStrokeTool, isPaintTool, isEraseTool,
     isExtrudeTool, toolElementRows, toolRanges, defaultBrush, toolPlacement, insertsTemplate, dropsAtClick
 } from './build-tools.js';
 import {
@@ -240,13 +240,20 @@ export const ACCEPT_EDITS = 'accept-edits';
 export const SAVE_AND_EXIT = 'save-and-exit';
 
 /**
+ * The question asked before a file loaded into a canvas takes the place of
+ * what is built on it: there is no keeping both, so it is `YES` or `CANCEL`.
+ */
+export const REPLACE_WORLD = 'replace-world';
+
+/**
  * What each confirm is headed, in the artwork's own words. The original tour
  * wrote the second as "Do you want to keep the current built environment?";
  * the panel drawn for it says `SAVE AND EXIT MODE`, and the artwork settles it.
  */
 export const CONFIRM_HEADINGS = Object.freeze({
     [ACCEPT_EDITS]: 'ACCEPT EDITS',
-    [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE'
+    [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE',
+    [REPLACE_WORLD]: 'REPLACE THE BUILT WORLD'
 });
 
 /**
@@ -271,6 +278,15 @@ export const CONFIRM_ENTRIES = Object.freeze([
     Object.freeze({ id: CONFIRM_NO,   label: 'NO' }),
     Object.freeze({ id: CONFIRM_STAY, label: 'CANCEL' })
 ]);
+
+/**
+ * The buttons a question is drawn with. Replacing the built world has no `NO`
+ * - there is nothing to keep it beside - so it is `YES` and `CANCEL`, the safe
+ * way out last, as on the other two.
+ */
+export function confirmEntries(ask) {
+    return ask === REPLACE_WORLD ? CONFIRM_ENTRIES.filter(entry => entry.id !== CONFIRM_NO) : CONFIRM_ENTRIES;
+}
 
 /** How an edit was settled, as `answerConfirm` reports it. */
 export const ACCEPTED  = 'accepted';
@@ -352,6 +368,9 @@ export function answerConfirm(state, answer) {
 
     if (answer !== CONFIRM_YES && answer !== CONFIRM_NO) return { stay: true };
 
+    // `YES` goes on to the file; anything else - and it has no `NO` - stays.
+    if (asked.ask === REPLACE_WORLD) return answer === CONFIRM_YES ? { load: true } : { stay: true };
+
     if (asked.ask === SAVE_AND_EXIT) {
         return {
             leave: true,
@@ -375,6 +394,81 @@ export function answerConfirm(state, answer) {
     if (Number.isInteger(pick)) pickUpPlacement(state, pick);
 
     return { settled: answer === CONFIRM_YES ? ACCEPTED : CANCELLED, tool: state.tool, picked: pickedIndex(state) };
+}
+
+// --- Saving and loading ---------------------------------------------------------
+
+/**
+ * The world the canvas holds as a file is written from it - the environment,
+ * the committed placements and the environment's own rows - in the shape the
+ * builder keeps a world in. An edit in hand is not part of it: choosing
+ * SAVE / LOAD asks about one first.
+ */
+export function sessionWorld(state) {
+    if (!buildModeDrawing(state)) return null;
+    return { environment: state.environment, placements: committedPlacements(state), world: worldRows(state) };
+}
+
+/** True while what is on the canvas is something a file loaded over it would take away: something built, or the world's rows changed. */
+export function replacesBuild(state) {
+    if (!buildModeDrawing(state)) return false;
+    return (state.placements ?? []).length > 0 || JSON.stringify(state.world ?? []) !== state.openedWorld;
+}
+
+/**
+ * Asks to load a file over the canvas. With nothing built on it there is
+ * nothing to lose, and the file is chosen at once - `{ load: true }`; with
+ * something, `REPLACE THE BUILT WORLD` is asked first - `{ confirm }` - and
+ * its `YES` goes on to the file. Null off a canvas, under a question, or with
+ * an edit in hand.
+ */
+export function requestLoad(state) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || draftPending(state)) return null;
+    if (!replacesBuild(state)) return { load: true };
+    state.confirm = { ask: REPLACE_WORLD, then: null };
+    return { confirm: REPLACE_WORLD };
+}
+
+/**
+ * Opens the world a file brought as the canvas, in place of the one there:
+ * its environment, its placements committed, its rows the environment's -
+ * the way a kept build is opened - with the SAVE / LOAD panel still live, so
+ * what the load came to stays in front of the pilot. `name` is the world's,
+ * which a save writes it under again.
+ *
+ * Refused off a canvas, under a question, with an edit in hand, or for a world
+ * that is not one.
+ */
+export function loadCanvas(state, world, name = '') {
+    if (!buildModeDrawing(state) || confirmOpen(state) || draftPending(state)) return false;
+    if (typeof world?.environment !== 'string' || world.environment === '') return false;
+
+    openCanvas(state, world.environment, world.placements ?? [], world.world ?? []);
+    if (isChoosableTool(FILES_TOOL)) state.tool = FILES_TOOL;
+    state.saveName = typeof name === 'string' ? name : '';
+    return true;
+}
+
+/** The name a save writes the canvas's world under, as the pilot typed it - '' for none, which a save fills from the environment. */
+export function saveName(state) {
+    return state?.saveName ?? '';
+}
+
+export function setSaveName(state, name) {
+    if (!buildModeDrawing(state)) return false;
+    state.saveName = typeof name === 'string' ? name.slice(0, 120) : '';
+    return true;
+}
+
+/** What the last save or load came to - `{ text, refused }` - or null. */
+export function fileStatus(state) {
+    return state?.fileStatus ?? null;
+}
+
+export function setFileStatus(state, text, { refused = false } = {}) {
+    if (!buildModeDrawing(state)) return false;
+    state.fileStatus = text ? { text: String(text), refused: refused === true } : null;
+    return true;
 }
 
 /**
@@ -1022,6 +1116,12 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     if (!buildModePicking(state)) return false;
     if (typeof environmentId !== 'string' || environmentId === '') return false;
 
+    openCanvas(state, environmentId, kept, world);
+    return true;
+}
+
+/** Everything a canvas opens with, whether from the picker or over another from a file. */
+function openCanvas(state, environmentId, kept, world) {
     state.screen = BUILD_CANVAS;
     state.environment = environmentId;
     // Select is the navigation state, so a canvas opens on looking at it.
@@ -1048,7 +1148,13 @@ export function beginCanvas(state, environmentId, kept = [], world = []) {
     state.camera = null;
     state.settingsOver = null;
     state.kept = null;
-    return true;
+    // The environment's own rows as the canvas opened with them, so a change
+    // made to them since is something a file loaded over it would replace.
+    state.openedWorld = JSON.stringify(state.world);
+    // The name a save writes the world under, and what the last save or load
+    // came to - see `saveName` and `fileStatus`.
+    state.saveName = '';
+    state.fileStatus = null;
 }
 
 /** The tool the canvas is being worked with, and null while there is no canvas. */

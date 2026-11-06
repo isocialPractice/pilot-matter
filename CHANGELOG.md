@@ -5,6 +5,90 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.60.0] - 2026-11-05
+
+A built world saved to a file and loaded back, from the builder and from the
+settings.
+
+### Added
+
+- **Save and load in the builder.** `SAVE / LOAD` across the foot of the
+  palette is a tool now. Its panel names the world - the environment's own
+  name until one is typed - over `LOAD ENVIRONMENT…` and `SAVE ENVIRONMENT…`.
+  A save writes what is built on the canvas to `<name>.pilot-matter.json`,
+  through the browser's save dialog where there is one and as a download
+  elsewhere. A load opens the file's world as the canvas; with something
+  built there, `REPLACE THE BUILT WORLD` asks first, with `YES` and `CANCEL`.
+  What each answer came to - saved, loaded, or why a file was refused - is
+  written under it until the next.
+- **Save and load from Settings.** The settings' worlds end with `LOAD
+  ENVIRONMENT…` and `SAVE ENVIRONMENT…`, from the title screen and the pause
+  menu. A world loaded joins the list under its own name, saying what it was
+  built on, and is chosen and flown; the browser keeps it, chosen if it was,
+  across a reload. A save writes the world the settings would fly. Neither row
+  is offered while a game mode runs.
+
+### Changed
+
+- A preset chosen over a loaded world is that preset as it is - even the one
+  the world was built on.
+- A row on a menu draws its note again when the note changes, so a file row
+  can say what it came to, and a refusal is drawn in amber.
+
+Held in Node by `test/save-load.test.js` - the last world a file brought kept
+as the file's text and read back through the format, a kept world that no
+longer reads and a storage too full to keep one, the file rows under the
+worlds and the loaded world after them, the rows gone while a game mode runs,
+the loaded choice held beside a preset environment and kept only while the
+world is, chosen by its row and let go of by a preset - even its own - a world
+built on Blank Canvas leaving the environment alone, a file row saying what it
+came to, the editor letting go of a kept world whole, `REPLACE THE BUILT WORLD`
+with `YES` and `CANCEL` and when it is asked, a load refused off a canvas or
+over an edit, a load opening the file's world in the canvas's place with SAVE
+/ LOAD still live, what a save writes read back the same world, the name and
+the status, and SAVE / LOAD's panel - `test/menu.test.js` - a note drawn
+again and a refusal marked - and `test/page.test.js`, which holds the wiring:
+the world read before the settings and kept on the editor before the first
+ground, the panel put on its worlds as it opens, the file rows and the loaded
+world worked before a world is applied, a file refused before anything is
+kept, the settings' save of the world they fly, the builder's answers and the
+question's `YES` opening the dialog, each question's own buttons, the outcome
+said, and the dock's line of text and its status. Each rejected the defect it
+names when that was put back, 42 in all: the loaded choice never read
+back or chosen with no world kept, the loaded world never listed, the file
+rows drawn during a game mode, a preset over the loaded world its own preset
+still, the loaded world chosen again as a change, its preset not held beside
+it, the choice not stored, the preset under it marked flown too, a file row's
+outcome never said or a refusal not marked, a file row answering nothing, the
+loaded choice kept with no world, a kept world taken however it reads, a world
+said kept with nowhere to keep it, its note not saying its base, the question
+asked with a `NO`, its `YES` settling an edit, its `NO` going to the file, a
+load over a build never asking, the world's rows not counted a build, a load
+over an edit in hand, a load leaving SAVE / LOAD or losing its name, a save
+without the world's rows, save drawn before load, no name offered, a status
+not read out or a refusal not marked, the name overwritten while typed, a
+preset over the loaded world keeping its build, a build kept from the builder
+leaving the file chosen, every confirm drawn with the same buttons, the file
+rows drawn among the options, the settings saving the preset over a kept
+build, the file rows offered in a game mode, `YES` on the question opening no
+file, the loaded world never kept on the editor at startup, the editor letting
+go of the world and not of the choice, a note never drawn again, a refused row
+never marked, and a refusal drawn like any note.
+
+Settled in Chromium in 23 checks: `SAVE / LOAD` on the palette; choosing it
+with an edit in hand asking `ACCEPT EDITS` and `YES` opening the files; its
+panel headed and ordered as the art has it; a save downloaded under the name
+typed, said under it; a load over a build asking `REPLACE THE BUILT WORLD`
+with `YES` and `CANCEL` only, and `CANCEL` opening no dialog; a file that is
+not JSON refused, saying why; a load over nothing opening the dialog at once
+and the file's world becoming the canvas, listed by the settings and kept on
+the way out as the world flown; the browser's save dialog offered the world's
+name, and closed said as `not saved`; the settings' rows, a refused file
+there, a world loaded joining the list chosen with its mountain standing where
+it was built, kept chosen and flown across a reload, saved under its name, let
+go of by its own preset, and the rows gone while a game mode runs; and on a
+phone the answers in view under the palette, a tap saving.
+
 ## [1.0.0-alpha.1.59.0] - 2026-11-05
 
 The ground the builder's new tools stand on: what each section does declared

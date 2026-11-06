@@ -14,6 +14,17 @@ import {
     TOGGLE_ENTRY,
     BACK_ENTRY,
     SCREEN_ENTRY,
+    FILE_ENTRY,
+    FILE_GROUP,
+    LOADED_ENVIRONMENT_ID,
+    LOAD_ENVIRONMENT_ID,
+    SAVE_ENVIRONMENT_ID,
+    LOAD_ENVIRONMENT_LABEL,
+    SAVE_ENVIRONMENT_LABEL,
+    setSettingsWorlds,
+    loadedChosen,
+    chooseLoadedWorld,
+    setFileNotice,
     START_GROUP,
     OPTION_GROUP,
     BUILDER_GROUP,
@@ -161,7 +172,7 @@ test('the panel lists every environment, then every option, then the builder\'s 
     // is why the rows are counted back to the options rather than the other way.
     assert.deepEqual(
         [...new Set(entries
-            .filter(entry => entry.kind !== ENVIRONMENT_ENTRY && entry.kind !== BACK_ENTRY && entry.kind !== SCREEN_ENTRY)
+            .filter(entry => entry.kind !== ENVIRONMENT_ENTRY && entry.kind !== BACK_ENTRY && entry.kind !== SCREEN_ENTRY && entry.kind !== FILE_ENTRY)
             .map(entry => entry.option ?? entry.id))],
         SETTINGS_OPTIONS.map(option => option.id)
     );
