@@ -65,6 +65,57 @@ its context survives being archived.
     assertion in `test/page.test.js` beside the existing `li.refused` one.
   - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
 
+- [ ] A small extrusion has no top surface, so its top colour never shows and
+  its prism is never previewed
+  - **Issue**: `surfaceAt` in `js/extrude.js` calls a point the top only where
+    the footprint's weight reaches `TOP_WEIGHT`, which is 1, and a footprint's
+    weight reaches 1 only a feather inside its edge. The default feather is 160
+    units, so a region narrower than about twice that has no point at weight 1
+    at all. Measured on the default canvas - 16000 units across, sampled every
+    80: a 200-unit square extrusion weighs 9 vertices and not one of them is a
+    top, and the first top appears at 320 units. Three things follow for every
+    extrusion smaller than that, and Extrude accepts regions down to
+    `MIN_REGION`, which is 40. The `extrude` element paints by the same weight
+    through `drawn: 'edge'`, so the whole of it takes the wall colour and the
+    `topColor` row on the surfaces panel changes nothing. `surfacePress` in
+    `js/main.js` reads the weight under the click and hands it to `surfaceAt`,
+    so a click anywhere on it answers `wall` and the top can never be chosen.
+    And `liftedTop` averages only the vertices at weight 1, so it returns null
+    and `drawPrism`'s `Number.isFinite(drag.top)` guard draws no preview while
+    the blue arrow pulls the height. A small building is the ordinary case for
+    this tool, and all three are silent: nothing refuses the region or says why
+    the colour did not take.
+  - **Goal**: give a region its top wherever it has an inside, rather than
+    where a fixed feather has finished easing. The weight model is the thing to
+    change, not the three readers: either hold a footprint's feather to a share
+    of the region's own extent so a small region still eases to 1 in its
+    middle, or read the top from the region's own interior distance rather than
+    from the weight the feather produced. Whichever is chosen, `surfaceAt`,
+    `drawn: 'edge'` on the `extrude` element, `TOP_LEVEL` in
+    `js/build-overlay.js` and `liftedTop` all have to read it the same way, so
+    the colour painted, the surface clicked, the edge outlined and the prism
+    previewed stay one answer. Too large for a review turn: it moves the
+    footprint weighting that twelve tools share. Cover it in
+    `test/surfaces.test.js` with a region near `MIN_REGION` as well as a large
+    one, since the suite's extrusions are all comfortably over 320 units and
+    reported none of this.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+
+- [ ] `ringArea` says it returns twice the area it returns
+  - **Issue**: the docstring on `ringArea` in `js/shapes.js` reads "Twice the
+    area a ring encloses, signed by the way it winds", but the shoelace sum it
+    accumulates is twice the signed area and the function returns that sum
+    halved, which is the area itself - on a 10 by 10 square it answers 100, not
+    200. Its one caller compares the result against `MIN_REGION * MIN_REGION /
+    2`, which is the area of a right triangle with `MIN_REGION` legs and reads
+    correctly against an area, so the code is right and only the sentence is
+    wrong. It matters because the next reader to use the helper will halve a
+    figure that is already halved, and get a threshold twice as permissive as
+    the one they wrote.
+  - **Goal**: drop "Twice" - "The area a ring encloses, signed by the way it
+    winds". Nothing else in the file changes.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
