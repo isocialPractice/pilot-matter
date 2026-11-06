@@ -24,6 +24,7 @@ import { getEnvironment, environmentElements } from '../environment/presets.js';
 import { applyFootprintedElement } from '../environment/footprinted.js';
 import { applyDepth, applyDaylight, SKY_COLOR, FOG_DENSITY } from '../sky.js';
 import { animateWater } from '../water.js';
+import { holdGroundColor } from '../ground-material.js';
 import {
     resolveEnvironmentOptions, validateAircraftContract, boundsFromSize, tileOrigin
 } from './contract.js';
@@ -501,7 +502,7 @@ function buildMesh(field, resolved, origin) {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(field.color.slice(), 3));
     geo.computeVertexNormals();
 
-    return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    return new THREE.Mesh(geo, holdGroundColor(new THREE.MeshLambertMaterial({ vertexColors: true })));
 }
 
 function settle(entry, field) {

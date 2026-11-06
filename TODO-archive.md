@@ -4942,3 +4942,65 @@ still be found by name.
     surface's colour row offers the eye dropper and it fills that row:
     `state.dropper` names the row, where Free Paint's is `true`.
   - From: Interactive Build Mode
+- [x] **Extrusions settle into the ground**: each surface taking the ground's
+  own lightness, and the wall's colour fading to the ground's across the band
+  its height already eases over
+  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
+    `js/environment/elements.js` gives a colour the ground's own luminance,
+    which is the first half of this.
+  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
+    the band at its footprint's edge its wall colour, and the compositor
+    blends it into the ground by the band's weight, so the wall already fades
+    toward the ground at its foot; what is left is both surfaces through
+    `tintColor`.
+  - **Settled**: `extrude` has a `blend`, `tint` by default, as paint's
+    does: each surface is `tintColor` of the ground and its colour, so a wall
+    shades down a hillside the way the hillside does, and the wall, blended
+    into the ground by the band's weight as before, fades from its tinted
+    colour. `normal` lays the colours as they are. The ground a surface takes
+    its lightness from is the ground as composited at the extrusion's turn in
+    the order, so water and snow drawn after it - which raised ground may no
+    longer be under - are not what it is measured against.
+  - From: Interactive Build Mode
+- [x] **The camera from inside a tool**: a held pan that suspends the live tool
+  rather than changing it, putting the tool back on release so a half-drawn
+  shape is not committed by moving the view
+  - **Settled**: `holdCamera`, `cameraHeld` and `releaseCamera` in
+    `js/build-mode.js` are the plan's override, `state.camera = {
+    overriding, resumes }`: held as a `shift` and right-button pan begins
+    with any tool but Select, whose camera is its own, and let go when the
+    drag ends. While it is held no tool is chosen, the cursor grabs, the
+    brush and a runway's outline are put away, and a shape drawn a click at a
+    time stops reaching to the pointer; nothing is committed, cancelled or
+    asked about, so the draft, a shape half drawn and the selection are as
+    they were when it is let go. The pan was already the camera's for every
+    tool; what this adds is the state saying so, which the builder's settings
+    screen can suspend a tool through as well.
+  - From: Interactive Build Mode
+- [x] **Derived ranges are hidden**: a range the footprint already determines
+  taken off the panel rather than shown and ignored, and given the value the
+  footprint implies - the count going away while a selection is live, a ground
+  cover's band going away when it is drawn, and drawn water's level with it
+  - **The mountain's count already goes.** A mountain dropped at a click is one
+    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
+    is a `derived` value on the tool, left off the panel by `panelRanges` for
+    any placement carrying `at`. What is left is the cover band and drawn
+    water's level, which a footprint rather than a click settles.
+  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
+    off a range the element's `footprintSettles` names for a placement with a
+    footprint, and the cover tool's own panel carries only density, the stamp
+    and the colours. What is left is drawn water's level.
+  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
+    with a footprint shows neither what its element's `footprintSettles`
+    works out nor what its `footprintIgnores` - drawn water's level and
+    flatten - beside the count and the band. Its run is checking nothing else
+    is shown and ignored, and settling it.
+  - **Settled**: nothing else was shown and ignored, and
+    `test/derived-ranges.test.js` now holds it: every row a tool's placement
+    shows - each cover's stroke, paint, an extrusion, a dropped mountain, a
+    runway and an airport - is stepped both ways and must change the ground
+    the placement draws, a switch's bounds judged with the switch on.
+    Extrude's `level` is off its panel, a footprint settling it, and its
+    `blend` is on it and read. A wall's band can fall between the vertices of
+    a coarse sampling, so the check draws at half the game's density.
+  - From: Interactive Build Mode

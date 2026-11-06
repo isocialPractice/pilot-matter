@@ -113,9 +113,15 @@ export const CAMERA_PAN   = 'pan';
  * at the press.
  *
  * Select is the navigation state, so its left drag orbits and its middle drag
- * pans. `shift` and the right button pans from any tool, which is how the view
- * is reached from inside a drawing tool - and it pans in Select as well, which
- * a laptop's trackpad needs, having no middle button.
+ * pans. The right button turns the view from any tool, Select among them,
+ * because every tool but Select keeps the left drag for its own drawing; and
+ * with `shift` it pans from any tool, which is how a drawing tool reaches the
+ * pan - and in Select too, which a laptop's trackpad needs, having no middle
+ * button.
+ *
+ * A right press is also a right click, which opens the popup on the
+ * selection, so it does not turn the view until it has travelled past what a
+ * click may - see `pressMayClick`.
  *
  * One table, read by the handler and by the control list alike, so the list
  * cannot describe a gesture the canvas does not answer to. `tools` of null is
@@ -123,6 +129,7 @@ export const CAMERA_PAN   = 'pan';
  */
 export const CAMERA_GESTURES = Object.freeze([
     Object.freeze({ gesture: CAMERA_ORBIT, button: 0, shift: false, tools: Object.freeze([SELECT_TOOL]) }),
+    Object.freeze({ gesture: CAMERA_ORBIT, button: 2, shift: false, tools: null }),
     Object.freeze({ gesture: CAMERA_PAN,   button: 1, shift: false, tools: Object.freeze([SELECT_TOOL]) }),
     Object.freeze({ gesture: CAMERA_PAN,   button: 2, shift: true,  tools: null })
 ]);
@@ -378,6 +385,22 @@ export function cameraGesture({ button, shiftKey = false } = {}, tool = SELECT_T
         && entry.shift === Boolean(shiftKey)
         && (entry.tools === null || entry.tools.includes(tool)));
     return match ? match.gesture : null;
+}
+
+/**
+ * Whether a press the camera takes may yet be a click, and so moves nothing
+ * until it has travelled past what a click may: Select's plain left press,
+ * which picks what it is let go of over, and a plain right press, which opens
+ * the popup on the selection. Neither is a click with `shift` held - that is
+ * the selection's, or a pan - so those move from the first pixel.
+ *
+ * Returns which click it would be, `'pick'` or `'menu'`, or null.
+ */
+export function pressMayClick({ button, shiftKey = false } = {}, tool = SELECT_TOOL) {
+    if (shiftKey) return null;
+    if (button === 0 && tool === SELECT_TOOL) return 'pick';
+    if (button === 2) return 'menu';
+    return null;
 }
 
 /**

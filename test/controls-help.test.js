@@ -258,7 +258,7 @@ test('the builder list never offers the key a canvas leaves free', () => {
 
 test('the builder list reads as the input and then what it does', () => {
     assert.deepEqual(buildHelpLines().map(line => line.text), [
-        'Drag (Select) - Orbit',
+        'Drag (Select) or Right Drag - Orbit',
         'Middle Drag (Select) or Shift+Right Drag - Pan',
         'Wheel - Zoom',
         'W/A/S/D or ↑/←/↓/→ - Move',

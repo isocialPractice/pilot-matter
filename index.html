@@ -1600,7 +1600,9 @@
         /* The builder's two confirms, ACCEPT EDITS and SAVE AND EXIT MODE: a
            small panel over the canvas rather than a screen of its own, drawn in
            the artwork's colours - the navy body, the green tab it is headed in,
-           a green YES and a tan NO. The text on the green is navy rather than
+           a green YES and a tan NO - with CANCEL after them outlined rather
+           than filled, as the dock's CANCEL is, being the answer that does
+           nothing. The text on the green is navy rather than
            the artwork's white, which reads at barely two to one on it. The
            layer behind the panel takes every press, so the palette, the dock
            and the canvas wait on the answer, and a press anywhere off the panel
@@ -1653,7 +1655,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 322px;
+            width: 360px;
             max-width: calc(100vw - 40px);
             padding: 0 20px 22px;
             font-family: 'Courier New', monospace;
@@ -1672,9 +1674,13 @@
             border-radius: 0 0 6px 6px;
         }
 
+        /* Three across where they fit, which a phone's 390 pixels still give;
+           narrower, CANCEL wraps to a line of its own under the other two. */
         #build-confirm-menu {
             display: flex;
-            gap: 28px;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
             margin: 0;
             padding: 0;
             list-style: none;
@@ -1700,6 +1706,12 @@
         #build-confirm-menu li[data-entry="no"] {
             color: #fff;
             background: #8b7355;
+        }
+
+        #build-confirm-menu li[data-entry="stay"] {
+            color: #fff;
+            background: transparent;
+            border-color: rgba(255, 176, 0, 0.6);
         }
 
         /* The cursor, which the keys and the pointer both move: Enter answers

@@ -60,7 +60,7 @@ import {
 import {
     canvasFarPlane, CANVAS_FOG, createBuildCamera, buildCameraPosition,
     orbitBuildCamera, panBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera,
-    cameraGesture, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
+    cameraGesture, pressMayClick, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
     writeCameraField, nudgeBuildCamera, unitsPerPixel, viewBearing, CAMERA_ORBIT, DEFAULT_FOV
 } from './build-camera.js';
 import {
@@ -363,7 +363,7 @@ class FlightSimulator {
         this.pickerState = createMenuState(pickerEntries(this.picker));
 
         // The confirm a canvas asks before an edit is settled or the builder is
-        // left, as a menu of its two buttons.
+        // left, as a menu of its three buttons.
         this.confirmState = createMenuState(CONFIRM_ENTRIES);
 
         // The builder's own control list, open when a canvas first opens - a
@@ -2254,7 +2254,7 @@ class FlightSimulator {
     trackHover() {
         const pointer  = this.canvasPointer;
         const drag     = this.canvasDrag;
-        const dragging = (drag != null && (drag.travelled || !drag.picks)) || this.gumballDrag != null;
+        const dragging = (drag != null && (drag.travelled || drag.clicks == null)) || this.gumballDrag != null;
         const looking  = pointer != null && pointer.type !== 'touch' && !dragging && !confirmOpen(this.builder);
 
         // A handle of the gumball under the pointer comes before anything
@@ -2561,10 +2561,12 @@ class FlightSimulator {
         surface.addEventListener('lostpointercapture', (e) => this.onCanvasRelease(e));
         surface.addEventListener('pointerleave',       () => { this.canvasPointer = null; });
         surface.addEventListener('wheel',              (e) => this.onCanvasWheel(e), { passive: false });
+        // The browser's own menu is kept off a canvas, and opens nothing of the
+        // builder's: a right click is read off the right button's release, in
+        // `onCanvasRelease`, because some systems send the menu at the press,
+        // before a right drag has had the chance to turn the view.
         surface.addEventListener('contextmenu', (e) => {
-            if (!buildModeDrawing(this.builder)) return;
-            e.preventDefault();
-            this.onCanvasMenu(e);
+            if (buildModeDrawing(this.builder)) e.preventDefault();
         });
 
         // The popup's own button, and a press anywhere else off the canvas -
@@ -2583,13 +2585,19 @@ class FlightSimulator {
      * make a gesture, and a tool that drops at a click takes a plain press of
      * the main button - a mouse's left, or a finger.
      *
-     * A plain press of the main button with Select live is held as one that
-     * may yet be a click: the view does not turn until it has travelled past
-     * what a click may, and one let go of before then picks what is under it
-     * rather than orbiting.
+     * A plain press of the main button with Select live, and a plain press of
+     * the right button with any tool, is held as one that may yet be a click:
+     * the view does not turn until it has travelled past what a click may, and
+     * one let go of before then picks what is under it, or opens the popup on
+     * the selection, rather than orbiting.
+     *
+     * Nothing else is taken while a drag is in hand - the view's, a handle's,
+     * a stroke's or a lasso's - so a second button or a second finger pressed
+     * during one starts nothing of its own.
      */
     onCanvasPress(e) {
         if (!buildModeDrawing(this.builder) || this.canvasDrag || this.gumballDrag) return;
+        if (this.strokeDrawing || this.lassoDrawing?.gesture === LASSO_DRAG) return;
 
         // A press anywhere off the popup shuts it, and does nothing else: it
         // was the answer to the popup, not a press on the ground under it.
@@ -2598,10 +2606,6 @@ class FlightSimulator {
             this.syncOverlays();
             return;
         }
-
-        // Where a right press went down, so the click it ends in can be told
-        // from a drag that panned.
-        this.rightPress = e.button === 2 ? { x: e.clientX, y: e.clientY, type: e.pointerType } : null;
 
         // A press on a handle of the gumball drags that handle, whichever tool
         // is live: it is the edit in hand's, and comes before an orbit, a pick
@@ -2637,31 +2641,37 @@ class FlightSimulator {
             pointer: e.pointerId, gesture, x: e.clientX, y: e.clientY,
             start: { x: e.clientX, y: e.clientY },
             type: e.pointerType,
-            picks: tool === SELECT_TOOL && e.button === 0 && !e.shiftKey,
+            clicks: pressMayClick(e, tool),
             travelled: false
         };
-        // From inside a tool the pan is an override: the tool is suspended,
-        // not changed, so a shape half drawn waits for it rather than being
-        // committed or asked about.
+        // From inside a tool a turn or a pan is an override: the tool is
+        // suspended, not changed, so a shape half drawn waits for it rather
+        // than being committed or asked about. A press that may yet be a click
+        // holds nothing until it travels, so a right click does not put the
+        // tool away and back.
+        if (this.canvasDrag.clicks == null) this.holdCanvasCamera();
+    }
+
+    /** The view taken from inside a tool, which suspends the tool while it is held. */
+    holdCanvasCamera() {
         if (holdCamera(this.builder)) this.renderer.domElement.style.cursor = this.canvasCursor();
     }
 
     /**
-     * A right click on the canvas: on the selection, the popup carrying
-     * `DESELECT` opens at the pointer, whatever tool is live; anywhere else,
-     * and after a right drag that panned, nothing does. A click with `shift`
-     * is the start of a pan, and nothing is opened under a drag or a stroke.
+     * A right click on the canvas - a right press let go of before it travelled
+     * past a click: on the selection, the popup carrying `DESELECT` opens at
+     * the pointer, whatever tool is live; anywhere else, nothing does. A right
+     * drag turns the view, and one with `shift` pans, so neither opens
+     * anything; nor does a click while a shape is being drawn a click at a
+     * time.
      */
-    onCanvasMenu(e) {
-        const press = this.rightPress;
-        this.rightPress = null;
-        if (press == null || e.shiftKey || travelledPast(press, { x: e.clientX, y: e.clientY }, press.type)) return;
+    menuAt(clientX, clientY) {
         if (this.strokeDrawing || this.lassoDrawing || this.gumballDrag || this.canvasDrag) return;
 
         const selection = this.builder.selection;
-        const point = selection ? this.pickCanvasPoint(e.clientX, e.clientY) : null;
+        const point = selection ? this.pickCanvasPoint(clientX, clientY) : null;
         const inside = point != null && footprintWeight(selection, point.x, point.z, this.terrain.size) > 0;
-        if (openDeselectPopup(this.builder, { x: e.clientX, y: e.clientY }, inside)) this.syncOverlays();
+        if (openDeselectPopup(this.builder, { x: clientX, y: clientY }, inside)) this.syncOverlays();
     }
 
     /**
@@ -2743,9 +2753,10 @@ class FlightSimulator {
         const drag = this.canvasDrag;
         if (!drag || e.pointerId !== drag.pointer) return;
 
-        if (drag.picks && !drag.travelled) {
+        if (drag.clicks != null && !drag.travelled) {
             if (!travelledPast(drag.start, { x: e.clientX, y: e.clientY }, drag.type)) return;
             drag.travelled = true;
+            this.holdCanvasCamera();
         }
 
         const dx = e.clientX - drag.x;
@@ -2793,9 +2804,12 @@ class FlightSimulator {
         const drag = this.canvasDrag;
         if (!drag || e.pointerId !== drag.pointer) return;
 
-        const click = e.type === 'pointerup' && drag.picks && !drag.travelled;
+        // Let go of before it travelled, a press that may have been a click
+        // was one: Select's picks, and the right button's opens the popup.
+        const click = e.type === 'pointerup' && !drag.travelled ? drag.clicks : null;
         this.endCanvasDrag();
-        if (click) this.pickAt(e.clientX, e.clientY);
+        if (click === 'pick') this.pickAt(e.clientX, e.clientY);
+        else if (click === 'menu') this.menuAt(e.clientX, e.clientY);
     }
 
     /**
@@ -3766,8 +3780,8 @@ class FlightSimulator {
 
     /**
      * A key while a confirm is open. The arrows and their letters move between
-     * the two buttons whichever way they point, since the buttons stand side by
-     * side; `Enter` answers the one under the cursor; `Escape` calls the
+     * the three buttons whichever way they point, since the buttons stand side
+     * by side; `Enter` answers the one under the cursor; `Escape` calls the
      * question off. Each is kept from the page, so `Enter` never also presses a
      * tile that had the focus.
      */

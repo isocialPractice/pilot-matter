@@ -237,7 +237,7 @@ back.
 
 | Input | Does |
 |-------|------|
-| Drag, or one finger, in Select | Orbit the view about the middle of the screen |
+| Drag, or one finger, in Select, or right drag with any tool | Orbit the view about the middle of the screen; with any other tool live the tool waits, as it does for a pan |
 | Middle drag in Select, or `Shift` and right drag | Pan, the ground following the pointer; with any other tool live the tool waits rather than changing, so a shape half drawn is still being drawn when the pan is let go |
 | Wheel | Zoom toward the ground under the pointer, out no further than the whole canvas |
 | `W`/`A`/`S`/`D` or the arrows | Move across the ground, the way the view faces |
@@ -277,7 +277,7 @@ is for in brackets.
 
 | Input | Action |
 |-------|--------|
-| Drag (Select) | Orbit |
+| Drag (Select) or Right Drag | Orbit |
 | Middle Drag (Select) or Shift+Right Drag | Pan |
 | Wheel | Zoom |
 | W/A/S/D or ↑/←/↓/→ | Move |
@@ -316,8 +316,10 @@ elements under `WORLD:`, folded until its heading is pressed. A value changed
 there changes every one of that element across the world, and `YES` on
 leaving keeps it.
 
-The two questions open on `YES`; the arrows cross to `NO`, and `Esc` or a press
-off the panel calls the question off. `YES` on `ACCEPT EDITS` keeps the edit and
+The two questions open on `YES`; the arrows cross to `NO` and `CANCEL`, and
+`CANCEL`, `Esc` or a press off the panel calls the question off with nothing
+changed - the edit still in hand, the tool still the one it was, the canvas
+still open. `YES` on `ACCEPT EDITS` keeps the edit and
 stays, so keeping work never doubles as leaving; `YES` on `SAVE AND EXIT MODE`
 keeps what was built as the world flown and leaves. Choosing another tool with
 an edit in hand asks `ACCEPT EDITS` first.

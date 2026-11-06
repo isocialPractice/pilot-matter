@@ -287,7 +287,7 @@
 <table>
     <thead><tr><th>Input</th><th>Does</th></tr></thead>
     <tbody>
-        <tr><td>Drag, or one finger, in Select</td><td>Orbit the view about the middle of the screen</td></tr>
+        <tr><td>Drag, or one finger, in Select, or right drag with any tool</td><td>Orbit the view about the middle of the screen; with any other tool live the tool waits, as it does for a pan</td></tr>
         <tr><td>Middle drag in Select, or <kbd>Shift</kbd> and right drag</td><td>Pan, the ground following the pointer; with any other tool live the tool waits rather than changing, so a shape half drawn is still being drawn when the pan is let go</td></tr>
         <tr><td>Wheel</td><td>Zoom toward the ground under the pointer, out no further than the whole canvas</td></tr>
         <tr><td><kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd> or the arrows</td><td>Move across the ground, the way the view faces</td></tr>
@@ -329,7 +329,7 @@
 <table id="builder-control-list">
     <thead><tr><th>Input</th><th>Action</th></tr></thead>
     <tbody>
-        <tr><td>Drag (Select)</td><td>Orbit</td></tr>
+        <tr><td>Drag (Select) or Right Drag</td><td>Orbit</td></tr>
         <tr><td>Middle Drag (Select) or Shift+Right Drag</td><td>Pan</td></tr>
         <tr><td>Wheel</td><td>Zoom</td></tr>
         <tr><td>W/A/S/D or ↑/←/↓/→</td><td>Move</td></tr>
@@ -364,7 +364,7 @@
 
 <p>Down the right is the dock: <code>SELECTION MODE</code>, the camera written out as fields to read and type into, or the edit in hand with <code>ACCEPT</code> and <code>CANCEL</code> under it. Only its fields scroll, and the wheel over it scrolls them. In Select the camera stays on top: beneath it is the placement picked, under <code>SELECTED</code> and its name, or with nothing picked each of the world's own elements under <code>WORLD:</code>, folded until its heading is pressed. A value changed there changes every one of that element across the world, and <code>YES</code> on leaving keeps it.</p>
 
-<p>The two questions open on <code>YES</code>; the arrows cross to <code>NO</code>, and <kbd>Esc</kbd> or a press off the panel calls the question off. <code>YES</code> on <code>ACCEPT EDITS</code> keeps the edit and stays, so keeping work never doubles as leaving; <code>YES</code> on <code>SAVE AND EXIT MODE</code> keeps what was built as the world flown and leaves. Choosing another tool with an edit in hand asks <code>ACCEPT EDITS</code> first.</p>
+<p>The two questions open on <code>YES</code>; the arrows cross to <code>NO</code> and <code>CANCEL</code>, and <code>CANCEL</code>, <kbd>Esc</kbd> or a press off the panel calls the question off with nothing changed - the edit still in hand, the tool still the one it was, the canvas still open. <code>YES</code> on <code>ACCEPT EDITS</code> keeps the edit and stays, so keeping work never doubles as leaving; <code>YES</code> on <code>SAVE AND EXIT MODE</code> keeps what was built as the world flown and leaves. Choosing another tool with an edit in hand asks <code>ACCEPT EDITS</code> first.</p>
 
 <p>In Select, the placement under the pointer is outlined in white and the one picked, or dropped and in hand, in blue. A press that travels more than a few pixels orbits and picks nothing. A pick changed on the dock asks <code>ACCEPT EDITS</code> before it is let go; one left as it was asks nothing.</p>
 

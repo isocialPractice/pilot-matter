@@ -5,6 +5,86 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.57.0] - 2026-11-05
+
+The first of the builder's polish: the view turned with the right button from
+any tool, `CANCEL` on both of the builder's questions, and saturated paint no
+longer seen through fog that has taken everything around it.
+
+### Added
+
+- **Turn with the right button.** A right drag turns the view over a canvas
+  whatever tool is live, Select included, so a drawing tool no longer has to
+  be put down to look round what it is drawing; while it is held the tool waits
+  rather than changing, as it does for a pan. A right press turns nothing until
+  it has travelled further than a click, and one let go of before then is still
+  the right click that opens `DESELECT` on the selection. `Shift` and a right
+  drag still pans.
+- **`CANCEL` on the confirms.** `ACCEPT EDITS` and `SAVE AND EXIT MODE` carry
+  `CANCEL` after `YES` and `NO`: the answer `Esc` and a press off the panel
+  already gave, now on screen, changing nothing - the edit still in hand, the
+  tool the one it was, the canvas open. It is outlined rather than filled, and
+  on a screen too narrow for three across it wraps to a line of its own.
+
+### Changed
+
+- The builder's control list reads `Drag (Select) or Right Drag - Orbit`, and
+  the controls page and both cheat sheets with it.
+- A right click on a canvas is read when the right button is let go of rather
+  than off the browser's menu event, which some systems send at the press,
+  before a right drag has begun to turn.
+- A press made while a stroke or a lasso drag is in hand - a second finger -
+  starts nothing.
+
+### Fixed
+
+- Ground painted a saturated colour - pure cyan or blue - showed in its own
+  colour through fog that had taken everything around it, however far off it
+  was. No colour was out of range: with antialiasing on, a pixel the edge of a
+  triangle crosses is shaded at its middle, which can lie outside the triangle,
+  and there the colour is carried on past the triangle's corners. Far off the
+  ground is nearly edge-on, so a channel the paint held near 0 came out below
+  it, and the frame's colour encoding turned that into a channel written as 0
+  after the fog was mixed in. The ground's shader now holds the colour to 0
+  and 1 before it is lit, for the flight's ground and the Matter API's.
+
+Held in Node by `test/ground-color.test.js` - the shader's colour chunk
+replaced by one held to 0 and 1 under three's own two guards and nothing else
+touched, a shader without it given back as it was, the edit made at compile
+and cached apart, both grounds drawn through it, and every world a flight or a
+canvas is drawn on, and the build the patch was measured on, coloured within
+0 and 1 - `test/build-camera.test.js` - the right button turning the view from
+every tool, and a right press and Select's left press held as clicks until
+they travel, never with `shift` - `test/build-mode.test.js` - the three
+answers in their order, and `CANCEL` on either question changing nothing -
+and `test/page.test.js` and `test/controls-help.test.js`, which hold the
+release that reads a right click, the browser's menu kept off, the confirm's
+styles and the list's orbit line in all three documents. Each rejected the
+defect it names when that was put back, 29 in all: the colour or a
+colour carrying alpha multiplied in unheld, the chunk left as three wrote it,
+the vertex-colour guard dropped, the edit never made at compile or cached as
+the unedited program, either ground drawn unheld, a generator writing a colour
+past 1, the right button turning nothing or only in Select, a right press
+turning from its first pixel, a shift press counted a click, the popup opened
+off the menu event, the browser's menu let through, a right click opening
+nothing, a right drag that travelled opening the popup, a right click putting
+the tool away and back, a right drag never taking the view from the tool, a
+press during a stroke starting something, the popup opened under a drag, the
+orbit line stale on the controls page or in the markdown cheat sheet,
+`CANCEL` not drawn, put first, answering `NO`, filled like `NO`, the three
+running off a narrow card, and `CANCEL`'s edge drawn over the cursor.
+
+Settled in Chromium in 22 checks: painted cyan and blue 8000 units off fogged
+exactly as the wall beside them, and 2500 off still showing as a fogged cyan;
+a right drag turning the view in Grass with no stroke laid and the tool
+suspended only while it is held, and in Select; a right drag over the
+selection opening nothing and a right click on it opening `DESELECT`, one off
+it nothing; `Shift` and a right drag panning; a right press during a stroke
+turning nothing; and at 1280x800, 390x844 and 320x640, `YES`, `NO` and `CANCEL`
+in their order inside the card, on one row or `CANCEL` wrapped below, the
+arrows walking to it, and `CANCEL` on `ACCEPT EDITS` keeping the mountain in
+hand and the tool it was.
+
 ## [1.0.0-alpha.1.56.0] - 2026-11-05
 
 The interactive build mode finished: strokes auto accept keeps joined where

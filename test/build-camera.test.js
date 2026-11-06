@@ -4,7 +4,7 @@ import {
     canvasCamera, canvasFarPlane,
     CANVAS_PITCH, CANVAS_STANDOFF, CANVAS_FAR, CANVAS_FOG,
     createBuildCamera, buildCameraPosition, orbitBuildCamera, panBuildCamera,
-    zoomBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera, cameraGesture, wheelPixels,
+    zoomBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera, cameraGesture, pressMayClick, wheelPixels,
     moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
     CAMERA_ORBIT, CAMERA_PAN, CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS,
     MIN_PITCH, MAX_PITCH, MAX_MOVE_STEP, CAMERA_CLEARANCE
@@ -390,8 +390,36 @@ test('shift and the right button pans from any tool', () => {
     }
 });
 
+/**
+ * Every tool but Select keeps the left drag for its own drawing, so the right
+ * button is the one that turns the view from inside any of them - and in
+ * Select as well, so the same hand does the same thing whatever is live.
+ */
+test('the right button turns the view from any tool, Select included', () => {
+    for (const tool of [SELECT_TOOL, 'lasso', 'mountain', 'grass', 'water', 'runway', 'paint', 'erase', 'extrude']) {
+        assert.equal(cameraGesture({ button: 2 }, tool), CAMERA_ORBIT, `in ${tool}`);
+    }
+});
+
+/**
+ * A right press is a right click too, which opens the popup on the selection,
+ * and Select's left press is a click that picks. Each moves nothing until it
+ * has travelled past a click; with shift neither is a click, and every other
+ * press moves from its first pixel.
+ */
+test('a right press and Select\'s left press may yet be clicks, and say which', () => {
+    for (const tool of [SELECT_TOOL, 'grass', 'extrude']) {
+        assert.equal(pressMayClick({ button: 2 }, tool), 'menu', `a right press in ${tool} may open the popup`);
+        assert.equal(pressMayClick({ button: 2, shiftKey: true }, tool), null, `and with shift is a pan in ${tool}`);
+    }
+    assert.equal(pressMayClick({ button: 0 }, SELECT_TOOL), 'pick', 'Select\'s left press may pick');
+    assert.equal(pressMayClick({ button: 0, shiftKey: true }, SELECT_TOOL), null);
+    assert.equal(pressMayClick({ button: 0 }, 'grass'), null, 'another tool\'s left press is its own');
+    assert.equal(pressMayClick({ button: 1 }, SELECT_TOOL), null, 'and a middle press pans at once');
+    assert.equal(pressMayClick({}, SELECT_TOOL), null);
+});
+
 test('a press that drives nothing is left alone', () => {
-    assert.equal(cameraGesture({ button: 2 }, SELECT_TOOL), null, 'the right button alone is kept for the selection');
     assert.equal(cameraGesture({ button: 0, shiftKey: true }, SELECT_TOOL), null, 'shift at a left press is the selection\'s');
     assert.equal(cameraGesture({ button: 0 }, 'grass'), null, 'and a drawing tool\'s left drag is its own');
     assert.equal(cameraGesture({ button: 1 }, 'grass'), null);

@@ -545,9 +545,39 @@ function withMountainDropped() {
 
 test('a confirm is headed in the artwork\'s words and opens on YES', () => {
     assert.deepEqual(CONFIRM_HEADINGS, { [ACCEPT_EDITS]: 'ACCEPT EDITS', [SAVE_AND_EXIT]: 'SAVE AND EXIT MODE' });
-    assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.id), [CONFIRM_YES, CONFIRM_NO],
-        'YES first, so Enter on a confirm just opened keeps the work');
-    assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.label), ['YES', 'NO']);
+    assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.id), [CONFIRM_YES, CONFIRM_NO, CONFIRM_STAY],
+        'YES first, so Enter on a confirm just opened keeps the work, and CANCEL last, never the default');
+    assert.deepEqual(CONFIRM_ENTRIES.map(entry => entry.label), ['YES', 'NO', 'CANCEL']);
+});
+
+/**
+ * `CANCEL` is drawn on both confirms. On `SAVE AND EXIT MODE` it stays in the
+ * builder with what was built still there; on `ACCEPT EDITS` it keeps the edit
+ * in hand and does not do what the question was asked on the way to.
+ */
+test('CANCEL on either confirm changes nothing at all', () => {
+    const cancel = CONFIRM_ENTRIES.at(-1).id;
+
+    // SAVE AND EXIT MODE, with a mountain committed.
+    const built = withMountainDropped();
+    acceptDraft(built);
+    const committed = structuredClone(committedPlacements(built));
+    assert.deepEqual(requestLeave(built), { confirm: SAVE_AND_EXIT });
+    assert.deepEqual(answerConfirm(built, cancel), { stay: true });
+    assert.equal(buildModeDrawing(built), true, 'the canvas is still open');
+    assert.deepEqual(committedPlacements(built), committed, 'and what was built is still there');
+
+    // ACCEPT EDITS, asked by the way out and by a tool change.
+    for (const ask of [state => requestLeave(state), state => chooseBuildTool(state, SELECT_TOOL)]) {
+        const state = withMountainDropped();
+        const draft = structuredClone(buildDraft(state));
+        ask(state);
+        assert.equal(buildConfirm(state), ACCEPT_EDITS);
+        assert.deepEqual(answerConfirm(state, cancel), { stay: true });
+        assert.deepEqual(buildDraft(state), draft, 'the edit is still in hand');
+        assert.equal(buildModeTool(state), 'mountain', 'the tool is the one it was');
+        assert.equal(buildModeDrawing(state), true, 'and the canvas is open');
+    }
 });
 
 test('YES on ACCEPT EDITS from the way out commits the edit and stays, so accepting is never leaving', () => {

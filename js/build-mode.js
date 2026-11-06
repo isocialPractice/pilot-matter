@@ -250,22 +250,26 @@ export const CONFIRM_HEADINGS = Object.freeze({
 });
 
 /**
- * The answers a confirm takes: its two buttons, and calling it off - which is
- * `Escape`, or a click anywhere but the confirm. Anything that is not one of
- * the two buttons calls it off, so an answer that means nothing never commits
- * or drops anything.
+ * The answers a confirm takes: `YES`, `NO`, and calling it off - which is the
+ * `CANCEL` button, `Escape`, or a click anywhere but the confirm. Anything that
+ * is not `YES` or `NO` calls it off, so an answer that means nothing never
+ * commits or drops anything.
  */
 export const CONFIRM_YES  = 'yes';
 export const CONFIRM_NO   = 'no';
 export const CONFIRM_STAY = 'stay';
 
 /**
- * The two buttons, as the entries of the menu a confirm is drawn and walked
- * as. `YES` first, so a confirm opens on it and `Enter` keeps the work.
+ * The three buttons, as the entries of the menu a confirm is drawn and walked
+ * as. `YES` first, so a confirm opens on it and `Enter` keeps the work, and
+ * `CANCEL` last: the answer `Escape` and a press off the confirm already give,
+ * drawn so a pilot who does not know either has it in front of them. It is
+ * never first, being the one answer that does nothing.
  */
 export const CONFIRM_ENTRIES = Object.freeze([
-    Object.freeze({ id: CONFIRM_YES, label: 'YES' }),
-    Object.freeze({ id: CONFIRM_NO,  label: 'NO' })
+    Object.freeze({ id: CONFIRM_YES,  label: 'YES' }),
+    Object.freeze({ id: CONFIRM_NO,   label: 'NO' }),
+    Object.freeze({ id: CONFIRM_STAY, label: 'CANCEL' })
 ]);
 
 /** How an edit was settled, as `answerConfirm` reports it. */

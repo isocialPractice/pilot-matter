@@ -11,21 +11,19 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Colours the fog can reach**: a patch of built ground seen saturated
-  through fog that hides everything around it, measured in Chromium before
-  anything is changed, fixed where the colour is made, with the ground's colour
-  attribute held to 0 to 1 as a backstop and every vertex of every preset and
-  of the measured build tested to lie in it
+- [ ] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
+  percentage moved a tenth at a press wherever it is stepped, still written and
+  typed to the hundredth through a precision of its own
   - From: Post Interactive Build
-- [ ] **Turn with the right button**: a right drag orbiting the view in every
-  tool and in Select, as the camera override from inside a tool, with `shift`
-  and a right drag still panning, a right click that did not travel still
-  opening `DESELECT` - decided on the button's release rather than on
-  `contextmenu` - and a second button ignored while a drag is in hand
+- [ ] **The dock's own spin buttons**: the browser's spinner, which moves a
+  field by 1, replaced by the panel's own up and down inside the field, with
+  `shift` on a click or an arrow key a coarse step of ten presses, `Page Up`
+  and `Page Down` always coarse, and the wheel over a field moving nothing
   - From: Post Interactive Build
-- [ ] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
-  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
-  changed, never the default, and fitting the card on a phone
+- [ ] **Arrows on switches and choices only**: `‹ ›` drawn only beside a row
+  with no figure to type, a number row the label and its field with the column
+  of figures kept in line, and a switch's or choice's reading drawn as a box a
+  click steps
   - From: Post Interactive Build
 
 ## Game UI/UX
@@ -108,19 +106,6 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
-- [ ] **Colours the fog can reach**: a patch of built ground seen saturated
-  through fog that hides everything around it, measured in Chromium before
-  anything is changed, fixed where the colour is made, with the ground's colour
-  attribute held to 0 to 1 as a backstop and every vertex of every preset and
-  of the measured build tested to lie in it
-- [ ] **Turn with the right button**: a right drag orbiting the view in every
-  tool and in Select, as the camera override from inside a tool, with `shift`
-  and a right drag still panning, a right click that did not travel still
-  opening `DESELECT` - decided on the button's release rather than on
-  `contextmenu` - and a second button ignored while a drag is in hand
-- [ ] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
-  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
-  changed, never the default, and fitting the card on a phone
 - [ ] **Fractions step a tenth**: a range from 0 to 1 that is not read as a
   percentage moved a tenth at a press wherever it is stepped, still written and
   typed to the hundredth through a precision of its own
@@ -249,70 +234,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 372 earlier items in `TODO-archive.md`, newest last.
+> 375 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Extrusions settle into the ground**: each surface taking the ground's
-  own lightness, and the wall's colour fading to the ground's across the band
-  its height already eases over
-  - **The blend is there.** Since `1.0.0-alpha.1.51.0` `tintColor` in
-    `js/environment/elements.js` gives a colour the ground's own luminance,
-    which is the first half of this.
-  - **The fade is half there.** Since `1.0.0-alpha.1.53.0` an extrusion paints
-    the band at its footprint's edge its wall colour, and the compositor
-    blends it into the ground by the band's weight, so the wall already fades
-    toward the ground at its foot; what is left is both surfaces through
-    `tintColor`.
-  - **Settled**: `extrude` has a `blend`, `tint` by default, as paint's
-    does: each surface is `tintColor` of the ground and its colour, so a wall
-    shades down a hillside the way the hillside does, and the wall, blended
-    into the ground by the band's weight as before, fades from its tinted
-    colour. `normal` lays the colours as they are. The ground a surface takes
-    its lightness from is the ground as composited at the extrusion's turn in
-    the order, so water and snow drawn after it - which raised ground may no
-    longer be under - are not what it is measured against.
-  - From: Interactive Build Mode
-- [x] **The camera from inside a tool**: a held pan that suspends the live tool
-  rather than changing it, putting the tool back on release so a half-drawn
-  shape is not committed by moving the view
-  - **Settled**: `holdCamera`, `cameraHeld` and `releaseCamera` in
-    `js/build-mode.js` are the plan's override, `state.camera = {
-    overriding, resumes }`: held as a `shift` and right-button pan begins
-    with any tool but Select, whose camera is its own, and let go when the
-    drag ends. While it is held no tool is chosen, the cursor grabs, the
-    brush and a runway's outline are put away, and a shape drawn a click at a
-    time stops reaching to the pointer; nothing is committed, cancelled or
-    asked about, so the draft, a shape half drawn and the selection are as
-    they were when it is let go. The pan was already the camera's for every
-    tool; what this adds is the state saying so, which the builder's settings
-    screen can suspend a tool through as well.
-  - From: Interactive Build Mode
-- [x] **Derived ranges are hidden**: a range the footprint already determines
-  taken off the panel rather than shown and ignored, and given the value the
-  footprint implies - the count going away while a selection is live, a ground
-  cover's band going away when it is drawn, and drawn water's level with it
-  - **The mountain's count already goes.** A mountain dropped at a click is one
-    whether or not a selection is live, so since `1.0.0-alpha.1.42.0` its count
-    is a `derived` value on the tool, left off the panel by `panelRanges` for
-    any placement carrying `at`. What is left is the cover band and drawn
-    water's level, which a footprint rather than a click settles.
-  - **The cover band goes too.** Since `1.0.0-alpha.1.48.0` `panelRanges` leaves
-    off a range the element's `footprintSettles` names for a placement with a
-    footprint, and the cover tool's own panel carries only density, the stamp
-    and the colours. What is left is drawn water's level.
-  - **Everything it names now goes.** Since `1.0.0-alpha.1.49.0` a placement
-    with a footprint shows neither what its element's `footprintSettles`
-    works out nor what its `footprintIgnores` - drawn water's level and
-    flatten - beside the count and the band. Its run is checking nothing else
-    is shown and ignored, and settling it.
-  - **Settled**: nothing else was shown and ignored, and
-    `test/derived-ranges.test.js` now holds it: every row a tool's placement
-    shows - each cover's stroke, paint, an extrusion, a dropped mountain, a
-    runway and an airport - is stepped both ways and must change the ground
-    the placement draws, a switch's bounds judged with the switch on.
-    Extrude's `level` is off its panel, a footprint settling it, and its
-    `blend` is on it and read. A wall's band can fall between the vertices of
-    a coarse sampling, so the check draws at half the game's density.
-  - From: Interactive Build Mode
 - [x] **Builder settings**: a settings screen for the builder's own
   preferences, declared and stored the way the game's two settings screens are,
   with a reset to defaults, and read by nothing that generates ground, so a
@@ -434,3 +357,55 @@ how the simulator got here rather than as a list still to be worked.
     order, nothing more - so a binding added, renamed or taken off fails
     each document until it follows.
   - From: Interactive Build Mode
+- [x] **Colours the fog can reach**: a patch of built ground seen saturated
+  through fog that hides everything around it, measured in Chromium before
+  anything is changed, fixed where the colour is made, with the ground's colour
+  attribute held to 0 to 1 as a backstop and every vertex of every preset and
+  of the measured build tested to lie in it
+  - **Settled**: measured first, and the colours were not out of range.
+    Every vertex colour of every build tried - water, extrusions, snow and
+    paint in five orders, pairs straddling every seam, the water animating
+    over several frames - lay in 0 to 1. The patch was the colour as
+    interpolated at the pixel: with antialiasing on, a pixel the edge of a
+    triangle crosses is shaded once at its middle, which can lie outside the
+    triangle, and there the colour is carried on past the triangle's corners.
+    Far off, the ground is nearly edge-on and its triangles slivers, so a
+    channel a saturated paint holds near 0 came out below it; the frame's
+    sRGB encoding raised that to a fractional power, which the shader the
+    browser hands the GPU on Windows made no number at all, written as 0 after
+    the fog - red 97 where the fog alone gives 194, 8000 units off. The fix
+    holds the interpolated colour to 0 and 1 in the ground's shader:
+    `holdGroundColor` in the new `js/ground-material.js`, a string edit on
+    three's `color_fragment` chunk, used by the flight's ground and the Matter
+    API's. The attribute copy is not clamped, never having been out of range;
+    instead every world's generated colours, and the measured build's, are
+    tested to lie in 0 to 1, since the held shader would hide a generator
+    that broke that. It reopens no archived item: the ground was drawn this
+    way from the start, and a saturated paint was the first colour to show
+    it.
+  - From: Post Interactive Build
+- [x] **Turn with the right button**: a right drag orbiting the view in every
+  tool and in Select, as the camera override from inside a tool, with `shift`
+  and a right drag still panning, a right click that did not travel still
+  opening `DESELECT` - decided on the button's release rather than on
+  `contextmenu` - and a second button ignored while a drag is in hand
+  - **Settled**: a right drag orbits in every tool and in Select, one more
+    row in `CAMERA_GESTURES`, so the list's orbit line reads `Drag (Select) or
+    Right Drag`. A right press waits until it travels past a click before it
+    turns, as Select's left press always has, through `pressMayClick`; one let
+    go of before then is the right click, and opens the popup through `menuAt`
+    on the release, while `contextmenu` only keeps the browser's menu off the
+    canvas. The tool is suspended only once the press travels, so a right
+    click does not put it away and back. A press while a stroke or a lasso
+    drag is in hand starts nothing; a second mouse button pressed during a
+    drag never reaches the press at all, pointer events sending it as a move.
+  - From: Post Interactive Build
+- [x] **Cancel on the confirms**: `CANCEL` drawn third on `SAVE AND EXIT MODE`
+  and `ACCEPT EDITS`, the answer `Escape` already gives, staying with nothing
+  changed, never the default, and fitting the card on a phone
+  - **Settled**: `CANCEL` is the third of `CONFIRM_ENTRIES`, answering
+    `CONFIRM_STAY`, on both confirms, and outlined as the dock's `CANCEL` is.
+    The card is 360 pixels wide so the three stand on one row on a 390-pixel
+    phone; on anything narrower they wrap, `CANCEL` alone under `YES` and
+    `NO`, measured at 320.
+  - From: Post Interactive Build

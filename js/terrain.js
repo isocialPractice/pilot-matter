@@ -7,6 +7,7 @@ import { buildEnvironment, getEnvironment, DEFAULT_ENVIRONMENT_ID } from './envi
 import { isGroup } from './templates.js';
 import { animateWater } from './water.js';
 import { updateNormals } from './terrain-normals.js';
+import { holdGroundColor } from './ground-material.js';
 import {
     TILE_REACH, TILE_KEEP, CANVAS_REACH, CANVAS_KEEP, tileIndexAt, tileKey,
     tileBounds, tileCenter, tilesInReach, tileWorthKeeping, sameTile, isHomeTile,
@@ -453,7 +454,7 @@ function buildMesh(field) {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(field.color.slice(), 3));
     geo.computeVertexNormals();
 
-    return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    return new THREE.Mesh(geo, holdGroundColor(new THREE.MeshLambertMaterial({ vertexColors: true })));
 }
 
 /**

@@ -3582,8 +3582,10 @@ test('the renderer\'s canvas listens for the pointer, with the wheel kept from t
     }
     assert.match(wired, /addEventListener\('wheel',\s*\(e\) => this\.onCanvasWheel\(e\), \{ passive: false \}\)/,
         'and for the wheel non-passively, so it can keep the page from zooming');
-    assert.match(wired, /addEventListener\('contextmenu', \(e\) => \{\s*if \(!buildModeDrawing\(this\.builder\)\) return;\s*e\.preventDefault\(\);\s*this\.onCanvasMenu\(e\);/,
-        'the right button\'s menu kept off only while a canvas is open, and a right click read as the builder\'s');
+    assert.match(wired, /addEventListener\('contextmenu', \(e\) => \{\s*if \(buildModeDrawing\(this\.builder\)\) e\.preventDefault\(\);\s*\}\);/,
+        'the right button\'s menu kept off only while a canvas is open, and nothing of the builder\'s opened from it');
+    assert.doesNotMatch(mainSource, /onCanvasMenu|rightPress/,
+        'a right click is read off the right button\'s release, never off the menu event some systems send at the press');
 
     const setups = mainSource.match(/this\.setupBuilderPointer\(\);/g) ?? [];
     assert.equal(setups.length, 1, 'attached once, for as long as the page is open');
@@ -3782,6 +3784,12 @@ test('the page carries one confirm panel, a dialog with a heading and a menu of 
     assert.match(layer[1], /inset:\s*0/, 'across the whole screen, so the palette, the dock and the canvas wait');
     assert.match(indexHtml, /#build-confirm-menu li\[data-entry="yes"\] \{[^}]*background:\s*#90c090/, 'a green YES');
     assert.match(indexHtml, /#build-confirm-menu li\[data-entry="no"\] \{[^}]*background:\s*#8b7355/, 'and a tan NO');
+    assert.match(indexHtml, /#build-confirm-menu li\[data-entry="stay"\] \{[^}]*background:\s*transparent;[^}]*border-color:\s*rgba\(255, 176, 0, 0\.6\);/,
+        'and CANCEL outlined rather than filled, as the dock\'s CANCEL is');
+    assert.match(indexHtml, /#build-confirm-menu \{[^}]*flex-wrap:\s*wrap;[^}]*justify-content:\s*center;/,
+        'the three wrapping on a screen too narrow for them, rather than running off the card');
+    assert.ok(indexHtml.indexOf('#build-confirm-menu li[data-entry="stay"]') < indexHtml.indexOf('#build-confirm-menu li.selected'),
+        'with the cursor\'s edge drawn over CANCEL\'s, so the cursor shows on it');
 });
 
 test('the confirm is drawn over a canvas only while it is asking, headed for its question', () => {
@@ -3868,23 +3876,25 @@ test('a click with a tool that drops picks the ground and drops there', () => {
  */
 test('a Select press that does not travel is a click, and picks; one that travels orbits', () => {
     const press = methodBody(mainSource, 'onCanvasPress');
-    assert.match(press, /picks: tool === SELECT_TOOL && e\.button === 0 && !e\.shiftKey,/,
-        'a plain main-button press with Select live may yet be a click');
+    assert.match(press, /clicks: pressMayClick\(e, tool\),/,
+        'a press that may yet be a click - Select\'s plain left, or a plain right - says which');
     assert.match(press, /start: \{ x: e\.clientX, y: e\.clientY \},/, 'measured from where it began');
     assert.match(press, /travelled: false/);
 
     const drag = methodBody(mainSource, 'onCanvasDrag');
     assert.match(drag,
-        /if \(drag\.picks && !drag\.travelled\) \{\s*if \(!travelledPast\(drag\.start, \{ x: e\.clientX, y: e\.clientY \}, drag\.type\)\) return;\s*drag\.travelled = true;\s*\}/,
-        'the view does not turn until the press has travelled past a click');
+        /if \(drag\.clicks != null && !drag\.travelled\) \{\s*if \(!travelledPast\(drag\.start, \{ x: e\.clientX, y: e\.clientY \}, drag\.type\)\) return;\s*drag\.travelled = true;\s*this\.holdCanvasCamera\(\);\s*\}/,
+        'the view does not turn until the press has travelled past a click, and is taken from the tool only then');
     assert.ok(drag.indexOf('this.canvasPointer = ') < drag.indexOf('const drag = this.canvasDrag;'),
         'and every move over the canvas is where the hover is read from, drag or not');
 
     const release = methodBody(mainSource, 'onCanvasRelease');
-    assert.match(release, /const click = e\.type === 'pointerup' && drag\.picks && !drag\.travelled;/,
+    assert.match(release, /const click = e\.type === 'pointerup' && !drag\.travelled \? drag\.clicks : null;/,
         'only a press let go of, not one cancelled or taken away, is a click');
-    assert.ok(release.indexOf('this.endCanvasDrag();') < release.indexOf('if (click) this.pickAt(e.clientX, e.clientY);'),
+    assert.ok(release.indexOf('this.endCanvasDrag();') < release.indexOf("if (click === 'pick') this.pickAt(e.clientX, e.clientY);"),
         'and it picks once the drag is over');
+    assert.match(release, /if \(click === 'pick'\) this\.pickAt\(e\.clientX, e\.clientY\);\s*else if \(click === 'menu'\) this\.menuAt\(e\.clientX, e\.clientY\);/,
+        'or, for the right button, opens the popup');
 });
 
 test('a click picks the committed placement under it through its reach, not off the scene', () => {
@@ -4492,16 +4502,33 @@ test('an erase stroke reads alt once at the press and is laid with it', () => {
     assert.match(methodBody(mainSource, 'finishStroke'), /layStroke\(this\.builder, drawn\.points, stamp, \{ size: this\.terrain\.size, alt: drawn\.alt \}\)/);
 });
 
-test('a right click on the selection opens the popup, and a right drag that panned does not', () => {
-    const press = methodBody(mainSource, 'onCanvasPress');
-    assert.match(press, /this\.rightPress = e\.button === 2 \? \{ x: e\.clientX, y: e\.clientY, type: e\.pointerType \} : null;/);
-    const menu = methodBody(mainSource, 'onCanvasMenu');
-    assert.match(menu, /if \(press == null \|\| e\.shiftKey \|\| travelledPast\(press, \{ x: e\.clientX, y: e\.clientY \}, press\.type\)\) return;/,
-        'a pan, with shift or by travelling, opens nothing');
-    assert.match(menu, /if \(this\.strokeDrawing \|\| this\.lassoDrawing \|\| this\.gumballDrag \|\| this\.canvasDrag\) return;/);
+test('a right click on the selection opens the popup, and a right drag that turned or panned does not', () => {
+    // Only a right press let go of before it travelled reaches the popup:
+    // `pressMayClick` says a shift press is never one, and the release reads
+    // `travelled` - held in the test above.
+    const menu = methodBody(mainSource, 'menuAt');
+    assert.ok(menu, 'js/main.js should define menuAt()');
+    assert.match(menu, /if \(this\.strokeDrawing \|\| this\.lassoDrawing \|\| this\.gumballDrag \|\| this\.canvasDrag\) return;/,
+        'and nothing is opened under a drag, a stroke or a shape being drawn');
     assert.match(menu, /const inside = point != null && footprintWeight\(selection, point\.x, point\.z, this\.terrain\.size\) > 0;/,
         'on the selected ground, measured on the canvas it repeats across');
-    assert.match(menu, /if \(openDeselectPopup\(this\.builder, \{ x: e\.clientX, y: e\.clientY \}, inside\)\) this\.syncOverlays\(\);/);
+    assert.match(menu, /if \(openDeselectPopup\(this\.builder, \{ x: clientX, y: clientY \}, inside\)\) this\.syncOverlays\(\);/);
+
+    const release = methodBody(mainSource, 'onCanvasRelease');
+    assert.ok(release.indexOf('this.endCanvasDrag();') < release.indexOf('this.menuAt('),
+        'the drag is over before the popup is opened, so it is not refused as one under a drag');
+});
+
+/**
+ * Pointer Events send a second button pressed during a drag as a move, but a
+ * second finger is a pointer of its own, so a press during a stroke or a
+ * lasso drag is refused by name rather than left to the button it came on.
+ */
+test('a press while a stroke or a lasso drag is in hand starts nothing', () => {
+    const press = methodBody(mainSource, 'onCanvasPress');
+    assert.match(press, /if \(this\.strokeDrawing \|\| this\.lassoDrawing\?\.gesture === LASSO_DRAG\) return;/);
+    assert.ok(press.indexOf('this.lassoDrawing?.gesture === LASSO_DRAG) return;') < press.indexOf('closeDeselectPopup'),
+        'before anything else is read off it');
 });
 
 test('the popup is shut by a press anywhere off it, the canvas\'s press going no further, and by Escape first', () => {
@@ -4646,8 +4673,10 @@ test('BACK from the surfaces draws the ground again as it stood', () => {
 
 test('a pan from inside a tool holds the camera, and letting it go puts the tool back', () => {
     const press = methodBody(mainSource, 'onCanvasPress');
-    assert.match(press, /travelled: false\s*\};\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*if \(holdCamera\(this\.builder\)\) this\.renderer\.domElement\.style\.cursor = this\.canvasCursor\(\);/,
-        'held as the drag begins');
+    assert.match(press, /travelled: false\s*\};\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*if \(this\.canvasDrag\.clicks == null\) this\.holdCanvasCamera\(\);/,
+        'held as the drag begins - or, for a press that may yet be a click, once it travels');
+    assert.match(methodBody(mainSource, 'holdCanvasCamera'),
+        /if \(holdCamera\(this\.builder\)\) this\.renderer\.domElement\.style\.cursor = this\.canvasCursor\(\);/);
     const begun = press.slice(press.indexOf('const gesture'));
     assert.doesNotMatch(begun.slice(begun.indexOf('e.preventDefault();')), /cancelLasso|cancelStroke|acceptDraft|cancelDraft|chooseBuildTool|finishLasso/,
         'a pan neither settles the draft nor drops a shape half drawn');
