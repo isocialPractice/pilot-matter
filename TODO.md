@@ -38,89 +38,48 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - a refused file row says why in a colour it cannot be read in
+### UI/UX Override - the top a click cannot reach
 
 #### Found Issues
 
-- [ ] The Settings file row's refusal is amber on the selection's green, at
-  1.34:1
-  - **Issue**: `#settings-menu li.refused::after` writes the reason a file was
-    refused in `#ffb000`, and `li.selected` fills the row `#0f0` with black
-    text. A row is only ever refused just after it was pressed, and a row is
-    pressed where the cursor is, so the two always land together: the reason
-    is drawn amber on bright green. Measured in Chromium at 1.34:1 over 10
-    pixel text, where the row's own label manages 15.3:1 on the same fill -
-    below the 4.5:1 small text needs, and close enough to 1:1 that the line
-    reads as a texture rather than as words. Driven three times over
-    `LOAD ENVIRONMENT...` in Settings with a JSON file whose `format` is not
-    `pilot-matter.environment`; the reason itself is right
-    (`could not load not-a-world.json: the file is not an environment file`).
-    Stepping the cursor one row down makes the same text legible at 11.46:1,
-    so the message is only unreadable in the one state it appears in. The
-    builder's own SAVE / LOAD dock is not affected - its refusal is the same
-    amber on the dock's dark fill at 11.46:1 - so this is the Settings list
-    alone.
-  - **Goal**: give a row that is both selected and refused a fill the warning
-    amber reads against, rather than the ordinary green selection. A rule
-    after the two existing ones - `#settings-menu li.selected.refused` with a
-    dark fill and an amber border, keeping `::after` at `#ffb000` - clears
-    4.5:1 and keeps the warning reading as a warning; the green selection fill
-    is what has to go on that row, not the amber. Check the same pairing on
-    `#settings-start`, `#settings-options` and `#settings-builder`, which
-    share the `li.selected` rule, and hold whatever is chosen with a contrast
-    assertion in `test/page.test.js` beside the existing `li.refused` one.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [ ] A click cannot choose the top of the canvas's own highest ground
+  - **Issue**: `pickGround` walks a ray from where it crosses
+    `canvasGround.top`, the highest vertex of the field, and throws the pick
+    away when the clearance there is not above zero - a guard written for a
+    camera buried in a hill. A ray aimed at a point that is itself at that
+    height crosses the ceiling exactly on it, so the clearance is exactly 0
+    and the pick answers null. Driven in Chromium: one 2400 unit extrusion
+    600 units tall on a blank canvas, clicked at its middle from camera
+    pitches of 85, 70, 55, 40, 30 and 20 degrees - nothing at every one of
+    them, so `EDIT EXTRUSION` leaves the panel pointed at both colours rather
+    than narrowing to `TOP COLOR` and `BLEND`, and the top's red rim is never
+    drawn. Stand a taller block anywhere else on the canvas and the same
+    click answers `top` at every pitch down to 30. It reaches every tool that
+    reads the ground under the pointer, not Extrude's surfaces alone. Not
+    new: the same drive against `js/environment/footprints.js` as it was
+    before the feather was held, served into the page, answers `nothing` too.
+  - **Goal**: Resolve to [highest-ground-pick.prompt.md](.claude/prompts/highest-ground-pick.prompt.md)
+  - From: UI/UX Override - the top a click cannot reach
 
-- [ ] A small extrusion has no top surface, so its top colour never shows and
-  its prism is never previewed
-  - **Issue**: `surfaceAt` in `js/extrude.js` calls a point the top only where
-    the footprint's weight reaches `TOP_WEIGHT`, which is 1, and a footprint's
-    weight reaches 1 only a feather inside its edge. The default feather is 160
-    units, so a region narrower than about twice that has no point at weight 1
-    at all. Measured on the default canvas - 16000 units across, sampled every
-    80: a 200-unit square extrusion weighs 9 vertices and not one of them is a
-    top, and the first top appears at 320 units. Three things follow for every
-    extrusion smaller than that, and Extrude accepts regions down to
-    `MIN_REGION`, which is 40. The `extrude` element paints by the same weight
-    through `drawn: 'edge'`, so the whole of it takes the wall colour and the
-    `topColor` row on the surfaces panel changes nothing. `surfacePress` in
-    `js/main.js` reads the weight under the click and hands it to `surfaceAt`,
-    so a click anywhere on it answers `wall` and the top can never be chosen.
-    And `liftedTop` averages only the vertices at weight 1, so it returns null
-    and `drawPrism`'s `Number.isFinite(drag.top)` guard draws no preview while
-    the blue arrow pulls the height. A small building is the ordinary case for
-    this tool, and all three are silent: nothing refuses the region or says why
-    the colour did not take.
-  - **Goal**: give a region its top wherever it has an inside, rather than
-    where a fixed feather has finished easing. The weight model is the thing to
-    change, not the three readers: either hold a footprint's feather to a share
-    of the region's own extent so a small region still eases to 1 in its
-    middle, or read the top from the region's own interior distance rather than
-    from the weight the feather produced. Whichever is chosen, `surfaceAt`,
-    `drawn: 'edge'` on the `extrude` element, `TOP_LEVEL` in
-    `js/build-overlay.js` and `liftedTop` all have to read it the same way, so
-    the colour painted, the surface clicked, the edge outlined and the prism
-    previewed stay one answer. Too large for a review turn: it moves the
-    footprint weighting that twelve tools share. Cover it in
-    `test/surfaces.test.js` with a region near `MIN_REGION` as well as a large
-    one, since the suite's extrusions are all comfortably over 320 units and
-    reported none of this.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
-
-- [ ] `ringArea` says it returns twice the area it returns
-  - **Issue**: the docstring on `ringArea` in `js/shapes.js` reads "Twice the
-    area a ring encloses, signed by the way it winds", but the shoelace sum it
-    accumulates is twice the signed area and the function returns that sum
-    halved, which is the area itself - on a 10 by 10 square it answers 100, not
-    200. Its one caller compares the result against `MIN_REGION * MIN_REGION /
-    2`, which is the area of a right triangle with `MIN_REGION` legs and reads
-    correctly against an area, so the code is right and only the sentence is
-    wrong. It matters because the next reader to use the helper will halve a
-    figure that is already halved, and get a threshold twice as permissive as
-    the one they wrote.
-  - **Goal**: drop "Twice" - "The area a ring encloses, signed by the way it
-    winds". Nothing else in the file changes.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [ ] A small extrusion's chosen top is outlined by a few pixels or by none
+  - **Issue**: `surfaceEdges` traces the top's rim by marching squares over
+    `OUTLINE_CELLS` - 256 cells across a 16,000 unit canvas, so 62.5 units to
+    a cell. With the feather now held to half a region's reach, a 200 unit
+    region's ground at full cover is about 100 units across, which is between
+    one and two cells, and where it falls on that grid decides whether a
+    contour is found at all. Two hand-driven runs of the same 200 unit block
+    gave a rim of 83 pixels spanning 33 by 13, and a rim of 1 pixel. By 320
+    units it is 615 pixels and reads as a rim. The top is chosen correctly in
+    every case and `TOP COLOR` works - only the red outline that says which
+    surface is chosen is missing, which is the one thing on screen that
+    answers "did that click take".
+  - **Goal**: Trace the rim finely enough to find a region of the size
+    Extrude accepts - `surfaceEdges` could take its cell count from the
+    footprint's own reach rather than from the canvas, as `regionEdges` could
+    - or, where no contour is found at all, fall back to marking the chosen
+    top some other way. Hold it with a test in `test/build-overlay.test.js`
+    asserting `surfaceEdges` answers a non-empty run for a 200 unit rect.
+  - From: UI/UX Override - the top a click cannot reach
 
 ## Game UI/UX
 
@@ -744,67 +703,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 395 earlier items in `TODO-archive.md`, newest last.
+> 398 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
-  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
-  the world and flown on it
-  - **Settled**: `plane` joins `BUILT_TOOLS`, and its dock is `DOCK_PLANE`
-    headed `INSERT PLANE`: SELECT PLANE, five named cards with the chosen one
-    pressed, and SELECT STARTING POINT, `AT X`, `AT Z`, `HEADING` and `HEIGHT
-    FEET` or `HEIGHT METERS` in the settings' altitude unit, or a line saying
-    to click the ground while there is none, with `CLEAR` pinned under them
-    and not pressable until there is something to take. Each section carries
-    its mode type off the tool. The plane chosen rides the world as the start
-    point does, as `plane` in the file, and `refreshWorld` puts the pilot in it
-    through `flyPlane`. The control list gains `Click (Insert plane) - Put the
-    Start Point There` and `Drag (Insert plane) - Turn the Start Point by Its
-    Knob`.
-  - From: Post Interactive Build
-- [x] **Objects on the ground**: a placement drawn as a mesh standing on the
-  ground rather than as ground, repeated on every tile on that tile's own
-  ground, fogged like the ground, solid to the aircraft - any touch on one a
-  crash, roofs included, while an extrusion's top is still landed on as
-  ground - picked by Select and taken whole by Erase
-  - **Settled**: an object is a placement of type `object` - `{ prefab,
-    recipe, config: { at, heading, scale } }` - and `js/objects.js` lays it
-    out. `buildEnvironment` leaves objects out, so the ground is drawn as
-    without them; each tile then stands them with `standingObjects`, once its
-    ground is joined to its neighbours, at the same canvas point on every tile:
-    on the highest ground under the footprint, over a plinth to the lowest.
-    The footprint is a hard-edged rect round the recipe, scaled and turned to
-    the heading. `js/object-mesh.js` draws one `InstancedMesh` to a recipe and
-    one for the plinths, in the ground's own held material, so fog takes them
-    as it takes the ground. `Terrain.obstacleTopAt` asks the tile under a point
-    and the tiles beside it; `Aircraft.update` takes it as `obstacle` and
-    crashes at any touch, read before the ground so a roof is never landed on,
-    while the ground - an extrusion's top included - is landed on as before; a
-    recipe marked `solid: false` is flown over. Select picks it inside its
-    footprint, over the ground it stands on; its outline is the footprint
-    traced; the Flat gumball moves it, turns it by its arc and scales it evenly
-    by its two ground squares; its panel is `HEADING` and `SCALE` under its
-    prefab's name. Erase taking everything takes it whole when a stroke's region
-    reaches its middle at all, and a put-back there gives it back - the last
-    batch to reach it deciding. The file reads it with its recipe and holds its
-    heading and scale.
-  - From: Post Interactive Build
-- [x] **Prefabs**: a building as a recipe of primitives in its own frame,
-  copied into the placement as a template's members are, merged and instanced
-  per prefab
-  - **Settled**: `js/prefabs.js` holds recipes of boxes, cylinders, cones
-    and wedges - a wedge's ridge down its middle or along its +x edge, a
-    cylinder narrowing to a `top` - each part standing its base on `at`, turned
-    about its upright by `turn` degrees, with a `0xrrggbb` colour.
-    `recipeGeometry` merges them into one list of triangles, every face wound
-    outward from its part and its normal worked from its own corners, colours
-    turned from sRGB to the linear light a vertex colour is read in.
-    `placeObject` copies the recipe in, so a prefab changed later leaves a
-    built world alone; `recipeKey` groups placements of one recipe into one
-    instanced mesh. `readRecipe` takes a file's recipe whole or refuses it,
-    naming where. The catalogue starts with two - COTTAGE and WATER TOWER -
-    under the six categories Insert City will fold; the city's own buildings
-    are the next run's.
-  - From: Post Interactive Build
 - [x] **City buildings**: five skylines, three factories, nine residential,
   five commercial and five infrastructure buildings, original and generic, in
   the catalogue a test holds to the counts asked
@@ -912,3 +812,107 @@ how the simulator got here rather than as a list still to be worked.
     the strip does, so landing, scoring and takeoff work on the strip as they
     do on any.
   - From: Post Interactive Build
+- [x] The Settings file row's refusal is amber on the selection's green, at
+  1.34:1
+  - **Issue**: `#settings-menu li.refused::after` writes the reason a file was
+    refused in `#ffb000`, and `li.selected` fills the row `#0f0` with black
+    text. A row is only ever refused just after it was pressed, and a row is
+    pressed where the cursor is, so the two always land together: the reason
+    is drawn amber on bright green. Measured in Chromium at 1.34:1 over 10
+    pixel text, where the row's own label manages 15.3:1 on the same fill -
+    below the 4.5:1 small text needs, and close enough to 1:1 that the line
+    reads as a texture rather than as words. Driven three times over
+    `LOAD ENVIRONMENT...` in Settings with a JSON file whose `format` is not
+    `pilot-matter.environment`; the reason itself is right
+    (`could not load not-a-world.json: the file is not an environment file`).
+    Stepping the cursor one row down makes the same text legible at 11.46:1,
+    so the message is only unreadable in the one state it appears in. The
+    builder's own SAVE / LOAD dock is not affected - its refusal is the same
+    amber on the dock's dark fill at 11.46:1 - so this is the Settings list
+    alone.
+  - **Goal**: give a row that is both selected and refused a fill the warning
+    amber reads against, rather than the ordinary green selection. A rule
+    after the two existing ones - `#settings-menu li.selected.refused` with a
+    dark fill and an amber border, keeping `::after` at `#ffb000` - clears
+    4.5:1 and keeps the warning reading as a warning; the green selection fill
+    is what has to go on that row, not the amber. Check the same pairing on
+    `#settings-start`, `#settings-options` and `#settings-builder`, which
+    share the `li.selected` rule, and hold whatever is chosen with a contrast
+    assertion in `test/page.test.js` beside the existing `li.refused` one.
+  - **Settled**: `#settings-menu li.selected.refused` in `index.html` drops the
+    green for the colours the low-altitude warning is already drawn in -
+    `rgba(0, 0, 0, 0.85)` under `#ffb000` type and an `rgba(255, 176, 0, 0.6)`
+    edge - so the row still reads as the one the cursor is on while the reason
+    reads as a warning. The label takes the amber too, since black on that fill
+    would be the defect the other way round. Measured in Chromium at 10.76:1
+    over a white flight and 11.46:1 over a black one, against 1.34:1 before.
+    The three other settings lists were checked and carry no `li.refused` rule
+    at all, and nothing writes `refused` onto their entries, so the pair cannot
+    arise on them; a test asserts that as well. `test/page.test.js` now settles
+    the row's two colours through the cascade rather than looking the rule up,
+    and measures them over both a bright and a dark flight.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [x] A small extrusion has no top surface, so its top colour never shows and
+  its prism is never previewed
+  - **Issue**: `surfaceAt` in `js/extrude.js` calls a point the top only where
+    the footprint's weight reaches `TOP_WEIGHT`, which is 1, and a footprint's
+    weight reaches 1 only a feather inside its edge. The default feather is 160
+    units, so a region narrower than about twice that has no point at weight 1
+    at all. Measured on the default canvas - 16000 units across, sampled every
+    80: a 200-unit square extrusion weighs 9 vertices and not one of them is a
+    top, and the first top appears at 320 units. Three things follow for every
+    extrusion smaller than that, and Extrude accepts regions down to
+    `MIN_REGION`, which is 40. The `extrude` element paints by the same weight
+    through `drawn: 'edge'`, so the whole of it takes the wall colour and the
+    `topColor` row on the surfaces panel changes nothing. `surfacePress` in
+    `js/main.js` reads the weight under the click and hands it to `surfaceAt`,
+    so a click anywhere on it answers `wall` and the top can never be chosen.
+    And `liftedTop` averages only the vertices at weight 1, so it returns null
+    and `drawPrism`'s `Number.isFinite(drag.top)` guard draws no preview while
+    the blue arrow pulls the height. A small building is the ordinary case for
+    this tool, and all three are silent: nothing refuses the region or says why
+    the colour did not take.
+  - **Goal**: give a region its top wherever it has an inside, rather than
+    where a fixed feather has finished easing. The weight model is the thing to
+    change, not the three readers: either hold a footprint's feather to a share
+    of the region's own extent so a small region still eases to 1 in its
+    middle, or read the top from the region's own interior distance rather than
+    from the weight the feather produced. Whichever is chosen, `surfaceAt`,
+    `drawn: 'edge'` on the `extrude` element, `TOP_LEVEL` in
+    `js/build-overlay.js` and `liftedTop` all have to read it the same way, so
+    the colour painted, the surface clicked, the edge outlined and the prism
+    previewed stay one answer. Too large for a review turn: it moves the
+    footprint weighting that twelve tools share. Cover it in
+    `test/surfaces.test.js` with a region near `MIN_REGION` as well as a large
+    one, since the suite's extrusions are all comfortably over 320 units and
+    reported none of this.
+  - **Settled**: the feather, not the readers. `footprintReach` in
+    `js/environment/footprints.js` answers how far inside a region its deepest
+    point is - exact for a disc, an ellipse, a box and a swathe, and the
+    half-width of the square round an outline otherwise - and `feather` holds
+    the band to `FEATHER_SHARE` of it, which is a half. So the inner half of
+    any region is covered whole, and all four readers of a full cover go on
+    weighing the same number against the same 1. Half rather than the whole
+    reach because easing to 1 at one point only is a top the sampling misses.
+    The feather is kept per footprint in a `WeakMap`, as `FLATTENED` keeps a
+    path's outline and for the same reason. A region over 640 units across
+    keeps the feather it had, so all five bundled environments build vertex for
+    vertex as they did - measured by building each with the hold taken out.
+    `test/surfaces.test.js` walks `MIN_REGION`, 200 and 2400 and checks the
+    four readers against each other; nine mutants were each caught.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [x] `ringArea` says it returns twice the area it returns
+  - **Issue**: the docstring on `ringArea` in `js/shapes.js` reads "Twice the
+    area a ring encloses, signed by the way it winds", but the shoelace sum it
+    accumulates is twice the signed area and the function returns that sum
+    halved, which is the area itself - on a 10 by 10 square it answers 100, not
+    200. Its one caller compares the result against `MIN_REGION * MIN_REGION /
+    2`, which is the area of a right triangle with `MIN_REGION` legs and reads
+    correctly against an area, so the code is right and only the sentence is
+    wrong. It matters because the next reader to use the helper will halve a
+    figure that is already halved, and get a threshold twice as permissive as
+    the one they wrote.
+  - **Goal**: drop "Twice" - "The area a ring encloses, signed by the way it
+    winds". Nothing else in the file changes.
+  - **Settled**: the word dropped, and nothing else in `js/shapes.js` touched.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
