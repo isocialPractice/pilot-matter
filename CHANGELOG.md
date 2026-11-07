@@ -17,6 +17,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   few units to either side came out part covered or not at all. The search now
   covers the sampling as well as the stroke, which leaves a stroke wider than
   the sampling measured as it was. Held in Node by `test/drawn-water.test.js`.
+- **A small extrusion has its top.** An extrusion's top is the ground its
+  footprint wholly covers, and a footprint reached full cover only a feather
+  inside its edge. The feather was a fixed two cells of the sampling - 160
+  units - so a region narrower than about twice that had no fully covered
+  point at all, while Extrude accepts regions down to 40. On the default
+  canvas a 200-unit square weighed nine vertices and not one of them was a
+  top, and the first top appeared at 320 units. Three things followed on every
+  smaller extrusion, all three silent: the whole of it took the wall's colour,
+  so the `TOP COLOR` row changed nothing; a click anywhere on it answered the
+  wall, so the top could never be chosen; and the mean of the ground it wholly
+  covers was the mean of none, so no prism was drawn while the blue arrow
+  pulled the height. A footprint's feather is now held to half the way in from
+  its edge to its deepest point, so the inner half of a region is covered
+  whole whatever its size. A region with room to spare - anything over 640
+  units across, which is every region in the worlds that ship - keeps the
+  feather it had, and all five bundled environments build vertex for vertex as
+  they did.
+- **A refused file row in Settings says why in a colour that reads.** A row is
+  only ever refused just after it was pressed, and a row is pressed where the
+  cursor is, so the reason - written in the instruments' amber - was always
+  drawn on the green the cursor fills a row with. Measured in Chromium at
+  1.34:1 over 10 pixel text, close enough to 1:1 that the line read as a
+  texture rather than as words, while the row's own label managed 15.3:1 on
+  the same fill. A row that is both refused and under the cursor now takes the
+  warning card's own colours - near-black, amber type, an amber edge marking
+  the cursor - which the reason reads against at 10.76:1 over a bright flight
+  and 11.46:1 over a dark one. The builder's own `SAVE / LOAD` dock was never
+  affected and is unchanged.
+- **`ringArea` says what it returns.** Its docstring read "Twice the area a
+  ring encloses"; the shoelace sum it accumulates is twice the area and the
+  function returns that sum halved, so it answers 100 on a 10 by 10 square.
+  Its one caller already reads it as an area. Only the sentence changed.
+- **A runway group read from a file is held to the strip's own bounds.** An
+  environment file's ranges are clamped as a panel would clamp them, but a
+  group's branch in `readPlacement` answered before that clamp, so it was the
+  one placement type whose figures went through as written: a file saying
+  `heading: 123456`, `length: 1e9`, `width: -5000` was read with no problem
+  named and kept at exactly those. Nothing was drawn wrong, because
+  `groupConfig` holds the same bounds again when the ground is laid - but the
+  dock, whose rows declare 600 to 8000 and 80 to 600, showed the figure the
+  file came with, and a world loaded and saved carried it forward every time.
+  A group's `heading`, `length` and `width` are now held on the way in, as an
+  object's and an element's always were, so the figure kept is the strip
+  built. A group that carried no configuration still carries none.
+
+Held in Node by `test/surfaces.test.js`, which now walks a region at the
+smallest size Extrude accepts as well as a large one and checks the four
+readers of a full cover against each other - the surface a click chooses, the
+colour the element paints, the height the prism is lifted from and the outline
+the top is traced by - and by `test/page.test.js`, which measures the refused
+row's two colours against the fill the cascade actually leaves it on, over
+both a bright flight and a dark one. Each rejected the defect it names when
+that was put back, nine in all: a feather taken as asked, a feather taking the
+whole reach, a box's reach read as its diagonal, a swathe's reach read as its
+stamp's shorter half, the top read at a weight any feather reaches, the
+element painting no vertex the top, a click reading the top only above a full
+cover, the overlay tracing the top above one, the prism lifted from every
+vertex a region reaches; and for the row, the green selection fill left on it,
+the rule removed so it falls back to that fill, a fill too pale for the amber,
+the label left the selection's black, and the reason dimmed off the amber.
+
+Settled in Chromium in 13 checks: a 200-unit and a 2400-unit extrusion each
+clicking as the top in its middle, offering `TOP COLOR` on the panel, and
+answering a finite height for the prism; a 200-unit block accepted onto a
+canvas and drawn with its top in the top's colour; and the refused file row
+under the cursor drawn on the warning fill with its reason at better than
+10:1, over both a bright and a dark flight.
 
 ## [1.0.0-alpha.1.65.0] - 2026-11-06
 

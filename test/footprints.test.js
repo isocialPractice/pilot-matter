@@ -200,8 +200,11 @@ test('a stroke sampled every few pixels is whole down its middle, however shallo
         assert.equal(footprintWeight(drag, (ax + bx) / 2, (az + bz) / 2), 1, 'and between the samples');
     }
 
+    // 600 across the way it went, so its reach is 300 and its feather is held
+    // to 150 - see `FEATHER_SHARE`. A half-depth of 100 is 50 short of that, so
+    // the last 50 units of the stroke are feathered and the rest is whole.
     const shallow = { kind: 'stroke', points: [[-2000, 0], [2000, 0]], stamp: { width: 600, depth: 200, corner: 0 } };
-    assert.ok(footprintWeight(shallow, 1950, 0) < 1,
+    assert.ok(footprintWeight(shallow, 1990, 0) < 1,
         'a shallow stamp\'s end face is under a feather from the last sample, and feathers what is short of it too');
     assert.equal(footprintWeight(shallow, 1800, 0), 1, 'and only that');
 

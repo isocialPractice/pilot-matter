@@ -9,10 +9,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    createField, applyBase, getElement, readColor, fieldX, fieldZ, tintColor, luminance, DEFAULT_SIZE
+    createField, applyBase, getElement, readColor, fieldX, fieldZ, tintColor, luminance, DEFAULT_SIZE, DEFAULT_SEGMENTS
 } from '../js/environment/elements.js';
 import { applyFootprintedElement } from '../js/environment/footprinted.js';
-import { footprintWeight } from '../js/environment/footprints.js';
+import {
+    footprintWeight, footprintSampler, footprintBounds, footprintReach, FEATHER_SHARE, DEFAULT_FEATHER
+} from '../js/environment/footprints.js';
 import {
     EXTRUDE_SURFACES_DECLARED, EXTRUDE_BACK, TOP_WEIGHT, surfaceAt, surfaceRows, EXTRUDE_EXTRUDING, EXTRUDE_SURFACES,
     EXTRUDE_DRAWING, EXTRUDE_STAGE_ACTION
@@ -25,6 +27,7 @@ import {
 } from '../js/build-mode.js';
 import { dockContent, DOCK_ACCEPT, DOCK_CANCEL } from '../js/build-panel.js';
 import { surfaceEdges, EDGE_LEVEL } from '../js/build-overlay.js';
+import { MIN_REGION } from '../js/shapes.js';
 
 const near = (a, b, within = 1e-4) => Math.abs(a - b) <= within;
 const SIZE = DEFAULT_SIZE;
@@ -267,6 +270,97 @@ test('at the tint blend each surface takes its colour\'s hue at the ground\'s ow
     // A top laid over ground of more than one lightness is shaded the way the ground was.
     const lightness = tops.map(i => luminance(readColor(field, i)));
     assert.ok(Math.max(...lightness) - Math.min(...lightness) > 0.01, 'not one printed colour');
+});
+
+/**
+ * Found at the surfaces panel on a small building. `surfaceAt` calls a point
+ * the top only at a weight of `TOP_WEIGHT`, which is 1, and a weight reached 1
+ * only a feather inside the region's edge. The feather was a fixed 160 units,
+ * so on the default canvas - 16000 across, sampled every 80 - a 200 unit
+ * square extrusion weighed nine vertices and not one of them was a top, and
+ * the first top appeared at 320 units. Extrude accepts regions down to
+ * `MIN_REGION`, which is 40, and a small building is the ordinary case for it.
+ *
+ * Three things failed on every extrusion under that size, all three silently:
+ * the element painted the whole of it the wall's colour through `drawn:
+ * 'edge'`, so the `topColor` row changed nothing; a click anywhere on it read
+ * a weight short of 1 and answered `wall`, so the top could never be chosen;
+ * and the mean of the vertices at full weight - what `liftedTop` hands the
+ * prism preview - was the mean of none, so no prism was drawn while the blue
+ * arrow pulled the height.
+ *
+ * A feather is held to `FEATHER_SHARE` of the region's own reach now, so every
+ * region has an inside whatever its size. All four readers weigh the same
+ * number against the same 1, so the colour painted, the surface clicked, the
+ * edge outlined and the height lifted stay one answer - which is what this
+ * measures, at the smallest region the tool accepts as well as a large one.
+ */
+test('a region has its top wherever it has an inside, down to the smallest Extrude accepts', () => {
+    const step = SIZE / DEFAULT_SEGMENTS;
+    assert.equal(step, 80, 'the bundled sampling, which the figures below are measured at');
+    assert.equal(FEATHER_SHARE, 0.5, 'half the way in, so the inner half of a region is its top');
+
+    for (const side of [MIN_REGION, 200, 2400]) {
+        const footprint = { kind: 'rect', x: 0, z: 0, width: side, depth: side, angle: 0, corner: 0 };
+
+        // Held to half the way in from the edge to the deepest point, so the
+        // band is never wider than the region has room for - and left at the
+        // sampling's own 160 on a region with room to spare, which is every
+        // region over 640 units across and is what the hold leaves alone.
+        assert.equal(footprintReach(footprint), side / 2, `${side}: its reach is its half-width`);
+        // The square round a box is its own diagonal, so what the feather adds
+        // to it is read past that rather than past its half-width.
+        const band = footprintBounds(footprint).maxX - Math.hypot(side, side) / 2;
+        assert.ok(near(band, Math.min(DEFAULT_FEATHER, side / 4), 1e-9), `${side}: its feather is held to ${band}`);
+        const weigh = footprintSampler(footprint, SIZE);
+        assert.equal(weigh(0, 0), 1, `${side}: its middle is wholly covered`);
+
+        // The vertices of the default canvas the region reaches, and which of
+        // them each reader calls the top. One answer, four readings of it.
+        const covered = [];
+        for (let gz = -DEFAULT_SEGMENTS / 2; gz <= DEFAULT_SEGMENTS / 2; gz++) {
+            for (let gx = -DEFAULT_SEGMENTS / 2; gx <= DEFAULT_SEGMENTS / 2; gx++) {
+                const weight = weigh(gx * step, gz * step);
+                if (weight > 0) covered.push({ x: gx * step, z: gz * step, weight });
+            }
+        }
+        const tops = covered.filter(point => point.weight >= TOP_WEIGHT);
+        assert.ok(tops.length > 0, `${side}: ${covered.length} vertices covered and ${tops.length} of them a top`);
+
+        // 1. The surface a click there chooses.
+        for (const point of tops) assert.equal(surfaceAt(point.weight), 'top', `${side}: ${point.x},${point.z} clicks as the top`);
+
+        // 2. The colour the element paints it, at the normal blend so the
+        //    colour is laid as it is rather than taking the ground's lightness.
+        const field = createField({ size: SIZE, segments: DEFAULT_SEGMENTS });
+        applyBase(field, { maxHeight: 400 });
+        applyFootprintedElement(field, { type: 'extrude', config: { blend: 'normal', height: 120 }, footprint });
+        let painted = 0;
+        for (let i = 0; i < field.count; i++) {
+            if (weigh(fieldX(field, i), fieldZ(field, i)) < TOP_WEIGHT) continue;
+            assert.ok(readColor(field, i).every((c, k) => near(c, TOP[k], 1e-6)), `${side}: vertex ${i} takes the top's colour`);
+            painted++;
+        }
+        assert.equal(painted, tops.length, `${side}: every top vertex is painted as one`);
+
+        // 3. The height the prism is lifted from, as `liftedTop` in
+        //    `js/main.js` takes it: the mean of the ground at full weight,
+        //    and null for none - which is what left `drawPrism` with nothing
+        //    to draw while the blue arrow pulled the height. Read off the
+        //    field rather than off the weights, since it is a mean of ground.
+        let standing = 0, lifted = null;
+        for (let i = 0; i < field.count; i++) {
+            if (weigh(fieldX(field, i), fieldZ(field, i)) < TOP_WEIGHT) continue;
+            lifted = (lifted ?? 0) + field.height[i];
+            standing++;
+        }
+        assert.equal(standing, tops.length, `${side}: the prism is lifted from every top vertex and no other`);
+        assert.ok(standing > 0 && Number.isFinite(lifted / standing),
+            `${side}: the prism is lifted from the mean of ${standing} vertices, not from the mean of none`);
+
+        // 4. The outline the top is traced by, which reads the same weight.
+        assert.ok(surfaceEdges(footprint, 'top', SIZE).length > 0, `${side}: its top is outlined`);
+    }
 });
 
 test('at the normal blend the two colours are laid as they are', () => {

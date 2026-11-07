@@ -519,6 +519,64 @@ function cascaded(css, classes, property) {
     return winner ? winner.declared.value : null;
 }
 
+/**
+ * A CSS colour as `[red, green, blue, alpha]` in 0 to 1 - `#rgb`, `#rrggbb`,
+ * `rgb()` and `rgba()`, which is every form this page is written in. A keyword
+ * is refused rather than guessed at: nothing here is set by one, and a silent
+ * black would make a contrast reading pass for the wrong reason.
+ */
+function cssColor(value) {
+    const text = String(value).trim();
+
+    const hex = text.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
+    if (hex) {
+        const pairs = hex.length === 3 ? [...hex].map(digit => digit + digit) : hex.match(/../g);
+        return [...pairs.map(pair => parseInt(pair, 16) / 255), 1];
+    }
+
+    const channels = text.match(/^rgba?\(([^)]+)\)$/i)?.[1];
+    assert.ok(channels, `cssColor() cannot read "${text}"`);
+    const parts = channels.split(/\s*[,/]\s*/).map(part => Number(part));
+    assert.ok(parts.length >= 3 && parts.every(Number.isFinite), `cssColor() cannot read "${text}"`);
+    return [...parts.slice(0, 3).map(channel => channel / 255), parts[3] ?? 1];
+}
+
+/**
+ * A stack of colours flattened onto the last of them, nearest the eye first.
+ * The compositor blends in sRGB rather than in light, so this does too -
+ * a reading taken in linear light would answer a few tenths out from what the
+ * browser actually paints, which is the figure a contrast check is about.
+ *
+ * The base has to be opaque: what lies behind the whole stack is the flight,
+ * and a contrast floor has to hold over any frame of it rather than over an
+ * average one.
+ */
+function flatten(...stack) {
+    const base = cssColor(stack.at(-1));
+    assert.equal(base[3], 1, 'the colour a stack is flattened onto has to be opaque');
+
+    return stack.slice(0, -1).reduceRight((under, layer) => {
+        const [r, g, b, alpha] = cssColor(layer);
+        return [
+            r * alpha + under[0] * (1 - alpha),
+            g * alpha + under[1] * (1 - alpha),
+            b * alpha + under[2] * (1 - alpha)
+        ];
+    }, base.slice(0, 3));
+}
+
+/** WCAG relative luminance of an opaque colour given as channels in 0 to 1. */
+function relativeLuminance([r, g, b]) {
+    const light = channel => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    return 0.2126 * light(r) + 0.7152 * light(g) + 0.0722 * light(b);
+}
+
+/** The WCAG contrast ratio between two opaque colours, the larger way up. */
+function contrastRatio(a, b) {
+    const [lighter, darker] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
 test('the warning overlays start hidden and wait for the flight to trip them', () => {
     for (const id of ['low-altitude', 'crashed', 'landed']) {
         const rule = styleRule(indexHtml, id);
@@ -5020,4 +5078,89 @@ test('a section\'s line of text and its status are drawn by the dock, the status
     assert.match(methodBody(panelViewSource, 'onChange'), /if \(field\.classList\.contains\('dock-text'\)\) \{\s*this\.handlers\.onText\?\.\(field\.dataset\.text, field\.value, field\.dataset\.section\);\s*return;\s*\}/);
     assert.match(indexHtml, /\.dock-status\.refused \{\s*color: #ffb000;/);
     assert.match(indexHtml, /#settings-menu li\.refused::after \{\s*color: #ffb000;/, 'and a refused file row in the same amber');
+});
+
+/**
+ * Found by driving `LOAD ENVIRONMENT...` in Settings with a JSON file whose
+ * `format` is not `pilot-matter.environment`: the reason is written in the
+ * instruments' amber, and it is written on the row the cursor is on, because a
+ * row is only ever refused just after it was pressed and a row is pressed where
+ * the cursor is. Amber on the green selection fill measured 1.34:1 over 10
+ * pixel text - the row's own label managed 15.3:1 on the same fill - and the
+ * sentence read as a texture rather than as words. Stepping one row down made
+ * the same text legible, so the message was unreadable in the one state it
+ * appears in.
+ *
+ * The green fill is what has to go on that row, so the pair is measured here
+ * rather than only looked for: a rule that exists and loses draws nothing, and
+ * the floor is the 4.5:1 small text needs. Both ways the panel can be lit are
+ * read, since what lies behind it is the flight.
+ */
+test('a file row that is both refused and under the cursor says why in a colour that reads', () => {
+    /**
+     * What a `#settings-menu` row carrying a set of classes is left declaring
+     * for one property, for the row itself or for one of its pseudo-elements.
+     * The row is reached through an id, which `cascaded` refuses by design, so
+     * the same weighing - importance, then specificity, then the order the
+     * sheet was written in - is done here against the one list in question.
+     */
+    const rowValue = (classes, property, pseudo = '') => {
+        const wanted = new Set(classes);
+        const declared = [];
+
+        for (const rule of styleRules(indexHtml)) {
+            if (rule.nested) continue;
+            for (const selector of rule.selectors) {
+                const match = selector.match(/^#settings-menu li((?:\.[\w-]+|\[[^\]]*\])*)(::[\w-]+)?$/);
+                if (!match || (match[2] ?? '') !== pseudo) continue;
+
+                // A refused row always carries the note the reason is written
+                // as, so a rule reaching it through `[data-note]` reaches it.
+                const parts = match[1].match(/\.[\w-]+|\[[^\]]*\]/g) ?? [];
+                if (!parts.every(part => part.startsWith('.') ? wanted.has(part.slice(1)) : part === '[data-note]')) continue;
+
+                const value = declaredValue(rule.body, property);
+                if (value) declared.push({ selector, rule, value });
+            }
+        }
+
+        const winner = declared
+            .sort((a, b) => (Number(a.value.important) - Number(b.value.important))
+                || compareSpecificity(specificity(a.selector), specificity(b.selector))
+                || a.rule.order - b.rule.order)
+            .pop();
+        return winner ? winner.value.value : null;
+    };
+
+    const panel = declaredValue(styleRule(indexHtml, 'settings'), 'background').value;
+
+    // The flight is what the panel is laid over, so each pair is read against
+    // the brightest and the darkest frame it can be laid over.
+    const against = (color, fill) => ['#ffffff', '#000000'].map(flight =>
+        contrastRatio(flatten(color, fill, panel, flight), flatten(fill, panel, flight)));
+
+    for (const state of [['refused'], ['selected', 'refused']]) {
+        const row = state.join(' and ');
+        const fill = rowValue(state, 'background') ?? 'rgba(0, 0, 0, 0)';
+
+        assert.notEqual(fill, '#0f0',
+            `a ${row} row may not take the green selection fill: the amber on it reads at 1.34:1`);
+
+        for (const [name, color] of [['the reason', rowValue(state, 'color', '::after')], ['the label', rowValue(state, 'color')]]) {
+            assert.ok(color, `a ${row} row should say what colour ${name} is drawn in`);
+            for (const ratio of against(color, fill)) {
+                assert.ok(ratio >= 4.5,
+                    `${name} on a ${row} row reads at ${ratio.toFixed(2)}:1, under the 4.5:1 small text needs`);
+            }
+        }
+    }
+
+    // The other three settings lists share the `li.selected` rule, so the same
+    // pairing would arise on them the moment one of them drew a refusal. None
+    // does: nothing writes `refused` onto their entries and no rule draws it.
+    for (const list of ['settings-start', 'settings-options', 'settings-builder']) {
+        assert.ok(!styleRules(indexHtml).some(rule => rule.selectors.some(selector =>
+            selector.startsWith(`#${list} `) && selector.includes('.refused'))),
+            `#${list} carries no refusal rule, so a row on it is never amber on green`);
+    }
 });

@@ -997,6 +997,23 @@
             opacity: 1;
         }
 
+        /* A row is only ever refused just after it was pressed, and a row is
+           pressed where the cursor is, so the amber above and the green
+           selection fill always land together: measured in Chromium, the reason
+           read at 1.34:1 over that green, which is close enough to 1:1 that the
+           line was a texture rather than words. So the one row that is both
+           drops the green for the warning card's own colours - near-black,
+           amber type, an amber edge marking the cursor - which the reason reads
+           against at better than 10:1 whatever the flight shows through the
+           panel. Keep this rule next to the one above: it exists because that
+           one draws amber, and the other three settings lists carry no refusal
+           rule at all, so nothing on them is ever this pair. */
+        #settings-menu li.selected.refused {
+            color: #ffb000;
+            background: rgba(0, 0, 0, 0.85);
+            border-color: rgba(255, 176, 0, 0.6);
+        }
+
         /* The canvases are cards rather than rows: two columns of them, each a
            picture of the ground it starts from over a label band and the line
            that says what that ground is. The picture is a render the builder

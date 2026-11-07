@@ -5349,3 +5349,65 @@ still be found by name.
     raised the twin's top speed to 240. A preset world and every game mode fly
     the trainer.
   - From: Post Interactive Build
+
+## Archived 11-07-26
+
+- [x] **Insert Plane**: the tool and its mark, with SELECT PLANE's cards and
+  SELECT STARTING POINT's rows as two sections, the chosen plane saved with
+  the world and flown on it
+  - **Settled**: `plane` joins `BUILT_TOOLS`, and its dock is `DOCK_PLANE`
+    headed `INSERT PLANE`: SELECT PLANE, five named cards with the chosen one
+    pressed, and SELECT STARTING POINT, `AT X`, `AT Z`, `HEADING` and `HEIGHT
+    FEET` or `HEIGHT METERS` in the settings' altitude unit, or a line saying
+    to click the ground while there is none, with `CLEAR` pinned under them
+    and not pressable until there is something to take. Each section carries
+    its mode type off the tool. The plane chosen rides the world as the start
+    point does, as `plane` in the file, and `refreshWorld` puts the pilot in it
+    through `flyPlane`. The control list gains `Click (Insert plane) - Put the
+    Start Point There` and `Drag (Insert plane) - Turn the Start Point by Its
+    Knob`.
+  - From: Post Interactive Build
+- [x] **Objects on the ground**: a placement drawn as a mesh standing on the
+  ground rather than as ground, repeated on every tile on that tile's own
+  ground, fogged like the ground, solid to the aircraft - any touch on one a
+  crash, roofs included, while an extrusion's top is still landed on as
+  ground - picked by Select and taken whole by Erase
+  - **Settled**: an object is a placement of type `object` - `{ prefab,
+    recipe, config: { at, heading, scale } }` - and `js/objects.js` lays it
+    out. `buildEnvironment` leaves objects out, so the ground is drawn as
+    without them; each tile then stands them with `standingObjects`, once its
+    ground is joined to its neighbours, at the same canvas point on every tile:
+    on the highest ground under the footprint, over a plinth to the lowest.
+    The footprint is a hard-edged rect round the recipe, scaled and turned to
+    the heading. `js/object-mesh.js` draws one `InstancedMesh` to a recipe and
+    one for the plinths, in the ground's own held material, so fog takes them
+    as it takes the ground. `Terrain.obstacleTopAt` asks the tile under a point
+    and the tiles beside it; `Aircraft.update` takes it as `obstacle` and
+    crashes at any touch, read before the ground so a roof is never landed on,
+    while the ground - an extrusion's top included - is landed on as before; a
+    recipe marked `solid: false` is flown over. Select picks it inside its
+    footprint, over the ground it stands on; its outline is the footprint
+    traced; the Flat gumball moves it, turns it by its arc and scales it evenly
+    by its two ground squares; its panel is `HEADING` and `SCALE` under its
+    prefab's name. Erase taking everything takes it whole when a stroke's region
+    reaches its middle at all, and a put-back there gives it back - the last
+    batch to reach it deciding. The file reads it with its recipe and holds its
+    heading and scale.
+  - From: Post Interactive Build
+- [x] **Prefabs**: a building as a recipe of primitives in its own frame,
+  copied into the placement as a template's members are, merged and instanced
+  per prefab
+  - **Settled**: `js/prefabs.js` holds recipes of boxes, cylinders, cones
+    and wedges - a wedge's ridge down its middle or along its +x edge, a
+    cylinder narrowing to a `top` - each part standing its base on `at`, turned
+    about its upright by `turn` degrees, with a `0xrrggbb` colour.
+    `recipeGeometry` merges them into one list of triangles, every face wound
+    outward from its part and its normal worked from its own corners, colours
+    turned from sRGB to the linear light a vertex colour is read in.
+    `placeObject` copies the recipe in, so a prefab changed later leaves a
+    built world alone; `recipeKey` groups placements of one recipe into one
+    instanced mesh. `readRecipe` takes a file's recipe whole or refuses it,
+    naming where. The catalogue starts with two - COTTAGE and WATER TOWER -
+    under the six categories Insert City will fold; the city's own buildings
+    are the next run's.
+  - From: Post Interactive Build

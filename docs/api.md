@@ -1309,7 +1309,12 @@ other corner in to that share of the radius, making a star) and `path`
 (`points`, run through by a smooth curve, round the loop unless `closed` is
 `false`, when it ends on its last point and closes straight back), each with an
 optional `feather`: the width in world units of the band the element fades out
-across at the edge, two cells of the sampling where none is given. A `combine`
+across at the edge, two cells of the sampling where none is given. Whichever it
+comes to, it is held to half the way in from the region's edge to its deepest
+point, so the inner half of a region is always covered whole: a feather wider
+than a small region has room for would leave it with no point fully covered at
+all, and everything that reads one - an extrusion's top among them - would read
+nothing. A region with room to spare keeps the feather as given. A `combine`
 (`op`, `a`, `b`) makes one region of two: `union` covers either, `intersect`
 only both and `subtract` the first without the second, each part keeping its
 own feather, and either part may itself be a `combine`. A `placed` footprint

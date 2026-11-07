@@ -619,15 +619,104 @@ function falloff(inside, edge) {
 }
 
 /**
- * The feather a footprint carries, which is the sampling's where it names none.
- * A combination carries none of its own: its two regions keep theirs. Nor does
- * a frame, whose region's feather is stretched with it.
+ * The most of the way in from a region's edge to its deepest point that the
+ * feather may take.
+ *
+ * Half, so the inner half of every region stands at full weight rather than
+ * its one deepest point. A share of 1 would ease to exactly 1 at that point
+ * and nowhere else, which a field sampled every 80 units misses on anything
+ * small: a region would be left with a top of one vertex, or of none.
+ */
+export const FEATHER_SHARE = 0.5;
+
+/**
+ * How far inside a region its deepest point is - the radius of the largest
+ * circle that fits in it, in world units. Null for a footprint that describes
+ * no region, which is the answer `extent` gives one.
+ *
+ * It is the ceiling on a feather that means anything. `falloff` eases across
+ * the feather from the edge inward, so a feather wider than this leaves the
+ * region with no point at full weight at all: everything that reads a weight
+ * of 1 - an extrusion's top, the colour it is painted, the surface a click
+ * chooses, the mean the prism is lifted from - then reads nothing, silently.
+ * That is what `feather` holds the band to.
+ *
+ * Exact for the kinds whose deepest point is arithmetic: a disc's middle, an
+ * ellipse's, a box's, and the middle of a swathe, which is half the stamp's
+ * width wherever the drag travelled and the stamp's own shorter half where it
+ * did not. For an outline it is the half-width of the square round it, which
+ * is the largest circle that square could hold and is the figure itself for a
+ * shape that fills its square - a rectangle, a regular polygon, a lasso drawn
+ * roughly round. An answer above the truth leaves a feather wider than it
+ * should be, which is the state every region was in before any of this was
+ * measured; one below it only sharpens an edge.
+ */
+export function footprintReach(footprint) {
+    switch (footprint?.kind) {
+        case 'disc': {
+            const radius = Number(footprint.radius) || 0;
+            return radius > 0 ? radius : null;
+        }
+        case 'ellipse': {
+            const inner = Math.min(Number(footprint.radiusX) || 0, Number(footprint.radiusZ) || 0);
+            return inner > 0 ? inner : null;
+        }
+        case 'rect': {
+            const inner = Math.min(Number(footprint.width) || 0, Number(footprint.depth) || 0) / 2;
+            return inner > 0 ? inner : null;
+        }
+        case 'stroke': {
+            const width = Math.max(Number(footprint.stamp?.width) || 0, 0);
+            const depth = Math.max(Number(footprint.stamp?.depth) || 0, 0);
+            if (!(width > 0) || !(depth > 0)) return null;
+            return firstStretch(usablePoints(footprint.points)) < 0 ? Math.min(width, depth) / 2 : width / 2;
+        }
+        default: {
+            const box = extent(footprint);
+            if (box == null) return null;
+            const inner = Math.min(box.maxX - box.minX, box.maxZ - box.minZ) / 2;
+            return inner > 0 ? inner : null;
+        }
+    }
+}
+
+/** The feather each footprint comes to, worked out once for as long as it is held. */
+const FEATHERS = new WeakMap();
+
+/**
+ * The feather a footprint carries: the sampling's where it names none, held to
+ * `FEATHER_SHARE` of the region's own reach either way. A combination carries
+ * none of its own - its two regions keep theirs - and nor does a frame, whose
+ * region's feather is stretched with it.
+ *
+ * Held rather than taken as asked because a feather is a width in world units
+ * and a region has a size of its own, so the sampling's 160 is a soft edge on
+ * a mountain and the whole of a 200 unit building. Before it was held, a
+ * region narrower than about twice the feather had no inside: the first top on
+ * the default canvas appeared at 320 units, while Extrude accepts regions down
+ * to 40, and every reader of a full weight failed on the ones between without
+ * refusing them or saying why.
+ *
+ * Kept per footprint, as `FLATTENED` keeps a path's outline and for the same
+ * reason: a tile weighs a region at every one of its 40,401 vertices, the
+ * reach is the same reach at all of them, and a footprint is rewritten rather
+ * than edited in place - `reshapeShape` and `moveFootprint` both answer with a
+ * new object - so what is held cannot go stale under what holds it.
  */
 function feather(footprint) {
     if (footprint?.kind === COMBINE_KIND || footprint?.kind === PLACED_KIND) return 0;
-    const stated = Number(footprint?.feather);
-    if (Number.isFinite(stated) && stated >= 0) return stated;
-    return DEFAULT_FEATHER;
+    if (footprint == null || typeof footprint !== 'object') return DEFAULT_FEATHER;
+
+    const held = FEATHERS.get(footprint);
+    if (held !== undefined) return held;
+
+    const stated = Number(footprint.feather);
+    const asked  = Number.isFinite(stated) && stated >= 0 ? stated : DEFAULT_FEATHER;
+    const reach  = footprintReach(footprint);
+    const band   = reach == null ? asked : Math.min(asked, reach * FEATHER_SHARE);
+
+    FEATHERS.set(footprint, band);
+    return band;
 }
 
 /**

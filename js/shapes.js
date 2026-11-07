@@ -198,7 +198,7 @@ function distinct(points) {
     return out;
 }
 
-/** Twice the area a ring encloses, signed by the way it winds. */
+/** The area a ring encloses, signed by the way it winds. */
 function ringArea(ring) {
     let twice = 0;
     for (let i = 0; i < ring.length; i++) {
