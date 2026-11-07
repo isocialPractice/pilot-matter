@@ -41,7 +41,7 @@ import { ELEMENTS_BY_ID, getElement, resolveConfig, resolvePoint } from './envir
 import { BUILDER_ENVIRONMENTS, getEnvironment } from './environment/presets.js';
 import { ERASE_TYPE, ERASE_RANGES } from './environment/erase.js';
 import { isFootprint } from './environment/footprints.js';
-import { GROUP_TYPE } from './templates.js';
+import { GROUP_TYPE, GROUP_RANGES } from './templates.js';
 import { elementRow } from './element-editor.js';
 import { SHADE_RANGE } from './properties-panel.js';
 import { cleanStartPoint } from './start-point.js';
@@ -420,6 +420,11 @@ function readPlacement(placement, where, problems, groups) {
             if (config[key] != null && !Number.isFinite(config[key])) problems.push(`${where}: ${key} is not a number`);
         }
         read.members = readPlacements(read.members ?? [], `${where}.members`, problems, false);
+        // Held to the strip's own bounds, as an object's and an element's are.
+        // `groupConfig` holds them again when the ground is drawn, so a file
+        // left unclamped here drew a clamped strip under a panel and a saved
+        // file that both still said the figure the file came with.
+        if (read.config != null) read.config = clampConfig({ ranges: GROUP_RANGES }, config);
         return read;
     }
 

@@ -11,7 +11,7 @@ import {
 import { ELEMENTS_BY_ID, getElement } from '../js/environment/elements.js';
 import { BUILDER_ENVIRONMENTS } from '../js/environment/presets.js';
 import { createEditorState, canvasWorld } from '../js/element-editor.js';
-import { placeTemplate } from '../js/templates.js';
+import { placeTemplate, groupConfig, GROUP_TYPE, GROUP_RANGES } from '../js/templates.js';
 import { ERASE_TYPE } from '../js/environment/erase.js';
 
 const schema = JSON.parse(readFileSync(new URL('../schemas/environment.schema.json', import.meta.url), 'utf8'));
@@ -125,6 +125,33 @@ test('every range a file sets is held to its bounds, and nothing it leaves out i
     assert.deepEqual(read.world.world[0].config.height, [low, high], 'and a row\'s');
     assert.deepEqual(Object.keys(read.world.placements[0].config), ['count', 'at', 'height'], 'no range added that the file left out');
     assert.equal(read.world.placements.find(p => p.type === ERASE_TYPE).config.restore, true, 'and what is no range kept as it was');
+});
+
+/**
+ * A group's figures were the one kind the reader let through: its branch
+ * answered before the clamp every other placement goes through, so a file
+ * saying `width: -5000` was read with no problem named and kept at -5000.
+ * `groupConfig` holds them again when the ground is drawn, so nothing was
+ * drawn wrong - but the dock, whose rows declare `GROUP_RANGES`, and the file
+ * saved next both still said the figure the file came with, and a world
+ * loaded and saved carried it forward every time.
+ */
+test('a group\'s strip is held to its bounds too, so the figure kept is the strip drawn', () => {
+    const document = environmentDocument(builtWorld(), { savedAt: SAVED });
+    const group = document.placements.find(placement => placement.type === GROUP_TYPE);
+    Object.assign(group.config, { heading: 123456, length: 1e9, width: -5000 });
+
+    const read = readEnvironmentDocument(JSON.stringify(document));
+    assert.equal(read.ok, true, read.problems.join('; '));
+
+    const kept = read.world.placements.find(placement => placement.type === GROUP_TYPE);
+    assert.equal(kept.config.length, GROUP_RANGES.length.high, 'a length past the longest strip');
+    assert.equal(kept.config.width, GROUP_RANGES.width.low, 'and a width under the narrowest');
+    assert.deepEqual(
+        [kept.config.heading, kept.config.length, kept.config.width],
+        [groupConfig(kept).heading, groupConfig(kept).length, groupConfig(kept).width],
+        'the figures kept are the ones the strip is built at'
+    );
 });
 
 test('a row\'s shades are held to what a shade may be', () => {
