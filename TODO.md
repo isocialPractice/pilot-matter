@@ -40,6 +40,45 @@ its context survives being archived.
 
 ### UI/UX Override - the top a click cannot reach
 
+#### Resolve Issues
+
+- [ ] Held Feather 1: the hold halved the soft brush's edge, and three
+  sentences still say it is a half
+  - **Issue**: the hold is applied to a stated feather as well as a default
+    one, and Free Paint states one. `paintStamp` in `js/build-tools.js` asks
+    for `round(width * SOFT_EDGE)` on a soft edge, and `SOFT_EDGE` is 0.5, so
+    the feather asked for is half the stamp's width - which is also exactly
+    the stroke's reach, `width / 2`. The hold then takes
+    `reach * FEATHER_SHARE`, a half of a half. Measured through the real path
+    at three brush sizes - 25, 100 and 400 pixels at `unitsPerPixel` 1 - the
+    feather used is 6.25, 25 and 100 against the 13, 50 and 200 asked for: a
+    soft brush eases across 25% of its width at every size, not 50%. The
+    weight profile of a 400 unit soft stroke now reads 1.000 at 0, 50 and 100
+    units off its centreline and 0.500 at 150, so the stroke is whole across
+    its inner half rather than "whole only down its middle". `SOFT_EDGE` is
+    inert as a result: every value from 0.5 up produces the same 25%, so the
+    constant can no longer express what it was written to express. Three
+    sentences state the old behaviour - its own docstring at
+    `js/build-tools.js:313`, `paintStamp`'s at `js/build-tools.js:380`
+    ("`SOFT` eases across half the stamp's width, from its middle out"), and
+    `docs/terrain.html:183` ("a soft one across half the brush's width").
+    Not queued as a fix because which way it should go is a decision about the
+    shared weight model rather than a correction: the hold is what gives an
+    extrusion its top and must stay, so either paint is exempted from it -
+    paint reads no full cover, it only blends by weight, so a feather that
+    eases to 1 at one point is no defect there - or `SOFT_EDGE` is re-scaled
+    against what the hold allows and the three sentences are rewritten to the
+    figure that results.
+  - **Goal**: decide whether a stated feather is exempt from the hold, or only
+    a default one is, and make the three sentences say what the code does
+    either way. If paint is exempted, `feather` needs to tell a stated feather
+    from a default one, which it does not today - both arrive as `asked`. Hold
+    the outcome with a test in `test/footprints.test.js` asserting the feather
+    a soft `paintStamp` comes to at a named brush size, so the figure is
+    written down somewhere rather than being whatever the two constants
+    multiply to.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+
 #### Found Issues
 
 - [ ] A click cannot choose the top of the canvas's own highest ground
@@ -79,6 +118,63 @@ its context survives being archived.
     - or, where no contour is found at all, fall back to marking the chosen
     top some other way. Hold it with a test in `test/build-overlay.test.js`
     asserting `surfaceEdges` answers a non-empty run for a 200 unit rect.
+  - From: UI/UX Override - the top a click cannot reach
+
+- [ ] A `.glb` asset can make the page fetch a URL it names
+  - **Issue**: `selfContained` is applied to `.gltf` only, so a `.glb` reaches
+    `parseAsync` unchecked, and a GLB's JSON chunk may name an external `uri`
+    for any buffer but the first and for every image. In the pinned
+    `three@0.160.0`, `GLTFLoader.js:2948` and `:3247` fetch those addresses,
+    with `options.path` empty so an absolute URL is fetched as given. An
+    environment file carries its assets' bytes and `adoptAssets` hands each to
+    `registerAsset`, so a shared world is an untrusted input that reaches this
+    path and one crafted `.glb` beacons for every pilot who opens it. The
+    SHA-256 check does not help - it proves the bytes are the ones the file's
+    author shipped. Written up with the reproduction, the two fix shapes and
+    the prose it contradicts in
+    [KNOWN_RISKS.md](KNOWN_RISKS.md#2026-11-07-a-glb-asset-can-make-the-page-fetch-a-url-it-names).
+  - **Goal**: hold both glTF formats to the same rule - a `LoadingManager`
+    whose `setURLModifier` refuses anything not beginning `data:` is the
+    recommendation, since it covers whatever a later extension adds a `uri` to
+    and fails closed through the `AssetRefused` path that already exists. Fix
+    the refusal message, which currently tells the pilot to save as a `.glb`,
+    and `docs/terrain.html:320`, which states the narrow claim. Not fixed in
+    review because it cannot be verified here: `three` is a CDN import with no
+    local install and `readModel` has no test that executes it, so this needs
+    a vendored `three` or a Chromium check that serves a crafted `.glb` and
+    asserts no request leaves the page.
+  - From: UI/UX Override - the top a click cannot reach
+
+- [ ] A runway asset's strip is not the width the asset is
+  - **Issue**: `placeAssetRunway` says it builds "a real runway of the asset's
+    length and width - so landing, scoring and takeoff work on it unchanged",
+    but `assetFit`'s runway test bounds width only against `depth / 4` while
+    the strip can only be built between `GROUP_RANGES.width.low` and `.high`,
+    which are 80 and 600. The two disagree in both directions, and nothing
+    warns. Run through the real path: a 600 by 20 m asset fits and is given an
+    80 m strip, so the landable ground is four times the model's width and a
+    pilot can land well clear of what they can see; a 5000 by 1200 m asset
+    fits and is given a 600 m strip, so the model's edges hang over ground
+    that is not runway; and a 600 by 0 m asset - a flat plan - fits and is
+    given an 80 m strip out of nothing, because the runway branch has no
+    "nothing to place" guard where the city branch does. The suite misses all
+    of it: every runway case in `test/assets.test.js` uses a 60 m width, which
+    is already under the 80 m floor, and the one over-wide case tests 601 at
+    depth 2400 where `depth / 4` and `width.high` both happen to be 600.
+    `test/assets.test.js:171` does assert the 80 m strip and calls it "at
+    least the narrowest strip", so the clamp was seen on the way in; what was
+    not is that the fit check lets through what the strip cannot be built at.
+  - **Goal**: make `assetFit`'s runway bounds the bounds the strip can be built
+    at - width held to `GROUP_RANGES.width` as well as to a quarter of the
+    length, with a named reason either side, and a guard for a width of
+    nothing - so an asset that cannot be placed faithfully is refused with a
+    reason rather than silently clamped. Decide separately whether the
+    hardcoded 5000 m ceiling should be `GROUP_RANGES.length.high`, which is
+    8000; the module docstring and `test/assets.test.js` both state 5000, so
+    it reads as deliberate. Expect the five runway assertions in
+    `test/assets.test.js` to need their widths moved above 80, and correct the
+    docstring table and `placeAssetRunway`'s own sentence, which both claim
+    the strip is the asset's width.
   - From: UI/UX Override - the top a click cannot reach
 
 ## Game UI/UX
@@ -852,8 +948,8 @@ how the simulator got here rather than as a list still to be worked.
     the row's two colours through the cascade rather than looking the rule up,
     and measures them over both a bright and a dark flight.
   - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
-- [x] A small extrusion has no top surface, so its top colour never shows and
-  its prism is never previewed
+- [x] **Held Feather**: A small extrusion has no top surface, so its top colour
+  never shows and its prism is never previewed
   - **Issue**: `surfaceAt` in `js/extrude.js` calls a point the top only where
     the footprint's weight reaches `TOP_WEIGHT`, which is 1, and a footprint's
     weight reaches 1 only a feather inside its edge. The default feather is 160
