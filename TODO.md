@@ -38,144 +38,25 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - the top a click cannot reach
-
-#### Resolve Issues
-
-- [ ] Held Feather 1: the hold halved the soft brush's edge, and three
-  sentences still say it is a half
-  - **Issue**: the hold is applied to a stated feather as well as a default
-    one, and Free Paint states one. `paintStamp` in `js/build-tools.js` asks
-    for `round(width * SOFT_EDGE)` on a soft edge, and `SOFT_EDGE` is 0.5, so
-    the feather asked for is half the stamp's width - which is also exactly
-    the stroke's reach, `width / 2`. The hold then takes
-    `reach * FEATHER_SHARE`, a half of a half. Measured through the real path
-    at three brush sizes - 25, 100 and 400 pixels at `unitsPerPixel` 1 - the
-    feather used is 6.25, 25 and 100 against the 13, 50 and 200 asked for: a
-    soft brush eases across 25% of its width at every size, not 50%. The
-    weight profile of a 400 unit soft stroke now reads 1.000 at 0, 50 and 100
-    units off its centreline and 0.500 at 150, so the stroke is whole across
-    its inner half rather than "whole only down its middle". `SOFT_EDGE` is
-    inert as a result: every value from 0.5 up produces the same 25%, so the
-    constant can no longer express what it was written to express. Three
-    sentences state the old behaviour - its own docstring at
-    `js/build-tools.js:313`, `paintStamp`'s at `js/build-tools.js:380`
-    ("`SOFT` eases across half the stamp's width, from its middle out"), and
-    `docs/terrain.html:183` ("a soft one across half the brush's width").
-    Not queued as a fix because which way it should go is a decision about the
-    shared weight model rather than a correction: the hold is what gives an
-    extrusion its top and must stay, so either paint is exempted from it -
-    paint reads no full cover, it only blends by weight, so a feather that
-    eases to 1 at one point is no defect there - or `SOFT_EDGE` is re-scaled
-    against what the hold allows and the three sentences are rewritten to the
-    figure that results.
-  - **Goal**: decide whether a stated feather is exempt from the hold, or only
-    a default one is, and make the three sentences say what the code does
-    either way. If paint is exempted, `feather` needs to tell a stated feather
-    from a default one, which it does not today - both arrive as `asked`. Hold
-    the outcome with a test in `test/footprints.test.js` asserting the feather
-    a soft `paintStamp` comes to at a named brush size, so the figure is
-    written down somewhere rather than being whatever the two constants
-    multiply to.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+### UI/UX Override - a .glb that points at another file
 
 #### Found Issues
 
-- [ ] A click cannot choose the top of the canvas's own highest ground
-  - **Issue**: `pickGround` walks a ray from where it crosses
-    `canvasGround.top`, the highest vertex of the field, and throws the pick
-    away when the clearance there is not above zero - a guard written for a
-    camera buried in a hill. A ray aimed at a point that is itself at that
-    height crosses the ceiling exactly on it, so the clearance is exactly 0
-    and the pick answers null. Driven in Chromium: one 2400 unit extrusion
-    600 units tall on a blank canvas, clicked at its middle from camera
-    pitches of 85, 70, 55, 40, 30 and 20 degrees - nothing at every one of
-    them, so `EDIT EXTRUSION` leaves the panel pointed at both colours rather
-    than narrowing to `TOP COLOR` and `BLEND`, and the top's red rim is never
-    drawn. Stand a taller block anywhere else on the canvas and the same
-    click answers `top` at every pitch down to 30. It reaches every tool that
-    reads the ground under the pointer, not Extrude's surfaces alone. Not
-    new: the same drive against `js/environment/footprints.js` as it was
-    before the feather was held, served into the page, answers `nothing` too.
-  - **Goal**: Resolve to [highest-ground-pick.prompt.md](.claude/prompts/highest-ground-pick.prompt.md)
-  - From: UI/UX Override - the top a click cannot reach
-
-- [ ] A small extrusion's chosen top is outlined by a few pixels or by none
-  - **Issue**: `surfaceEdges` traces the top's rim by marching squares over
-    `OUTLINE_CELLS` - 256 cells across a 16,000 unit canvas, so 62.5 units to
-    a cell. With the feather now held to half a region's reach, a 200 unit
-    region's ground at full cover is about 100 units across, which is between
-    one and two cells, and where it falls on that grid decides whether a
-    contour is found at all. Two hand-driven runs of the same 200 unit block
-    gave a rim of 83 pixels spanning 33 by 13, and a rim of 1 pixel. By 320
-    units it is 615 pixels and reads as a rim. The top is chosen correctly in
-    every case and `TOP COLOR` works - only the red outline that says which
-    surface is chosen is missing, which is the one thing on screen that
-    answers "did that click take".
-  - **Goal**: Trace the rim finely enough to find a region of the size
-    Extrude accepts - `surfaceEdges` could take its cell count from the
-    footprint's own reach rather than from the canvas, as `regionEdges` could
-    - or, where no contour is found at all, fall back to marking the chosen
-    top some other way. Hold it with a test in `test/build-overlay.test.js`
-    asserting `surfaceEdges` answers a non-empty run for a 200 unit rect.
-  - From: UI/UX Override - the top a click cannot reach
-
-- [ ] A `.glb` asset can make the page fetch a URL it names
-  - **Issue**: `selfContained` is applied to `.gltf` only, so a `.glb` reaches
-    `parseAsync` unchecked, and a GLB's JSON chunk may name an external `uri`
-    for any buffer but the first and for every image. In the pinned
-    `three@0.160.0`, `GLTFLoader.js:2948` and `:3247` fetch those addresses,
-    with `options.path` empty so an absolute URL is fetched as given. An
-    environment file carries its assets' bytes and `adoptAssets` hands each to
-    `registerAsset`, so a shared world is an untrusted input that reaches this
-    path and one crafted `.glb` beacons for every pilot who opens it. The
-    SHA-256 check does not help - it proves the bytes are the ones the file's
-    author shipped. Written up with the reproduction, the two fix shapes and
-    the prose it contradicts in
-    [KNOWN_RISKS.md](KNOWN_RISKS.md#2026-11-07-a-glb-asset-can-make-the-page-fetch-a-url-it-names).
-  - **Goal**: hold both glTF formats to the same rule - a `LoadingManager`
-    whose `setURLModifier` refuses anything not beginning `data:` is the
-    recommendation, since it covers whatever a later extension adds a `uri` to
-    and fails closed through the `AssetRefused` path that already exists. Fix
-    the refusal message, which currently tells the pilot to save as a `.glb`,
-    and `docs/terrain.html:320`, which states the narrow claim. Not fixed in
-    review because it cannot be verified here: `three` is a CDN import with no
-    local install and `readModel` has no test that executes it, so this needs
-    a vendored `three` or a Chromium check that serves a crafted `.glb` and
-    asserts no request leaves the page.
-  - From: UI/UX Override - the top a click cannot reach
-
-- [ ] A runway asset's strip is not the width the asset is
-  - **Issue**: `placeAssetRunway` says it builds "a real runway of the asset's
-    length and width - so landing, scoring and takeoff work on it unchanged",
-    but `assetFit`'s runway test bounds width only against `depth / 4` while
-    the strip can only be built between `GROUP_RANGES.width.low` and `.high`,
-    which are 80 and 600. The two disagree in both directions, and nothing
-    warns. Run through the real path: a 600 by 20 m asset fits and is given an
-    80 m strip, so the landable ground is four times the model's width and a
-    pilot can land well clear of what they can see; a 5000 by 1200 m asset
-    fits and is given a 600 m strip, so the model's edges hang over ground
-    that is not runway; and a 600 by 0 m asset - a flat plan - fits and is
-    given an 80 m strip out of nothing, because the runway branch has no
-    "nothing to place" guard where the city branch does. The suite misses all
-    of it: every runway case in `test/assets.test.js` uses a 60 m width, which
-    is already under the 80 m floor, and the one over-wide case tests 601 at
-    depth 2400 where `depth / 4` and `width.high` both happen to be 600.
-    `test/assets.test.js:171` does assert the 80 m strip and calls it "at
-    least the narrowest strip", so the clamp was seen on the way in; what was
-    not is that the fit check lets through what the strip cannot be built at.
-  - **Goal**: make `assetFit`'s runway bounds the bounds the strip can be built
-    at - width held to `GROUP_RANGES.width` as well as to a quarter of the
-    length, with a named reason either side, and a guard for a width of
-    nothing - so an asset that cannot be placed faithfully is refused with a
-    reason rather than silently clamped. Decide separately whether the
-    hardcoded 5000 m ceiling should be `GROUP_RANGES.length.high`, which is
-    8000; the module docstring and `test/assets.test.js` both state 5000, so
-    it reads as deliberate. Expect the five runway assertions in
-    `test/assets.test.js` to need their widths moved above 80, and correct the
-    docstring table and `placeAssetRunway`'s own sentence, which both claim
-    the strip is the asset's width.
-  - From: UI/UX Override - the top a click cannot reach
+- [ ] A `.glb` naming an external image loads instead of being refused
+  - **Issue**: loading a `.glb` whose JSON names an external image opens the
+    step after loading as though the model were sound - headed LOADED ASSET,
+    `glTF binary, 12 triangles`, no refusal drawn - and the model is kept
+    untextured with nothing said to the pilot. The other three ways of
+    reaching outside the file are all refused: a `.gltf` naming a buffer or an
+    image is refused by name, and a `.glb` naming a buffer is refused with the
+    address `scene.bin`. `embeddedOnly` does fire for the image, and nothing
+    leaves for the network - that half holds - but three catches the thrown
+    `AssetRefused` inside its texture loading, drops the texture and resolves
+    the parse, so `readModel` answers with a model. `test/assets.test.js`
+    checks this area by reading `js/asset-loader.js` as text, so it passes
+    with the defect in place.
+  - **Goal**: Resolve to [glb-external-image.prompt.md](.claude/prompts/glb-external-image.prompt.md)
+  - From: UI/UX Override - a .glb that points at another file
 
 ## Game UI/UX
 
@@ -436,6 +317,25 @@ record.
   - Give each recipe its own start speed and trim, held by a test that steps
     every plane a few seconds from the start point and expects it neither
     stalled nor sinking.
+- [ ] **A pick reaches a summit narrower than the sampling**: `pickGround`
+  finds the ground under the pointer on a region too small to raise more than
+  one vertex, rather than stepping over it onto the flat ground beyond
+  - The march steps half a cell, 40 units. A 200 unit extrusion is raised at
+    one vertex of the 80 unit grid, so its sides fall about 5 units per unit
+    while a ray at 55 degrees comes down 1.4: a ray aimed a pixel off the peak
+    meets the flank 0.8 units from it, and the first step jumps from 3.5 units
+    in front of the peak to 19 units past it. Driven in Chromium on 11-08-26,
+    one 200 unit block alone on a blank canvas: the pick answers the peak when
+    aimed at its exact point and answers the ground 450 units beyond for every
+    pixel either side, so `EDIT EXTRUSION` cannot be pointed at its top.
+    `.tmp/ui-ux/t28/top-and-rim.log`, phase C, is the measurement, and the 320
+    unit block beside it in the same log is reached at every try.
+  - The ceiling boundary is settled and is not this: a ray aimed at the peak
+    is answered at the entry, which is what `PICK_SURFACE` is for. What is
+    left is the step. Refining between the entry and the first step, or
+    stepping by a share of the ray's own descent rather than of a cell, are
+    the two shapes - and the cost is paid on every pointer move, since the
+    hover outline asks the same question, so measure before choosing.
 
 ### Editor Workflow
 
@@ -799,86 +699,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 398 earlier items in `TODO-archive.md`, newest last.
+> 403 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **City buildings**: five skylines, three factories, nine residential,
-  five commercial and five infrastructure buildings, original and generic, in
-  the catalogue a test holds to the counts asked
-  - **Settled**: the catalogue in `js/prefabs.js` holds 27 buildings - five
-    skylines, three factories, nine residential, five commercial and five
-    infrastructure - generic and original, built with small helpers: `block`
-    and `drum` give a box or a round tower a band of windows at every floor,
-    `front` puts a house's door and windows on its `+z` wall. Every card's
-    footprint was measured off its recipe and is held to it; a skyline is two
-    to five towers by the places something 25 metres tall stands. A test holds
-    each category's count to the range asked and the names to the plan's, every
-    building solid on the usual plinth, nothing below the ground it stands on,
-    and no recipe past 3000 triangles. Roads, the infrastructure category's
-    second half, are the next run's.
-  - From: Post Interactive Build
-- [x] **Parks**: seven parks of trees, paths, water and fields, drawn as
-  objects with no roof
-  - **Settled**: seven parks - LAWN, WOODLAND, POND PARK, PLAYGROUND, SPORTS
-    FIELD, PLAZA and FORMAL GARDEN - each `solid: false`, laid on a lawn of its
-    own the size of its card, with trees, paths, benches, water and a pitch's
-    lines as meshes. A recipe may now name its `plinth` colour, read and held
-    by the file and the schema, and `js/object-mesh.js` colours each plinth
-    instance with it, so a park on falling ground reads as a grassy terrace
-    rather than a concrete one.
-  - From: Post Interactive Build
-- [x] **Roads that snap**: six road pieces laid over the ground, each with
-  connectors at its open ends, snapping end to end to an open connector within
-  30 metres while previewed, and placed free with `shift`
-  - **Settled**: a recipe gains a `ribbon` part - a flat strip along a
-    line, cut every `RIBBON_STEP` (10 m), turned to face up - and two fields:
-    `drape`, which lays every corner on the ground under it `DRAPE_LIFT` over
-    it rather than standing the recipe on a plinth, and `connectors`, each a
-    point and the heading leading out. Six road pieces under INFRASTRUCTURE,
-    after its buildings - STRAIGHT, CURVE, T-JUNCTION, CROSSROADS, ROUNDABOUT
-    and DEAD END - 12 m wide with a dashed centre line, flown over. A tile lays
-    its roads into one mesh with `drapedGeometry`, pulled toward the camera by
-    a polygon offset. `js/roads.js` is the pure arithmetic: a connector where
-    its piece's heading and scale put it, two joined when they meet face to
-    face, the open ones those no other meets, and `snapRoad`, which moves and
-    turns a piece so its nearest end meets the nearest open one within 30 m.
-    The file and the schema read ribbons, drapes and connectors.
-  - From: Post Interactive Build
-- [x] **Insert City**: the tool and its mark, a folding section per category
-  of named cards, a chosen card previewed under the pointer and placed by a
-  click, and turned by the gumball
-  - **Settled**: `city` joins `BUILT_TOOLS`, so every tool declared is built.
-    Its dock, `DOCK_CITY`, is a folding section for each category with only
-    the last opened open, each a grid of named cards, Infrastructure's roads a
-    row of their own. A card arms it; the pointer carries the card's footprint
-    lined up with the view, outlined green where a road would snap; a click
-    places it as the edit in hand with `HEADING` and `SCALE` over `ACCEPT` and
-    `CANCEL`, a second click moves it - snapping again - and another card
-    swaps the piece in hand. `shift` places a road free. A free point is held
-    to a tenth of a metre. Auto accept for drawing keeps the piece in hand at
-    the next click. The control list gains `Click (Insert city)` and
-    `Shift+Click (Insert city)`, which needed the list to write a held key
-    before a click. The browser check found a row of six cards running off
-    both sides of the dock under the canvas, so a row of tiles now wraps.
-  - From: Post Interactive Build
-- [x] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
-  never sent anywhere, then a step that sets its scale, up and facing and says
-  which insert menus it fits, from its bounds, with the reason where it does
-  not
-  - **Settled**: `LOAD ASSET…` on SAVE / LOAD reads a file with
-    `file.arrayBuffer()` - refused past 25 MB before it is read, and by its
-    name where it is no GLB, glTF, OBJ, STL or SVG - and `js/asset-loader.js`
-    reads it with three's own loaders, fetched with three: a `.gltf` only when
-    every buffer and image is a `data:` address, an SVG parsed as text and
-    extruded, never put into the page, and any model past 300,000 triangles
-    refused. `LOADED ASSET` shows it on the canvas, the camera brought in to
-    it, with MODEL - `NAME`, `SCALE`, `UP`, `FACING`, `COLOR` for a format
-    with none, `HEIGHT` for a plan - and USE AS - a switch for each use, held
-    shut with why where `assetFit` in the pure `js/asset-fit.js` says it does
-    not fit, `FLIES LIKE` and `SECTION`. glTF is taken as metres, its own
-    unit, and only OBJ and STL are guessed as millimetres past 2000 units; a
-    runway's least length is the strip's own 600 m, not the 400 the plan
-    first said, since it is placed over a real strip of its size.
-  - From: Post Interactive Build
 - [x] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
   listed with what each is used as and removable, and carried inside an
   environment file that uses them so it opens on another computer
@@ -1012,3 +834,196 @@ how the simulator got here rather than as a list still to be worked.
     winds". Nothing else in the file changes.
   - **Settled**: the word dropped, and nothing else in `js/shapes.js` touched.
   - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [x] Held Feather 1: the hold halved the soft brush's edge, and three
+  sentences still say it is a half
+  - **Issue**: the hold is applied to a stated feather as well as a default
+    one, and Free Paint states one. `paintStamp` in `js/build-tools.js` asks
+    for `round(width * SOFT_EDGE)` on a soft edge, and `SOFT_EDGE` is 0.5, so
+    the feather asked for is half the stamp's width - which is also exactly
+    the stroke's reach, `width / 2`. The hold then takes
+    `reach * FEATHER_SHARE`, a half of a half. Measured through the real path
+    at three brush sizes - 25, 100 and 400 pixels at `unitsPerPixel` 1 - the
+    feather used is 6.25, 25 and 100 against the 13, 50 and 200 asked for: a
+    soft brush eases across 25% of its width at every size, not 50%. The
+    weight profile of a 400 unit soft stroke now reads 1.000 at 0, 50 and 100
+    units off its centreline and 0.500 at 150, so the stroke is whole across
+    its inner half rather than "whole only down its middle". `SOFT_EDGE` is
+    inert as a result: every value from 0.5 up produces the same 25%, so the
+    constant can no longer express what it was written to express. Three
+    sentences state the old behaviour - its own docstring at
+    `js/build-tools.js:313`, `paintStamp`'s at `js/build-tools.js:380`
+    ("`SOFT` eases across half the stamp's width, from its middle out"), and
+    `docs/terrain.html:183` ("a soft one across half the brush's width").
+    Not queued as a fix because which way it should go is a decision about the
+    shared weight model rather than a correction: the hold is what gives an
+    extrusion its top and must stay, so either paint is exempted from it -
+    paint reads no full cover, it only blends by weight, so a feather that
+    eases to 1 at one point is no defect there - or `SOFT_EDGE` is re-scaled
+    against what the hold allows and the three sentences are rewritten to the
+    figure that results.
+  - **Goal**: decide whether a stated feather is exempt from the hold, or only
+    a default one is, and make the three sentences say what the code does
+    either way. If paint is exempted, `feather` needs to tell a stated feather
+    from a default one, which it does not today - both arrive as `asked`. Hold
+    the outcome with a test in `test/footprints.test.js` asserting the feather
+    a soft `paintStamp` comes to at a named brush size, so the figure is
+    written down somewhere rather than being whatever the two constants
+    multiply to.
+  - **Settled**: no feather is exempt - the hold is what gives every region a
+    top and it stays for all of them - and `SOFT_EDGE` is read off the hold
+    instead: `FEATHER_SHARE / 2`, a quarter of the stamp's width, which is
+    exactly `FEATHER_SHARE` of a swept stamp's reach. `paintStamp` asks for
+    `width * SOFT_EDGE` unrounded, so the feather asked for is the feather
+    used and the hold no longer cuts it down. No figure the pilot sees moved:
+    the three sizes measured still ease across 6.25, 25 and 100 units. The
+    three sentences now say a quarter - `SOFT_EDGE`'s own docstring,
+    `paintStamp`'s and `docs/terrain.html` - and all three say what the hold
+    also makes true, that a hard and a soft edge come to the same band at 640
+    units and under, so the axis only reads on a stroke laid from far out.
+    `test/footprints.test.js` pins the figure at the three sizes, that it is
+    `FEATHER_SHARE` of the reach, and where the two edges part.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [x] A click cannot choose the top of the canvas's own highest ground
+  - **Issue**: `pickGround` walks a ray from where it crosses
+    `canvasGround.top`, the highest vertex of the field, and throws the pick
+    away when the clearance there is not above zero - a guard written for a
+    camera buried in a hill. A ray aimed at a point that is itself at that
+    height crosses the ceiling exactly on it, so the clearance is exactly 0
+    and the pick answers null. Driven in Chromium: one 2400 unit extrusion
+    600 units tall on a blank canvas, clicked at its middle from camera
+    pitches of 85, 70, 55, 40, 30 and 20 degrees - nothing at every one of
+    them, so `EDIT EXTRUSION` leaves the panel pointed at both colours rather
+    than narrowing to `TOP COLOR` and `BLEND`, and the top's red rim is never
+    drawn. Stand a taller block anywhere else on the canvas and the same
+    click answers `top` at every pitch down to 30. It reaches every tool that
+    reads the ground under the pointer, not Extrude's surfaces alone. Not
+    new: the same drive against `js/environment/footprints.js` as it was
+    before the feather was held, served into the page, answers `nothing` too.
+  - **Goal**: Resolve to [highest-ground-pick.prompt.md](.claude/prompts/highest-ground-pick.prompt.md)
+  - **Settled**: the guard was right about its case and wrong about its
+    boundary, so the entry is now tested for the surface rather than for the
+    sign - option 1 of the prompt. A clearance at the entry within
+    `PICK_SURFACE`, a micron, is a hit at the entry; only below that is a
+    camera inside a hill. The ceiling's own height is what the clearance is
+    measured from, so a plateau reads exactly 0 rather than a rounding off it,
+    and the tolerance is what reaches a summit too narrow to have a flat top -
+    the ground read a hair off the aimed point comes back parts in 10^13 under
+    the ceiling. Driven in Chromium: one 2400 unit block alone on a blank
+    canvas, clicked at its middle from 85, 70, 55, 40, 30 and 20 degrees,
+    answers `top` at every one where it answered nothing before
+    (`.tmp/ui-ux/t28/top-and-rim.log`, phase A). `test/build-picking.test.js`
+    holds both the plateau and the narrow summit, and a mutation to `=== 0` or
+    to `<= 0` fails them.
+  - From: UI/UX Override - the top a click cannot reach
+- [x] A small extrusion's chosen top is outlined by a few pixels or by none
+  - **Issue**: `surfaceEdges` traces the top's rim by marching squares over
+    `OUTLINE_CELLS` - 256 cells across a 16,000 unit canvas, so 62.5 units to
+    a cell. With the feather now held to half a region's reach, a 200 unit
+    region's ground at full cover is about 100 units across, which is between
+    one and two cells, and where it falls on that grid decides whether a
+    contour is found at all. Two hand-driven runs of the same 200 unit block
+    gave a rim of 83 pixels spanning 33 by 13, and a rim of 1 pixel. By 320
+    units it is 615 pixels and reads as a rim. The top is chosen correctly in
+    every case and `TOP COLOR` works - only the red outline that says which
+    surface is chosen is missing, which is the one thing on screen that
+    answers "did that click take".
+  - **Goal**: Trace the rim finely enough to find a region of the size
+    Extrude accepts - `surfaceEdges` could take its cell count from the
+    footprint's own reach rather than from the canvas, as `regionEdges` could
+    - or, where no contour is found at all, fall back to marking the chosen
+    top some other way. Hold it with a test in `test/build-overlay.test.js`
+    asserting `surfaceEdges` answers a non-empty run for a 200 unit rect.
+  - **Settled**: traced over the region's own square rather than over the
+    canvas. The new `footprintContour` in `js/build-overlay.js` takes a
+    footprint's box, cuts it and each of its repeats to the canvas - so a
+    region past a seam is still traced on both sides and still cut at the edge
+    - and gives each square the cells the whole box would have had, so the cell
+    is the region's own size divided and a rim reads the same at every size
+    Extrude accepts. `surfaceEdges` and `regionEdges` both go through it;
+    `placementOutline` keeps the canvas grid, because a placement's reach is a
+    weight rather than a footprint and a placement small enough to fall between
+    cells is an object, traced round as it stands. A 200 unit block's rim went
+    from 1 px to 488 px in Chromium, and 40 units - the least Extrude takes -
+    is one closed run of 269 points where it was four segments.
+  - From: UI/UX Override - the top a click cannot reach
+- [x] A `.glb` asset can make the page fetch a URL it names
+  - **Issue**: `selfContained` is applied to `.gltf` only, so a `.glb` reaches
+    `parseAsync` unchecked, and a GLB's JSON chunk may name an external `uri`
+    for any buffer but the first and for every image. In the pinned
+    `three@0.160.0`, `GLTFLoader.js:2948` and `:3247` fetch those addresses,
+    with `options.path` empty so an absolute URL is fetched as given. An
+    environment file carries its assets' bytes and `adoptAssets` hands each to
+    `registerAsset`, so a shared world is an untrusted input that reaches this
+    path and one crafted `.glb` beacons for every pilot who opens it. The
+    SHA-256 check does not help - it proves the bytes are the ones the file's
+    author shipped. Written up with the reproduction, the two fix shapes and
+    the prose it contradicts in
+    [KNOWN_RISKS.md](KNOWN_RISKS.md#2026-11-07-a-glb-asset-can-make-the-page-fetch-a-url-it-names).
+  - **Goal**: hold both glTF formats to the same rule - a `LoadingManager`
+    whose `setURLModifier` refuses anything not beginning `data:` is the
+    recommendation, since it covers whatever a later extension adds a `uri` to
+    and fails closed through the `AssetRefused` path that already exists. Fix
+    the refusal message, which currently tells the pilot to save as a `.glb`,
+    and `docs/terrain.html:320`, which states the narrow claim. Not fixed in
+    review because it cannot be verified here: `three` is a CDN import with no
+    local install and `readModel` has no test that executes it, so this needs
+    a vendored `three` or a Chromium check that serves a crafted `.glb` and
+    asserts no request leaves the page.
+  - **Settled**: both formats held at a `THREE.LoadingManager` whose
+    `setURLModifier` refuses every address but `data:` and `blob:`, which is
+    the recommendation, with the scheme matched either case. `blob:` is in the
+    rule because three hands a GLB's embedded texture to the image loader as a
+    blob the page made from its own bytes - a `data:`-only rule would refuse
+    most textured GLBs. The modifier throws `AssetRefused`, which three turns
+    into a rejected parse and `readModel` passes through, so the read fails
+    closed with the address named. `selfContained` stays as the early, named
+    refusal for a `.gltf` and now reads the same rule; its message no longer
+    steers the pilot at `.glb`. Verified in Chromium against a crafted GLB
+    naming an external buffer: no request leaves the page, while the same bytes
+    through a bare `GLTFLoader` do fetch it - and a GLB with its PNG in the BIN
+    chunk, and one with it as a `data:` uri, both still read with their texture
+    (`.tmp/ui-ux/t28/glb-no-fetch.mjs`, `glb-embedded-texture.mjs`).
+    `KNOWN_RISKS.md` and `docs/terrain.html` follow.
+  - From: UI/UX Override - the top a click cannot reach
+- [x] A runway asset's strip is not the width the asset is
+  - **Issue**: `placeAssetRunway` says it builds "a real runway of the asset's
+    length and width - so landing, scoring and takeoff work on it unchanged",
+    but `assetFit`'s runway test bounds width only against `depth / 4` while
+    the strip can only be built between `GROUP_RANGES.width.low` and `.high`,
+    which are 80 and 600. The two disagree in both directions, and nothing
+    warns. Run through the real path: a 600 by 20 m asset fits and is given an
+    80 m strip, so the landable ground is four times the model's width and a
+    pilot can land well clear of what they can see; a 5000 by 1200 m asset
+    fits and is given a 600 m strip, so the model's edges hang over ground
+    that is not runway; and a 600 by 0 m asset - a flat plan - fits and is
+    given an 80 m strip out of nothing, because the runway branch has no
+    "nothing to place" guard where the city branch does. The suite misses all
+    of it: every runway case in `test/assets.test.js` uses a 60 m width, which
+    is already under the 80 m floor, and the one over-wide case tests 601 at
+    depth 2400 where `depth / 4` and `width.high` both happen to be 600.
+    `test/assets.test.js:171` does assert the 80 m strip and calls it "at
+    least the narrowest strip", so the clamp was seen on the way in; what was
+    not is that the fit check lets through what the strip cannot be built at.
+  - **Goal**: make `assetFit`'s runway bounds the bounds the strip can be built
+    at - width held to `GROUP_RANGES.width` as well as to a quarter of the
+    length, with a named reason either side, and a guard for a width of
+    nothing - so an asset that cannot be placed faithfully is refused with a
+    reason rather than silently clamped. Decide separately whether the
+    hardcoded 5000 m ceiling should be `GROUP_RANGES.length.high`, which is
+    8000; the module docstring and `test/assets.test.js` both state 5000, so
+    it reads as deliberate. Expect the five runway assertions in
+    `test/assets.test.js` to need their widths moved above 80, and correct the
+    docstring table and `placeAssetRunway`'s own sentence, which both claim
+    the strip is the asset's width.
+  - **Settled**: `assetFit`'s runway bounds are the strip's own bounds -
+    width held to `GROUP_RANGES.width` as well as to a quarter of the length,
+    each with its own reason - and a width or length of nothing is `nothing to
+    place`, as the city branch already had. The 5000 m ceiling stays, now the
+    named `RUNWAY_LENGTH_LIMIT`: it is deliberately under
+    `GROUP_RANGES.length.high`, since 5 km is past every runway there is and a
+    model longer than that has its units guessed wrong. So the clamp in
+    `placeAssetRunway` is a guard rather than a resize, and the docstring
+    table and its own sentence now say so. The five runway cases in
+    `test/assets.test.js` moved above the 80 m floor, and a test of its own
+    holds the three sizes that used to be let through and silently resized.
+  - From: UI/UX Override - the top a click cannot reach
