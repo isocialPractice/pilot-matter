@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-alpha.1.65.1] - 2026-11-08
 
 ### Fixed
 
@@ -61,6 +61,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A group's `heading`, `length` and `width` are now held on the way in, as an
   object's and an element's always were, so the figure kept is the strip
   built. A group that carried no configuration still carries none.
+- **A loaded model is read from the file it came in and from nothing else.** A
+  glTF names its buffers and images by address, and only a `.gltf` was checked
+  for addresses pointing elsewhere. A `.glb` carries the same description in
+  its first chunk and went to the loader unchecked, so a model could name any
+  address on the network and the page would fetch it when the model was read -
+  and an environment file carries its models' bytes, so one crafted file in a
+  shared world called home for every pilot who opened it, every time. Both
+  formats are now held while they are read: a model may use its own bytes and
+  addresses written inside it, and anything else is refused by name before it
+  is fetched. The refusal covers whatever a later glTF extension points
+  somewhere, rather than the two lists that were checked by hand, and a model
+  that carries its own pictures - which is most of them - reads exactly as it
+  did.
+- **A loaded runway is refused at a size no strip can be built at.** A runway
+  asset is laid over a real strip of its size, and a strip is 80 to 600 metres
+  across; the fit only held a model to a quarter of its own length, so the two
+  disagreed in both directions with nothing said. A 600 by 20 m model was
+  accepted and given an 80 m strip, so the landable ground was four times the
+  model a pilot could see; a 5000 by 1200 m one was given a 600 m strip, so
+  the model hung over ground that was not runway; and a flat plan with no
+  width at all was given a strip out of nothing. A model outside the strip's
+  own width is now refused with which bound it is past, and a runway that is
+  offered is built at the size the model is, to the metre.
+- **A click reaches the canvas's own highest ground.** The search for the
+  ground under the pointer starts where the ray comes down through the highest
+  the ground stands, and threw the answer away when the ray began level with
+  it - a guard meant for a camera buried in a hill. A ray aimed at ground that
+  *is* the highest begins exactly level with it, so the highest flat ground on
+  a canvas was unreachable by everything that asks what is under the pointer:
+  the hover outline, Select, a drop, a stroke, the start point, and Extrude's
+  surfaces. One extrusion standing alone on a blank canvas is the ordinary
+  case - clicking its top chose nothing from any angle. A ray that begins on
+  the ground has now arrived at it, which also reaches the peak of a region
+  too small for the ground to give it a flat top.
+- **The chosen surface of a small extrusion is outlined.** The red rim round
+  the top a click chose was traced over the whole canvas at a few hundred
+  metres to a cell, while Extrude accepts a region 40 metres across - so a
+  small extrusion's rim came out as a pixel or two, or as nothing, and the one
+  thing on screen that answers "did that click take" was missing. A region is
+  now traced over its own square, so the detail follows the region's size
+  rather than the canvas's: a 200-metre block's rim went from one pixel to
+  488, and the smallest region the tool accepts is outlined as closely as the
+  largest. A region drawn across the edge of the canvas is still traced on
+  both sides of it.
+- **A soft brush eases across a quarter of its width, and says so.** The soft
+  edge asked for half the brush's width, which is the whole of a stroke's
+  reach, so the hold that keeps every region some ground at full cover took
+  half of it straight back: every value from a half upward came to the same
+  quarter, and three sentences described a band that never reached the ground.
+  The figure the pilot sees has not moved - a 25, 100 or 400 unit brush still
+  eases across 6.25, 25 and 100 units - but the constant is now read off the
+  hold, so what is asked for is what is used, and the documentation says a
+  quarter. It also now says what follows: on a brush 640 units across or
+  narrower, a hard and a soft edge come to the same band, because there is no
+  room between the ground's sampling and the hold for the two to differ.
 
 Held in Node by `test/surfaces.test.js`, which now walks a region at the
 smallest size Extrude accepts as well as a large one and checks the four
@@ -84,6 +139,35 @@ answering a finite height for the prism; a 200-unit block accepted onto a
 canvas and drawn with its top in the top's colour; and the refused file row
 under the cursor drawn on the warning fill with its reason at better than
 10:1, over both a bright and a dark flight.
+
+The five fixes above those two are held in Node by `test/build-picking.test.js`
+- a ray aimed at a plateau standing at the ceiling, and at the peak of a
+summit too narrow for the ground to flatten, each met rather than walked past,
+with the camera-inside-a-hill guard still refusing what it was written for - by
+`test/build-overlay.test.js`, which traces a 40, a 200 and a 2400 unit region
+and expects one closed rim of the same detail from each, on the top's own
+weight, and the seam still cut at the canvas; by `test/footprints.test.js`,
+which pins the feather a soft brush comes to at three sizes and the width where
+a hard and a soft edge part; by `test/assets.test.js`, for the three runway
+sizes that used to be accepted and silently resized and for the address rule
+the glTF loader is now given; and by `test/paint.test.js` for the stamp itself.
+Each rejected the defect it names when that was put back: the ceiling boundary
+compared at exactly zero and at zero-or-under, the region traced over the
+canvas again, the soft edge written as a half, and the rounding that made the
+feather asked for differ from the feather used.
+
+Settled in Chromium in 17 checks, in three scripts under `.tmp/ui-ux/t28/`: a
+2400 unit block alone on a blank canvas clicked at six camera pitches, every
+one entering the search level with the ceiling and every one now choosing the
+top; five extrusions from 200 to 1200 units each outlined at better than 200
+red pixels where 200 units was one; a crafted `.glb` naming an outside address
+read through the page with no request leaving it, against the same bytes
+through an unguarded loader, which fetches it; and a `.glb` carrying its
+picture in its own chunk, and one carrying it as an address inside itself, both
+read with their texture. A 200 unit extrusion standing alone on a canvas is
+reached at its exact peak and not from the pixels either side - the search
+steps half a cell and such a summit is narrower than a step - which is queued
+under **Closing the Builder's Gaps** rather than fixed here.
 
 ## [1.0.0-alpha.1.65.0] - 2026-11-06
 

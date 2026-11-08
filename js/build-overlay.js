@@ -22,7 +22,7 @@
  */
 
 import { placementReach, PICK_WEIGHT } from './build-select.js';
-import { footprintSampler, polygonPoints, flattenPath, COMBINE_KIND } from './environment/footprints.js';
+import { footprintSampler, footprintBounds, polygonPoints, flattenPath, COMBINE_KIND } from './environment/footprints.js';
 import { canvasPickBounds } from './build-picking.js';
 import { AXIS_COLOURS } from './gumball.js';
 import { TOP_WEIGHT, EXTRUDE_SURFACES_DECLARED } from './extrude.js';
@@ -138,8 +138,77 @@ export function contourSegments(weigh, bounds, cells = OUTLINE_CELLS, level = PI
 }
 
 /**
+ * A footprint's weight traced at `level`, as segments in the canvas's frame -
+ * the contour of `contourSegments`, taken over the region's own square rather
+ * than over the whole canvas.
+ *
+ * `cells` cells across a 16,000 unit canvas is 62.5 units to a cell, and
+ * Extrude accepts a region 40 units across: a 200 unit region's ground at full
+ * cover is about 100 units wide, which is between one and two cells, so where
+ * it happened to fall on that grid decided whether a contour was found at all.
+ * Two drives of the same 200 unit block gave a rim of 83 pixels and a rim of 1.
+ * Over the region's own square the cell is the region's own size divided, so a
+ * rim reads the same at every size Extrude accepts.
+ *
+ * A region is still traced within the canvas, in as many squares as it has
+ * repeats reaching it: the part of it past a seam is the part that carries on
+ * across that seam, and it is traced where it comes back in on the opposite
+ * side, exactly as a trace over the whole canvas cut it there. The squares are
+ * a canvas apart and no wider than one, so no two of them overlap and no
+ * crossing is traced twice.
+ *
+ * A region as wide as the canvas, or one of no readable kind, is traced over
+ * the canvas as it always was - there is nothing to be gained by tightening a
+ * square to the thing it already is.
+ */
+export function footprintContour(footprint, size = 0, cells = OUTLINE_CELLS, level = PICK_WEIGHT) {
+    if (!(Number(size) > 0)) return [];
+    const weigh = footprintSampler(footprint, size);
+    return traceSquares(footprint, Number(size), cells)
+        .flatMap(square => contourSegments(weigh, square.bounds, square.cells, level));
+}
+
+/** The squares of the canvas a footprint is traced over, each with the cells across it. */
+function traceSquares(footprint, size, cells) {
+    const canvas = canvasPickBounds(size);
+    const whole = [{ bounds: canvas, cells }];
+
+    const box = footprintBounds(footprint);
+    if (box == null) return whole;
+
+    const across = Math.max(box.maxX - box.minX, box.maxZ - box.minZ);
+    if (!(across > 0) || across >= size) return whole;
+
+    // The cell the region would be traced at on its own, which every square
+    // keeps - so a region cut by a seam is drawn at one detail either side.
+    const cell = across / Math.max(1, Math.round(cells));
+    const squares = [];
+
+    for (const shiftX of [-size, 0, size]) {
+        for (const shiftZ of [-size, 0, size]) {
+            const minX = Math.max(box.minX + shiftX, canvas.minX);
+            const maxX = Math.min(box.maxX + shiftX, canvas.maxX);
+            const minZ = Math.max(box.minZ + shiftZ, canvas.minZ);
+            const maxZ = Math.min(box.maxZ + shiftZ, canvas.maxZ);
+            if (!(maxX > minX) || !(maxZ > minZ)) continue;
+            squares.push({
+                bounds: { minX, maxX, minZ, maxZ },
+                cells: Math.ceil(Math.max(maxX - minX, maxZ - minZ) / cell)
+            });
+        }
+    }
+
+    return squares.length > 0 ? squares : whole;
+}
+
+/**
  * The outline of a placement on a canvas `size` wide, as segments in the
  * canvas's frame: its reach traced at the weight a click needs.
+ *
+ * Over the canvas rather than over the placement's own square, because a
+ * placement's reach is a weight and not a footprint - a mountain's is several
+ * peaks - and there is no one square to tighten to. A placement small enough to
+ * fall between the canvas's cells is an object, which is traced round instead.
  */
 export function placementOutline(placement, size = 0, cells = OUTLINE_CELLS) {
     if (!(Number(size) > 0)) return [];
@@ -690,14 +759,12 @@ export const EDGE_LEVEL = 0.01;
  * The edge of a region with no one outline of its own - shapes added to a
  * selection, drawn inside it or cut out of it - as runs of canvas points, the
  * contour of its weight chained end to end so a dashed line flows along it.
- * Traced over the canvas through the region's wrapped weight, so it is drawn on
- * both sides of a seam it crosses. A region that has an outline of its own is
- * better drawn from `footprintLoop`, which is its exact edge.
+ * Traced through the region's wrapped weight, so it is drawn on both sides of a
+ * seam it crosses. A region that has an outline of its own is better drawn from
+ * `footprintLoop`, which is its exact edge.
  */
 export function regionEdges(footprint, size = 0, cells = OUTLINE_CELLS) {
-    if (!(Number(size) > 0)) return [];
-    const segments = contourSegments(footprintSampler(footprint, size), canvasPickBounds(size), cells, EDGE_LEVEL);
-    return chainSegments(segments);
+    return chainSegments(footprintContour(footprint, size, cells, EDGE_LEVEL));
 }
 
 /**
@@ -719,10 +786,8 @@ const TOP_LEVEL = TOP_WEIGHT - 1e-6;
  */
 export function surfaceEdges(footprint, surface, size = 0, cells = OUTLINE_CELLS) {
     if (!(Number(size) > 0) || footprint == null || !EXTRUDE_SURFACES_DECLARED[surface]) return [];
-    const weigh = footprintSampler(footprint, size);
-    const bounds = canvasPickBounds(size);
     const levels = surface === 'top' ? [TOP_LEVEL] : [EDGE_LEVEL, TOP_LEVEL];
-    return levels.flatMap(level => chainSegments(contourSegments(weigh, bounds, cells, level)));
+    return levels.flatMap(level => chainSegments(footprintContour(footprint, size, cells, level)));
 }
 
 /** True for a region that is drawn from its contour rather than its own outline. */

@@ -22,6 +22,21 @@ export const PICK_REFINEMENTS = 24;
 export const PICK_STEP_CELLS = 0.5;
 
 /**
+ * How near the ground a ray has to begin to be counted as starting on it, in
+ * world units.
+ *
+ * A micron, which is nothing at a scale where the ground is sampled every 80
+ * metres, and far wider than the rounding it is there to absorb: the point
+ * where a ray crosses the ceiling is worked out by arithmetic, so the ground
+ * read there comes back a few parts in 10^13 off the ceiling rather than
+ * exactly on it. Compared at exactly zero, the ceiling test holds for a
+ * plateau - whose top is flat, so a hair off the aimed point reads the same
+ * height - and misses the summit of anything narrower than the sampling,
+ * whose interpolated ground falls away from its one high vertex immediately.
+ */
+export const PICK_SURFACE = 1e-6;
+
+/**
  * Where a ray first meets the ground, or null where it does not.
  *
  * `origin` and `direction` are `{ x, y, z }`; the direction need not be of unit
@@ -31,8 +46,10 @@ export const PICK_STEP_CELLS = 0.5;
  * the ground, and the step that crossed is then halved down to the crossing.
  * `top` is the highest the ground stands: the stretch of ray above it can meet
  * nothing, so the walk starts where the ray comes down through it, and a ray
- * level with it or climbing away from it misses outright. `maxDistance` is as
- * far as anything is drawn.
+ * level with it or climbing away from it misses outright. A ray aimed at
+ * ground that stands at `top` - within `PICK_SURFACE` - meets it at that
+ * crossing itself, with no walk to make. `maxDistance` is as far as anything
+ * is drawn.
  *
  * `bounds`, `{ minX, maxX, minZ, maxZ }`, is the ground that may be picked. A
  * ray that meets the ground outside it misses rather than being moved onto its
@@ -52,14 +69,40 @@ export function pickGround(origin, direction, heightAt, {
     };
 
     let from = 0;
+    let entryHeight = origin.y;
     if (Number.isFinite(top) && origin.y > top) {
         if (dy >= 0) return null;
         from = (origin.y - top) / -dy;
+        // The crossing stands at the ceiling by construction, so the ceiling
+        // is what its clearance is measured from: `origin.y + dy * from` is
+        // the same height to within a rounding, and this boundary is decided
+        // at exactly zero.
+        entryHeight = top;
     }
+
+    const entry = at(from);
+    const above = entryHeight - heightAt(entry.x, entry.z);
 
     // A ray that starts under the ground has nothing to say about what it
     // points at - it is a camera inside a hill.
-    if (clearance(from) <= 0) return null;
+    if (above < -PICK_SURFACE) return null;
+
+    // A ray that starts *on* the ground has arrived at it, and the march has
+    // nowhere to go: the ceiling is the highest the ground stands, so the only
+    // ground at that height is the point the ray came down onto. Reading that
+    // as a camera inside a hill is what left the canvas's own highest ground
+    // unpickable - a plateau, a mesa, or the one extrusion standing on a blank
+    // canvas - by every tool that asks what is under the pointer.
+    //
+    // It is also the only chance a summit narrower than the sampling gets. The
+    // march steps half a cell, and the sides of such a summit fall away faster
+    // than the ray comes down, so a ray aimed at its one high vertex is above
+    // the ground at every step after the entry and would walk past it to the
+    // flat ground beyond.
+    if (above <= PICK_SURFACE) {
+        const hit = { x: entry.x, y: heightAt(entry.x, entry.z), z: entry.z };
+        return within(hit, bounds) ? hit : null;
+    }
 
     let before = from;
     for (let t = from + step; t <= maxDistance + step; t += step) {

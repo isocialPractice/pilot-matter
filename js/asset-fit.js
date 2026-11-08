@@ -11,11 +11,13 @@
  * | ------ | ---------------------------------------------------------------- |
  * | PLANE  | longest side 3 to 90 m, height under half of it                  |
  * | CITY   | footprint up to 600 m a side, height up to 900 m                 |
- * | RUNWAY | 600 to 5000 m long, no wider than a quarter of that, no taller   |
- * |        | than 2% of it                                                     |
+ * | RUNWAY | 600 to 5000 m long, 80 to 600 m across and no wider than a       |
+ * |        | quarter of its length, no taller than 2% of it                    |
  *
- * A runway's least length is the strip's own, 600 m: a runway asset is placed
- * over a real strip of its size, and no strip is shorter.
+ * A runway's length and width are the strip's own: a runway asset is placed
+ * over a real strip of its size, so an asset is only offered as a runway at a
+ * size a strip can be built at - 600 to 8000 m long and 80 to 600 m across,
+ * with the length held tighter still by the table above.
  *
  * An asset is known by the SHA-256 of its bytes, so the same file loaded
  * twice, or carried in two environment files, is one asset.
@@ -137,9 +139,26 @@ export function facedSize(size, facing = '+z') {
 const metres = value => `${Math.round(value * 10) / 10} m`;
 
 /**
+ * The longest a runway asset may be. Shorter than `GROUP_RANGES.length.high`,
+ * which is what the strip itself may be built to, on purpose: 5 km is past
+ * every runway there is, and a model longer than that is a model whose units
+ * were guessed wrong rather than an aerodrome.
+ */
+export const RUNWAY_LENGTH_LIMIT = 5000;
+
+/**
  * Where a model of a size, in metres and facing along `+z`, may go, as
  * `{ plane, city, runway }`, each `{ fits, reason }` - the reason saying, where
  * it does not fit, which bound it is past.
+ *
+ * A runway's bounds are the strip's own, because `placeAssetRunway` builds a
+ * real strip of the asset's size and a strip can only be built between
+ * `GROUP_RANGES.width.low` and `.high`. Held to a quarter of the length as
+ * well, which is the shape of a runway rather than a limit of the strip. Before
+ * the two were the same figures they disagreed both ways without warning: a 600
+ * by 20 m model was given an 80 m strip, so the landable ground was four times
+ * the model a pilot could see, and a 5000 by 1200 m one was given a 600 m
+ * strip, so the model's edges hung over ground that was not runway.
  */
 export function assetFit(size) {
     const { width, height, depth } = size;
@@ -151,8 +170,11 @@ export function assetFit(size) {
     const city = Math.max(width, depth) > 600 ? `too large for the city: ${metres(Math.max(width, depth))} a side, the most is 600 m`
         : height > 900 ? `too tall for the city: ${metres(height)} high, the most is 900 m`
         : !(longest > 0) ? 'nothing to place' : null;
-    const runway = depth < GROUP_RANGES.length.low ? `too short for a runway: ${metres(depth)} long, the least is ${GROUP_RANGES.length.low} m`
-        : depth > 5000 ? `too long for a runway: ${metres(depth)} long, the most is 5000 m`
+    const runway = !(width > 0) || !(depth > 0) ? 'nothing to place'
+        : depth < GROUP_RANGES.length.low ? `too short for a runway: ${metres(depth)} long, the least is ${GROUP_RANGES.length.low} m`
+        : depth > RUNWAY_LENGTH_LIMIT ? `too long for a runway: ${metres(depth)} long, the most is ${RUNWAY_LENGTH_LIMIT} m`
+        : width < GROUP_RANGES.width.low ? `too narrow for a runway: ${metres(width)} across, the least is ${GROUP_RANGES.width.low} m`
+        : width > GROUP_RANGES.width.high ? `too wide for a runway: ${metres(width)} across, the most is ${GROUP_RANGES.width.high} m`
         : width > depth / 4 ? `too wide for a runway: ${metres(width)} across, no more than a quarter of its length`
         : height > depth * 0.02 ? `too tall for a runway: ${metres(height)} high, no more than 2% of its length`
         : null;
@@ -256,6 +278,11 @@ export function placeAssetObject(asset, at, { heading = 0, scale = 1 } = {}) {
  * A runway asset placed: a group whose strip is a real runway of the asset's
  * length and width - so landing, scoring and takeoff work on it unchanged -
  * with the asset drawn as an object over it, which is how it looks.
+ *
+ * The figures are still held to `GROUP_RANGES`, which is what a strip can be
+ * built at, but `assetFit` refuses an asset outside them, so the hold is a
+ * guard rather than a silent resize: a runway offered here is a runway whose
+ * strip is the size the model is, to the metre.
  */
 export function placeAssetRunway(asset, at, heading = 0) {
     if (!Array.isArray(at) || at.length !== 2 || !at.every(Number.isFinite)) return null;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    pickGround, canvasPickBounds, pickStep, pointerDevice, PICK_STEP_CELLS
+    pickGround, canvasPickBounds, pickStep, pointerDevice, PICK_STEP_CELLS, PICK_SURFACE
 } from '../js/build-picking.js';
 import { createField, applyBase, sampleHeight, DEFAULT_SIZE } from '../js/environment/elements.js';
 
@@ -77,6 +77,73 @@ test('ground met off the canvas is a miss, not a point moved onto its edge', () 
 
 test('a camera inside the ground points at nothing', () => {
     assert.equal(pickGround({ x: 0, y: 100, z: 0 }, { x: 0, y: -1, z: 1 }, hill), null);
+});
+
+/**
+ * The boundary the camera-inside-a-hill guard used to take with it: a ray aimed
+ * at ground standing at `top` crosses the ceiling exactly on that ground, so
+ * the clearance where the march begins is exactly 0 rather than above it. Read
+ * as a camera inside a hill, that left the canvas's own highest flat ground
+ * unpickable from every pitch - a plateau, or one extrusion standing alone on a
+ * blank canvas, whose top is what `EDIT EXTRUSION` needs a click on.
+ */
+test('a ray aimed at the highest ground on the canvas meets it rather than missing', () => {
+    // A 1200 unit square plateau 600 high, which is the whole of the highest
+    // ground there is, with flat ground around it.
+    const plateau = (x, z) => (Math.abs(x) <= 600 && Math.abs(z) <= 600 ? 600 : 0);
+
+    for (const pitch of [85, 70, 55, 40, 30, 20]) {
+        const away = Math.cos(pitch * Math.PI / 180) * 4000;
+        const up = Math.sin(pitch * Math.PI / 180) * 4000;
+        const origin = { x: 0, y: 600 + up, z: away };
+        const hit = pickGround(origin, { x: 0, y: -up, z: -away }, plateau, { step: 40, top: 600 });
+
+        assert.ok(hit, `aimed at the middle of the plateau from ${pitch} degrees and met nothing`);
+        assert.ok(near(hit.y, 600, 1e-6), `it should land on the top, and it landed at ${hit?.y}`);
+        assert.ok(near(hit.x, 0, 0.5) && near(hit.z, 0, 0.5), `on the point aimed at, and it landed at ${hit?.x},${hit?.z}`);
+    }
+
+    // And the entry point is still held to the canvas, as a hit found by
+    // walking is: a plateau reaching past the bounds is not picked beyond them.
+    const bounds = canvasPickBounds(800);
+    assert.ok(pickGround({ x: 0, y: 2000, z: 300 }, { x: 0, y: -1, z: 0 }, plateau, { top: 600, bounds }),
+        'straight down onto the plateau inside the canvas is a hit');
+    assert.equal(pickGround({ x: 0, y: 2000, z: 500 }, { x: 0, y: -1, z: 0 }, plateau, { top: 600, bounds }), null,
+        'and the same ground beyond the canvas is a miss, not a point moved onto its edge');
+});
+
+/**
+ * The same boundary on a summit the ground is too coarse to give a flat top.
+ *
+ * The ground is sampled every 80 units, so a region 200 units across is raised
+ * at one vertex and eased at its neighbours: a cone, whose sides fall away
+ * faster than the ray comes down. The entry is the ray's only meeting with it,
+ * and the ground read there comes back a few parts in 10^13 under the ceiling
+ * rather than exactly on it, because the crossing is arithmetic - which is what
+ * `PICK_SURFACE` absorbs. Compared at exactly zero, this walks past the summit
+ * to the flat ground beyond, which is what it did in Chromium.
+ */
+test('a summit narrower than the sampling is met at its peak rather than walked past', () => {
+    // 400 high at the middle, back to 0 by 80 units out: a single raised vertex
+    // interpolated, which is what a 200 unit extrusion comes to.
+    const summit = (x, z) => Math.max(0, 400 * (1 - Math.hypot(x, z) / 80));
+
+    for (const pitch of [85, 55, 30]) {
+        const away = Math.cos(pitch * Math.PI / 180) * 3000;
+        const up = Math.sin(pitch * Math.PI / 180) * 3000;
+        const hit = pickGround({ x: 0, y: 400 + up, z: away }, { x: 0, y: -up, z: -away }, summit,
+            { step: 40, top: 400 });
+
+        assert.ok(hit, `aimed at the peak from ${pitch} degrees and met nothing`);
+        assert.ok(near(hit.y, 400, 1e-6), `it should be the peak, and it was ${hit?.y} - the ground beyond it is 0`);
+        assert.ok(Math.hypot(hit.x, hit.z) < 1e-6, `at the peak, and it landed ${Math.hypot(hit.x, hit.z)} away`);
+    }
+
+    // The tolerance is a rounding, not a reach: ground a unit under the ceiling
+    // is still walked to rather than answered at the entry.
+    const shoulder = pickGround({ x: 0, y: 3000, z: 0 }, { x: 0, y: -1, z: 0 }, () => 399, { step: 40, top: 400 });
+    assert.ok(near(shoulder.y, 399), `the walk still happens a unit down, and it answered ${shoulder?.y}`);
+    assert.ok(PICK_SURFACE > 0 && PICK_SURFACE < 1e-3, `a rounding, and it is ${PICK_SURFACE}`);
 });
 
 // The walk starts where the ray comes down through the highest ground, which

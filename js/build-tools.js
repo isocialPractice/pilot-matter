@@ -15,7 +15,7 @@
  */
 
 import { scalar, choice } from './environment/elements.js';
-import { DEFAULT_FEATHER } from './environment/footprints.js';
+import { DEFAULT_FEATHER, FEATHER_SHARE } from './environment/footprints.js';
 import { ERASE_TYPE, placementRanges } from './environment/erase.js';
 import { mode, modeIs } from './mode-types.js';
 
@@ -311,10 +311,19 @@ export const PAINT_BRUSH = Object.freeze({
 });
 
 /**
- * How far in from its edge a soft brush eases, as a share of its width: half,
- * so a soft stroke is whole only down its middle and fades to either side.
+ * How far in from its edge a soft brush eases, as a share of its width: a
+ * quarter, so a soft stroke is whole across its inner half and fades across
+ * the quarter at either side.
+ *
+ * Read off the hold rather than written as a figure of its own, because the
+ * hold is what it is bounded by. A swept stamp's deepest point is half its
+ * width in, and `feather` keeps a band to `FEATHER_SHARE` of that - so a
+ * quarter of the width is the widest soft edge there is, and every larger
+ * share asked for came to the same quarter. It was 0.5 for that reason: the
+ * feather asked for was double what was used at every size, and three
+ * sentences described the half that never reached the ground.
  */
-export const SOFT_EDGE = 0.5;
+export const SOFT_EDGE = FEATHER_SHARE / 2;
 
 /**
  * The element's ranges Free Paint's panel carries: the colour under `COLOR
@@ -377,7 +386,16 @@ export function defaultBrush(tool) {
  * `HARD` is the feather every footprint carries unless it is told otherwise -
  * the sampling's two cells, which is the hardest edge the ground can draw: one
  * inside a cell is a staircase of whole vertices, the cliff the feather exists
- * to keep off. `SOFT` eases across half the stamp's width, from its middle out.
+ * to keep off. `SOFT` eases across `SOFT_EDGE` of the stamp's width at either
+ * side, which is a quarter and is as wide a band as the hold allows.
+ *
+ * A soft edge is asked for as a figure the hold leaves alone, rather than as
+ * one it cuts down: `width * SOFT_EDGE` is exactly `FEATHER_SHARE` of the
+ * stamp's reach. A hard edge asks for the sampling's two cells, which the hold
+ * does sharpen on a narrow stamp, since the hardest edge the ground can draw
+ * is still a band the region has room for. The two therefore come to the same
+ * feather at 640 units and under - eight of the ground's cells - where there
+ * is no room between the sampling and the hold for the axis to say anything.
  */
 export function paintStamp(brush = {}, unitsPerPixel = 1) {
     const scale  = Number(unitsPerPixel) > 0 ? Number(unitsPerPixel) : 1;
@@ -387,7 +405,7 @@ export function paintStamp(brush = {}, unitsPerPixel = 1) {
         width,
         depth: width,
         corner: brush?.tip === 'square' ? 0 : width / 2,
-        feather: brush?.edge === 'soft' ? Math.round(width * SOFT_EDGE) : DEFAULT_FEATHER
+        feather: brush?.edge === 'soft' ? width * SOFT_EDGE : DEFAULT_FEATHER
     };
 }
 

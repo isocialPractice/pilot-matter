@@ -12,10 +12,11 @@ import assert from 'node:assert/strict';
 import { DEFAULT_SIZE } from '../js/environment/elements.js';
 import { placementReach, placementAt, PICK_WEIGHT } from '../js/build-select.js';
 import {
-    contourSegments, placementOutline, projectOutline, strokeOutline,
+    contourSegments, footprintContour, placementOutline, projectOutline, strokeOutline, surfaceEdges, chainSegments,
     HOVER_OUTLINE, CHOSEN_OUTLINE, OUTLINE_CELLS
 } from '../js/build-overlay.js';
 import { canvasPickBounds } from '../js/build-picking.js';
+import { footprintWeight } from '../js/environment/footprints.js';
 
 const HALF = DEFAULT_SIZE / 2;
 
@@ -102,6 +103,51 @@ test('nothing reaching the canvas, or no canvas, has no outline', () => {
     assert.deepEqual(placementOutline({ type: 'mountain', config: { count: 4 } }, DEFAULT_SIZE), []);
     assert.deepEqual(placementOutline(dropped([0, 0]), 0), []);
     assert.ok(OUTLINE_CELLS >= 128, 'and the trace is fine enough to follow a small peak');
+});
+
+/**
+ * A cell of the canvas is 62.5 units at `OUTLINE_CELLS`, and Extrude accepts a
+ * region 40 units across, whose ground at full cover is about 20: traced over
+ * the canvas, whether a rim was found at all came down to where the region fell
+ * on that grid, and two drives of the same 200 unit block gave a rim of 83
+ * pixels and a rim of 1. Traced over the region's own square, the smallest
+ * region Extrude takes is outlined as closely as the largest.
+ */
+test('a region is traced at its own size, so a small one is outlined as closely as a large one', () => {
+    // Off the middle by an odd amount, which is where the canvas's grid used to
+    // decide it: a region centred on the canvas falls on the grid symmetrically.
+    const rect = width => ({ kind: 'rect', x: 31, z: -47, width, depth: width });
+
+    for (const width of [40, 200, 2400]) {
+        const footprint = rect(width);
+        const runs = surfaceEdges(footprint, 'top', DEFAULT_SIZE);
+        assert.equal(runs.length, 1, `${width}: one rim round one region`);
+
+        const run = runs[0];
+        assert.ok(run.length > 40, `${width}: traced in ${run.length} points, which is not a rim`);
+        assert.ok(Math.hypot(run[0][0] - run.at(-1)[0], run[0][1] - run.at(-1)[1]) < 1e-6,
+            `${width}: and closed, coming back to where it began`);
+        for (const [x, z] of run) {
+            assert.ok(footprintWeight(footprint, x, z, DEFAULT_SIZE) > 1 - 1e-5, `${width}: ${x},${z} is not on the top`);
+        }
+
+        // The top is the region inset by its feather, which the hold keeps to
+        // half the region's reach - so its rim spans about half the width.
+        const span = Math.max(...run.map(([x]) => x)) - Math.min(...run.map(([x]) => x));
+        const expected = width - 2 * Math.min(160, (width / 2) * 0.5);
+        assert.ok(Math.abs(span - expected) < width / 20, `${width}: the rim spans ${span}, not about ${expected}`);
+    }
+
+    // The square is still the canvas where a region is as wide as it, and a
+    // region past a seam is traced on both sides of the canvas as it was.
+    const wide = { kind: 'rect', x: 0, z: 0, width: DEFAULT_SIZE * 2, depth: DEFAULT_SIZE * 2 };
+    assert.deepEqual(footprintContour(wide, DEFAULT_SIZE, OUTLINE_CELLS, 0.5), [], 'a region covering the whole canvas has no edge on it');
+
+    const seam = { kind: 'disc', x: HALF - 300, z: 0, radius: 1200 };
+    const xs = chainSegments(footprintContour(seam, DEFAULT_SIZE, OUTLINE_CELLS, 0.5)).flat().map(([x]) => x);
+    assert.ok(xs.some(x => x > HALF - 1500), 'where it stands');
+    assert.ok(xs.some(x => x < -HALF + 1500), 'and where it comes back in across the seam');
+    assert.ok(xs.every(x => x >= -HALF && x <= HALF), 'cut at the canvas rather than traced off it');
 });
 
 // --- Onto the screen ---------------------------------------------------------------

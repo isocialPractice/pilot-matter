@@ -7,9 +7,10 @@ import { ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT } from './asset-fit.js'
  * Each format goes through the loader three is built with, fetched from the
  * same place three is, only when a file of that format is first read:
  *
- * - **glTF** - a `.glb` as it is; a `.gltf` only when every buffer and image
- *   it names is inside it as a `data:` address, since one file was given and
- *   nothing is fetched.
+ * - **glTF** - only when everything it uses is inside it: every buffer and
+ *   image either part of the file or named as a `data:` address. One file was
+ *   given, so nothing is fetched. A `.gltf` is refused before it is parsed, and
+ *   both formats are held to it while they are, by `embeddedOnly` below.
  * - **OBJ** and **STL** - geometry only, painted the colour the step chose.
  * - **SVG** - a plan: its shapes extruded up to the height the step asked for,
  *   flat-roofed. It is parsed as text and never put into the document, so a
@@ -21,7 +22,10 @@ import { ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT } from './asset-fit.js'
  */
 
 const LOADERS = {
-    gltf: () => import('three/addons/loaders/GLTFLoader.js').then(module => new module.GLTFLoader()),
+    // The glTF loader is the only one handed a manager, because it is the only
+    // one that resolves an address: the other three are given the bytes and
+    // parse what they were given.
+    gltf: () => import('three/addons/loaders/GLTFLoader.js').then(module => new module.GLTFLoader(embeddedOnly())),
     obj: () => import('three/addons/loaders/OBJLoader.js').then(module => new module.OBJLoader()),
     stl: () => import('three/addons/loaders/STLLoader.js').then(module => new module.STLLoader()),
     svg: () => import('three/addons/loaders/SVGLoader.js').then(module => module.SVGLoader)
@@ -29,6 +33,54 @@ const LOADERS = {
 
 /** A model refused while it was read, with why. */
 export class AssetRefused extends Error {}
+
+/**
+ * The addresses a model may be read from: a `data:` address written inside it,
+ * and a `blob:` the page itself made out of a chunk of it, which is how three
+ * hands an embedded texture to an image loader. Anything else is somewhere on
+ * the network. The scheme is matched either case, since `DATA:` is as valid as
+ * `data:`.
+ */
+const EMBEDDED_ADDRESS = /^(?:data|blob):/i;
+
+/** True for an address a model may be read from. */
+export function embeddedAddress(url) {
+    return EMBEDDED_ADDRESS.test(String(url ?? ''));
+}
+
+/** An address as it is named in a refusal: enough of it to recognise, never the whole of a long one. */
+function namedAddress(url) {
+    const address = String(url ?? '');
+    return address.length > 120 ? `${address.slice(0, 117)}...` : address;
+}
+
+/**
+ * A loading manager that refuses every address but those two, so a model is
+ * read from the file that was given and from nothing else.
+ *
+ * glTF names its buffers and images by `uri`, and three fetches each one it is
+ * handed - with `path` empty, an absolute address as given. A `.gltf` is read
+ * as text and checked by `selfContained` before it is parsed, but a `.glb`
+ * carries the same JSON in its first chunk and reaches the loader whole, so
+ * before this it was parsed unchecked: an environment file carries its assets'
+ * bytes, so one crafted `.glb` in a shared world called home for every pilot
+ * who opened it, and the SHA-256 check says nothing about that - it proves the
+ * bytes are the ones the file's author shipped.
+ *
+ * Refusing at the manager holds both formats to one rule, and holds whatever a
+ * later extension adds a `uri` to without being taught the field's name. It
+ * throws `AssetRefused`, which three turns into a rejected parse and `readModel`
+ * passes through with its reason intact, so the read fails closed rather than
+ * fetching first and complaining after.
+ */
+function embeddedOnly() {
+    const manager = new THREE.LoadingManager();
+    manager.setURLModifier(url => {
+        if (embeddedAddress(url)) return String(url);
+        throw new AssetRefused(`the model points at another file, ${namedAddress(url)}; everything it uses has to be inside it`);
+    });
+    return manager;
+}
 
 /** The triangles a model is drawn with. */
 export function countTriangles(object) {
@@ -41,9 +93,16 @@ export function countTriangles(object) {
     return Math.round(count);
 }
 
-/** True for a glTF whose buffers and images are all inside it. */
+/**
+ * True for a glTF whose buffers and images are all inside it.
+ *
+ * The early, named refusal for a `.gltf`, whose JSON is the file itself.
+ * `embeddedOnly` is what holds every format while it is parsed - this is read
+ * first so a pilot who picked the wrong file is told which file, rather than
+ * being told about an address they never wrote.
+ */
 export function selfContained(json) {
-    const outside = list => (list ?? []).some(item => typeof item?.uri === 'string' && !item.uri.startsWith('data:'));
+    const outside = list => (list ?? []).some(item => typeof item?.uri === 'string' && !embeddedAddress(item.uri));
     return !outside(json?.buffers) && !outside(json?.images);
 }
 
@@ -71,7 +130,7 @@ export async function readModel(format, bytes, { color = ASSET_COLOR, height = A
             let source = buffer;
             if (format === 'gltf') {
                 source = text();
-                if (!selfContained(JSON.parse(source))) throw new AssetRefused('the glTF points at other files; save it as a .glb, or with its buffers inside it');
+                if (!selfContained(JSON.parse(source))) throw new AssetRefused('the glTF points at other files; save it with its buffers and images inside it, as a .glb or as `data:` addresses');
             }
             object = (await loader.parseAsync(source, '')).scene;
         } else if (format === 'obj') {

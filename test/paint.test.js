@@ -282,8 +282,9 @@ test('a paint stamp is the brush\'s pixels in world units at the scale under the
     assert.deepEqual(paintStamp({ size: 25, tip: 'square', edge: 'hard' }, 32),
         { width: 800, depth: 800, corner: 0, feather: DEFAULT_FEATHER }, 'and a square one has no corner');
     assert.deepEqual(paintStamp({ size: 25, tip: 'round', edge: 'soft' }, 32),
-        { width: 800, depth: 800, corner: 400, feather: 800 * SOFT_EDGE }, 'a soft edge eases in across half the width');
-    assert.equal(SOFT_EDGE, 0.5);
+        { width: 800, depth: 800, corner: 400, feather: 200 }, 'a soft edge eases in across a quarter of the width');
+    assert.equal(SOFT_EDGE, 0.25, 'a quarter, which is the widest band the feather hold allows a swept stamp');
+    assert.equal(800 * SOFT_EDGE, 200, 'and asked for as a figure the hold leaves alone rather than cuts down');
     assert.equal(paintStamp({ size: 25 }, 3.5).width, 88, 'to the whole unit');
     assert.equal(paintStamp({ size: 5 }, 0.01).width, 1, 'never less than one');
     assert.equal(paintStamp({}, 10).width, 250, 'a brush with no size is the default 25 pixels');
@@ -336,7 +337,7 @@ test('the first paint stroke begins a batch, the next joins it, and the panel\'s
     const draft = buildDraft(state);
     assert.equal(draft.type, 'paint');
     assert.deepEqual(draft.config, { color: [0, 0, 0], opacity: 1, blend: 'tint' });
-    assert.equal(draft.footprint.of.feather, 250, 'a soft brush\'s feather is the stroke\'s');
+    assert.equal(draft.footprint.of.feather, 125, 'a soft brush\'s feather is the stroke\'s');
 
     assert.equal(layStroke(state, [[0, 2000], [0, 3000]], paintStamp({ size: 25 }, 20), { size: DEFAULT_SIZE }), true);
     assert.equal(buildDraft(state).footprint.of.kind, 'combine', 'two strokes, one batch');

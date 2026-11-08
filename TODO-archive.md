@@ -5411,3 +5411,84 @@ still be found by name.
     under the six categories Insert City will fold; the city's own buildings
     are the next run's.
   - From: Post Interactive Build
+
+## Archived 11-08-26
+
+- [x] **City buildings**: five skylines, three factories, nine residential,
+  five commercial and five infrastructure buildings, original and generic, in
+  the catalogue a test holds to the counts asked
+  - **Settled**: the catalogue in `js/prefabs.js` holds 27 buildings - five
+    skylines, three factories, nine residential, five commercial and five
+    infrastructure - generic and original, built with small helpers: `block`
+    and `drum` give a box or a round tower a band of windows at every floor,
+    `front` puts a house's door and windows on its `+z` wall. Every card's
+    footprint was measured off its recipe and is held to it; a skyline is two
+    to five towers by the places something 25 metres tall stands. A test holds
+    each category's count to the range asked and the names to the plan's, every
+    building solid on the usual plinth, nothing below the ground it stands on,
+    and no recipe past 3000 triangles. Roads, the infrastructure category's
+    second half, are the next run's.
+  - From: Post Interactive Build
+- [x] **Parks**: seven parks of trees, paths, water and fields, drawn as
+  objects with no roof
+  - **Settled**: seven parks - LAWN, WOODLAND, POND PARK, PLAYGROUND, SPORTS
+    FIELD, PLAZA and FORMAL GARDEN - each `solid: false`, laid on a lawn of its
+    own the size of its card, with trees, paths, benches, water and a pitch's
+    lines as meshes. A recipe may now name its `plinth` colour, read and held
+    by the file and the schema, and `js/object-mesh.js` colours each plinth
+    instance with it, so a park on falling ground reads as a grassy terrace
+    rather than a concrete one.
+  - From: Post Interactive Build
+- [x] **Roads that snap**: six road pieces laid over the ground, each with
+  connectors at its open ends, snapping end to end to an open connector within
+  30 metres while previewed, and placed free with `shift`
+  - **Settled**: a recipe gains a `ribbon` part - a flat strip along a
+    line, cut every `RIBBON_STEP` (10 m), turned to face up - and two fields:
+    `drape`, which lays every corner on the ground under it `DRAPE_LIFT` over
+    it rather than standing the recipe on a plinth, and `connectors`, each a
+    point and the heading leading out. Six road pieces under INFRASTRUCTURE,
+    after its buildings - STRAIGHT, CURVE, T-JUNCTION, CROSSROADS, ROUNDABOUT
+    and DEAD END - 12 m wide with a dashed centre line, flown over. A tile lays
+    its roads into one mesh with `drapedGeometry`, pulled toward the camera by
+    a polygon offset. `js/roads.js` is the pure arithmetic: a connector where
+    its piece's heading and scale put it, two joined when they meet face to
+    face, the open ones those no other meets, and `snapRoad`, which moves and
+    turns a piece so its nearest end meets the nearest open one within 30 m.
+    The file and the schema read ribbons, drapes and connectors.
+  - From: Post Interactive Build
+- [x] **Insert City**: the tool and its mark, a folding section per category
+  of named cards, a chosen card previewed under the pointer and placed by a
+  click, and turned by the gumball
+  - **Settled**: `city` joins `BUILT_TOOLS`, so every tool declared is built.
+    Its dock, `DOCK_CITY`, is a folding section for each category with only
+    the last opened open, each a grid of named cards, Infrastructure's roads a
+    row of their own. A card arms it; the pointer carries the card's footprint
+    lined up with the view, outlined green where a road would snap; a click
+    places it as the edit in hand with `HEADING` and `SCALE` over `ACCEPT` and
+    `CANCEL`, a second click moves it - snapping again - and another card
+    swaps the piece in hand. `shift` places a road free. A free point is held
+    to a tenth of a metre. Auto accept for drawing keeps the piece in hand at
+    the next click. The control list gains `Click (Insert city)` and
+    `Shift+Click (Insert city)`, which needed the list to write a held key
+    before a click. The browser check found a row of six cards running off
+    both sides of the dock under the canvas, so a row of tiles now wraps.
+  - From: Post Interactive Build
+- [x] **Load an asset**: a GLB, glTF, OBJ, STL or SVG read in the page and
+  never sent anywhere, then a step that sets its scale, up and facing and says
+  which insert menus it fits, from its bounds, with the reason where it does
+  not
+  - **Settled**: `LOAD ASSET…` on SAVE / LOAD reads a file with
+    `file.arrayBuffer()` - refused past 25 MB before it is read, and by its
+    name where it is no GLB, glTF, OBJ, STL or SVG - and `js/asset-loader.js`
+    reads it with three's own loaders, fetched with three: a `.gltf` only when
+    every buffer and image is a `data:` address, an SVG parsed as text and
+    extruded, never put into the page, and any model past 300,000 triangles
+    refused. `LOADED ASSET` shows it on the canvas, the camera brought in to
+    it, with MODEL - `NAME`, `SCALE`, `UP`, `FACING`, `COLOR` for a format
+    with none, `HEIGHT` for a plan - and USE AS - a switch for each use, held
+    shut with why where `assetFit` in the pure `js/asset-fit.js` says it does
+    not fit, `FLIES LIKE` and `SECTION`. glTF is taken as metres, its own
+    unit, and only OBJ and STL are guessed as millimetres past 2000 units; a
+    runway's least length is the strip's own 600 m, not the 400 the plan
+    first said, since it is placed over a real strip of its size.
+  - From: Post Interactive Build

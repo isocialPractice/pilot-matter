@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    footprintWeight, footprintBounds, footprintSampler, isFootprint, featherFor,
-    FOOTPRINT_KINDS, FEATHER_CELLS, DEFAULT_FEATHER
+    footprintWeight, footprintBounds, footprintSampler, isFootprint, featherFor, footprintReach,
+    FOOTPRINT_KINDS, FEATHER_CELLS, FEATHER_SHARE, DEFAULT_FEATHER
 } from '../js/environment/footprints.js';
 import { DEFAULT_SIZE, DEFAULT_SEGMENTS, createField } from '../js/environment/elements.js';
+import { paintStamp, SOFT_EDGE } from '../js/build-tools.js';
 
 /**
  * One of each kind, well clear of the canvas edges, so a weight read in the
@@ -498,4 +499,55 @@ test('a region nobody can read covers nothing, wrapped or not', () => {
         assert.equal(footprintWeight(nothing, 0, 0, DEFAULT_SIZE), 0);
         assert.equal(footprintSampler(nothing, DEFAULT_SIZE)(HALF, HALF), 0);
     }
+});
+
+/**
+ * The figure a soft brush's edge comes to, written down rather than left as
+ * whatever two constants multiply to.
+ *
+ * `SOFT_EDGE` used to be 0.5 and `paintStamp` asked for half the stamp's
+ * width - which is also the stroke's own reach, so the hold took half of it
+ * back and every value from 0.5 up came to the same quarter. The constant is
+ * now read off `FEATHER_SHARE`, so the feather asked for is the feather used,
+ * and these are the three sizes the halved edge was measured at.
+ */
+test('a soft brush eases across a quarter of its width, which is the widest band the hold allows', () => {
+    const band = (edge, pixels) => {
+        const stamp = paintStamp({ edge, size: pixels }, 1);
+        const stroke = {
+            kind: 'stroke', points: [[-2000, 0], [2000, 0]],
+            stamp: { width: stamp.width, depth: stamp.depth, corner: stamp.corner }, feather: stamp.feather
+        };
+        // Read through the real path: how far in from the stroke's own reach
+        // the weight is still short of whole, down the middle of its length.
+        const reach = footprintReach(stroke);
+        let inside = 0;
+        while (inside <= reach && footprintWeight(stroke, 0, reach - inside) < 1) inside += reach / 20000;
+        return { asked: stamp.feather, used: inside, reach };
+    };
+
+    assert.equal(SOFT_EDGE, FEATHER_SHARE / 2, 'a quarter, read off the hold rather than written beside it');
+
+    for (const [pixels, feather] of [[25, 6.25], [100, 25], [400, 100]]) {
+        const soft = band('soft', pixels);
+        assert.equal(soft.asked, feather, `${pixels} px asks for ${feather}`);
+        assert.ok(Math.abs(soft.used - feather) < feather / 100, `${pixels} px eases across ${soft.used}, not ${feather}`);
+        assert.equal(soft.asked, soft.reach * FEATHER_SHARE, `${pixels} px asks for exactly what the hold allows`);
+    }
+
+    // The weight profile that follows: whole across the inner half, and half
+    // way down the feather at three quarters of the way out.
+    const wide = paintStamp({ edge: 'soft', size: 400 }, 1);
+    const stroke = { kind: 'stroke', points: [[-2000, 0], [2000, 0]], stamp: { width: wide.width, depth: wide.depth, corner: wide.corner }, feather: wide.feather };
+    assert.equal(footprintWeight(stroke, 0, 100), 1, 'whole half way out');
+    assert.ok(footprintWeight(stroke, 0, 150) < 1 && footprintWeight(stroke, 0, 150) > 0, 'and fading three quarters out');
+
+    // A hard edge asks for the sampling's two cells and is held the same way,
+    // so the axis says nothing until the stamp is wider than eight cells.
+    const cell = DEFAULT_SIZE / DEFAULT_SEGMENTS;
+    assert.equal(DEFAULT_FEATHER, cell * FEATHER_CELLS);
+    const crossover = DEFAULT_FEATHER / FEATHER_SHARE / FEATHER_SHARE;
+    assert.equal(crossover, 640, 'eight of the ground\'s cells');
+    assert.ok(band('hard', crossover).used - band('soft', crossover).used < 1e-6, 'the same edge at the crossover');
+    assert.ok(band('soft', crossover * 2).used > band('hard', crossover * 2).used + 1, 'and a softer one past it');
 });

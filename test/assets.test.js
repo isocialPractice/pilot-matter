@@ -108,7 +108,7 @@ test('the step guesses millimetres for a long model of a format that names no un
     assert.equal(guessFacing({ x: 40, y: 30, z: 0 }, 'y', 'svg'), '+z', 'a plan is taken as drawn');
 });
 
-test('what fits where: a plane 3 to 90 m long and under half as high, the city to 600 m a side and 900 m high, a runway 600 to 5000 m', () => {
+test('what fits where: a plane 3 to 90 m long and under half as high, the city to 600 m a side and 900 m high, a runway the size a strip is', () => {
     const fits = size => Object.fromEntries(Object.entries(assetFit(size)).map(([use, { fits }]) => [use, fits]));
     assert.deepEqual(fits({ width: 11, height: 3, depth: 9 }), { plane: true, city: true, runway: false });
     assert.equal(assetFit({ width: 2, height: 0.5, depth: 2.9 }).plane.fits, false);
@@ -119,12 +119,52 @@ test('what fits where: a plane 3 to 90 m long and under half as high, the city t
     assert.equal(assetFit({ width: 600, height: 900, depth: 600 }).city.fits, true);
     assert.match(assetFit({ width: 601, height: 10, depth: 20 }).city.reason, /too large for the city: 601 m a side/);
     assert.match(assetFit({ width: 20, height: 901, depth: 20 }).city.reason, /too tall for the city/);
-    assert.equal(assetFit({ width: 60, height: 1, depth: 2400 }).runway.fits, true);
-    assert.match(assetFit({ width: 60, height: 1, depth: 599 }).runway.reason, new RegExp(`the least is ${GROUP_RANGES.length.low} m`), 'no strip is shorter than the strip allows');
-    assert.match(assetFit({ width: 60, height: 1, depth: 5001 }).runway.reason, /too long for a runway/);
+    assert.equal(assetFit({ width: 100, height: 1, depth: 2400 }).runway.fits, true);
+    assert.match(assetFit({ width: 100, height: 1, depth: 599 }).runway.reason, new RegExp(`the least is ${GROUP_RANGES.length.low} m`), 'no strip is shorter than the strip allows');
+    assert.match(assetFit({ width: 100, height: 1, depth: 5001 }).runway.reason, /too long for a runway/);
     assert.match(assetFit({ width: 601, height: 1, depth: 2400 }).runway.reason, /too wide for a runway/);
-    assert.match(assetFit({ width: 60, height: 49, depth: 2400 }).runway.reason, /too tall for a runway: 49 m high, no more than 2%/);
+    assert.match(assetFit({ width: 100, height: 49, depth: 2400 }).runway.reason, /too tall for a runway: 49 m high, no more than 2%/);
     assert.deepEqual([suggestSection(80), suggestSection(20), suggestSection(6)], ['skylines', 'commercial', 'residential']);
+});
+
+/**
+ * The fit and the strip have to agree, because `placeAssetRunway` builds a real
+ * strip of the asset's size and a strip can only be built between
+ * `GROUP_RANGES.width.low` and `.high`. They used to disagree in both
+ * directions, with nothing said either way: the figures below are the three
+ * cases that were let through and silently resized.
+ */
+test('a runway asset is refused at a size no strip can be built at, rather than being clamped to one', () => {
+    const runway = size => assetFit(size).runway;
+
+    assert.equal(runway({ width: GROUP_RANGES.width.low, height: 1, depth: 2400 }).fits, true, 'the narrowest strip is a runway');
+    assert.equal(runway({ width: GROUP_RANGES.width.high, height: 1, depth: 2400 }).fits, true, 'and so is the widest');
+
+    // A 600 by 20 m model was given an 80 m strip: four times the landable
+    // ground the pilot could see.
+    const narrow = runway({ width: 20, height: 1, depth: 600 });
+    assert.equal(narrow.fits, false);
+    assert.match(narrow.reason, new RegExp(`too narrow for a runway: 20 m across, the least is ${GROUP_RANGES.width.low} m`));
+
+    // A 5000 by 1200 m model was given a 600 m strip: the model hanging over
+    // ground that is not runway. Its quarter-of-the-length bound passes at this
+    // size, so the strip's own width is the only thing that catches it.
+    const wide = runway({ width: 1200, height: 1, depth: 5000 });
+    assert.equal(wide.fits, false);
+    assert.match(wide.reason, new RegExp(`too wide for a runway: 1,?200 m across, the most is ${GROUP_RANGES.width.high} m`));
+    assert.ok(1200 <= 5000 / 4, 'which a quarter of its length would have allowed');
+
+    // A flat plan with no width at all was given an 80 m strip out of nothing,
+    // where the city branch had a guard for it.
+    assert.deepEqual(runway({ width: 0, height: 0, depth: 600 }), { fits: false, reason: 'nothing to place' });
+    assert.deepEqual(runway({ width: 100, height: 1, depth: 0 }), { fits: false, reason: 'nothing to place' });
+
+    // And the hold in the placement is now a guard rather than a resize: every
+    // width the fit allows is a width the strip is built at unchanged.
+    for (const width of [GROUP_RANGES.width.low, 240, GROUP_RANGES.width.high]) {
+        const strip = asset({ name: 'strip', format: 'glb', raw: { x: width, y: 1, z: 2400 } });
+        assert.equal(placeAssetRunway(strip, [0, 0], 0).config.width, width, `${width} m across is built at ${width} m`);
+    }
 });
 
 test('a step starts with everything guessed, every use it fits switched on, and its section from its height', () => {
@@ -164,11 +204,11 @@ test('a placed asset refers to the model rather than copying it, at its size', (
 });
 
 test('a loaded runway is a real strip of its size, with the model drawn over it as an object facing the way it does', () => {
-    const strip = asset({ name: 'long-strip', format: 'gltf', raw: { x: 60, y: 1, z: 2400 } });
+    const strip = asset({ name: 'long-strip', format: 'gltf', raw: { x: 100, y: 1, z: 2400 } });
     const group = placeAssetRunway(strip, [100, -50], 87);
     assert.equal(group.type, 'group');
     assert.equal(group.template, assetRef(strip.id));
-    assert.deepEqual(group.config, { at: [100, -50], heading: 90, length: 2400, width: GROUP_RANGES.width.low }, 'its length, and at least the narrowest strip');
+    assert.deepEqual(group.config, { at: [100, -50], heading: 90, length: 2400, width: 100 }, 'the strip is the size the model is');
     const [runway, model] = expandGroup(group);
     assert.equal(runway.type, 'runway');
     assert.deepEqual([runway.config.length, runway.config.heading], [[2400, 2400], [90, 90]]);
@@ -193,7 +233,7 @@ test('a library offers its assets by use and section, and a world says which it 
     assert.deepEqual(flyablePlanes(library), [...planeIds(), assetRef(glider.id)]);
 
     const world = {
-        placements: [placeAssetObject(tower, [0, 0]), { type: 'mountain', config: {} }, placeAssetRunway(asset({ name: 'strip', raw: { x: 60, y: 1, z: 2400 } }), [0, 0])],
+        placements: [placeAssetObject(tower, [0, 0]), { type: 'mountain', config: {} }, placeAssetRunway(asset({ name: 'strip', raw: { x: 100, y: 1, z: 2400 } }), [0, 0])],
         plane: assetRef(glider.id)
     };
     assert.equal(assetsUsed(world).length, 3);
@@ -275,7 +315,7 @@ function canvas(tool = FILES_TOOL) {
 
 test('a loaded asset is a card on every insert menu it fits, and placed from there', () => {
     const tower = asset();
-    const strip = asset({ name: 'strip', format: 'gltf', raw: { x: 60, y: 1, z: 2400 }, bytes: new Uint8Array([4]) });
+    const strip = asset({ name: 'strip', format: 'gltf', raw: { x: 100, y: 1, z: 2400 }, bytes: new Uint8Array([4]) });
     const glider = asset({ name: 'glider', format: 'stl', raw: { x: 11000, y: 8000, z: 3000 }, bytes: new Uint8Array([5]) });
 
     const city = canvas(CITY_TOOL);
@@ -342,7 +382,7 @@ test('the step after loading: its rows written back, its name typed, ADD only wi
     assert.equal(assetStep(state), null);
     assert.equal(dockContent(state, {}).kind, DOCK_FILES, 'SAVE / LOAD again');
 
-    beginAssetStep(state, assetDraft({ fileName: 'strip.gltf', format: 'gltf', raw: { x: 60, y: 1, z: 2400 }, hash: 'aa'.repeat(32) }));
+    beginAssetStep(state, assetDraft({ fileName: 'strip.gltf', format: 'gltf', raw: { x: 100, y: 1, z: 2400 }, hash: 'aa'.repeat(32) }));
     assert.deepEqual(dockContent(state, {}).sections[0].rows.map(row => row.row.label), ['SCALE', 'UP', 'FACING'], 'a glTF brings its own colours');
     cancelAssetStep(state);
     beginAssetStep(state, assetDraft({ fileName: 'hall.svg', format: 'svg', raw: { x: 40, y: 30, z: 0 }, hash: 'ef'.repeat(32) }));
@@ -392,7 +432,7 @@ test('an asset recipe is read whole or refused, and names no part', () => {
     assert.deepEqual(readRecipe({ ...recipe, asset: 'tower' }, 'r').problems, ['r: asset is not an asset\'s id']);
     assert.deepEqual(readRecipe({ ...recipe, size: [1, 2] }, 'r').problems, ['r: size is not three lengths']);
     assert.deepEqual(readRecipe({ ...recipe, parts: [] }, 'r').problems, ['r: parts is not a field a recipe for an asset has']);
-    assert.deepEqual(readRecipe({ asset: 'a-0123456789abcdef', size: [60, 1, 2400] }).problems, [], 'a runway asset kilometres long');
+    assert.deepEqual(readRecipe({ asset: 'a-0123456789abcdef', size: [100, 1, 2400] }).problems, [], 'a runway asset kilometres long');
 });
 
 // --- In the page ---------------------------------------------------------------------------
@@ -401,6 +441,16 @@ test('a model is read in the page by three\'s own loaders, a glTF only when it c
     const loader = source('asset-loader.js');
     for (const name of ['GLTFLoader', 'OBJLoader', 'STLLoader', 'SVGLoader']) assert.match(loader, new RegExp(`import\\('three/addons/loaders/${name}\\.js'\\)`));
     assert.match(loader, /if \(!selfContained\(JSON\.parse\(source\)\)\) throw new AssetRefused/);
+
+    // A `.glb` carries the same JSON in its first chunk and reaches the loader
+    // whole, so the rule is held at the manager rather than at one format's
+    // branch: every address a glTF names is refused but its own bytes, which
+    // covers whatever a later extension adds a `uri` to.
+    assert.match(loader, /new module\.GLTFLoader\(embeddedOnly\(\)\)/, 'the glTF loader reads addresses, so it is given the manager');
+    assert.match(loader, /const EMBEDDED_ADDRESS = \/\^\(\?:data\|blob\):\/i;/, 'a data: address inside the file, or a blob: the page made from it');
+    assert.match(loader, /manager\.setURLModifier\(url => \{\n\s*if \(embeddedAddress\(url\)\) return String\(url\);\n\s*throw new AssetRefused\(/,
+        'and anything else refused before it is fetched, not after');
+    assert.doesNotMatch(loader, /save it as a \.glb/, 'and the refusal does not steer a pilot at a format to get round it');
     assert.match(loader, /if \(triangles > ASSET_TRIANGLE_LIMIT\) \{/);
     assert.match(loader, /const data = new SVGLoader\(\)\.parse\(text\(\)\);/, 'a plan parsed as text');
     assert.doesNotMatch(loader, /innerHTML|DOMParser|appendChild|createElement/, 'and never put into the document');
