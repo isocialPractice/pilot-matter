@@ -57,6 +57,51 @@ its context survives being archived.
     with the defect in place.
   - **Goal**: Resolve to [glb-external-image.prompt.md](.claude/prompts/glb-external-image.prompt.md)
   - From: UI/UX Override - a .glb that points at another file
+- [ ] `docs/terrain.html` says a hard and a soft brush come to the same band at
+  the ordinary zoom, which the figures do not support
+  - **Issue**: the Free Paint paragraph now ends "on a brush 640 units across
+    or narrower, which at the ordinary zoom is every brush the slider offers,
+    the two edges come to the same band and the axis reads only on a stroke
+    laid from far enough out to be wider than that". The 640 unit crossover is
+    right - `test/footprints.test.js` pins it - but the clause about the zoom
+    is not. `SIZE` is 5 to 400 screen pixels (`PAINT_BRUSH` in
+    `js/build-tools.js`) and a brush is laid at `unitsPerPixel(distance, fov,
+    viewHeight)`. On the default 16,000 unit canvas `createBuildCamera` opens
+    at its furthest, 15,200, which is 26.6 units a pixel across an 800 pixel
+    view: 640 units is reached at 24 px, so the default 25 px brush is already
+    665 units and the slider's widest is 10,643. The whole slider stays under
+    640 units only within 914 of the target, the innermost 4% of the 320 to
+    15,200 zoom range. So the sentence tells a reader the EDGE axis does
+    nothing in ordinary use when at the opening view it reads for all but the
+    smallest brushes, and "from far enough out" points the wrong way, since
+    the opening view is the furthest out there is.
+  - **Goal**: state it in the units the crossover is in and let the zoom
+    follow - a hard edge and a soft one come to the same band on a stroke 640
+    units across or narrower, which is a small brush at the opening view and
+    most of the slider once zoomed in. `CHANGELOG.md` already words it that
+    way, in world units with no claim about the zoom; leave that entry alone.
+  - From: UI/UX Override - a .glb that points at another file
+- [ ] `selfContained` accepts a `blob:` address, which its docstring says it
+  does not
+  - **Issue**: `js/asset-loader.js` reads both uses of an address through one
+    predicate, `embeddedAddress`, whose rule is `/^(?:data|blob):/i`. `blob:`
+    belongs in the manager, where three hands an embedded texture to the image
+    loader as a blob the page made from the file's own bytes. It does not
+    belong in `selfContained`, which reads the file's own JSON: a `.gltf`
+    carrying `"images": [{ "uri": "blob:https://example.com/abc" }]` passes a
+    check documented as "True for a glTF whose buffers and images are all
+    inside it", and a blob address can never be inside a file, since only the
+    page that made one can name it. Nothing escapes - the manager allows the
+    same two schemes and no request leaves for a blob the page did not make -
+    so this is the early, named refusal reading wider than it says rather than
+    an exposure.
+  - **Goal**: give `selfContained` the `data:`-only rule its docstring states
+    and leave `blob:` to the manager, or keep the one predicate and say in the
+    docstring why `blob:` is in it. Verifying it needs the Chromium harness or
+    a vendored `three`: `js/asset-loader.js` cannot be imported in Node, since
+    `three` is CDN-only, which is why `test/assets.test.js` reads it as source
+    text.
+  - From: UI/UX Override - a .glb that points at another file
 
 ## Game UI/UX
 
