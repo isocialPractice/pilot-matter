@@ -38,70 +38,54 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - a .glb that points at another file
+### UI/UX Override - a .glb refused in the dock, and the brush figure beside it
+
+#### Resolve Issues
+
+- [ ] Brush Crossover 1: the paragraph's slider figure leaves a 24 pixel brush
+  on the wrong side of the crossover
+  - **Issue**: the `FREE PAINT` paragraph in `docs/terrain.html` now reads "at
+    the opening view of a 16000 unit canvas, where a pixel is 27 units, it is a
+    brush under 24 of the slider's 5 to 400". A 24 pixel brush is inside the
+    crossover, not outside it. Drawn in Chromium at 1280x800 on a blank canvas,
+    the brush taken to each size by the panel's own `SIZE` slider and each
+    stroke measured alone off its draft's footprint through `footprintWeight`:
+    at 23 px a stroke is 612 units across and the two edges come to the same
+    band, 152.847 either way; at 24 px it is 639 units and they are still the
+    same, 159.75 either way; at 25 px it is 665 units and they part, 159.932
+    hard against 166.25 soft. A pixel is 26.608 units there, so the 640 unit
+    crossover is reached at 24.05 px and the bound is 24 or under, not under
+    24. The item's own settled note has the right figure in it - "the crossover
+    at 24.1 px" - so the measurement was sound and only the rounding to a whole
+    brush went the wrong way; 640 / 27 is 23.7, and the paragraph divides by
+    the figure it rounded rather than the one it measured. Everything else in
+    the paragraph holds: 665 units at the default brush, 27 units a pixel, the
+    two edges differing there, and both of them coming to 3.5 units zoomed all
+    the way in, where even the slider's widest 400 px brush is 224 units across
+    and inside the crossover.
+  - **Goal**: Resolve to [brush-crossover-figure.prompt.md](.claude/prompts/brush-crossover-figure.prompt.md)
+  - From: UI/UX Override - a .glb that points at another file
 
 #### Found Issues
 
-- [ ] A `.glb` naming an external image loads instead of being refused
-  - **Issue**: loading a `.glb` whose JSON names an external image opens the
-    step after loading as though the model were sound - headed LOADED ASSET,
-    `glTF binary, 12 triangles`, no refusal drawn - and the model is kept
-    untextured with nothing said to the pilot. The other three ways of
-    reaching outside the file are all refused: a `.gltf` naming a buffer or an
-    image is refused by name, and a `.glb` naming a buffer is refused with the
-    address `scene.bin`. `embeddedOnly` does fire for the image, and nothing
-    leaves for the network - that half holds - but three catches the thrown
-    `AssetRefused` inside its texture loading, drops the texture and resolves
-    the parse, so `readModel` answers with a model. `test/assets.test.js`
-    checks this area by reading `js/asset-loader.js` as text, so it passes
-    with the defect in place.
-  - **Goal**: Resolve to [glb-external-image.prompt.md](.claude/prompts/glb-external-image.prompt.md)
-  - From: UI/UX Override - a .glb that points at another file
-- [ ] `docs/terrain.html` says a hard and a soft brush come to the same band at
-  the ordinary zoom, which the figures do not support
-  - **Issue**: the Free Paint paragraph now ends "on a brush 640 units across
-    or narrower, which at the ordinary zoom is every brush the slider offers,
-    the two edges come to the same band and the axis reads only on a stroke
-    laid from far enough out to be wider than that". The 640 unit crossover is
-    right - `test/footprints.test.js` pins it - but the clause about the zoom
-    is not. `SIZE` is 5 to 400 screen pixels (`PAINT_BRUSH` in
-    `js/build-tools.js`) and a brush is laid at `unitsPerPixel(distance, fov,
-    viewHeight)`. On the default 16,000 unit canvas `createBuildCamera` opens
-    at its furthest, 15,200, which is 26.6 units a pixel across an 800 pixel
-    view: 640 units is reached at 24 px, so the default 25 px brush is already
-    665 units and the slider's widest is 10,643. The whole slider stays under
-    640 units only within 914 of the target, the innermost 4% of the 320 to
-    15,200 zoom range. So the sentence tells a reader the EDGE axis does
-    nothing in ordinary use when at the opening view it reads for all but the
-    smallest brushes, and "from far enough out" points the wrong way, since
-    the opening view is the furthest out there is.
-  - **Goal**: state it in the units the crossover is in and let the zoom
-    follow - a hard edge and a soft one come to the same band on a stroke 640
-    units across or narrower, which is a small brush at the opening view and
-    most of the slider once zoomed in. `CHANGELOG.md` already words it that
-    way, in world units with no claim about the zoom; leave that entry alone.
-  - From: UI/UX Override - a .glb that points at another file
-- [ ] `selfContained` accepts a `blob:` address, which its docstring says it
-  does not
-  - **Issue**: `js/asset-loader.js` reads both uses of an address through one
-    predicate, `embeddedAddress`, whose rule is `/^(?:data|blob):/i`. `blob:`
-    belongs in the manager, where three hands an embedded texture to the image
-    loader as a blob the page made from the file's own bytes. It does not
-    belong in `selfContained`, which reads the file's own JSON: a `.gltf`
-    carrying `"images": [{ "uri": "blob:https://example.com/abc" }]` passes a
-    check documented as "True for a glTF whose buffers and images are all
-    inside it", and a blob address can never be inside a file, since only the
-    page that made one can name it. Nothing escapes - the manager allows the
-    same two schemes and no request leaves for a blob the page did not make -
-    so this is the early, named refusal reading wider than it says rather than
-    an exposure.
-  - **Goal**: give `selfContained` the `data:`-only rule its docstring states
-    and leave `blob:` to the manager, or keep the one predicate and say in the
-    docstring why `blob:` is in it. Verifying it needs the Chromium harness or
-    a vendored `three`: `js/asset-loader.js` cannot be imported in Node, since
-    `three` is CDN-only, which is why `test/assets.test.js` reads it as source
-    text.
-  - From: UI/UX Override - a .glb that points at another file
+- [ ] A `.gltf`'s refusal names no address, and the asset table says it does
+  - **Issue**: the `.glb` / `.gltf` row of the formats table in
+    `docs/terrain.html` now says the refusal "names the address it points at -
+    a `.gltf` is that JSON, and a `.glb` carries the same JSON in its first
+    chunk, so the two are held to it alike". Read off the dock in Chromium, a
+    `.glb` does name it - "the model points at another file,
+    `https://example.com/textures/apron.png`; everything it uses has to be
+    inside it" - while a `.gltf` naming the same image says "the glTF points at
+    other files; save it with its buffers and images inside it, as a .glb or as
+    `data:` addresses", which names no address at all. The rule is held alike:
+    all four files are refused before the parse, nothing leaves for the
+    network, and every refusal is drawn in the refused amber at 11.46:1 without
+    clipping. It is the sentence that is not. `selfContained`'s docstring in
+    `js/asset-fit.js` still carries the reasoning behind the older `.gltf`
+    wording - a pilot "is told which file rather than being told about an
+    address they never wrote" - which the `.glb` branch no longer follows.
+  - **Goal**: Resolve to [gltf-refusal-address.prompt.md](.claude/prompts/gltf-refusal-address.prompt.md)
+  - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it
 
 ## Game UI/UX
 
@@ -744,77 +728,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 403 earlier items in `TODO-archive.md`, newest last.
+> 406 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
-  listed with what each is used as and removable, and carried inside an
-  environment file that uses them so it opens on another computer
-  - **Settled**: `js/asset-store.js` keeps each asset in IndexedDB,
-    database `pilot-matter`, store `assets`, by an id drawn from the SHA-256
-    of its bytes, so the same file is one asset wherever it comes from. The
-    page reads them back once it is up and draws each model in place of the
-    box that stood for it. ASSETS lists them with what each is used as;
-    `REMOVE ASSET` asks `REMOVE THE ASSET`, with `YES` and `CANCEL`, when the
-    canvas uses the one chosen, and takes what used it with it. A saved
-    environment carries every asset it uses once, in `assets`, as base64;
-    loading one checks each against its hash, keeps the ones not held, and
-    refuses the file where a placement or the plane refers to one it does not
-    carry.
-  - From: Post Interactive Build
-- [x] **Inserting loaded assets**: a loaded plane flown as a card of Insert
-  Plane, a loaded building placed as an object in its Insert City section, and
-  a loaded runway placed over a real strip of its size
-  - **Settled**: a loaded plane is a card on SELECT PLANE, flown through
-    `Aircraft.setModel` anchored at its bounds' middle, with the figures of
-    the plane it flies like and a chase scaled by its size. A loaded building
-    is a card in its Insert City section, placed as an object whose recipe is
-    `{ asset, size }` - a reference, not a copy - drawn as a copy of the read
-    model sharing its geometry, or as a box of its size until then. A loaded
-    runway is a card on Insert Runway, placed as a group of a real strip of
-    its length and width and the model as an object over it, facing the way
-    the strip does, so landing, scoring and takeoff work on the strip as they
-    do on any.
-  - From: Post Interactive Build
-- [x] The Settings file row's refusal is amber on the selection's green, at
-  1.34:1
-  - **Issue**: `#settings-menu li.refused::after` writes the reason a file was
-    refused in `#ffb000`, and `li.selected` fills the row `#0f0` with black
-    text. A row is only ever refused just after it was pressed, and a row is
-    pressed where the cursor is, so the two always land together: the reason
-    is drawn amber on bright green. Measured in Chromium at 1.34:1 over 10
-    pixel text, where the row's own label manages 15.3:1 on the same fill -
-    below the 4.5:1 small text needs, and close enough to 1:1 that the line
-    reads as a texture rather than as words. Driven three times over
-    `LOAD ENVIRONMENT...` in Settings with a JSON file whose `format` is not
-    `pilot-matter.environment`; the reason itself is right
-    (`could not load not-a-world.json: the file is not an environment file`).
-    Stepping the cursor one row down makes the same text legible at 11.46:1,
-    so the message is only unreadable in the one state it appears in. The
-    builder's own SAVE / LOAD dock is not affected - its refusal is the same
-    amber on the dock's dark fill at 11.46:1 - so this is the Settings list
-    alone.
-  - **Goal**: give a row that is both selected and refused a fill the warning
-    amber reads against, rather than the ordinary green selection. A rule
-    after the two existing ones - `#settings-menu li.selected.refused` with a
-    dark fill and an amber border, keeping `::after` at `#ffb000` - clears
-    4.5:1 and keeps the warning reading as a warning; the green selection fill
-    is what has to go on that row, not the amber. Check the same pairing on
-    `#settings-start`, `#settings-options` and `#settings-builder`, which
-    share the `li.selected` rule, and hold whatever is chosen with a contrast
-    assertion in `test/page.test.js` beside the existing `li.refused` one.
-  - **Settled**: `#settings-menu li.selected.refused` in `index.html` drops the
-    green for the colours the low-altitude warning is already drawn in -
-    `rgba(0, 0, 0, 0.85)` under `#ffb000` type and an `rgba(255, 176, 0, 0.6)`
-    edge - so the row still reads as the one the cursor is on while the reason
-    reads as a warning. The label takes the amber too, since black on that fill
-    would be the defect the other way round. Measured in Chromium at 10.76:1
-    over a white flight and 11.46:1 over a black one, against 1.34:1 before.
-    The three other settings lists were checked and carry no `li.refused` rule
-    at all, and nothing writes `refused` onto their entries, so the pair cannot
-    arise on them; a test asserts that as well. `test/page.test.js` now settles
-    the row's two colours through the cascade rather than looking the rule up,
-    and measures them over both a bright and a dark flight.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
 - [x] **Held Feather**: A small extrusion has no top surface, so its top colour
   never shows and its prism is never previewed
   - **Issue**: `surfaceAt` in `js/extrude.js` calls a point the top only where
@@ -1072,3 +987,101 @@ how the simulator got here rather than as a list still to be worked.
     `test/assets.test.js` moved above the 80 m floor, and a test of its own
     holds the three sizes that used to be let through and silently resized.
   - From: UI/UX Override - the top a click cannot reach
+- [x] A `.glb` naming an external image loads instead of being refused
+  - **Issue**: loading a `.glb` whose JSON names an external image opens the
+    step after loading as though the model were sound - headed LOADED ASSET,
+    `glTF binary, 12 triangles`, no refusal drawn - and the model is kept
+    untextured with nothing said to the pilot. The other three ways of
+    reaching outside the file are all refused: a `.gltf` naming a buffer or an
+    image is refused by name, and a `.glb` naming a buffer is refused with the
+    address `scene.bin`. `embeddedOnly` does fire for the image, and nothing
+    leaves for the network - that half holds - but three catches the thrown
+    `AssetRefused` inside its texture loading, drops the texture and resolves
+    the parse, so `readModel` answers with a model. `test/assets.test.js`
+    checks this area by reading `js/asset-loader.js` as text, so it passes
+    with the defect in place.
+  - **Goal**: Resolve to [glb-external-image.prompt.md](.claude/prompts/glb-external-image.prompt.md)
+  - **Settled**: the GLB's own JSON is read before it is parsed, which is the
+    fix the prompt recommended. `glbJson` in `js/asset-fit.js` returns the
+    first chunk parsed, or null for bytes that are not a GLB, so the check a
+    `.gltf` already went through covers a `.glb` too and does not depend on
+    what three swallows. The pure half moved to `js/asset-fit.js` to be
+    testable at all - `js/asset-loader.js` cannot be imported in Node - taking
+    `selfContained` with it and gaining `outsideAddress`, so the refusal names
+    the address the way the `.glb` buffer case already did. `embeddedOnly`
+    stays exactly as it was: it is the backstop that holds a field a later
+    extension adds a `uri` to, and it is what stops the fetch. Settled in
+    Chromium over a textured triangle built in the page: the external image is
+    refused naming the address and makes no request, while the same bytes
+    through a bare `GLTFLoader` do fetch it; a `.glb` with its image in the BIN
+    chunk and one with it as a `data:` uri both still read textured
+    (`.tmp/ui-ux/t29/glb-external-image.mjs`). Eight mutants caught, the
+    dropped `glb` branch among them.
+  - From: UI/UX Override - a .glb that points at another file
+- [x] **Brush Crossover**: `docs/terrain.html` says a hard and a soft brush
+  come to the same band at the ordinary zoom, which the figures do not support
+  - **Issue**: the Free Paint paragraph now ends "on a brush 640 units across
+    or narrower, which at the ordinary zoom is every brush the slider offers,
+    the two edges come to the same band and the axis reads only on a stroke
+    laid from far enough out to be wider than that". The 640 unit crossover is
+    right - `test/footprints.test.js` pins it - but the clause about the zoom
+    is not. `SIZE` is 5 to 400 screen pixels (`PAINT_BRUSH` in
+    `js/build-tools.js`) and a brush is laid at `unitsPerPixel(distance, fov,
+    viewHeight)`. On the default 16,000 unit canvas `createBuildCamera` opens
+    at its furthest, 15,200, which is 26.6 units a pixel across an 800 pixel
+    view: 640 units is reached at 24 px, so the default 25 px brush is already
+    665 units and the slider's widest is 10,643. The whole slider stays under
+    640 units only within 914 of the target, the innermost 4% of the 320 to
+    15,200 zoom range. So the sentence tells a reader the EDGE axis does
+    nothing in ordinary use when at the opening view it reads for all but the
+    smallest brushes, and "from far enough out" points the wrong way, since
+    the opening view is the furthest out there is.
+  - **Goal**: state it in the units the crossover is in and let the zoom
+    follow - a hard edge and a soft one come to the same band on a stroke 640
+    units across or narrower, which is a small brush at the opening view and
+    most of the slider once zoomed in. `CHANGELOG.md` already words it that
+    way, in world units with no claim about the zoom; leave that entry alone.
+  - **Settled**: the crossover is stated in world units and the zoom follows
+    it - "on a stroke 640 units across or narrower the two edges come to the
+    same band, and the axis reads only on a wider one", then the brush being
+    set in pixels and laid in units, so at the opening view of a 16000 unit
+    canvas, where a pixel is 27 units, it is a brush under 24 of the slider's
+    5 to 400, and zoomed in far enough it is every brush the slider offers.
+    Every figure re-measured against `createBuildCamera(16000)` and
+    `unitsPerPixel`: 15200 units out, 26.608 a pixel, the crossover at 24.1 px,
+    the whole slider under it within 914 of the target - 4.0% of the 320 to
+    15200 range. The 1.0.0-alpha.1.54.0 changelog entry was left as it was.
+  - From: UI/UX Override - a .glb that points at another file
+- [x] `selfContained` accepts a `blob:` address, which its docstring says it
+  does not
+  - **Issue**: `js/asset-loader.js` reads both uses of an address through one
+    predicate, `embeddedAddress`, whose rule is `/^(?:data|blob):/i`. `blob:`
+    belongs in the manager, where three hands an embedded texture to the image
+    loader as a blob the page made from the file's own bytes. It does not
+    belong in `selfContained`, which reads the file's own JSON: a `.gltf`
+    carrying `"images": [{ "uri": "blob:https://example.com/abc" }]` passes a
+    check documented as "True for a glTF whose buffers and images are all
+    inside it", and a blob address can never be inside a file, since only the
+    page that made one can name it. Nothing escapes - the manager allows the
+    same two schemes and no request leaves for a blob the page did not make -
+    so this is the early, named refusal reading wider than it says rather than
+    an exposure.
+  - **Goal**: give `selfContained` the `data:`-only rule its docstring states
+    and leave `blob:` to the manager, or keep the one predicate and say in the
+    docstring why `blob:` is in it. Verifying it needs the Chromium harness or
+    a vendored `three`: `js/asset-loader.js` cannot be imported in Node, since
+    `three` is CDN-only, which is why `test/assets.test.js` reads it as source
+    text.
+  - **Settled**: the first option - the one predicate is now two, each named
+    for whose rule it is. `insideFile` in `js/asset-fit.js` is `/^data:/i`,
+    what a *file* may name, and `selfContained` reads through it; the manager's
+    `EMBEDDED_ADDRESS` stays `/^(?:data|blob):/i`, what the *page* may ask for
+    while it reads a model it was handed. Both docstrings say why they differ
+    and point at each other, since the names are close enough to be swapped by
+    mistake. A `.gltf` or a `.glb` carrying a `blob:` image is now refused
+    early and by name where it used to pass the check and be stopped at the
+    manager, so nothing widened. Verified in the same Chromium harness as the
+    item above, which reads both predicates in the page, and pinned in Node now
+    that `insideFile` and `selfContained` are importable - a mutant widening
+    the file's rule back to `blob:` is caught.
+  - From: UI/UX Override - a .glb that points at another file
