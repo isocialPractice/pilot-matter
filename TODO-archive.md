@@ -5492,3 +5492,75 @@ still be found by name.
     runway's least length is the strip's own 600 m, not the 400 the plan
     first said, since it is placed over a real strip of its size.
   - From: Post Interactive Build
+
+## Archived 11-09-26
+
+- [x] **Loaded assets kept**: the assets in IndexedDB, surviving a reload,
+  listed with what each is used as and removable, and carried inside an
+  environment file that uses them so it opens on another computer
+  - **Settled**: `js/asset-store.js` keeps each asset in IndexedDB,
+    database `pilot-matter`, store `assets`, by an id drawn from the SHA-256
+    of its bytes, so the same file is one asset wherever it comes from. The
+    page reads them back once it is up and draws each model in place of the
+    box that stood for it. ASSETS lists them with what each is used as;
+    `REMOVE ASSET` asks `REMOVE THE ASSET`, with `YES` and `CANCEL`, when the
+    canvas uses the one chosen, and takes what used it with it. A saved
+    environment carries every asset it uses once, in `assets`, as base64;
+    loading one checks each against its hash, keeps the ones not held, and
+    refuses the file where a placement or the plane refers to one it does not
+    carry.
+  - From: Post Interactive Build
+- [x] **Inserting loaded assets**: a loaded plane flown as a card of Insert
+  Plane, a loaded building placed as an object in its Insert City section, and
+  a loaded runway placed over a real strip of its size
+  - **Settled**: a loaded plane is a card on SELECT PLANE, flown through
+    `Aircraft.setModel` anchored at its bounds' middle, with the figures of
+    the plane it flies like and a chase scaled by its size. A loaded building
+    is a card in its Insert City section, placed as an object whose recipe is
+    `{ asset, size }` - a reference, not a copy - drawn as a copy of the read
+    model sharing its geometry, or as a box of its size until then. A loaded
+    runway is a card on Insert Runway, placed as a group of a real strip of
+    its length and width and the model as an object over it, facing the way
+    the strip does, so landing, scoring and takeoff work on the strip as they
+    do on any.
+  - From: Post Interactive Build
+- [x] The Settings file row's refusal is amber on the selection's green, at
+  1.34:1
+  - **Issue**: `#settings-menu li.refused::after` writes the reason a file was
+    refused in `#ffb000`, and `li.selected` fills the row `#0f0` with black
+    text. A row is only ever refused just after it was pressed, and a row is
+    pressed where the cursor is, so the two always land together: the reason
+    is drawn amber on bright green. Measured in Chromium at 1.34:1 over 10
+    pixel text, where the row's own label manages 15.3:1 on the same fill -
+    below the 4.5:1 small text needs, and close enough to 1:1 that the line
+    reads as a texture rather than as words. Driven three times over
+    `LOAD ENVIRONMENT...` in Settings with a JSON file whose `format` is not
+    `pilot-matter.environment`; the reason itself is right
+    (`could not load not-a-world.json: the file is not an environment file`).
+    Stepping the cursor one row down makes the same text legible at 11.46:1,
+    so the message is only unreadable in the one state it appears in. The
+    builder's own SAVE / LOAD dock is not affected - its refusal is the same
+    amber on the dock's dark fill at 11.46:1 - so this is the Settings list
+    alone.
+  - **Goal**: give a row that is both selected and refused a fill the warning
+    amber reads against, rather than the ordinary green selection. A rule
+    after the two existing ones - `#settings-menu li.selected.refused` with a
+    dark fill and an amber border, keeping `::after` at `#ffb000` - clears
+    4.5:1 and keeps the warning reading as a warning; the green selection fill
+    is what has to go on that row, not the amber. Check the same pairing on
+    `#settings-start`, `#settings-options` and `#settings-builder`, which
+    share the `li.selected` rule, and hold whatever is chosen with a contrast
+    assertion in `test/page.test.js` beside the existing `li.refused` one.
+  - **Settled**: `#settings-menu li.selected.refused` in `index.html` drops the
+    green for the colours the low-altitude warning is already drawn in -
+    `rgba(0, 0, 0, 0.85)` under `#ffb000` type and an `rgba(255, 176, 0, 0.6)`
+    edge - so the row still reads as the one the cursor is on while the reason
+    reads as a warning. The label takes the amber too, since black on that fill
+    would be the defect the other way round. Measured in Chromium at 10.76:1
+    over a white flight and 11.46:1 over a black one, against 1.34:1 before.
+    The three other settings lists were checked and carry no `li.refused` rule
+    at all, and nothing writes `refused` onto their entries, so the pair cannot
+    arise on them; a test asserts that as well. `test/page.test.js` now settles
+    the row's two colours through the cascade rather than looking the rule up,
+    and measures them over both a bright and a dark flight.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in

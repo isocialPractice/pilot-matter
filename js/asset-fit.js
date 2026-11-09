@@ -22,6 +22,11 @@
  * An asset is known by the SHA-256 of its bytes, so the same file loaded
  * twice, or carried in two environment files, is one asset.
  *
+ * It also reads what a glTF names outside itself - `glbJson` and
+ * `selfContained` below - because that is a question about the file's bytes
+ * rather than about the model three draws from them, and so can be answered
+ * here where it is testable.
+ *
  * Pure module with no DOM or Three.js dependency.
  */
 
@@ -92,6 +97,88 @@ export function refAsset(ref) {
 /** True for an id the way assets are named. */
 export function isAssetId(id) {
     return typeof id === 'string' && /^a-[0-9a-f]{16}$/.test(id);
+}
+
+// --- What a glTF names outside itself -------------------------------------------------
+
+/**
+ * The only address a glTF may name and still be one file: a `data:` address,
+ * whose payload is written into the JSON itself. Matched either case, since
+ * `DATA:` is as valid as `data:`.
+ *
+ * This is the file's rule, not the page's, and the two are not the same. The
+ * loading manager in `js/asset-loader.js` also allows a `blob:`, because that
+ * is how the page hands three a texture it made out of the file's own bytes -
+ * but a `blob:` can never be written *in* a file, since only the page that
+ * made one can name it, so a glTF naming one is naming something outside
+ * itself like any other address.
+ */
+const INSIDE_FILE = /^data:/i;
+
+/** True for an address whose payload is written into the glTF itself. */
+export function insideFile(uri) {
+    return INSIDE_FILE.test(String(uri ?? ''));
+}
+
+/**
+ * The first address a glTF names that is not inside it, or null when
+ * everything it uses is. A buffer or image with no `uri` at all names nothing
+ * - it is a chunk of the file, which is how a GLB carries its own bytes.
+ */
+export function outsideAddress(json) {
+    for (const list of [json?.buffers, json?.images]) {
+        for (const item of list ?? []) {
+            if (typeof item?.uri === 'string' && !insideFile(item.uri)) return item.uri;
+        }
+    }
+    return null;
+}
+
+/**
+ * True for a glTF whose buffers and images are all inside it.
+ *
+ * The early, named refusal both glTF formats are read through, so a pilot who
+ * picked the wrong file is told which file rather than being told about an
+ * address they never wrote. A `.gltf`'s JSON is the file itself; a `.glb`'s is
+ * its first chunk, which `glbJson` below reads.
+ */
+export function selfContained(json) {
+    return outsideAddress(json) == null;
+}
+
+/** A GLB's magic, the type tag of the chunk carrying its JSON, and the two header lengths. */
+const GLB_MAGIC = 0x46546c67;      // 'glTF', as the little-endian word it is written as
+const GLB_JSON_CHUNK = 0x4e4f534a; // 'JSON', likewise
+const GLB_HEADER = 12;
+const GLB_CHUNK_HEADER = 8;
+
+/**
+ * The JSON a GLB carries in its first chunk, parsed - or null for bytes that
+ * are not a GLB, carry no JSON chunk, or hold something that is not an object
+ * in it.
+ *
+ * A GLB is a 12 byte header - the magic, the version, the file's length - and
+ * then chunks, each an unsigned length and a four byte type tag. The first is
+ * the JSON by the format's own definition, so everything a `.glb` names is
+ * within reach without parsing the model, and the same check a `.gltf` is read
+ * through covers it. A chunk is padded with spaces to a four byte boundary,
+ * which `JSON.parse` takes in its stride.
+ */
+export function glbJson(bytes) {
+    if (!ArrayBuffer.isView(bytes) || bytes.byteLength < GLB_HEADER + GLB_CHUNK_HEADER) return null;
+    const words = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (words.getUint32(0, true) !== GLB_MAGIC) return null;
+    if (words.getUint32(GLB_HEADER + 4, true) !== GLB_JSON_CHUNK) return null;
+    const length = words.getUint32(GLB_HEADER, true);
+    const start = GLB_HEADER + GLB_CHUNK_HEADER;
+    if (length === 0 || start + length > bytes.byteLength) return null;
+    const chunk = new Uint8Array(bytes.buffer, bytes.byteOffset + start, length);
+    try {
+        const json = JSON.parse(new TextDecoder().decode(chunk));
+        return json != null && typeof json === 'object' ? json : null;
+    } catch {
+        return null;
+    }
 }
 
 // --- Size and fit ---------------------------------------------------------------------

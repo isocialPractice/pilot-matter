@@ -9,7 +9,8 @@ import {
     MILLIMETRE_GUESS, ASSET_FIELDS, assetFormat, assetName, assetId, assetRef, refAsset, isAssetId,
     fitSize, guessScale, guessUp, guessFacing, facedSize, assetFit, suggestSection, assetDraft, settleDraft, assetSize,
     draftUsable, fitReasons, assetRecipe, placeAssetObject, placeAssetRunway, assetsFor, libraryAsset, assetsUsed, withoutAsset,
-    toBase64, fromBase64, assetHash, assetForFile, readAsset, flyablePlanes
+    toBase64, fromBase64, assetHash, assetForFile, readAsset, flyablePlanes,
+    insideFile, outsideAddress, selfContained, glbJson
 } from '../js/asset-fit.js';
 import { readRecipe, recipeBounds, recipeGeometry, isAssetRecipe, ASSET_RECIPE_FIELDS } from '../js/prefabs.js';
 import { expandGroup, GROUP_RANGES } from '../js/templates.js';
@@ -47,6 +48,27 @@ function methodBody(text, name) {
         }
     }
     return null;
+}
+
+/**
+ * A GLB built round a JSON chunk, the way the format writes one: a 12 byte
+ * header - the magic, the version, the file's length - then the chunk's length
+ * and its four byte tag, then the JSON padded out to a four byte boundary with
+ * spaces. `magic` and `tag` are open so a file that is not a GLB, and one whose
+ * first chunk is not the JSON, can both be built.
+ */
+function glb(json, { magic = 'glTF', tag = 'JSON', length = null } = {}) {
+    const chunk = new TextEncoder().encode(typeof json === 'string' ? json : JSON.stringify(json));
+    const padded = chunk.byteLength + ((4 - chunk.byteLength % 4) % 4);
+    const bytes = new Uint8Array(12 + 8 + padded).fill(0x20, 20);
+    const words = new DataView(bytes.buffer);
+    bytes.set(new TextEncoder().encode(magic), 0);
+    words.setUint32(4, 2, true);
+    words.setUint32(8, bytes.byteLength, true);
+    words.setUint32(12, length ?? padded, true);
+    bytes.set(new TextEncoder().encode(tag), 16);
+    bytes.set(chunk, 20);
+    return bytes;
 }
 
 /** An asset as the library holds one: bytes, the hash its id is drawn from, and the step's settings. */
@@ -435,6 +457,47 @@ test('an asset recipe is read whole or refused, and names no part', () => {
     assert.deepEqual(readRecipe({ asset: 'a-0123456789abcdef', size: [100, 1, 2400] }).problems, [], 'a runway asset kilometres long');
 });
 
+test('a glTF is held to what it names, and a GLB read through its own JSON chunk', () => {
+    // The four ways a glTF can reach outside the file. A `.gltf` is its JSON
+    // and a `.glb` carries the same JSON in its first chunk, so one rule reads
+    // both - and the `.glb` image is the row that used to load untextured with
+    // nothing said to the pilot, because three swallows the throw from the
+    // manager inside its own texture loading.
+    const inside = { buffers: [{ byteLength: 8 }], images: [{ bufferView: 0 }] };
+    const apron = 'https://example.com/textures/apron.png';
+    assert.equal(selfContained(inside), true, 'bytes in the file\'s own chunks name nothing');
+    assert.equal(selfContained({}), true);
+    assert.equal(selfContained({ buffers: [{ uri: 'data:application/octet-stream;base64,AAAA' }] }), true);
+    assert.equal(selfContained({ images: [{ uri: 'DATA:image/png;base64,AAAA' }] }), true, 'the scheme either case');
+    assert.equal(selfContained({ buffers: [{ uri: 'scene.bin' }] }), false);
+    assert.equal(selfContained({ images: [{ uri: apron }] }), false);
+    assert.equal(outsideAddress({ images: [{ uri: apron }] }), apron, 'named, so the refusal says which file');
+    assert.equal(outsideAddress({ buffers: [{ uri: 'scene.bin' }], images: [{ uri: apron }] }), 'scene.bin', 'the first of them');
+    assert.equal(outsideAddress(inside), null);
+
+    // A `blob:` is the page's address, never a file's: three hands an embedded
+    // texture to the image loader as a blob the page made from the file's own
+    // bytes, and only the page that made one can name it. The manager allows
+    // it; the rule a file is read by cannot.
+    assert.equal(insideFile('data:image/png;base64,AAAA'), true);
+    assert.equal(insideFile('blob:https://example.com/abc'), false, 'a blob can never be inside the file naming it');
+    assert.equal(insideFile(null), false);
+    assert.equal(selfContained({ images: [{ uri: 'blob:https://example.com/abc' }] }), false);
+
+    // The JSON chunk read back out of a GLB, which is what puts the check in
+    // reach of a format that arrives as bytes.
+    assert.deepEqual(glbJson(glb(inside)), inside);
+    assert.equal(selfContained(glbJson(glb({ images: [{ uri: apron }] }))), false);
+    assert.equal(glbJson(glb(inside, { tag: 'BIN\0' })), null, 'a first chunk that is not the JSON');
+    assert.equal(glbJson(glb(inside, { magic: 'FTLG' })), null, 'bytes that are not a GLB at all');
+    assert.equal(glbJson(glb(inside, { length: 4096 })), null, 'a chunk running past the end of the file');
+    assert.equal(glbJson(glb(inside, { length: 0 })), null, 'an empty chunk');
+    assert.equal(glbJson(glb('{ "buffers": ')), null, 'a chunk that is not JSON');
+    assert.equal(glbJson(glb(5)), null, 'a chunk holding JSON that is not an object');
+    assert.equal(glbJson(new Uint8Array(8)), null, 'too few bytes to hold the two headers');
+    assert.equal(glbJson(null), null);
+});
+
 // --- In the page ---------------------------------------------------------------------------
 
 test('a model is read in the page by three\'s own loaders, a glTF only when it carries everything, and refused past its limits', () => {
@@ -442,10 +505,20 @@ test('a model is read in the page by three\'s own loaders, a glTF only when it c
     for (const name of ['GLTFLoader', 'OBJLoader', 'STLLoader', 'SVGLoader']) assert.match(loader, new RegExp(`import\\('three/addons/loaders/${name}\\.js'\\)`));
     assert.match(loader, /if \(!selfContained\(JSON\.parse\(source\)\)\) throw new AssetRefused/);
 
-    // A `.glb` carries the same JSON in its first chunk and reaches the loader
-    // whole, so the rule is held at the manager rather than at one format's
-    // branch: every address a glTF names is refused but its own bytes, which
-    // covers whatever a later extension adds a `uri` to.
+    // Both formats are refused from their own JSON before either is parsed: a
+    // `.gltf`'s is the file, and a `.glb` carries the same JSON in its first
+    // chunk, which `glbJson` reads. Three turns the manager's throw into a
+    // rejected parse for a buffer but swallows it for an image, so the check
+    // before the parse is what the pilot is actually told by.
+    assert.match(loader, /import \{[^}]*\bglbJson\b[^}]*\boutsideAddress\b[^}]*\bselfContained\b[^}]*\} from '\.\/asset-fit\.js';/,
+        'the file\'s own rule read from the pure module, where it is tested');
+    assert.doesNotMatch(loader, /function selfContained/, 'and not a second copy of it here');
+    assert.match(loader, /const json = glbJson\(bytes\);\n\s*const outside = json == null \? null : outsideAddress\(json\);\n\s*if \(outside != null\) throw new AssetRefused\(/,
+        'a .glb refused before it is parsed, naming the address');
+
+    // The manager stays as the backstop, and its rule is the wider one: what
+    // the page may ask for while it reads a model, blobs of the file's own
+    // bytes included.
     assert.match(loader, /new module\.GLTFLoader\(embeddedOnly\(\)\)/, 'the glTF loader reads addresses, so it is given the manager');
     assert.match(loader, /const EMBEDDED_ADDRESS = \/\^\(\?:data\|blob\):\/i;/, 'a data: address inside the file, or a blob: the page made from it');
     assert.match(loader, /manager\.setURLModifier\(url => \{\n\s*if \(embeddedAddress\(url\)\) return String\(url\);\n\s*throw new AssetRefused\(/,

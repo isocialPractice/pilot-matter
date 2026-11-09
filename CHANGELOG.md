@@ -5,6 +5,76 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.65.2] - 2026-11-09
+
+### Fixed
+
+- **A `.glb` naming an external image is refused, not read untextured.** Three
+  of the four ways a glTF can reach outside its file were refused by name; the
+  fourth was not. A `.glb` whose JSON named an external image opened the step
+  after loading as though the model were sound - headed LOADED ASSET, its
+  triangles and size reported, no refusal drawn - and the model was kept
+  untextured with nothing said to the pilot. The guard at the loading manager
+  did fire, and nothing left for the network, so the half that mattered most
+  always held: what was missing was the refusal. Three catches the manager's
+  throw inside its own texture loading, drops the texture and resolves the
+  parse anyway, so a model came back where a buffer in the same position had
+  rejected the parse. Both formats are now refused from their own JSON before
+  either is parsed - a `.gltf`'s JSON is the file, and `glbJson` reads a
+  `.glb`'s out of its first chunk - so the two read alike, name the address
+  they point at, and do not depend on what three chooses to swallow. The
+  manager stays as the backstop behind them, which is what holds a field a
+  later extension adds a `uri` to.
+- **A glTF file may name a `data:` address and nothing else.** Both uses of an
+  address were read through one predicate allowing `data:` and `blob:`, so
+  `selfContained` - documented as "True for a glTF whose buffers and images are
+  all inside it" - passed a file carrying `"uri": "blob:https://..."`. A
+  `blob:` belongs to the page, where three is handed an embedded texture as a
+  blob made from the file's own bytes; it can never be inside a file that names
+  one, since only the page that minted a blob can resolve it. The two rules are
+  now separate and say which is which: `insideFile` is what a file may name,
+  and the manager's wider rule is what the page may ask for while it reads a
+  model. Nothing escaped either way - the narrowing refuses a file earlier than
+  before rather than letting one through.
+- **`docs/terrain.html` states the brush-edge crossover in the units it is
+  in.** The Free Paint paragraph said a hard and a soft edge come to the same
+  band on a brush 640 units across or narrower, "which at the ordinary zoom is
+  every brush the slider offers", and that the `EDGE` axis therefore reads only
+  from far enough out. The 640 units are right and `test/footprints.test.js`
+  pins them, but the zoom clause points the wrong way: `SIZE` is 5 to 400
+  screen pixels, a 16000 unit canvas opens at its furthest, 15200, where a
+  pixel is 27 units, so 640 units is a 24 pixel brush and the default 25 is
+  already past it - the whole slider stays under the crossover only within 914
+  units of the target, the innermost 4% of the zoom range. The opening view is
+  the furthest out there is, so the sentence told a reader the axis does
+  nothing in ordinary use when at the opening view it reads for all but the
+  smallest brushes. It now states the crossover in world units and lets the
+  zoom follow.
+
+Held in Node by `test/assets.test.js`, which moves the pure half of this out
+of `js/asset-loader.js` - unimportable in Node, since `three` is CDN-only,
+which is why that module is checked by reading its source - into
+`js/asset-fit.js`, where `glbJson`, `outsideAddress`, `selfContained` and
+`insideFile` are exercised against a GLB built in the test: the JSON chunk
+read back parsed, and null for a first chunk that is not the JSON, bytes that
+are not a GLB, a chunk running past the end of the file, an empty one, one
+that is not JSON, one holding JSON that is not an object, and too few bytes to
+hold the two headers. Eight mutants were each caught: the `glb` branch
+dropped, which is the defect itself; the file's rule widened back to `blob:`;
+the magic, the chunk tag and the chunk bounds each left unchecked; a
+non-object chunk taken as JSON; only buffers read for an outside address; and
+the address not named.
+
+Settled in Chromium in 12 checks over a textured triangle built in the page.
+The `.glb` naming an external image is refused as `AssetRefused` naming the
+address, is not read untextured instead, and makes no request - while the same
+bytes through a bare `GLTFLoader` do fetch it, so the file is reaching out and
+the check is what stops it being read. A `.glb` carrying its image in the BIN
+chunk and one carrying it as a `data:` uri both still read with their texture
+on; a `.glb` naming an external buffer and a `.gltf` naming an external image
+are both still refused; and a `blob:` is outside a file while the manager still
+allows it (`.tmp/ui-ux/t29/glb-external-image.mjs`).
+
 ## [1.0.0-alpha.1.65.1] - 2026-11-08
 
 ### Fixed
