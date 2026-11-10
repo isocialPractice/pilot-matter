@@ -81,6 +81,40 @@ its context survives being archived.
     so the suite cannot import it, and `namedAddress` is private inside it.
   - **Goal**: Resolve to [address-cut-untested.prompt.md](.claude/prompts/address-cut-untested.prompt.md)
   - From: UI/UX Override - a refusal a short phone never shows
+- [ ] A `.glb` that is really glTF JSON skips the refusal before the parse
+  - **Issue**: `assetFormat` in `js/asset-fit.js` reads the format off the
+    filename's extension alone, so a glTF JSON file named `scene.glb` is read
+    down the `.glb` branch. There `refuseOutside(glbJson(bytes))` refuses
+    nothing: `glbJson` answers null for any bytes without the `glTF` magic, and
+    `refuseOutside` passes a null through by design. Measured in Node on the
+    bytes of `{"asset":{"version":"2.0"},"images":[{"uri":"https://example.com/textures/apron.png"}]}`
+    - `glbJson` answers null while `outsideAddress` on the same JSON answers
+    the address - so the check that is meant to catch both formats catches
+    neither for this one file. The loading manager is then the only guard left.
+    It stops the fetch, so nothing leaves for the network; but the docstring on
+    `embeddedOnly` records why that is not enough on its own - three catches an
+    image's throw inside its own texture loading, drops the texture and resolves
+    the parse anyway - which is the whole reason the check before the parse
+    exists. If three parses such a file, the formats table at
+    `docs/terrain.html:320` promises "one pointing at another file is refused"
+    and the pilot instead gets an untextured model with nothing said on the
+    dock. The behaviour is not new - the branch this turn rewrote handled null
+    the same way - but nothing exercises it, and the turn's five mutants all pin
+    the source's shape rather than what such a file does.
+  - **Goal**: settle first whether three's `GLTFLoader` falls back to parsing a
+    non-GLB `ArrayBuffer` as JSON text. It cannot be answered in Node - `three`
+    is CDN-only, `import('three')` answers `ERR_MODULE_NOT_FOUND`, and that is
+    why the suite reads `js/asset-loader.js` as source text - so read it in the
+    browser through the builder's own route, with a `.gltf` renamed `.glb`
+    naming an outside image and another naming an outside buffer. If it parses:
+    on the `.glb` branch, when `glbJson` answers null and the bytes still decode
+    as a glTF object, read the refusal off that object, so one `refuseOutside`
+    covers both formats and the sentence does not change. If it refuses the
+    bytes outright, the gap is only in the wording and the table's promise
+    holds - say so where `glbJson`'s null case is already described. Either way
+    pin the premise in Node, where it is cheap: `glbJson` answers null for glTF
+    JSON text.
+  - From: UI/UX Override - a refusal a short phone never shows
 
 ## Game UI/UX
 
