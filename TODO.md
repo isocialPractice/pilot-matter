@@ -38,54 +38,49 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - a .glb refused in the dock, and the brush figure beside it
-
-#### Resolve Issues
-
-- [ ] Brush Crossover 1: the paragraph's slider figure leaves a 24 pixel brush
-  on the wrong side of the crossover
-  - **Issue**: the `FREE PAINT` paragraph in `docs/terrain.html` now reads "at
-    the opening view of a 16000 unit canvas, where a pixel is 27 units, it is a
-    brush under 24 of the slider's 5 to 400". A 24 pixel brush is inside the
-    crossover, not outside it. Drawn in Chromium at 1280x800 on a blank canvas,
-    the brush taken to each size by the panel's own `SIZE` slider and each
-    stroke measured alone off its draft's footprint through `footprintWeight`:
-    at 23 px a stroke is 612 units across and the two edges come to the same
-    band, 152.847 either way; at 24 px it is 639 units and they are still the
-    same, 159.75 either way; at 25 px it is 665 units and they part, 159.932
-    hard against 166.25 soft. A pixel is 26.608 units there, so the 640 unit
-    crossover is reached at 24.05 px and the bound is 24 or under, not under
-    24. The item's own settled note has the right figure in it - "the crossover
-    at 24.1 px" - so the measurement was sound and only the rounding to a whole
-    brush went the wrong way; 640 / 27 is 23.7, and the paragraph divides by
-    the figure it rounded rather than the one it measured. Everything else in
-    the paragraph holds: 665 units at the default brush, 27 units a pixel, the
-    two edges differing there, and both of them coming to 3.5 units zoomed all
-    the way in, where even the slider's widest 400 px brush is 224 units across
-    and inside the crossover.
-  - **Goal**: Resolve to [brush-crossover-figure.prompt.md](.claude/prompts/brush-crossover-figure.prompt.md)
-  - From: UI/UX Override - a .glb that points at another file
+### UI/UX Override - a refusal a short phone never shows
 
 #### Found Issues
 
-- [ ] A `.gltf`'s refusal names no address, and the asset table says it does
-  - **Issue**: the `.glb` / `.gltf` row of the formats table in
-    `docs/terrain.html` now says the refusal "names the address it points at -
-    a `.gltf` is that JSON, and a `.glb` carries the same JSON in its first
-    chunk, so the two are held to it alike". Read off the dock in Chromium, a
-    `.glb` does name it - "the model points at another file,
-    `https://example.com/textures/apron.png`; everything it uses has to be
-    inside it" - while a `.gltf` naming the same image says "the glTF points at
-    other files; save it with its buffers and images inside it, as a .glb or as
-    `data:` addresses", which names no address at all. The rule is held alike:
-    all four files are refused before the parse, nothing leaves for the
-    network, and every refusal is drawn in the refused amber at 11.46:1 without
-    clipping. It is the sentence that is not. `selfContained`'s docstring in
-    `js/asset-fit.js` still carries the reasoning behind the older `.gltf`
-    wording - a pilot "is told which file rather than being told about an
-    address they never wrote" - which the `.glb` branch no longer follows.
-  - **Goal**: Resolve to [gltf-refusal-address.prompt.md](.claude/prompts/gltf-refusal-address.prompt.md)
-  - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it
+- [ ] The dock's status line is drawn below the fold on a short phone, so a
+  refused file looks like nothing happened
+  - **Issue**: the SAVE / LOAD dock writes what the last save, load or refusal
+    came to as the ENVIRONMENT section's status line, inside the fields that
+    scroll. Under 640px wide the dock takes the foot of the screen at
+    `top: max(60vh, palette bottom + 10px)`, and on a short phone the palette's
+    foot wins that `max`: at 360x640 the fields come to 62px, which holds the
+    ENVIRONMENT heading and the NAME row and nothing else. Read off the page in
+    Chromium through the builder's own route with a file that is refused, the
+    refusal is drawn at 541-598 in a window of 470-532 with `scrollTop` left at
+    0 - so the dock looks exactly as it did before and the pilot is told
+    nothing. The same at 375x667, where the window is 470-559. The boundary is
+    a viewport 708px tall at 360 wide: at 704 the refusal is below the fold, at
+    708 it is read. It is not the refusal's doing - measured before any file is
+    handed over, the empty status slot is already below the fold - and it costs
+    the same for every status the dock writes; the refusal is only the one that
+    matters most. Everything else on the dock holds at these sizes: the four
+    answers stay pinned, on screen and reachable, every palette tile is
+    reachable, ASSETS is reached by scrolling, and at 390x844 the refusal reads
+    perfectly - 3 lines, inside the dock, amber at 11.46:1.
+  - **Goal**: Resolve to [dock-status-below-the-fold.prompt.md](.claude/prompts/dock-status-below-the-fold.prompt.md)
+  - From: UI/UX Override - a refusal a short phone never shows
+- [ ] The address cut in a refusal is held by no test, only by a browser check
+  - **Issue**: `namedAddress` in `js/asset-loader.js` cuts an address over 120
+    characters to 117 and `...`, and every refusal a pilot reads is built
+    through it. `test/assets.test.js` reads the module as text and pins the
+    sentence's shape and that `namedAddress` is called in it, but asserts
+    nothing about 120, 117, the trailing `...`, or the tail of the sentence
+    surviving the cut. Run as a mutant rather than argued:
+    `address.slice(0, 117)` changed to `address.slice(0, 17)` leaves the suite
+    at 2426 passing and 0 failing. The rule was verified instead by driving the
+    dock in Chromium over files built for it - 120 drawn whole, 121 and 180 cut
+    to 117 and `...`, a `.gltf` and a `.glb` cut alike, and
+    `; everything it uses has to be inside it` surviving each cut, 53 checks
+    all passing - which means it is checked when this agent runs and at no
+    other time. The reason is structural: `js/asset-loader.js` imports Three.js
+    so the suite cannot import it, and `namedAddress` is private inside it.
+  - **Goal**: Resolve to [address-cut-untested.prompt.md](.claude/prompts/address-cut-untested.prompt.md)
+  - From: UI/UX Override - a refusal a short phone never shows
 
 ## Game UI/UX
 
@@ -728,72 +723,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 406 earlier items in `TODO-archive.md`, newest last.
+> 408 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Held Feather**: A small extrusion has no top surface, so its top colour
-  never shows and its prism is never previewed
-  - **Issue**: `surfaceAt` in `js/extrude.js` calls a point the top only where
-    the footprint's weight reaches `TOP_WEIGHT`, which is 1, and a footprint's
-    weight reaches 1 only a feather inside its edge. The default feather is 160
-    units, so a region narrower than about twice that has no point at weight 1
-    at all. Measured on the default canvas - 16000 units across, sampled every
-    80: a 200-unit square extrusion weighs 9 vertices and not one of them is a
-    top, and the first top appears at 320 units. Three things follow for every
-    extrusion smaller than that, and Extrude accepts regions down to
-    `MIN_REGION`, which is 40. The `extrude` element paints by the same weight
-    through `drawn: 'edge'`, so the whole of it takes the wall colour and the
-    `topColor` row on the surfaces panel changes nothing. `surfacePress` in
-    `js/main.js` reads the weight under the click and hands it to `surfaceAt`,
-    so a click anywhere on it answers `wall` and the top can never be chosen.
-    And `liftedTop` averages only the vertices at weight 1, so it returns null
-    and `drawPrism`'s `Number.isFinite(drag.top)` guard draws no preview while
-    the blue arrow pulls the height. A small building is the ordinary case for
-    this tool, and all three are silent: nothing refuses the region or says why
-    the colour did not take.
-  - **Goal**: give a region its top wherever it has an inside, rather than
-    where a fixed feather has finished easing. The weight model is the thing to
-    change, not the three readers: either hold a footprint's feather to a share
-    of the region's own extent so a small region still eases to 1 in its
-    middle, or read the top from the region's own interior distance rather than
-    from the weight the feather produced. Whichever is chosen, `surfaceAt`,
-    `drawn: 'edge'` on the `extrude` element, `TOP_LEVEL` in
-    `js/build-overlay.js` and `liftedTop` all have to read it the same way, so
-    the colour painted, the surface clicked, the edge outlined and the prism
-    previewed stay one answer. Too large for a review turn: it moves the
-    footprint weighting that twelve tools share. Cover it in
-    `test/surfaces.test.js` with a region near `MIN_REGION` as well as a large
-    one, since the suite's extrusions are all comfortably over 320 units and
-    reported none of this.
-  - **Settled**: the feather, not the readers. `footprintReach` in
-    `js/environment/footprints.js` answers how far inside a region its deepest
-    point is - exact for a disc, an ellipse, a box and a swathe, and the
-    half-width of the square round an outline otherwise - and `feather` holds
-    the band to `FEATHER_SHARE` of it, which is a half. So the inner half of
-    any region is covered whole, and all four readers of a full cover go on
-    weighing the same number against the same 1. Half rather than the whole
-    reach because easing to 1 at one point only is a top the sampling misses.
-    The feather is kept per footprint in a `WeakMap`, as `FLATTENED` keeps a
-    path's outline and for the same reason. A region over 640 units across
-    keeps the feather it had, so all five bundled environments build vertex for
-    vertex as they did - measured by building each with the hold taken out.
-    `test/surfaces.test.js` walks `MIN_REGION`, 200 and 2400 and checks the
-    four readers against each other; nine mutants were each caught.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
-- [x] `ringArea` says it returns twice the area it returns
-  - **Issue**: the docstring on `ringArea` in `js/shapes.js` reads "Twice the
-    area a ring encloses, signed by the way it winds", but the shoelace sum it
-    accumulates is twice the signed area and the function returns that sum
-    halved, which is the area itself - on a 10 by 10 square it answers 100, not
-    200. Its one caller compares the result against `MIN_REGION * MIN_REGION /
-    2`, which is the area of a right triangle with `MIN_REGION` legs and reads
-    correctly against an area, so the code is right and only the sentence is
-    wrong. It matters because the next reader to use the helper will halve a
-    figure that is already halved, and get a threshold twice as permissive as
-    the one they wrote.
-  - **Goal**: drop "Twice" - "The area a ring encloses, signed by the way it
-    winds". Nothing else in the file changes.
-  - **Settled**: the word dropped, and nothing else in `js/shapes.js` touched.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
 - [x] Held Feather 1: the hold halved the soft brush's edge, and three
   sentences still say it is a half
   - **Issue**: the hold is applied to a stated feather as well as a default
@@ -1085,3 +1016,83 @@ how the simulator got here rather than as a list still to be worked.
     that `insideFile` and `selfContained` are importable - a mutant widening
     the file's rule back to `blob:` is caught.
   - From: UI/UX Override - a .glb that points at another file
+- [x] Brush Crossover 1: the paragraph's slider figure leaves a 24 pixel brush
+  on the wrong side of the crossover
+  - **Issue**: the `FREE PAINT` paragraph in `docs/terrain.html` now reads "at
+    the opening view of a 16000 unit canvas, where a pixel is 27 units, it is a
+    brush under 24 of the slider's 5 to 400". A 24 pixel brush is inside the
+    crossover, not outside it. Drawn in Chromium at 1280x800 on a blank canvas,
+    the brush taken to each size by the panel's own `SIZE` slider and each
+    stroke measured alone off its draft's footprint through `footprintWeight`:
+    at 23 px a stroke is 612 units across and the two edges come to the same
+    band, 152.847 either way; at 24 px it is 639 units and they are still the
+    same, 159.75 either way; at 25 px it is 665 units and they part, 159.932
+    hard against 166.25 soft. A pixel is 26.608 units there, so the 640 unit
+    crossover is reached at 24.05 px and the bound is 24 or under, not under
+    24. The item's own settled note has the right figure in it - "the crossover
+    at 24.1 px" - so the measurement was sound and only the rounding to a whole
+    brush went the wrong way; 640 / 27 is 23.7, and the paragraph divides by
+    the figure it rounded rather than the one it measured. Everything else in
+    the paragraph holds: 665 units at the default brush, 27 units a pixel, the
+    two edges differing there, and both of them coming to 3.5 units zoomed all
+    the way in, where even the slider's widest 400 px brush is 224 units across
+    and inside the crossover.
+  - **Goal**: Resolve to [brush-crossover-figure.prompt.md](.claude/prompts/brush-crossover-figure.prompt.md)
+  - **Settled**: the prompt's first option, which keeps the per-pixel figure
+    round and hedges it - "where a pixel is a little under 27 units, it is a
+    brush of 24 or under of the slider's 5 to 400". The hedge is what makes the
+    two figures agree: 640 / 27 is 23.7 and 640 / 26.608 is 24.05, so dividing
+    by the rounded figure is what moved the bound by a whole brush. Nothing
+    else in the paragraph moved, and the 1.0.0-alpha.1.54.0 changelog entry was
+    left alone as the completed item before this one left it. The figure is now
+    held rather than written down: a new test in `test/site.test.js` reads the
+    Free Paint paragraph and compares the brush it names with what
+    `createBuildCamera(16000)`, `unitsPerPixel` at an 800 pixel view and
+    `paintStamp` actually give against the crossover read off the footprint
+    hold - 26.60788 units a pixel, 639 units at 24 px and 665 at 25, so the
+    widest brush inside 640 is 24. It reads the direction of the bound as well
+    as the number, since the number was never what was wrong, and takes either
+    phrasing as the same inclusive maximum so the wording can still change.
+    Three mutants caught: the bound back as "under 24", the bound at 23, and
+    the per-pixel figure stated as a round 27 with no hedge. The paragraph's
+    figures are an 800 pixel view's - the bound is 18 px in a 600 px view and
+    27 at 900 - which the paragraph does not say and did not say before; the
+    test names the view it holds them at.
+  - From: UI/UX Override - a .glb that points at another file
+- [x] A `.gltf`'s refusal names no address, and the asset table says it does
+  - **Issue**: the `.glb` / `.gltf` row of the formats table in
+    `docs/terrain.html` now says the refusal "names the address it points at -
+    a `.gltf` is that JSON, and a `.glb` carries the same JSON in its first
+    chunk, so the two are held to it alike". Read off the dock in Chromium, a
+    `.glb` does name it - "the model points at another file,
+    `https://example.com/textures/apron.png`; everything it uses has to be
+    inside it" - while a `.gltf` naming the same image says "the glTF points at
+    other files; save it with its buffers and images inside it, as a .glb or as
+    `data:` addresses", which names no address at all. The rule is held alike:
+    all four files are refused before the parse, nothing leaves for the
+    network, and every refusal is drawn in the refused amber at 11.46:1 without
+    clipping. It is the sentence that is not. `selfContained`'s docstring in
+    `js/asset-fit.js` still carries the reasoning behind the older `.gltf`
+    wording - a pilot "is told which file rather than being told about an
+    address they never wrote" - which the `.glb` branch no longer follows.
+  - **Goal**: Resolve to [gltf-refusal-address.prompt.md](.claude/prompts/gltf-refusal-address.prompt.md)
+  - **Settled**: the prompt's first option - the `.gltf` names the address too,
+    so the table needs no edit and the two formats say one thing. Both branches
+    now go through one `refuseOutside(json)` in `js/asset-loader.js`, handed a
+    `.gltf`'s own JSON or a `.glb`'s first chunk through `glbJson`, and all
+    three places an outside address is found - those two and the loading
+    manager behind them - throw one `outsideFileRefusal`, so the sentence is
+    written once and cannot drift again. `selfContained` went with it rather
+    than keeping a corrected docstring: it was the predicate form of
+    `outsideAddress` and had no caller left once both branches wanted the
+    address rather than a yes or no, so the reasoning the prompt quoted is gone
+    rather than reworded. Its assertions in `test/assets.test.js` are now
+    `outsideAddress`'s and say which address was found. Settled in Chromium in
+    33 checks over all four files that reach outside themselves, read off the
+    dock through the builder's own route: each is refused before the step
+    opens, names its address, no longer steers the pilot at a `.glb`, draws in
+    the refused amber at 11.46:1 without clipping, and makes no request - and
+    shaped by replacing the file and the address, all four sentences are now
+    one (`.tmp/run1110/refusals.mjs`). Five mutants caught in Node, including
+    a second wording put back for a `.gltf`.
+  - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it
