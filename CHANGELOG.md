@@ -5,6 +5,67 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.65.3] - 2026-11-10
+
+### Fixed
+
+- **A `.gltf` naming another file is refused in the same words a `.glb` is.**
+  Both formats were refused before the parse and neither left anything for the
+  network, so the rule was held alike; the sentence was not. A `.glb` named the
+  address it found - "the model points at another file,
+  `https://example.com/textures/apron.png`" - while a `.gltf` naming the same
+  image said "the glTF points at other files; save it with its buffers and
+  images inside it, as a .glb or as `data:` addresses", which named no address
+  and sent the pilot to the very format they would then be told about. The
+  `.gltf` wording was written when neither format named an address, and the
+  asset table in `docs/terrain.html` had since been written to the `.glb`
+  behaviour. Both branches now read `outsideAddress` through one
+  `refuseOutside` check, and all three places an outside address is found - a
+  `.gltf`'s JSON, a `.glb`'s first chunk, and the manager behind them - throw
+  one `outsideFileRefusal`, so the sentence cannot drift again. `selfContained`
+  went with the change: it was the predicate form of `outsideAddress` and had
+  no caller left once both branches wanted the address rather than a yes or no.
+- **`docs/terrain.html` names the right brush at the edge crossover.** The Free
+  Paint paragraph said that at the opening view of a 16000 unit canvas a hard
+  and a soft edge come to the same band on "a brush under 24" of the slider's 5
+  to 400. A 24 pixel brush is inside the crossover, not outside it. The
+  measurement behind the sentence was sound - the crossover falls at 24.05
+  pixels - but the paragraph rounded the per-pixel figure up to 27 and then
+  divided by the rounded figure, and 640 / 27 is 23.7 where 640 / 26.608 is
+  24.05, which moves the bound by a whole brush. It now reads "where a pixel is
+  a little under 27 units, it is a brush of 24 or under", the hedge being what
+  makes the two figures agree.
+
+Held in Node by `test/assets.test.js`, which reads `js/asset-loader.js` as
+source text - the module cannot be imported in Node, since `three` is CDN-only
+- and now pins both branches rather than the `.glb` one alone: the one
+`refuseOutside` check, each branch's call to it, the refusal written once in
+the file, and the old `.gltf` wording absent. Five mutants were each caught:
+the `.gltf` check dropped, the `.glb` check dropped, the manager left saying
+something of its own, a second wording put back for a `.gltf`, and the null
+guard removed from `refuseOutside`. The pure half moves with it:
+`selfContained`'s assertions are now `outsideAddress`'s, which say which
+address was found rather than only that one was.
+
+The doc figure is held by a new test in `test/site.test.js`, which reads the
+Free Paint paragraph and holds the brush it names to what the slider and the
+camera actually do - `createBuildCamera(16000)`, `unitsPerPixel` at an 800
+pixel view, and `paintStamp`'s width against the crossover read off the
+footprint hold. It reads the direction of the bound as well as the number,
+since the number was never what was wrong, and accepts either phrasing by
+turning both into the same inclusive maximum. Three mutants caught: the bound
+back as "under 24", the bound at 23, and the per-pixel figure stated as a round
+27 without the hedge.
+
+Settled in Chromium in 33 checks, one file to a page through the builder's own
+route - INTERACTIVE ENVIRONMENT BUILDER, BLANK CANVAS, SAVE / LOAD, LOAD ASSET
+- reading the refusal off the dock. All four files that reach outside
+themselves, a `.glb` and a `.gltf` each naming an image and a buffer, are
+refused before the step after loading opens, name the address they point at,
+no longer steer the pilot at a `.glb`, draw in the refused amber at 11.46:1
+without clipping, and make no request. Shaped by replacing the file and the
+address, all four sentences are now one (`.tmp/run1110/refusals.mjs`).
+
 ## [1.0.0-alpha.1.65.2] - 2026-11-09
 
 ### Fixed

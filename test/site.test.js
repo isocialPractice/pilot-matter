@@ -9,6 +9,10 @@ import { ENVIRONMENTS, MODE_ENVIRONMENTS } from '../js/environment/presets.js';
 import { GAME_MODES } from '../js/game-modes.js';
 import { reservedKeys, reservedRole } from '../js/reserved-keys.js';
 import { keyLabel } from '../js/key-bindings.js';
+import { createBuildCamera, unitsPerPixel, DEFAULT_FOV } from '../js/build-camera.js';
+import { paintStamp, PAINT_BRUSH } from '../js/build-tools.js';
+import { DEFAULT_SIZE } from '../js/environment/elements.js';
+import { DEFAULT_FEATHER, FEATHER_SHARE } from '../js/environment/footprints.js';
 import { renderApiReference, PAGE } from '../tools/build-api-reference.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -649,6 +653,65 @@ test('a document quoting the refusal quotes one the panel would write', () => {
         // a document stops saying what the panel does.
         assert.ok(quoted > 0, `${name} no longer quotes what a refused row says`);
     }
+});
+
+/**
+ * The view the Free Paint paragraph's figures are written at.
+ *
+ * A brush is laid at `unitsPerPixel(distance, fov, viewHeight)`, so the
+ * paragraph's pixel figures move with how tall the window is - 18 px in a 600
+ * px view, 24 at 800, 27 at 900. 800 is the height they were measured at.
+ */
+const PARAGRAPH_VIEW = 800;
+
+/**
+ * The widest brush, in the pixels the panel is set in, whose hard and soft
+ * edges still come to the same band at the opening view of a default canvas.
+ *
+ * The 640 unit crossover is `test/footprints.test.js`'s to pin - eight of the
+ * ground's cells, read off the hold the same way it reads it there. This only
+ * has to carry it into the pixels the paragraph talks in.
+ */
+function widestBrushInsideCrossover() {
+    const crossover = DEFAULT_FEATHER / FEATHER_SHARE / FEATHER_SHARE;
+    const perPixel  = unitsPerPixel(createBuildCamera(DEFAULT_SIZE).distance, DEFAULT_FOV, PARAGRAPH_VIEW);
+    const brushes   = Array.from({ length: PAINT_BRUSH.size.high - PAINT_BRUSH.size.low + 1 },
+        (_, at) => at + PAINT_BRUSH.size.low);
+    return {
+        perPixel,
+        widest: brushes.filter(pixels => paintStamp({ size: pixels }, perPixel).width <= crossover).pop()
+    };
+}
+
+/**
+ * The paragraph states a figure about the builder, so the builder is what it
+ * is held to.
+ *
+ * The direction of the bound is read as well as the number, because the number
+ * was never what was wrong: the paragraph said "a brush under 24" where 24 is
+ * itself inside the crossover, and a test reading only the digits would have
+ * passed on it. Either phrasing is accepted and turned into the same
+ * inclusive maximum, so the wording can change and the claim cannot drift.
+ */
+test('the Free Paint paragraph names the brush the crossover actually falls at', () => {
+    const { perPixel, widest } = widestBrushInsideCrossover();
+    const paragraph = sources.get('docs/terrain.html').match(/<code>FREE PAINT<\/code>[\s\S]*?<\/p>/)[0];
+
+    const inclusive = paragraph.match(/it is a brush of (\d+) or under\b/);
+    const exclusive = paragraph.match(/it is a brush under (\d+)\b/);
+    assert.ok(inclusive || exclusive,
+        'the paragraph no longer states the widest brush the two edges agree at');
+    const named = inclusive ? Number(inclusive[1]) : Number(exclusive[1]) - 1;
+
+    assert.equal(named, widest,
+        `the FREE PAINT paragraph says the edges agree up to a ${named} px brush; the slider says ${widest}`);
+
+    // And the per-pixel figure the bound was divided by. Rounding it up to 27
+    // and dividing by the rounded figure is what moved the bound by a whole
+    // brush, so the prose keeps the round number only as a hedge.
+    assert.ok(Math.abs(perPixel - 26.608) < 0.01, `a pixel at the opening view is ${perPixel}`);
+    assert.match(paragraph, /where a pixel is a little under 27 units/,
+        'the paragraph rounds the per-pixel figure, so it has to say it is rounding');
 });
 
 // The README is the front door rather than the manual, and the check that

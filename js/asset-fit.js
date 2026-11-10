@@ -23,7 +23,7 @@
  * twice, or carried in two environment files, is one asset.
  *
  * It also reads what a glTF names outside itself - `glbJson` and
- * `selfContained` below - because that is a question about the file's bytes
+ * `outsideAddress` below - because that is a question about the file's bytes
  * rather than about the model three draws from them, and so can be answered
  * here where it is testable.
  *
@@ -124,6 +124,11 @@ export function insideFile(uri) {
  * The first address a glTF names that is not inside it, or null when
  * everything it uses is. A buffer or image with no `uri` at all names nothing
  * - it is a chunk of the file, which is how a GLB carries its own bytes.
+ *
+ * The early refusal both glTF formats are read through, and it names what it
+ * found rather than only answering yes or no, so the pilot is told which
+ * address stopped the file. A `.gltf`'s JSON is the file itself; a `.glb`'s is
+ * its first chunk, which `glbJson` below reads.
  */
 export function outsideAddress(json) {
     for (const list of [json?.buffers, json?.images]) {
@@ -132,18 +137,6 @@ export function outsideAddress(json) {
         }
     }
     return null;
-}
-
-/**
- * True for a glTF whose buffers and images are all inside it.
- *
- * The early, named refusal both glTF formats are read through, so a pilot who
- * picked the wrong file is told which file rather than being told about an
- * address they never wrote. A `.gltf`'s JSON is the file itself; a `.glb`'s is
- * its first chunk, which `glbJson` below reads.
- */
-export function selfContained(json) {
-    return outsideAddress(json) == null;
 }
 
 /** A GLB's magic, the type tag of the chunk carrying its JSON, and the two header lengths. */

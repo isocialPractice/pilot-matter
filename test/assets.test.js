@@ -10,7 +10,7 @@ import {
     fitSize, guessScale, guessUp, guessFacing, facedSize, assetFit, suggestSection, assetDraft, settleDraft, assetSize,
     draftUsable, fitReasons, assetRecipe, placeAssetObject, placeAssetRunway, assetsFor, libraryAsset, assetsUsed, withoutAsset,
     toBase64, fromBase64, assetHash, assetForFile, readAsset, flyablePlanes,
-    insideFile, outsideAddress, selfContained, glbJson
+    insideFile, outsideAddress, glbJson
 } from '../js/asset-fit.js';
 import { readRecipe, recipeBounds, recipeGeometry, isAssetRecipe, ASSET_RECIPE_FIELDS } from '../js/prefabs.js';
 import { expandGroup, GROUP_RANGES } from '../js/templates.js';
@@ -465,15 +465,13 @@ test('a glTF is held to what it names, and a GLB read through its own JSON chunk
     // manager inside its own texture loading.
     const inside = { buffers: [{ byteLength: 8 }], images: [{ bufferView: 0 }] };
     const apron = 'https://example.com/textures/apron.png';
-    assert.equal(selfContained(inside), true, 'bytes in the file\'s own chunks name nothing');
-    assert.equal(selfContained({}), true);
-    assert.equal(selfContained({ buffers: [{ uri: 'data:application/octet-stream;base64,AAAA' }] }), true);
-    assert.equal(selfContained({ images: [{ uri: 'DATA:image/png;base64,AAAA' }] }), true, 'the scheme either case');
-    assert.equal(selfContained({ buffers: [{ uri: 'scene.bin' }] }), false);
-    assert.equal(selfContained({ images: [{ uri: apron }] }), false);
+    assert.equal(outsideAddress(inside), null, 'bytes in the file\'s own chunks name nothing');
+    assert.equal(outsideAddress({}), null);
+    assert.equal(outsideAddress({ buffers: [{ uri: 'data:application/octet-stream;base64,AAAA' }] }), null);
+    assert.equal(outsideAddress({ images: [{ uri: 'DATA:image/png;base64,AAAA' }] }), null, 'the scheme either case');
+    assert.equal(outsideAddress({ buffers: [{ uri: 'scene.bin' }] }), 'scene.bin');
     assert.equal(outsideAddress({ images: [{ uri: apron }] }), apron, 'named, so the refusal says which file');
     assert.equal(outsideAddress({ buffers: [{ uri: 'scene.bin' }], images: [{ uri: apron }] }), 'scene.bin', 'the first of them');
-    assert.equal(outsideAddress(inside), null);
 
     // A `blob:` is the page's address, never a file's: three hands an embedded
     // texture to the image loader as a blob the page made from the file's own
@@ -482,12 +480,12 @@ test('a glTF is held to what it names, and a GLB read through its own JSON chunk
     assert.equal(insideFile('data:image/png;base64,AAAA'), true);
     assert.equal(insideFile('blob:https://example.com/abc'), false, 'a blob can never be inside the file naming it');
     assert.equal(insideFile(null), false);
-    assert.equal(selfContained({ images: [{ uri: 'blob:https://example.com/abc' }] }), false);
+    assert.equal(outsideAddress({ images: [{ uri: 'blob:https://example.com/abc' }] }), 'blob:https://example.com/abc');
 
     // The JSON chunk read back out of a GLB, which is what puts the check in
     // reach of a format that arrives as bytes.
     assert.deepEqual(glbJson(glb(inside)), inside);
-    assert.equal(selfContained(glbJson(glb({ images: [{ uri: apron }] }))), false);
+    assert.equal(outsideAddress(glbJson(glb({ images: [{ uri: apron }] }))), apron);
     assert.equal(glbJson(glb(inside, { tag: 'BIN\0' })), null, 'a first chunk that is not the JSON');
     assert.equal(glbJson(glb(inside, { magic: 'FTLG' })), null, 'bytes that are not a GLB at all');
     assert.equal(glbJson(glb(inside, { length: 4096 })), null, 'a chunk running past the end of the file');
@@ -503,26 +501,35 @@ test('a glTF is held to what it names, and a GLB read through its own JSON chunk
 test('a model is read in the page by three\'s own loaders, a glTF only when it carries everything, and refused past its limits', () => {
     const loader = source('asset-loader.js');
     for (const name of ['GLTFLoader', 'OBJLoader', 'STLLoader', 'SVGLoader']) assert.match(loader, new RegExp(`import\\('three/addons/loaders/${name}\\.js'\\)`));
-    assert.match(loader, /if \(!selfContained\(JSON\.parse\(source\)\)\) throw new AssetRefused/);
 
     // Both formats are refused from their own JSON before either is parsed: a
     // `.gltf`'s is the file, and a `.glb` carries the same JSON in its first
     // chunk, which `glbJson` reads. Three turns the manager's throw into a
     // rejected parse for a buffer but swallows it for an image, so the check
     // before the parse is what the pilot is actually told by.
-    assert.match(loader, /import \{[^}]*\bglbJson\b[^}]*\boutsideAddress\b[^}]*\bselfContained\b[^}]*\} from '\.\/asset-fit\.js';/,
+    assert.match(loader, /import \{[^}]*\bglbJson\b[^}]*\boutsideAddress\b[^}]*\} from '\.\/asset-fit\.js';/,
         'the file\'s own rule read from the pure module, where it is tested');
-    assert.doesNotMatch(loader, /function selfContained/, 'and not a second copy of it here');
-    assert.match(loader, /const json = glbJson\(bytes\);\n\s*const outside = json == null \? null : outsideAddress\(json\);\n\s*if \(outside != null\) throw new AssetRefused\(/,
-        'a .glb refused before it is parsed, naming the address');
+    assert.doesNotMatch(loader, /function outsideAddress/, 'and not a second copy of it here');
+    assert.match(loader, /function refuseOutside\(json\) \{\n\s*const outside = outsideAddress\(json\);\n\s*if \(outside != null\) throw outsideFileRefusal\(outside\);/,
+        'the one check, naming the address it found');
+    assert.match(loader, /refuseOutside\(JSON\.parse\(source\)\);/, 'a .gltf refused off the file\'s own JSON');
+    assert.match(loader, /refuseOutside\(glbJson\(bytes\)\);/, 'a .glb refused off its first chunk');
+
+    // One sentence for all three places an outside address is found, so a
+    // pilot is told the same thing however it was caught - the `.gltf` branch
+    // used to say something else and send them to a `.glb`, which is the file
+    // they would then be told about.
+    assert.equal(loader.match(/the model points at another file,/g).length, 1, 'the refusal written once');
+    assert.match(loader, /function outsideFileRefusal\(url\) \{\n\s*return new AssetRefused\(`the model points at another file, \$\{namedAddress\(url\)\}; everything it uses has to be inside it`\);/);
+    assert.doesNotMatch(loader, /save it with its buffers and images inside it/, 'and not a second wording for a .gltf');
 
     // The manager stays as the backstop, and its rule is the wider one: what
     // the page may ask for while it reads a model, blobs of the file's own
     // bytes included.
     assert.match(loader, /new module\.GLTFLoader\(embeddedOnly\(\)\)/, 'the glTF loader reads addresses, so it is given the manager');
     assert.match(loader, /const EMBEDDED_ADDRESS = \/\^\(\?:data\|blob\):\/i;/, 'a data: address inside the file, or a blob: the page made from it');
-    assert.match(loader, /manager\.setURLModifier\(url => \{\n\s*if \(embeddedAddress\(url\)\) return String\(url\);\n\s*throw new AssetRefused\(/,
-        'and anything else refused before it is fetched, not after');
+    assert.match(loader, /manager\.setURLModifier\(url => \{\n\s*if \(embeddedAddress\(url\)\) return String\(url\);\n\s*throw outsideFileRefusal\(url\);/,
+        'and anything else refused before it is fetched, not after, in the same words');
     assert.doesNotMatch(loader, /save it as a \.glb/, 'and the refusal does not steer a pilot at a format to get round it');
     assert.match(loader, /if \(triangles > ASSET_TRIANGLE_LIMIT\) \{/);
     assert.match(loader, /const data = new SVGLoader\(\)\.parse\(text\(\)\);/, 'a plan parsed as text');

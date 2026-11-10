@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT, glbJson, outsideAddress, selfContained } from './asset-fit.js';
+import { ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT, glbJson, outsideAddress } from './asset-fit.js';
 
 /**
  * A loaded asset's bytes read into a model, in the page.
@@ -63,6 +63,34 @@ function namedAddress(url) {
 }
 
 /**
+ * The one sentence a model naming an address outside itself is refused with.
+ *
+ * Three places find such an address - a `.gltf`'s own JSON, a `.glb`'s first
+ * chunk, and the manager below while the model is read - and a pilot is told
+ * the same thing by all three, since what they found is the same thing. The
+ * file is named by `main.js`, which prefixes every refusal with `could not
+ * load <file>:`, so the sentence itself carries the address alone.
+ */
+function outsideFileRefusal(url) {
+    return new AssetRefused(`the model points at another file, ${namedAddress(url)}; everything it uses has to be inside it`);
+}
+
+/**
+ * Refuses a glTF whose own JSON names an address outside the file, naming the
+ * address it found.
+ *
+ * A `.gltf`'s JSON is the file itself and a `.glb`'s is its first chunk, which
+ * `glbJson` reads, so one check covers both formats and the two are told apart
+ * only by where the JSON came from. Null JSON - bytes that are not a GLB at
+ * all - names no address, so nothing is refused here and the bytes go on to
+ * the loader, which says what is wrong with them better.
+ */
+function refuseOutside(json) {
+    const outside = outsideAddress(json);
+    if (outside != null) throw outsideFileRefusal(outside);
+}
+
+/**
  * A loading manager that refuses every address but those two, so a model is
  * read from the file that was given and from nothing else.
  *
@@ -72,21 +100,23 @@ function namedAddress(url) {
  * home for every pilot who opened it, and the SHA-256 check says nothing about
  * that - it proves the bytes are the ones the file's author shipped.
  *
- * `selfContained` refuses both formats from their own JSON before either is
- * parsed. This is the backstop behind it: it holds whatever a later extension
- * adds a `uri` to without being taught the field's name, and it is what stops
- * the fetch rather than merely naming it. It throws `AssetRefused`, which three
- * turns into a rejected parse and `readModel` passes through with its reason
- * intact - for a buffer. For an image three catches the throw inside its own
- * texture loading, drops the texture and resolves the parse anyway, so a model
- * reaching here on an image would be drawn untextured with nothing said; the
- * check before the parse is what makes the refusal the pilot sees.
+ * `refuseOutside` above refuses both formats from their own JSON before either
+ * is parsed. This is the backstop behind it: it holds whatever a later
+ * extension adds a `uri` to without being taught the field's name, and it is
+ * what stops the fetch rather than merely naming it. Both throw the same
+ * refusal, so a pilot reads one sentence whichever of the two found the
+ * address. It is an `AssetRefused`, which three turns into a rejected parse
+ * and `readModel` passes through with its reason intact - for a buffer. For an
+ * image three catches the throw inside its own texture loading, drops the
+ * texture and resolves the parse anyway, so a model reaching here on an image
+ * would be drawn untextured with nothing said; the check before the parse is
+ * what makes the refusal the pilot sees.
  */
 function embeddedOnly() {
     const manager = new THREE.LoadingManager();
     manager.setURLModifier(url => {
         if (embeddedAddress(url)) return String(url);
-        throw new AssetRefused(`the model points at another file, ${namedAddress(url)}; everything it uses has to be inside it`);
+        throw outsideFileRefusal(url);
     });
     return manager;
 }
@@ -124,16 +154,15 @@ export async function readModel(format, bytes, { color = ASSET_COLOR, height = A
         if (format === 'glb' || format === 'gltf') {
             const loader = await LOADERS.gltf();
             let source = buffer;
+            // Both formats are refused from their own JSON before either is
+            // parsed, by the one check and with the one sentence: a `.gltf`'s
+            // JSON is the file, and a `.glb` carries the same JSON in its
+            // first chunk.
             if (format === 'gltf') {
                 source = text();
-                if (!selfContained(JSON.parse(source))) throw new AssetRefused('the glTF points at other files; save it with its buffers and images inside it, as a .glb or as `data:` addresses');
+                refuseOutside(JSON.parse(source));
             } else {
-                // A GLB carries the same JSON in its first chunk, so the same
-                // check is read off that chunk. Unparseable bytes are left to
-                // the loader, which says what is wrong with them better.
-                const json = glbJson(bytes);
-                const outside = json == null ? null : outsideAddress(json);
-                if (outside != null) throw new AssetRefused(`the model points at another file, ${namedAddress(outside)}; everything it uses has to be inside it`);
+                refuseOutside(glbJson(bytes));
             }
             object = (await loader.parseAsync(source, '')).scene;
         } else if (format === 'obj') {
