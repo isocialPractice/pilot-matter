@@ -38,83 +38,32 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - a refusal a short phone never shows
+### UI/UX Override - the dock's scroll, read on a phone
 
 #### Found Issues
 
-- [ ] The dock's status line is drawn below the fold on a short phone, so a
-  refused file looks like nothing happened
-  - **Issue**: the SAVE / LOAD dock writes what the last save, load or refusal
-    came to as the ENVIRONMENT section's status line, inside the fields that
-    scroll. Under 640px wide the dock takes the foot of the screen at
-    `top: max(60vh, palette bottom + 10px)`, and on a short phone the palette's
-    foot wins that `max`: at 360x640 the fields come to 62px, which holds the
-    ENVIRONMENT heading and the NAME row and nothing else. Read off the page in
-    Chromium through the builder's own route with a file that is refused, the
-    refusal is drawn at 541-598 in a window of 470-532 with `scrollTop` left at
-    0 - so the dock looks exactly as it did before and the pilot is told
-    nothing. The same at 375x667, where the window is 470-559. The boundary is
-    a viewport 708px tall at 360 wide: at 704 the refusal is below the fold, at
-    708 it is read. It is not the refusal's doing - measured before any file is
-    handed over, the empty status slot is already below the fold - and it costs
-    the same for every status the dock writes; the refusal is only the one that
-    matters most. Everything else on the dock holds at these sizes: the four
-    answers stay pinned, on screen and reachable, every palette tile is
-    reachable, ASSETS is reached by scrolling, and at 390x844 the refusal reads
-    perfectly - 3 lines, inside the dock, amber at 11.46:1.
-  - **Goal**: Resolve to [dock-status-below-the-fold.prompt.md](.claude/prompts/dock-status-below-the-fold.prompt.md)
-  - From: UI/UX Override - a refusal a short phone never shows
-- [ ] The address cut in a refusal is held by no test, only by a browser check
-  - **Issue**: `namedAddress` in `js/asset-loader.js` cuts an address over 120
-    characters to 117 and `...`, and every refusal a pilot reads is built
-    through it. `test/assets.test.js` reads the module as text and pins the
-    sentence's shape and that `namedAddress` is called in it, but asserts
-    nothing about 120, 117, the trailing `...`, or the tail of the sentence
-    surviving the cut. Run as a mutant rather than argued:
-    `address.slice(0, 117)` changed to `address.slice(0, 17)` leaves the suite
-    at 2426 passing and 0 failing. The rule was verified instead by driving the
-    dock in Chromium over files built for it - 120 drawn whole, 121 and 180 cut
-    to 117 and `...`, a `.gltf` and a `.glb` cut alike, and
-    `; everything it uses has to be inside it` surviving each cut, 53 checks
-    all passing - which means it is checked when this agent runs and at no
-    other time. The reason is structural: `js/asset-loader.js` imports Three.js
-    so the suite cannot import it, and `namedAddress` is private inside it.
-  - **Goal**: Resolve to [address-cut-untested.prompt.md](.claude/prompts/address-cut-untested.prompt.md)
-  - From: UI/UX Override - a refusal a short phone never shows
-- [ ] A `.glb` that is really glTF JSON skips the refusal before the parse
-  - **Issue**: `assetFormat` in `js/asset-fit.js` reads the format off the
-    filename's extension alone, so a glTF JSON file named `scene.glb` is read
-    down the `.glb` branch. There `refuseOutside(glbJson(bytes))` refuses
-    nothing: `glbJson` answers null for any bytes without the `glTF` magic, and
-    `refuseOutside` passes a null through by design. Measured in Node on the
-    bytes of `{"asset":{"version":"2.0"},"images":[{"uri":"https://example.com/textures/apron.png"}]}`
-    - `glbJson` answers null while `outsideAddress` on the same JSON answers
-    the address - so the check that is meant to catch both formats catches
-    neither for this one file. The loading manager is then the only guard left.
-    It stops the fetch, so nothing leaves for the network; but the docstring on
-    `embeddedOnly` records why that is not enough on its own - three catches an
-    image's throw inside its own texture loading, drops the texture and resolves
-    the parse anyway - which is the whole reason the check before the parse
-    exists. If three parses such a file, the formats table at
-    `docs/terrain.html:320` promises "one pointing at another file is refused"
-    and the pilot instead gets an untextured model with nothing said on the
-    dock. The behaviour is not new - the branch this turn rewrote handled null
-    the same way - but nothing exercises it, and the turn's five mutants all pin
-    the source's shape rather than what such a file does.
-  - **Goal**: settle first whether three's `GLTFLoader` falls back to parsing a
-    non-GLB `ArrayBuffer` as JSON text. It cannot be answered in Node - `three`
-    is CDN-only, `import('three')` answers `ERR_MODULE_NOT_FOUND`, and that is
-    why the suite reads `js/asset-loader.js` as source text - so read it in the
-    browser through the builder's own route, with a `.gltf` renamed `.glb`
-    naming an outside image and another naming an outside buffer. If it parses:
-    on the `.glb` branch, when `glbJson` answers null and the bytes still decode
-    as a glTF object, read the refusal off that object, so one `refuseOutside`
-    covers both formats and the sentence does not change. If it refuses the
-    bytes outright, the gap is only in the wording and the table's promise
-    holds - say so where `glbJson`'s null case is already described. Either way
-    pin the premise in Node, where it is cheap: `glbJson` answers null for glTF
-    JSON text.
-  - From: UI/UX Override - a refusal a short phone never shows
+- [ ] `showStatus` is held by regex pins, not by anything that runs it
+  - **Issue**: `PanelView.showStatus` in `js/panel-view.js` is the whole of
+    what a pilot sees in this turn's fix - it is what puts a refusal at the
+    top of a 62px window instead of at 541-598 below it.
+    `test/panel-view.test.js` holds it by reading the module as text and
+    pinning three of its lines with `assert.match`, which is the only way this
+    project can hold a module that touches the DOM. A pin catches a line that
+    is edited or deleted; it cannot catch a guard no pin names. Both of the
+    method's early returns are in that class, run as mutants against the whole
+    suite rather than argued: `if (box.height === 0) return;` deleted leaves
+    2432 passing and 0 failing, `if (!line || !this.fields) return;` deleted
+    leaves 2432 passing and 0 failing, and swapping the two guards so a line
+    with no height is scrolled to leaves 2432 passing and 0 failing. The
+    second is not cosmetic - without that guard, `showStatus` called for a
+    section whose line was never drawn reaches `getBoundingClientRect` on
+    `undefined` and throws inside `update`, which runs on every frame the dock
+    is open. The fix itself was verified and passed on every count this run:
+    30 checks at 360x640, 375x667 and 390x844, 13 on the scroll that must not
+    fight the pilot, 16 on the `.glb` that is really glTF text, 17 on the
+    address cut.
+  - **Goal**: Resolve to [show-status-untested.prompt.md](.claude/prompts/show-status-untested.prompt.md)
+  - From: UI/UX Override - the dock's scroll, read on a phone
 
 ## Game UI/UX
 
@@ -757,120 +706,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 408 earlier items in `TODO-archive.md`, newest last.
+> 411 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Held Feather 1: the hold halved the soft brush's edge, and three
-  sentences still say it is a half
-  - **Issue**: the hold is applied to a stated feather as well as a default
-    one, and Free Paint states one. `paintStamp` in `js/build-tools.js` asks
-    for `round(width * SOFT_EDGE)` on a soft edge, and `SOFT_EDGE` is 0.5, so
-    the feather asked for is half the stamp's width - which is also exactly
-    the stroke's reach, `width / 2`. The hold then takes
-    `reach * FEATHER_SHARE`, a half of a half. Measured through the real path
-    at three brush sizes - 25, 100 and 400 pixels at `unitsPerPixel` 1 - the
-    feather used is 6.25, 25 and 100 against the 13, 50 and 200 asked for: a
-    soft brush eases across 25% of its width at every size, not 50%. The
-    weight profile of a 400 unit soft stroke now reads 1.000 at 0, 50 and 100
-    units off its centreline and 0.500 at 150, so the stroke is whole across
-    its inner half rather than "whole only down its middle". `SOFT_EDGE` is
-    inert as a result: every value from 0.5 up produces the same 25%, so the
-    constant can no longer express what it was written to express. Three
-    sentences state the old behaviour - its own docstring at
-    `js/build-tools.js:313`, `paintStamp`'s at `js/build-tools.js:380`
-    ("`SOFT` eases across half the stamp's width, from its middle out"), and
-    `docs/terrain.html:183` ("a soft one across half the brush's width").
-    Not queued as a fix because which way it should go is a decision about the
-    shared weight model rather than a correction: the hold is what gives an
-    extrusion its top and must stay, so either paint is exempted from it -
-    paint reads no full cover, it only blends by weight, so a feather that
-    eases to 1 at one point is no defect there - or `SOFT_EDGE` is re-scaled
-    against what the hold allows and the three sentences are rewritten to the
-    figure that results.
-  - **Goal**: decide whether a stated feather is exempt from the hold, or only
-    a default one is, and make the three sentences say what the code does
-    either way. If paint is exempted, `feather` needs to tell a stated feather
-    from a default one, which it does not today - both arrive as `asked`. Hold
-    the outcome with a test in `test/footprints.test.js` asserting the feather
-    a soft `paintStamp` comes to at a named brush size, so the figure is
-    written down somewhere rather than being whatever the two constants
-    multiply to.
-  - **Settled**: no feather is exempt - the hold is what gives every region a
-    top and it stays for all of them - and `SOFT_EDGE` is read off the hold
-    instead: `FEATHER_SHARE / 2`, a quarter of the stamp's width, which is
-    exactly `FEATHER_SHARE` of a swept stamp's reach. `paintStamp` asks for
-    `width * SOFT_EDGE` unrounded, so the feather asked for is the feather
-    used and the hold no longer cuts it down. No figure the pilot sees moved:
-    the three sizes measured still ease across 6.25, 25 and 100 units. The
-    three sentences now say a quarter - `SOFT_EDGE`'s own docstring,
-    `paintStamp`'s and `docs/terrain.html` - and all three say what the hold
-    also makes true, that a hard and a soft edge come to the same band at 640
-    units and under, so the axis only reads on a stroke laid from far out.
-    `test/footprints.test.js` pins the figure at the three sizes, that it is
-    `FEATHER_SHARE` of the reach, and where the two edges part.
-  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
-- [x] A click cannot choose the top of the canvas's own highest ground
-  - **Issue**: `pickGround` walks a ray from where it crosses
-    `canvasGround.top`, the highest vertex of the field, and throws the pick
-    away when the clearance there is not above zero - a guard written for a
-    camera buried in a hill. A ray aimed at a point that is itself at that
-    height crosses the ceiling exactly on it, so the clearance is exactly 0
-    and the pick answers null. Driven in Chromium: one 2400 unit extrusion
-    600 units tall on a blank canvas, clicked at its middle from camera
-    pitches of 85, 70, 55, 40, 30 and 20 degrees - nothing at every one of
-    them, so `EDIT EXTRUSION` leaves the panel pointed at both colours rather
-    than narrowing to `TOP COLOR` and `BLEND`, and the top's red rim is never
-    drawn. Stand a taller block anywhere else on the canvas and the same
-    click answers `top` at every pitch down to 30. It reaches every tool that
-    reads the ground under the pointer, not Extrude's surfaces alone. Not
-    new: the same drive against `js/environment/footprints.js` as it was
-    before the feather was held, served into the page, answers `nothing` too.
-  - **Goal**: Resolve to [highest-ground-pick.prompt.md](.claude/prompts/highest-ground-pick.prompt.md)
-  - **Settled**: the guard was right about its case and wrong about its
-    boundary, so the entry is now tested for the surface rather than for the
-    sign - option 1 of the prompt. A clearance at the entry within
-    `PICK_SURFACE`, a micron, is a hit at the entry; only below that is a
-    camera inside a hill. The ceiling's own height is what the clearance is
-    measured from, so a plateau reads exactly 0 rather than a rounding off it,
-    and the tolerance is what reaches a summit too narrow to have a flat top -
-    the ground read a hair off the aimed point comes back parts in 10^13 under
-    the ceiling. Driven in Chromium: one 2400 unit block alone on a blank
-    canvas, clicked at its middle from 85, 70, 55, 40, 30 and 20 degrees,
-    answers `top` at every one where it answered nothing before
-    (`.tmp/ui-ux/t28/top-and-rim.log`, phase A). `test/build-picking.test.js`
-    holds both the plateau and the narrow summit, and a mutation to `=== 0` or
-    to `<= 0` fails them.
-  - From: UI/UX Override - the top a click cannot reach
-- [x] A small extrusion's chosen top is outlined by a few pixels or by none
-  - **Issue**: `surfaceEdges` traces the top's rim by marching squares over
-    `OUTLINE_CELLS` - 256 cells across a 16,000 unit canvas, so 62.5 units to
-    a cell. With the feather now held to half a region's reach, a 200 unit
-    region's ground at full cover is about 100 units across, which is between
-    one and two cells, and where it falls on that grid decides whether a
-    contour is found at all. Two hand-driven runs of the same 200 unit block
-    gave a rim of 83 pixels spanning 33 by 13, and a rim of 1 pixel. By 320
-    units it is 615 pixels and reads as a rim. The top is chosen correctly in
-    every case and `TOP COLOR` works - only the red outline that says which
-    surface is chosen is missing, which is the one thing on screen that
-    answers "did that click take".
-  - **Goal**: Trace the rim finely enough to find a region of the size
-    Extrude accepts - `surfaceEdges` could take its cell count from the
-    footprint's own reach rather than from the canvas, as `regionEdges` could
-    - or, where no contour is found at all, fall back to marking the chosen
-    top some other way. Hold it with a test in `test/build-overlay.test.js`
-    asserting `surfaceEdges` answers a non-empty run for a 200 unit rect.
-  - **Settled**: traced over the region's own square rather than over the
-    canvas. The new `footprintContour` in `js/build-overlay.js` takes a
-    footprint's box, cuts it and each of its repeats to the canvas - so a
-    region past a seam is still traced on both sides and still cut at the edge
-    - and gives each square the cells the whole box would have had, so the cell
-    is the region's own size divided and a rim reads the same at every size
-    Extrude accepts. `surfaceEdges` and `regionEdges` both go through it;
-    `placementOutline` keeps the canvas grid, because a placement's reach is a
-    weight rather than a footprint and a placement small enough to fall between
-    cells is an object, traced round as it stands. A 200 unit block's rim went
-    from 1 px to 488 px in Chromium, and 40 units - the least Extrude takes -
-    is one closed run of 269 points where it was four segments.
-  - From: UI/UX Override - the top a click cannot reach
 - [x] A `.glb` asset can make the page fetch a URL it names
   - **Issue**: `selfContained` is applied to `.gltf` only, so a `.glb` reaches
     `parseAsync` unchecked, and a GLB's JSON chunk may name an external `uri`
@@ -1130,3 +967,121 @@ how the simulator got here rather than as a list still to be worked.
     one (`.tmp/run1110/refusals.mjs`). Five mutants caught in Node, including
     a second wording put back for a `.gltf`.
   - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it
+- [x] The dock's status line is drawn below the fold on a short phone, so a
+  refused file looks like nothing happened
+  - **Issue**: the SAVE / LOAD dock writes what the last save, load or refusal
+    came to as the ENVIRONMENT section's status line, inside the fields that
+    scroll. Under 640px wide the dock takes the foot of the screen at
+    `top: max(60vh, palette bottom + 10px)`, and on a short phone the palette's
+    foot wins that `max`: at 360x640 the fields come to 62px, which holds the
+    ENVIRONMENT heading and the NAME row and nothing else. Read off the page in
+    Chromium through the builder's own route with a file that is refused, the
+    refusal is drawn at 541-598 in a window of 470-532 with `scrollTop` left at
+    0 - so the dock looks exactly as it did before and the pilot is told
+    nothing. The same at 375x667, where the window is 470-559. The boundary is
+    a viewport 708px tall at 360 wide: at 704 the refusal is below the fold, at
+    708 it is read. It is not the refusal's doing - measured before any file is
+    handed over, the empty status slot is already below the fold - and it costs
+    the same for every status the dock writes; the refusal is only the one that
+    matters most. Everything else on the dock holds at these sizes: the four
+    answers stay pinned, on screen and reachable, every palette tile is
+    reachable, ASSETS is reached by scrolling, and at 390x844 the refusal reads
+    perfectly - 3 lines, inside the dock, amber at 11.46:1.
+  - **Goal**: Resolve to [dock-status-below-the-fold.prompt.md](.claude/prompts/dock-status-below-the-fold.prompt.md)
+  - **Settled**: the line is brought into the fields' window when its words
+    have just changed - the smallest of the prompt's two options, the dock's
+    status keeping the place in the ENVIRONMENT section it belongs to.
+    `statusLines` and `statusToShow` are exported from `js/panel-view.js`,
+    since which line changed and which of two changed lines to show are both
+    decidable without a browser, and `PanelView.update` reads them before it
+    writes the lines - writing one is what takes it out of being news.
+    `showStatus` puts the line's first line at the top of the window rather
+    than reaching for `scrollIntoView({ block: 'nearest' })`, which on a 62px
+    window leaves a four line refusal reading as the end of a sentence whose
+    start is missing. Three redraws are deliberately not news, so the scroll
+    cannot take back a view the pilot set by hand: a line unchanged, a line
+    gone empty, and the line a section opens on - the second of the prompt's
+    two questions, answered by what each section always says rather than by
+    which section it is. The phone pass is at 121 passing and 0 failing where
+    it was at 117 and 4, the height sweep's boundary at 704 is gone, and seven
+    new checks read the three that are not news.
+  - From: UI/UX Override - a refusal a short phone never shows
+- [x] The address cut in a refusal is held by no test, only by a browser check
+  - **Issue**: `namedAddress` in `js/asset-loader.js` cuts an address over 120
+    characters to 117 and `...`, and every refusal a pilot reads is built
+    through it. `test/assets.test.js` reads the module as text and pins the
+    sentence's shape and that `namedAddress` is called in it, but asserts
+    nothing about 120, 117, the trailing `...`, or the tail of the sentence
+    surviving the cut. Run as a mutant rather than argued:
+    `address.slice(0, 117)` changed to `address.slice(0, 17)` leaves the suite
+    at 2426 passing and 0 failing. The rule was verified instead by driving the
+    dock in Chromium over files built for it - 120 drawn whole, 121 and 180 cut
+    to 117 and `...`, a `.gltf` and a `.glb` cut alike, and
+    `; everything it uses has to be inside it` surviving each cut, 53 checks
+    all passing - which means it is checked when this agent runs and at no
+    other time. The reason is structural: `js/asset-loader.js` imports Three.js
+    so the suite cannot import it, and `namedAddress` is private inside it.
+  - **Goal**: Resolve to [address-cut-untested.prompt.md](.claude/prompts/address-cut-untested.prompt.md)
+  - **Settled**: `namedAddress` and the sentence it is written into moved to
+    `js/asset-fit.js` as `namedAddress` and `outsideFileSentence`, with
+    `NAMED_ADDRESS_LIMIT` and `NAMED_ADDRESS_KEPT` naming the two figures.
+    `outsideFileRefusal` keeps the `AssetRefused` class in
+    `js/asset-loader.js` and takes its words from there, so the sentence is
+    asserted by value rather than pinned as the shape of a line of source, and
+    the source-text assertions follow it: the sentence is counted once in
+    `js/asset-fit.js` and asserted absent from `js/asset-loader.js`. All six
+    of the prompt's assertions are in `test/assets.test.js`, and four mutants
+    name the test that catches them - the cut at 17, the limit at 1200, `>`
+    as `>=`, and the slice taken on the finished sentence rather than the
+    address.
+  - From: UI/UX Override - a refusal a short phone never shows
+- [x] A `.glb` that is really glTF JSON skips the refusal before the parse
+  - **Issue**: `assetFormat` in `js/asset-fit.js` reads the format off the
+    filename's extension alone, so a glTF JSON file named `scene.glb` is read
+    down the `.glb` branch. There `refuseOutside(glbJson(bytes))` refuses
+    nothing: `glbJson` answers null for any bytes without the `glTF` magic, and
+    `refuseOutside` passes a null through by design. Measured in Node on the
+    bytes of `{"asset":{"version":"2.0"},"images":[{"uri":"https://example.com/textures/apron.png"}]}`
+    - `glbJson` answers null while `outsideAddress` on the same JSON answers
+    the address - so the check that is meant to catch both formats catches
+    neither for this one file. The loading manager is then the only guard left.
+    It stops the fetch, so nothing leaves for the network; but the docstring on
+    `embeddedOnly` records why that is not enough on its own - three catches an
+    image's throw inside its own texture loading, drops the texture and resolves
+    the parse anyway - which is the whole reason the check before the parse
+    exists. If three parses such a file, the formats table at
+    `docs/terrain.html:320` promises "one pointing at another file is refused"
+    and the pilot instead gets an untextured model with nothing said on the
+    dock. The behaviour is not new - the branch this turn rewrote handled null
+    the same way - but nothing exercises it, and the turn's five mutants all pin
+    the source's shape rather than what such a file does.
+  - **Goal**: settle first whether three's `GLTFLoader` falls back to parsing a
+    non-GLB `ArrayBuffer` as JSON text. It cannot be answered in Node - `three`
+    is CDN-only, `import('three')` answers `ERR_MODULE_NOT_FOUND`, and that is
+    why the suite reads `js/asset-loader.js` as source text - so read it in the
+    browser through the builder's own route, with a `.gltf` renamed `.glb`
+    naming an outside image and another naming an outside buffer. If it parses:
+    on the `.glb` branch, when `glbJson` answers null and the bytes still decode
+    as a glTF object, read the refusal off that object, so one `refuseOutside`
+    covers both formats and the sentence does not change. If it refuses the
+    bytes outright, the gap is only in the wording and the table's promise
+    holds - say so where `glbJson`'s null case is already described. Either way
+    pin the premise in Node, where it is cheap: `glbJson` answers null for glTF
+    JSON text.
+  - **Settled**: it parses. Read in Chromium on 11.11.2026, three's
+    `GLTFLoader` handed the bytes of a `.gltf` renamed `.glb` as an
+    `ArrayBuffer` answered a box of one mesh, and the same file through the
+    builder's own route opened the step headed LOADED ASSET with the model
+    drawn untextured, nothing on the dock and one console line from three.
+    The buffer variant was refused by the manager, as a buffer always is, so
+    the image was the whole of the gap - which is the case the backstop cannot
+    cover. So the first branch of the goal: the `.glb` branch now reads
+    `gltfJson` in `js/asset-fit.js`, which answers a GLB's first chunk or, for
+    bytes that are not a GLB, the bytes read as the JSON text a `.gltf` is.
+    One `refuseOutside` covers all three cases and the sentence is unchanged.
+    The premise is pinned in Node as asked - `glbJson` answers null for glTF
+    JSON text while `outsideAddress` on the same bytes answers the address -
+    and two mutants name the test that catches them. The promise at
+    `docs/terrain.html:320` now holds for a file named `.glb` as well, and the
+    paragraph says so.
+  - From: UI/UX Override - a refusal a short phone never shows
