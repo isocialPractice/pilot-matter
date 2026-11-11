@@ -65,6 +65,28 @@ its context survives being archived.
   - **Goal**: Resolve to [show-status-untested.prompt.md](.claude/prompts/show-status-untested.prompt.md)
   - From: UI/UX Override - the dock's scroll, read on a phone
 
+- [ ] The address cut states both of its figures instead of deriving one
+  - **Issue**: `js/asset-fit.js` exports `NAMED_ADDRESS_LIMIT` as 120 and
+    `NAMED_ADDRESS_KEPT` as 117, two independent figures whose whole
+    relationship is the width of the `...` that joins them - a cut address
+    comes back exactly `NAMED_ADDRESS_LIMIT` characters long, which is the
+    invariant `test/assets.test.js` asserts twice ("121 comes back 120 long",
+    "however long it was") without anything in the module saying it. Nothing
+    is wrong today, and the test would catch either figure moved on its own;
+    the drift is against a convention this repository settled on 11.08.2026
+    for exactly this shape, where `SOFT_EDGE` was changed from a stated 0.5 to
+    a derived `FEATHER_SHARE / 2` so that the constant could no longer
+    disagree with the rule that bounds it - see `Held Feather 1` in
+    `TODO-archive.md`.
+  - **Goal**: name the ellipsis once and read the kept length off the limit -
+    `NAMED_ADDRESS_KEPT = NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, with
+    `namedAddress` appending that same `ELLIPSIS` - so the figure a refusal is
+    cut to is one decision rather than two that have to agree. Leave both
+    exports and both of their asserted values as they are: 120 and 117 are
+    what the pilot reads and what the tests pin, and this changes only where
+    the 117 comes from.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
