@@ -5631,3 +5631,118 @@ still be found by name.
     winds". Nothing else in the file changes.
   - **Settled**: the word dropped, and nothing else in `js/shapes.js` touched.
   - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+
+## Archived 11-11-26
+
+- [x] Held Feather 1: the hold halved the soft brush's edge, and three
+  sentences still say it is a half
+  - **Issue**: the hold is applied to a stated feather as well as a default
+    one, and Free Paint states one. `paintStamp` in `js/build-tools.js` asks
+    for `round(width * SOFT_EDGE)` on a soft edge, and `SOFT_EDGE` is 0.5, so
+    the feather asked for is half the stamp's width - which is also exactly
+    the stroke's reach, `width / 2`. The hold then takes
+    `reach * FEATHER_SHARE`, a half of a half. Measured through the real path
+    at three brush sizes - 25, 100 and 400 pixels at `unitsPerPixel` 1 - the
+    feather used is 6.25, 25 and 100 against the 13, 50 and 200 asked for: a
+    soft brush eases across 25% of its width at every size, not 50%. The
+    weight profile of a 400 unit soft stroke now reads 1.000 at 0, 50 and 100
+    units off its centreline and 0.500 at 150, so the stroke is whole across
+    its inner half rather than "whole only down its middle". `SOFT_EDGE` is
+    inert as a result: every value from 0.5 up produces the same 25%, so the
+    constant can no longer express what it was written to express. Three
+    sentences state the old behaviour - its own docstring at
+    `js/build-tools.js:313`, `paintStamp`'s at `js/build-tools.js:380`
+    ("`SOFT` eases across half the stamp's width, from its middle out"), and
+    `docs/terrain.html:183` ("a soft one across half the brush's width").
+    Not queued as a fix because which way it should go is a decision about the
+    shared weight model rather than a correction: the hold is what gives an
+    extrusion its top and must stay, so either paint is exempted from it -
+    paint reads no full cover, it only blends by weight, so a feather that
+    eases to 1 at one point is no defect there - or `SOFT_EDGE` is re-scaled
+    against what the hold allows and the three sentences are rewritten to the
+    figure that results.
+  - **Goal**: decide whether a stated feather is exempt from the hold, or only
+    a default one is, and make the three sentences say what the code does
+    either way. If paint is exempted, `feather` needs to tell a stated feather
+    from a default one, which it does not today - both arrive as `asked`. Hold
+    the outcome with a test in `test/footprints.test.js` asserting the feather
+    a soft `paintStamp` comes to at a named brush size, so the figure is
+    written down somewhere rather than being whatever the two constants
+    multiply to.
+  - **Settled**: no feather is exempt - the hold is what gives every region a
+    top and it stays for all of them - and `SOFT_EDGE` is read off the hold
+    instead: `FEATHER_SHARE / 2`, a quarter of the stamp's width, which is
+    exactly `FEATHER_SHARE` of a swept stamp's reach. `paintStamp` asks for
+    `width * SOFT_EDGE` unrounded, so the feather asked for is the feather
+    used and the hold no longer cuts it down. No figure the pilot sees moved:
+    the three sizes measured still ease across 6.25, 25 and 100 units. The
+    three sentences now say a quarter - `SOFT_EDGE`'s own docstring,
+    `paintStamp`'s and `docs/terrain.html` - and all three say what the hold
+    also makes true, that a hard and a soft edge come to the same band at 640
+    units and under, so the axis only reads on a stroke laid from far out.
+    `test/footprints.test.js` pins the figure at the three sizes, that it is
+    `FEATHER_SHARE` of the reach, and where the two edges part.
+  - From: UI/UX Override - a refused file row says why in a colour it cannot be read in
+- [x] A click cannot choose the top of the canvas's own highest ground
+  - **Issue**: `pickGround` walks a ray from where it crosses
+    `canvasGround.top`, the highest vertex of the field, and throws the pick
+    away when the clearance there is not above zero - a guard written for a
+    camera buried in a hill. A ray aimed at a point that is itself at that
+    height crosses the ceiling exactly on it, so the clearance is exactly 0
+    and the pick answers null. Driven in Chromium: one 2400 unit extrusion
+    600 units tall on a blank canvas, clicked at its middle from camera
+    pitches of 85, 70, 55, 40, 30 and 20 degrees - nothing at every one of
+    them, so `EDIT EXTRUSION` leaves the panel pointed at both colours rather
+    than narrowing to `TOP COLOR` and `BLEND`, and the top's red rim is never
+    drawn. Stand a taller block anywhere else on the canvas and the same
+    click answers `top` at every pitch down to 30. It reaches every tool that
+    reads the ground under the pointer, not Extrude's surfaces alone. Not
+    new: the same drive against `js/environment/footprints.js` as it was
+    before the feather was held, served into the page, answers `nothing` too.
+  - **Goal**: Resolve to [highest-ground-pick.prompt.md](.claude/prompts/highest-ground-pick.prompt.md)
+  - **Settled**: the guard was right about its case and wrong about its
+    boundary, so the entry is now tested for the surface rather than for the
+    sign - option 1 of the prompt. A clearance at the entry within
+    `PICK_SURFACE`, a micron, is a hit at the entry; only below that is a
+    camera inside a hill. The ceiling's own height is what the clearance is
+    measured from, so a plateau reads exactly 0 rather than a rounding off it,
+    and the tolerance is what reaches a summit too narrow to have a flat top -
+    the ground read a hair off the aimed point comes back parts in 10^13 under
+    the ceiling. Driven in Chromium: one 2400 unit block alone on a blank
+    canvas, clicked at its middle from 85, 70, 55, 40, 30 and 20 degrees,
+    answers `top` at every one where it answered nothing before
+    (`.tmp/ui-ux/t28/top-and-rim.log`, phase A). `test/build-picking.test.js`
+    holds both the plateau and the narrow summit, and a mutation to `=== 0` or
+    to `<= 0` fails them.
+  - From: UI/UX Override - the top a click cannot reach
+- [x] A small extrusion's chosen top is outlined by a few pixels or by none
+  - **Issue**: `surfaceEdges` traces the top's rim by marching squares over
+    `OUTLINE_CELLS` - 256 cells across a 16,000 unit canvas, so 62.5 units to
+    a cell. With the feather now held to half a region's reach, a 200 unit
+    region's ground at full cover is about 100 units across, which is between
+    one and two cells, and where it falls on that grid decides whether a
+    contour is found at all. Two hand-driven runs of the same 200 unit block
+    gave a rim of 83 pixels spanning 33 by 13, and a rim of 1 pixel. By 320
+    units it is 615 pixels and reads as a rim. The top is chosen correctly in
+    every case and `TOP COLOR` works - only the red outline that says which
+    surface is chosen is missing, which is the one thing on screen that
+    answers "did that click take".
+  - **Goal**: Trace the rim finely enough to find a region of the size
+    Extrude accepts - `surfaceEdges` could take its cell count from the
+    footprint's own reach rather than from the canvas, as `regionEdges` could
+    - or, where no contour is found at all, fall back to marking the chosen
+    top some other way. Hold it with a test in `test/build-overlay.test.js`
+    asserting `surfaceEdges` answers a non-empty run for a 200 unit rect.
+  - **Settled**: traced over the region's own square rather than over the
+    canvas. The new `footprintContour` in `js/build-overlay.js` takes a
+    footprint's box, cuts it and each of its repeats to the canvas - so a
+    region past a seam is still traced on both sides and still cut at the edge
+    - and gives each square the cells the whole box would have had, so the cell
+    is the region's own size divided and a rim reads the same at every size
+    Extrude accepts. `surfaceEdges` and `regionEdges` both go through it;
+    `placementOutline` keeps the canvas grid, because a placement's reach is a
+    weight rather than a footprint and a placement small enough to fall between
+    cells is an object, traced round as it stands. A 200 unit block's rim went
+    from 1 px to 488 px in Chromium, and 40 units - the least Extrude takes -
+    is one closed run of 269 points where it was four segments.
+  - From: UI/UX Override - the top a click cannot reach

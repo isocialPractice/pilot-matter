@@ -18,7 +18,10 @@ import {
     confirmEntries, requestLoad, loadCanvas, replacesBuild, sessionWorld, saveName, setSaveName, fileStatus, setFileStatus,
     BUILD_FROM_TITLE
 } from '../js/build-mode.js';
-import { dockContent, DOCK_FILES, DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_SECTION, FILES_NAME_FIELD, DOCK_DESELECT } from '../js/build-panel.js';
+import {
+    dockContent, DOCK_FILES, DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_SECTION, FILES_NAME_FIELD, ASSETS_SECTION, DOCK_DESELECT
+} from '../js/build-panel.js';
+import { statusLines, statusToShow } from '../js/panel-view.js';
 import { createEditorState, canvasWorld, keepBuiltWorld, builtWorld, setEditorWorld, releaseBuiltWorld } from '../js/element-editor.js';
 import { FILES_TOOL } from '../js/build-tools.js';
 import { setSelection } from '../js/build-mode.js';
@@ -369,6 +372,18 @@ test('SAVE / LOAD\'s panel is the world\'s name, what the last answer came to, a
     content = dockContent(state);
     assert.equal(content.sections[0].text.value, 'Sample Valley');
     assert.deepEqual(content.sections[0].status, { text: 'saved sample-valley.pilot-matter.json', refused: false });
+
+    // Both sections carry a line, so which of them the view scrolls to is a
+    // question the content answers: the one whose words changed, and the
+    // refused one first. ASSETS always says something, which is why a
+    // section's first line is never news - see `js/panel-view.js`.
+    assert.deepEqual(statusLines(content).map(line => line.id), [FILES_SECTION, ASSETS_SECTION]);
+    const said = new Map(statusLines(content).map(line => [line.id, line.text]));
+    assert.equal(statusToShow(content, said), null, 'nothing changed, so nothing is scrolled to');
+    setFileStatus(state, 'could not load nope.json: the file is not JSON', { refused: true });
+    assert.deepEqual(statusToShow(dockContent(state), said),
+        { id: FILES_SECTION, text: 'could not load nope.json: the file is not JSON', refused: true });
+    setFileStatus(state, '');
 
     setSelection(state, { kind: 'disc', x: 0, z: 0, radius: 500 });
     assert.deepEqual(dockContent(state).actions.map(action => action.id),

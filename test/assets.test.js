@@ -10,7 +10,8 @@ import {
     fitSize, guessScale, guessUp, guessFacing, facedSize, assetFit, suggestSection, assetDraft, settleDraft, assetSize,
     draftUsable, fitReasons, assetRecipe, placeAssetObject, placeAssetRunway, assetsFor, libraryAsset, assetsUsed, withoutAsset,
     toBase64, fromBase64, assetHash, assetForFile, readAsset, flyablePlanes,
-    insideFile, outsideAddress, glbJson
+    insideFile, outsideAddress, glbJson, gltfJson, namedAddress, outsideFileSentence,
+    NAMED_ADDRESS_LIMIT, NAMED_ADDRESS_KEPT
 } from '../js/asset-fit.js';
 import { readRecipe, recipeBounds, recipeGeometry, isAssetRecipe, ASSET_RECIPE_FIELDS } from '../js/prefabs.js';
 import { expandGroup, GROUP_RANGES } from '../js/templates.js';
@@ -496,10 +497,68 @@ test('a glTF is held to what it names, and a GLB read through its own JSON chunk
     assert.equal(glbJson(null), null);
 });
 
+test('a file named .glb that is really glTF text is read as the text it is', () => {
+    // `assetFormat` reads a format off the name alone, so glTF JSON saved as
+    // `scene.glb` goes down the `.glb` branch - where `glbJson` answers null,
+    // `refuseOutside` passes a null through by design, and three parses the
+    // bytes as glTF text regardless. Read in Chromium on 11.11.2026: such a
+    // file loaded as a box of one mesh with its outside image dropped and
+    // nothing said on the dock. `gltfJson` is what closes that.
+    const apron = 'https://example.com/textures/apron.png';
+    const lying = new TextEncoder().encode(JSON.stringify({ asset: { version: '2.0' }, images: [{ uri: apron }] }));
+    assert.equal(assetFormat('scene.glb'), 'glb', 'its name is all the format is read from');
+    assert.equal(glbJson(lying), null, 'the premise: a GLB chunk is not what these bytes hold');
+    assert.equal(outsideAddress(gltfJson(lying)), apron, 'and the address is found all the same');
+
+    // A real GLB still answers from its first chunk, and bytes that are
+    // neither format still answer nothing, so the one check covers all three.
+    const inside = { buffers: [{ byteLength: 8 }], images: [{ bufferView: 0 }] };
+    assert.deepEqual(gltfJson(glb(inside)), inside, 'a GLB by its chunk');
+    assert.equal(outsideAddress(gltfJson(glb({ buffers: [{ uri: 'scene.bin' }] }))), 'scene.bin');
+    assert.equal(gltfJson(new TextEncoder().encode('not a model at all')), null, 'bytes that are neither');
+    assert.equal(gltfJson(new TextEncoder().encode('5')), null, 'JSON that is not an object');
+    assert.equal(gltfJson(new TextEncoder().encode('{ "images": ')), null, 'text that does not parse');
+    assert.equal(gltfJson(null), null);
+});
+
+test('a long address is cut before it is named, and the sentence after it survives the cut', () => {
+    // What a pilot can read back of the address that stopped their file. The
+    // cut is the address's and never the sentence's: what follows the address
+    // is the half that says what to do about it.
+    assert.equal(NAMED_ADDRESS_LIMIT, 120);
+    assert.equal(NAMED_ADDRESS_KEPT, 117);
+
+    const address = length => `https://example.com/textures/${'a'.repeat(Math.max(0, length - 30))}.png`.slice(0, length);
+    const at120 = address(120), at121 = address(121), at180 = address(180);
+    assert.equal(at120.length, 120);
+    assert.equal(at121.length, 121);
+
+    assert.equal(namedAddress(at120), at120, '120 characters is the last named whole');
+    assert.equal(namedAddress(at120).endsWith('...'), false, 'and nothing is added to it');
+    assert.equal(namedAddress(at121).length, 120, '121 comes back 120 long');
+    assert.equal(namedAddress(at121), `${at121.slice(0, 117)}...`, 'its first 117 characters and an ellipsis');
+    assert.equal(namedAddress(at180).length, 120, 'however long it was');
+    assert.equal(namedAddress(at180), `${at180.slice(0, 117)}...`);
+    assert.equal(namedAddress('scene.bin'), 'scene.bin', 'a short address is untouched');
+    assert.equal(namedAddress(''), '');
+    assert.equal(namedAddress(null), '', 'and no address at all is the empty string, not "null"');
+    assert.equal(namedAddress(undefined), '');
+
+    // The whole sentence, which is what the dock draws. Taking the cut on the
+    // finished text instead would lose its second half, which is the part
+    // telling the pilot what the file has to carry.
+    const tail = '; everything it uses has to be inside it';
+    assert.equal(outsideFileSentence('scene.bin'), `the model points at another file, scene.bin${tail}`);
+    assert.equal(outsideFileSentence(at180), `the model points at another file, ${at180.slice(0, 117)}...${tail}`);
+    assert.ok(outsideFileSentence(at180).endsWith(tail), 'the cut is the address\'s, not the sentence\'s');
+    assert.ok(outsideFileSentence(at120).endsWith(`${at120}${tail}`), 'and an address at the limit is named whole in it');
+});
+
 // --- In the page ---------------------------------------------------------------------------
 
 test('a model is read in the page by three\'s own loaders, a glTF only when it carries everything, and refused past its limits', () => {
     const loader = source('asset-loader.js');
+    const fit = source('asset-fit.js');
     for (const name of ['GLTFLoader', 'OBJLoader', 'STLLoader', 'SVGLoader']) assert.match(loader, new RegExp(`import\\('three/addons/loaders/${name}\\.js'\\)`));
 
     // Both formats are refused from their own JSON before either is parsed: a
@@ -507,21 +566,24 @@ test('a model is read in the page by three\'s own loaders, a glTF only when it c
     // chunk, which `glbJson` reads. Three turns the manager's throw into a
     // rejected parse for a buffer but swallows it for an image, so the check
     // before the parse is what the pilot is actually told by.
-    assert.match(loader, /import \{[^}]*\bglbJson\b[^}]*\boutsideAddress\b[^}]*\} from '\.\/asset-fit\.js';/,
-        'the file\'s own rule read from the pure module, where it is tested');
+    assert.match(loader, /import \{[\s\S]*?\bgltfJson\b[\s\S]*?\boutsideAddress\b[\s\S]*?\boutsideFileSentence\b[\s\S]*?\} from '\.\/asset-fit\.js';/,
+        'the file\'s own rule and the words it is refused in, read from the pure module where both are tested');
     assert.doesNotMatch(loader, /function outsideAddress/, 'and not a second copy of it here');
     assert.match(loader, /function refuseOutside\(json\) \{\n\s*const outside = outsideAddress\(json\);\n\s*if \(outside != null\) throw outsideFileRefusal\(outside\);/,
         'the one check, naming the address it found');
     assert.match(loader, /refuseOutside\(JSON\.parse\(source\)\);/, 'a .gltf refused off the file\'s own JSON');
-    assert.match(loader, /refuseOutside\(glbJson\(bytes\)\);/, 'a .glb refused off its first chunk');
+    assert.match(loader, /refuseOutside\(gltfJson\(bytes\)\);/, 'a .glb off its first chunk, or off its text when it has no chunk');
 
     // One sentence for all three places an outside address is found, so a
     // pilot is told the same thing however it was caught - the `.gltf` branch
     // used to say something else and send them to a `.glb`, which is the file
-    // they would then be told about.
-    assert.equal(loader.match(/the model points at another file,/g).length, 1, 'the refusal written once');
-    assert.match(loader, /function outsideFileRefusal\(url\) \{\n\s*return new AssetRefused\(`the model points at another file, \$\{namedAddress\(url\)\}; everything it uses has to be inside it`\);/);
-    assert.doesNotMatch(loader, /save it with its buffers and images inside it/, 'and not a second wording for a .gltf');
+    // they would then be told about. The words themselves are asserted by
+    // value in `asset-fit.js`'s tests above; here only that nothing writes a
+    // second copy of them.
+    assert.equal(fit.match(/the model points at another file,/g).length, 1, 'the refusal written once');
+    assert.doesNotMatch(loader, /the model points at another file,/, 'and not again beside the class it is thrown as');
+    assert.match(loader, /function outsideFileRefusal\(url\) \{\n\s*return new AssetRefused\(outsideFileSentence\(url\)\);/);
+    assert.doesNotMatch(fit, /save it with its buffers and images inside it/, 'and not a second wording for a .gltf');
 
     // The manager stays as the backstop, and its rule is the wider one: what
     // the page may ask for while it reads a model, blobs of the file's own

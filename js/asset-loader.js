@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT, glbJson, outsideAddress } from './asset-fit.js';
+import {
+    ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT, gltfJson, outsideAddress, outsideFileSentence
+} from './asset-fit.js';
 
 /**
  * A loaded asset's bytes read into a model, in the page.
@@ -11,7 +13,8 @@ import { ASSET_COLOR, ASSET_HEIGHT, ASSET_TRIANGLE_LIMIT, glbJson, outsideAddres
  *   image either part of the file or named as a `data:` address. One file was
  *   given, so nothing is fetched. Both formats are refused before they are
  *   parsed, by the file's own JSON - a `.gltf`'s is the file, a `.glb`'s its
- *   first chunk - and held to it while they are, by `embeddedOnly` below.
+ *   first chunk, and a file named `.glb` that is really glTF text is read as
+ *   the text it is - and held to it while they are, by `embeddedOnly` below.
  * - **OBJ** and **STL** - geometry only, painted the colour the step chose.
  * - **SVG** - a plan: its shapes extruded up to the height the step asked for,
  *   flat-roofed. It is parsed as text and never put into the document, so a
@@ -56,34 +59,26 @@ export function embeddedAddress(url) {
     return EMBEDDED_ADDRESS.test(String(url ?? ''));
 }
 
-/** An address as it is named in a refusal: enough of it to recognise, never the whole of a long one. */
-function namedAddress(url) {
-    const address = String(url ?? '');
-    return address.length > 120 ? `${address.slice(0, 117)}...` : address;
-}
-
 /**
- * The one sentence a model naming an address outside itself is refused with.
- *
- * Three places find such an address - a `.gltf`'s own JSON, a `.glb`'s first
- * chunk, and the manager below while the model is read - and a pilot is told
- * the same thing by all three, since what they found is the same thing. The
- * file is named by `main.js`, which prefixes every refusal with `could not
- * load <file>:`, so the sentence itself carries the address alone.
+ * The one refusal a model naming an address outside itself is thrown as. Its
+ * words are `outsideFileSentence` in `js/asset-fit.js`, where the address's
+ * cut is testable; what is here is the class three turns into a rejected
+ * parse.
  */
 function outsideFileRefusal(url) {
-    return new AssetRefused(`the model points at another file, ${namedAddress(url)}; everything it uses has to be inside it`);
+    return new AssetRefused(outsideFileSentence(url));
 }
 
 /**
  * Refuses a glTF whose own JSON names an address outside the file, naming the
  * address it found.
  *
- * A `.gltf`'s JSON is the file itself and a `.glb`'s is its first chunk, which
- * `glbJson` reads, so one check covers both formats and the two are told apart
- * only by where the JSON came from. Null JSON - bytes that are not a GLB at
- * all - names no address, so nothing is refused here and the bytes go on to
- * the loader, which says what is wrong with them better.
+ * A `.gltf`'s JSON is the file itself and a `.glb`'s is its first chunk - or,
+ * for a `.glb` that is really glTF text under the wrong name, the text itself;
+ * `gltfJson` reads whichever it is. So one check covers both formats and the
+ * two are told apart only by where the JSON came from. Null JSON - bytes that
+ * are neither format - names no address, so nothing is refused here and the
+ * bytes go on to the loader, which says what is wrong with them better.
  */
 function refuseOutside(json) {
     const outside = outsideAddress(json);
@@ -157,12 +152,13 @@ export async function readModel(format, bytes, { color = ASSET_COLOR, height = A
             // Both formats are refused from their own JSON before either is
             // parsed, by the one check and with the one sentence: a `.gltf`'s
             // JSON is the file, and a `.glb` carries the same JSON in its
-            // first chunk.
+            // first chunk - or, named `.glb` while really being glTF text, is
+            // that text, which three parses as glTF regardless.
             if (format === 'gltf') {
                 source = text();
                 refuseOutside(JSON.parse(source));
             } else {
-                refuseOutside(glbJson(bytes));
+                refuseOutside(gltfJson(bytes));
             }
             object = (await loader.parseAsync(source, '')).scene;
         } else if (format === 'obj') {

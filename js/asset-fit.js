@@ -22,10 +22,11 @@
  * An asset is known by the SHA-256 of its bytes, so the same file loaded
  * twice, or carried in two environment files, is one asset.
  *
- * It also reads what a glTF names outside itself - `glbJson` and
- * `outsideAddress` below - because that is a question about the file's bytes
- * rather than about the model three draws from them, and so can be answered
- * here where it is testable.
+ * It also reads what a glTF names outside itself - `gltfJson`, `glbJson` and
+ * `outsideAddress` below - and writes the sentence such a model is refused
+ * with, `outsideFileSentence`, because both are questions about the file's
+ * bytes rather than about the model three draws from them, and so can be
+ * answered here where they are testable.
  *
  * Pure module with no DOM or Three.js dependency.
  */
@@ -166,12 +167,73 @@ export function glbJson(bytes) {
     const start = GLB_HEADER + GLB_CHUNK_HEADER;
     if (length === 0 || start + length > bytes.byteLength) return null;
     const chunk = new Uint8Array(bytes.buffer, bytes.byteOffset + start, length);
+    return jsonObject(chunk);
+}
+
+/** The JSON object some bytes decode to, or null for bytes that are not one. */
+function jsonObject(bytes) {
+    if (!ArrayBuffer.isView(bytes)) return null;
     try {
-        const json = JSON.parse(new TextDecoder().decode(chunk));
+        const json = JSON.parse(new TextDecoder().decode(bytes));
         return json != null && typeof json === 'object' ? json : null;
     } catch {
         return null;
     }
+}
+
+/**
+ * The glTF JSON a file's bytes carry, whichever of the two formats they are
+ * in: a GLB's first chunk, or - for bytes that are not a GLB - the bytes read
+ * as the JSON text a `.gltf` is. Null when they hold no glTF object either
+ * way, which is bytes that are neither format.
+ *
+ * The second half is not symmetry for its own sake. `assetFormat` above reads
+ * a file's format off its name alone, so a glTF JSON file named `scene.glb` is
+ * read as a `.glb`, where `glbJson` answers null for it - and three parses such
+ * bytes as glTF text all the same, read in Chromium on 11.11.2026: a box with
+ * one mesh, drawn untextured, its outside image quietly dropped. Without this
+ * the one file reaching the parse unchecked would be the one whose name lied
+ * about what it is.
+ */
+export function gltfJson(bytes) {
+    return glbJson(bytes) ?? jsonObject(bytes);
+}
+
+/** How long an address a refusal names whole, and how much of a longer one it keeps before the ellipsis. */
+export const NAMED_ADDRESS_LIMIT = 120;
+export const NAMED_ADDRESS_KEPT = 117;
+
+/**
+ * An address as it is named in a refusal: enough of it to recognise, never the
+ * whole of a long one.
+ *
+ * The cut is the address's and never the sentence's - what follows the address
+ * tells the pilot what to do about it, so it has to survive however long the
+ * address was.
+ */
+export function namedAddress(url) {
+    const address = String(url ?? '');
+    return address.length > NAMED_ADDRESS_LIMIT ? `${address.slice(0, NAMED_ADDRESS_KEPT)}...` : address;
+}
+
+/**
+ * The one sentence a model naming an address outside itself is refused with,
+ * the address named as far as it reads.
+ *
+ * Three places find such an address - a `.gltf`'s own JSON, a `.glb`'s first
+ * chunk, and the loading manager in `js/asset-loader.js` while the model is
+ * read - and a pilot is told the same thing by all three, since what they
+ * found is the same thing. The file is named by `main.js`, which prefixes
+ * every refusal with `could not load <file>:`, so the sentence itself carries
+ * the address alone.
+ *
+ * The words live here rather than beside the `AssetRefused` they are thrown as,
+ * because a sentence built out of a string is a question about a string: this
+ * module needs neither the DOM nor Three.js, so what a pilot reads can be
+ * asserted by value rather than pinned as the shape of a line of source.
+ */
+export function outsideFileSentence(url) {
+    return `the model points at another file, ${namedAddress(url)}; everything it uses has to be inside it`;
 }
 
 // --- Size and fit ---------------------------------------------------------------------
