@@ -19,6 +19,9 @@
  * Beneath its first part the dock may hold sections, each under a heading of
  * its own - Select's panel is the camera and then what is being looked at. A
  * section that folds has a heading that is a button, opening and shutting it.
+ * A section may end in a status line saying what its last answer came to, and
+ * a line whose words have just changed is scrolled into view, since the
+ * fields it sits in are short enough on a phone to hide it entirely.
  *
  * A colour row is drawn as a colour is chosen rather than stepped: its
  * swatches, the picker's strip in its four bands, the eye dropper and a hex
@@ -41,6 +44,56 @@ export const FIELD_STEP_KEYS = Object.freeze({
     PageUp:    Object.freeze({ step: 1,  coarse: true }),
     PageDown:  Object.freeze({ step: -1, coarse: true })
 });
+
+/** Every section's status line, in the order they are drawn: `{ id, text, refused }`. */
+export function statusLines(content) {
+    return (content?.sections ?? [])
+        .filter(section => 'status' in section)
+        .map(section => ({
+            id: section.id,
+            text: section.status?.text ?? '',
+            refused: section.status?.refused === true
+        }));
+}
+
+/**
+ * The status line a draw should bring into view, or null for none: one whose
+ * words have just changed into something to read, a refused one first.
+ *
+ * `said` is what each section's line last said. Three cases are deliberately
+ * not news, because scrolling for one would take a view the pilot set by hand:
+ *
+ * - **A line that has not changed.** The dock redraws every frame.
+ * - **A line gone empty.** There is nothing there to read.
+ * - **A section's first line.** A panel opening on the line it always opens on
+ *   is its resting state, not an answer - SAVE / LOAD's ASSETS section always
+ *   says something, so a first draw would scroll straight past the NAME row
+ *   above it on a phone. First is first on the screen, which `statusSaid`
+ *   below is what decides.
+ */
+export function statusToShow(content, said) {
+    const news = statusLines(content).filter(line =>
+        line.text !== '' && said.has(line.id) && said.get(line.id) !== line.text);
+    return news.find(line => line.refused) ?? news[0] ?? null;
+}
+
+/**
+ * What each status line says now, for the next draw to tell news from a
+ * redraw: the lines this draw carries, and only those.
+ *
+ * A section the draw does not carry is forgotten, so the section is on its
+ * first line again when it comes back. That is what makes the third case
+ * above hold, since a line can change while its section is off the screen:
+ * LOAD ASSET takes the dock to the step and brings it back to a SAVE / LOAD
+ * whose ASSETS line has changed from `no assets loaded` to `choose an asset`,
+ * which is the panel's resting state for a library of one and not an answer
+ * to scroll to. Only the panel's own redraws are a line's own again, which is
+ * every draw a section stays on the screen for, a rebuild included - the
+ * elements are made again, the words are not news again.
+ */
+export function statusSaid(content) {
+    return new Map(statusLines(content).map(line => [line.id, line.text]));
+}
 
 /**
  * The key a row is found by: its range's name and which part of the range it
@@ -115,6 +168,9 @@ export class PanelView {
         this.shape    = null;
         this.content  = null;
         this.drawn    = new Map();
+        // What each status line on the screen last said, by `statusSaid` -
+        // kept across a rebuild of the same panel, dropped with the section.
+        this.said     = new Map();
 
         root.addEventListener('click', (event) => this.onClick(event));
         root.addEventListener('change', (event) => this.onChange(event));
@@ -169,6 +225,9 @@ export class PanelView {
             this.root.style.display = 'none';
             this.shape = null;
             this.content = null;
+            // Nothing is on the screen to have said anything, so the panel
+            // that comes back is on its first line again.
+            this.said = new Map();
             return;
         }
 
@@ -274,6 +333,32 @@ export class PanelView {
         status.setAttribute('aria-live', 'polite');
         this.fields.append(status);
         this.drawn.set(`status:${section.id}`, { status });
+    }
+
+    /**
+     * Scrolls a section's status line into the fields' window, so a line that
+     * has just changed is read rather than drawn below the fold.
+     *
+     * The fields are what scrolls, and the dock leaves them where the pilot
+     * left them when it redraws - which on a short phone is the top, with 62
+     * of 210 px in view: room for the ENVIRONMENT heading and the NAME row,
+     * and none for the line under them saying why a file was refused. The
+     * dock then looked exactly as it had before, which is the one thing a
+     * refusal must not do.
+     *
+     * Its first line is put at the top of the window rather than merely
+     * brought to the nearest edge, because a refusal is four lines of which
+     * one fits: scrolled to its foot it reads as the end of a sentence whose
+     * start is missing.
+     */
+    showStatus(id) {
+        const line = this.drawn.get(`status:${id}`)?.status;
+        if (!line || !this.fields) return;
+        const box = line.getBoundingClientRect();
+        const view = this.fields.getBoundingClientRect();
+        if (box.height === 0) return;
+        if (box.top >= view.top - 1 && box.bottom <= view.bottom + 1) return;
+        this.fields.scrollTop += box.top - view.top;
     }
 
     /** Draws rows of tiles, one to each row the artwork groups them into. A tile with no art to it is a card: its name alone. */
@@ -472,6 +557,10 @@ export class PanelView {
             }
         }
 
+        // Read before the lines are written, since writing one is what makes
+        // it no longer news.
+        const show = statusToShow(content, this.said);
+
         for (const section of content.sections ?? []) {
             const text = section.text ? this.drawn.get(`text:${section.id}/${section.text.id}`) : null;
             if (text && document.activeElement !== text.field) {
@@ -485,6 +574,11 @@ export class PanelView {
                 status.status.classList.toggle('refused', section.status?.refused === true);
             }
         }
+
+        // Written after the lines, and only for the sections this draw drew.
+        this.said = statusSaid(content);
+
+        if (show) this.showStatus(show.id);
 
         for (const entry of dockRows(content)) {
             const drawn = this.drawn.get(rowKey(entry));

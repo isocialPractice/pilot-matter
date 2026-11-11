@@ -5,6 +5,122 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.65.4] - 2026-11-11
+
+### Fixed
+
+- **A refused file is read on a short phone.** The SAVE / LOAD dock writes
+  what the last save, load or refusal came to as the ENVIRONMENT section's
+  status line, inside the fields that scroll, and the dock leaves those fields
+  where the pilot left them when it redraws. Under 640px wide the dock takes
+  the foot of the screen at `top: max(60vh, palette bottom + 10px)`, and on a
+  short phone the palette's foot wins that `max`: at 360x640 the fields come
+  to 62px of 210, which holds the ENVIRONMENT heading and the NAME row and
+  nothing else. The line under them was drawn below the fold with `scrollTop`
+  at 0, so a pilot who handed the dock a file it refused saw the dock as it
+  had been. It was never the refusal's doing - measured before any file was
+  handed over, the empty status slot was already below the fold - and it cost
+  the same for every status the dock writes; the refusal is only the one that
+  matters most, being the one thing that says why the file they picked did
+  nothing. A line whose words have just changed is now scrolled into the
+  fields' window, its first line at the top rather than its foot on the fold,
+  which for a four line refusal is the difference between a sentence and the
+  end of one. Three redraws are deliberately not news, so the scroll cannot
+  take back a view the pilot set by hand: a line that has not changed, since
+  the dock redraws every frame; a line gone empty; and the line a section
+  opens on, the ASSETS section always carrying one. First is first on the
+  screen rather than first in the session, which `statusSaid` is what decides:
+  each draw records the lines it drew and only those, so a section is
+  forgotten the moment it leaves and is on its first line again when it comes
+  back. Without that, a line that changed while its section was off the screen
+  read as an answer on the panel's own opening draw - LOAD ASSET is the route,
+  the step being a panel of its own and the SAVE / LOAD it hands back carrying
+  an ASSETS line that has gone from `no assets loaded` to `choose an asset`,
+  which is that panel's resting state for a library of one. A panel taken off
+  the screen altogether says nothing for the same reason.
+- **The cut a long address is named by is held by a test.** `namedAddress`
+  cuts an address over 120 characters to its first 117 and an ellipsis, and
+  every refusal a pilot reads is built through it, but nothing in `test/`
+  asserted what it returned - the one line that mentioned it read the module
+  as text and pinned the sentence's shape. Run as a mutant rather than argued,
+  `address.slice(0, 117)` changed to `address.slice(0, 17)` left the suite at
+  2426 passing and 0 failing. The reason was structural rather than an
+  oversight: `js/asset-loader.js` imports Three.js, so the suite cannot import
+  it in Node and reads it as source text instead. `namedAddress` and the
+  sentence it is written into now live in `js/asset-fit.js` as `namedAddress`
+  and `outsideFileSentence`, which is the argument that module already makes
+  for itself about `outsideAddress` and `glbJson`: what a pilot reads is a
+  question about a string, so it can be answered where it is testable.
+  `outsideFileRefusal` keeps the `AssetRefused` class and takes its words from
+  there.
+- **A `.glb` that is really glTF JSON is refused like any other.**
+  `assetFormat` reads a file's format off its name alone, so glTF JSON saved
+  as `scene.glb` went down the `.glb` branch, where `glbJson` answered null
+  for bytes carrying no `glTF` magic and `refuseOutside` passed that null
+  through by design. Nothing then checked the file, and three parses a non-GLB
+  `ArrayBuffer` as glTF text regardless - so the one file reaching the parse
+  unchecked was the one whose name lied about what it was. Read in Chromium
+  through the builder's own route, such a file naming an outside image opened
+  the step after loading headed LOADED ASSET, its model drawn untextured, with
+  nothing said on the dock and only a console line from three to show for it -
+  the same failure the backstop cannot cover, since three catches an image's
+  throw inside its own texture loading and resolves the parse anyway. The
+  `.glb` branch now reads `gltfJson`, which answers a GLB's first chunk or,
+  for bytes that are not a GLB, the bytes read as the JSON text a `.gltf` is,
+  so one `refuseOutside` covers all three cases and the sentence does not
+  change. The formats table in `docs/terrain.html` promised "one pointing at
+  another file is refused"; it now holds for a file named `.glb` as well.
+
+Held in Node by the new `test/panel-view.test.js` and by
+`test/assets.test.js`. `statusLines`, `statusToShow` and `statusSaid` are
+exported from `js/panel-view.js` because which line changed, which of two
+changed lines to scroll to, and what a draw leaves behind to compare the next
+one against are all decidable without a browser; the view's own half - the
+window test and the scroll - is read as source text, the module being drawn
+into the page. The draw order is held both ways: by value, a section drawn,
+left and drawn again with other words is read as opening rather than
+answering, and a card pressed on the panel that stayed open is read as the
+answer it is; as source text, that a line is never recorded on its own and
+that a rebuild of the same panel does not forget what it says. The address cut is asserted by value for the first time: 120
+named whole and not ending in an ellipsis, 121 coming back 120 long as its
+first 117 and an ellipsis, a long address coming back 120 however long it was,
+a short one untouched, `null` and `undefined` as the empty string rather than
+`"null"`, and the whole sentence for a long address still ending `; everything
+it uses has to be inside it`, the cut being the address's and never the
+sentence's. `test/save-load.test.js` holds the content side: both of SAVE /
+LOAD's sections carry a line, nothing changed scrolls to nothing, and a
+refusal written where an empty slot was is the line picked.
+
+Sixteen mutants were each caught by the test named for it: the address cut at
+17 rather than 117, nothing under 1200 characters cut at all, an address of
+exactly 120 cut, the cut taken on the finished sentence rather than the
+address, a `.glb` of glTF text answering no JSON, bytes holding JSON that is
+not an object read as a model, the `.glb` branch refused off its first chunk
+alone again, a section's first line counted as news, a line gone empty counted
+as news, the first changed line winning over a refused one, a line already in
+view scrolled to anyway, the browser's own `scrollIntoView` in place of the
+scroll, what a line last said never recorded, a draw keeping what a section
+that has gone last said, a section recorded for a line it never drew, and a
+panel taken off the screen keeping its words.
+
+Settled in Chromium in 132 checks through the builder's own route -
+INTERACTIVE ENVIRONMENT BUILDER, BLANK CANVAS, START, SAVE / LOAD, LOAD ASSET.
+The phone pass is at 121 passing and 0 failing where it was at 117 and 4: all
+four files that reach outside themselves are now read without scrolling on the
+short phone, the fields scrolling to 71 and the four line refusal standing at
+470-527 in a window of 470-532, while everything else it holds is unchanged -
+the sentence, the wrap, the amber at 11.46:1, the four pinned answers and
+every palette tile. The height sweep's boundary at 360 wide is gone: 704 was
+the last height at which the refusal fell below the fold and now reads, and
+708 and above are untouched, which is the already-in-view guard holding. Seven
+more checks read the three redraws that are not news - the panel opening at
+`scrollTop` 0 with the NAME row in view, a view set by hand surviving 1.5
+seconds of redraws, and a standing refusal not scrolled to a second time. Four
+more read the lying `.glb`: three alone parses it as a box of one mesh, and
+the dock now refuses it by name where it had opened the step
+(`.tmp/ui-ux/t31/phone.mjs`, `.tmp/ui-ux/t31/sweep.mjs`,
+`.tmp/ui-ux/t32/opening.mjs`, `.tmp/ui-ux/t32/lying-glb.mjs`).
+
 ## [1.0.0-alpha.1.65.3] - 2026-11-10
 
 ### Fixed
