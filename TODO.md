@@ -38,53 +38,65 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### UI/UX Override - the dock's scroll, read on a phone
+### Code Review Override - the derived cut nothing holds
 
-#### Found Issues
+#### Resolve Issues
 
-- [ ] `showStatus` is held by regex pins, not by anything that runs it
-  - **Issue**: `PanelView.showStatus` in `js/panel-view.js` is the whole of
-    what a pilot sees in this turn's fix - it is what puts a refusal at the
-    top of a 62px window instead of at 541-598 below it.
-    `test/panel-view.test.js` holds it by reading the module as text and
-    pinning three of its lines with `assert.match`, which is the only way this
-    project can hold a module that touches the DOM. A pin catches a line that
-    is edited or deleted; it cannot catch a guard no pin names. Both of the
-    method's early returns are in that class, run as mutants against the whole
-    suite rather than argued: `if (box.height === 0) return;` deleted leaves
-    2432 passing and 0 failing, `if (!line || !this.fields) return;` deleted
-    leaves 2432 passing and 0 failing, and swapping the two guards so a line
-    with no height is scrolled to leaves 2432 passing and 0 failing. The
-    second is not cosmetic - without that guard, `showStatus` called for a
-    section whose line was never drawn reaches `getBoundingClientRect` on
-    `undefined` and throws inside `update`, which runs on every frame the dock
-    is open. The fix itself was verified and passed on every count this run:
-    30 checks at 360x640, 375x667 and 390x844, 13 on the scroll that must not
-    fight the pilot, 16 on the `.glb` that is really glTF text, 17 on the
-    address cut.
-  - **Goal**: Resolve to [show-status-untested.prompt.md](.claude/prompts/show-status-untested.prompt.md)
+- [ ] Derived Cut 1: the kept length can be written back as a figure of its own
+  and the suite stays green
+  - **Issue**: the module change is right and does what the item asked -
+    `ELLIPSIS` names `'...'` once, `NAMED_ADDRESS_KEPT` reads as
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and `namedAddress` appends that
+    same constant. What is not held is the derivation itself. The line added
+    to `test/assets.test.js:530`,
+    `assert.equal(NAMED_ADDRESS_LIMIT - NAMED_ADDRESS_KEPT, '...'.length)`,
+    sits three lines under `assert.equal(NAMED_ADDRESS_LIMIT, 120)` and
+    `assert.equal(NAMED_ADDRESS_KEPT, 117)`, so given those two it reads
+    `120 - 117 === 3` and can never be the assertion that fails - it is a
+    tautology, not a hold. Run as a mutant: `NAMED_ADDRESS_KEPT` put back to a
+    bare `117` leaves the whole suite at 2434 passing and 0 failing. The three
+    mutants the item's **Settled** note reports as caught - a two dot
+    ellipsis, the kept length restated as 116, the limit moved to 200 - are
+    each caught by the two absolute pins that were already there before this
+    run, not by the line added to hold the derivation. So the drift the item
+    was raised to close is open in its new form: the figure is one decision
+    today and nothing notices it becoming two again.
+  - **Goal**: hold it the way the precedent it cites is held, and the way this
+    file holds what a runtime cannot show. `test/footprints.test.js:529`
+    asserts `SOFT_EDGE` against `FEATHER_SHARE / 2` - the imported constant,
+    not a restated figure - which is only possible because both are exported;
+    export `ELLIPSIS` and assert `NAMED_ADDRESS_KEPT` off
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` so the test stops restating the
+    mark as its own `'...'` literal, which is the second copy the item set out
+    to remove. That still cannot tell a derived 117 from a written one, since
+    the two are the same value at runtime, so add the pin this project already
+    uses for exactly that: `test/assets.test.js:35` has a `source` helper and
+    `:564` already matches `source('asset-fit.js')`, so an `assert.match` on
+    the derivation line catches the revert the mutant above walks through.
+    Either make the tautology at `:530` carry weight through the exported
+    constant or drop it - as it stands it reports a hold the suite does not
+    have.
   - From: UI/UX Override - the dock's scroll, read on a phone
-
-- [ ] The address cut states both of its figures instead of deriving one
-  - **Issue**: `js/asset-fit.js` exports `NAMED_ADDRESS_LIMIT` as 120 and
-    `NAMED_ADDRESS_KEPT` as 117, two independent figures whose whole
-    relationship is the width of the `...` that joins them - a cut address
-    comes back exactly `NAMED_ADDRESS_LIMIT` characters long, which is the
-    invariant `test/assets.test.js` asserts twice ("121 comes back 120 long",
-    "however long it was") without anything in the module saying it. Nothing
-    is wrong today, and the test would catch either figure moved on its own;
-    the drift is against a convention this repository settled on 11.08.2026
-    for exactly this shape, where `SOFT_EDGE` was changed from a stated 0.5 to
-    a derived `FEATHER_SHARE / 2` so that the constant could no longer
-    disagree with the rule that bounds it - see `Held Feather 1` in
-    `TODO-archive.md`.
-  - **Goal**: name the ellipsis once and read the kept length off the limit -
-    `NAMED_ADDRESS_KEPT = NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, with
-    `namedAddress` appending that same `ELLIPSIS` - so the figure a refusal is
-    cut to is one decision rather than two that have to agree. Leave both
-    exports and both of their asserted values as they are: 120 and 117 are
-    what the pilot reads and what the tests pin, and this changes only where
-    the 117 comes from.
+- [ ] Derived Cut 2: the settled note credits the new line with a catch it
+  cannot make
+  - **Issue**: the **Settled** note on `Derived Cut` in `## Complete` says
+    `test/assets.test.js` "gained the one line the figures had never said out
+    loud ... which is what catches a kept length written back as a figure of
+    its own". That is the one mutant the line cannot catch, and the suite is
+    green through it, as `Derived Cut 1` shows. The archive is where this
+    project reads its own precedent back - this very item cites
+    `Held Feather 1` in `TODO-archive.md` as the convention it was following -
+    so a note claiming a hold that is not there is read later as a hold that
+    is, and the next run to touch these figures will trust it.
+  - **Goal**: correct the clause to say what the line does, which is state the
+    relationship between the two figures rather than catch a change to it, and
+    let whatever `Derived Cut 1` lands be what the note credits. Leave the
+    rest of the note as it is - the module description, the unchanged exports
+    and the `docs/terrain.html:320` sentence are all accurate, that last one
+    checked against the file and still reading "named as far as its first 117
+    and an ellipsis". `CHANGELOG.md` needs no edit: it attributes the six
+    catches to "the test named for it" and claims the suite-was-green-before
+    property only for the first three, which is true as written.
   - From: UI/UX Override - the dock's scroll, read on a phone
 
 ## Game UI/UX
@@ -728,89 +740,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 411 earlier items in `TODO-archive.md`, newest last.
+> 413 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A `.glb` asset can make the page fetch a URL it names
-  - **Issue**: `selfContained` is applied to `.gltf` only, so a `.glb` reaches
-    `parseAsync` unchecked, and a GLB's JSON chunk may name an external `uri`
-    for any buffer but the first and for every image. In the pinned
-    `three@0.160.0`, `GLTFLoader.js:2948` and `:3247` fetch those addresses,
-    with `options.path` empty so an absolute URL is fetched as given. An
-    environment file carries its assets' bytes and `adoptAssets` hands each to
-    `registerAsset`, so a shared world is an untrusted input that reaches this
-    path and one crafted `.glb` beacons for every pilot who opens it. The
-    SHA-256 check does not help - it proves the bytes are the ones the file's
-    author shipped. Written up with the reproduction, the two fix shapes and
-    the prose it contradicts in
-    [KNOWN_RISKS.md](KNOWN_RISKS.md#2026-11-07-a-glb-asset-can-make-the-page-fetch-a-url-it-names).
-  - **Goal**: hold both glTF formats to the same rule - a `LoadingManager`
-    whose `setURLModifier` refuses anything not beginning `data:` is the
-    recommendation, since it covers whatever a later extension adds a `uri` to
-    and fails closed through the `AssetRefused` path that already exists. Fix
-    the refusal message, which currently tells the pilot to save as a `.glb`,
-    and `docs/terrain.html:320`, which states the narrow claim. Not fixed in
-    review because it cannot be verified here: `three` is a CDN import with no
-    local install and `readModel` has no test that executes it, so this needs
-    a vendored `three` or a Chromium check that serves a crafted `.glb` and
-    asserts no request leaves the page.
-  - **Settled**: both formats held at a `THREE.LoadingManager` whose
-    `setURLModifier` refuses every address but `data:` and `blob:`, which is
-    the recommendation, with the scheme matched either case. `blob:` is in the
-    rule because three hands a GLB's embedded texture to the image loader as a
-    blob the page made from its own bytes - a `data:`-only rule would refuse
-    most textured GLBs. The modifier throws `AssetRefused`, which three turns
-    into a rejected parse and `readModel` passes through, so the read fails
-    closed with the address named. `selfContained` stays as the early, named
-    refusal for a `.gltf` and now reads the same rule; its message no longer
-    steers the pilot at `.glb`. Verified in Chromium against a crafted GLB
-    naming an external buffer: no request leaves the page, while the same bytes
-    through a bare `GLTFLoader` do fetch it - and a GLB with its PNG in the BIN
-    chunk, and one with it as a `data:` uri, both still read with their texture
-    (`.tmp/ui-ux/t28/glb-no-fetch.mjs`, `glb-embedded-texture.mjs`).
-    `KNOWN_RISKS.md` and `docs/terrain.html` follow.
-  - From: UI/UX Override - the top a click cannot reach
-- [x] A runway asset's strip is not the width the asset is
-  - **Issue**: `placeAssetRunway` says it builds "a real runway of the asset's
-    length and width - so landing, scoring and takeoff work on it unchanged",
-    but `assetFit`'s runway test bounds width only against `depth / 4` while
-    the strip can only be built between `GROUP_RANGES.width.low` and `.high`,
-    which are 80 and 600. The two disagree in both directions, and nothing
-    warns. Run through the real path: a 600 by 20 m asset fits and is given an
-    80 m strip, so the landable ground is four times the model's width and a
-    pilot can land well clear of what they can see; a 5000 by 1200 m asset
-    fits and is given a 600 m strip, so the model's edges hang over ground
-    that is not runway; and a 600 by 0 m asset - a flat plan - fits and is
-    given an 80 m strip out of nothing, because the runway branch has no
-    "nothing to place" guard where the city branch does. The suite misses all
-    of it: every runway case in `test/assets.test.js` uses a 60 m width, which
-    is already under the 80 m floor, and the one over-wide case tests 601 at
-    depth 2400 where `depth / 4` and `width.high` both happen to be 600.
-    `test/assets.test.js:171` does assert the 80 m strip and calls it "at
-    least the narrowest strip", so the clamp was seen on the way in; what was
-    not is that the fit check lets through what the strip cannot be built at.
-  - **Goal**: make `assetFit`'s runway bounds the bounds the strip can be built
-    at - width held to `GROUP_RANGES.width` as well as to a quarter of the
-    length, with a named reason either side, and a guard for a width of
-    nothing - so an asset that cannot be placed faithfully is refused with a
-    reason rather than silently clamped. Decide separately whether the
-    hardcoded 5000 m ceiling should be `GROUP_RANGES.length.high`, which is
-    8000; the module docstring and `test/assets.test.js` both state 5000, so
-    it reads as deliberate. Expect the five runway assertions in
-    `test/assets.test.js` to need their widths moved above 80, and correct the
-    docstring table and `placeAssetRunway`'s own sentence, which both claim
-    the strip is the asset's width.
-  - **Settled**: `assetFit`'s runway bounds are the strip's own bounds -
-    width held to `GROUP_RANGES.width` as well as to a quarter of the length,
-    each with its own reason - and a width or length of nothing is `nothing to
-    place`, as the city branch already had. The 5000 m ceiling stays, now the
-    named `RUNWAY_LENGTH_LIMIT`: it is deliberately under
-    `GROUP_RANGES.length.high`, since 5 km is past every runway there is and a
-    model longer than that has its units guessed wrong. So the clamp in
-    `placeAssetRunway` is a guard rather than a resize, and the docstring
-    table and its own sentence now say so. The five runway cases in
-    `test/assets.test.js` moved above the 80 m floor, and a test of its own
-    holds the three sizes that used to be let through and silently resized.
-  - From: UI/UX Override - the top a click cannot reach
 - [x] A `.glb` naming an external image loads instead of being refused
   - **Issue**: loading a `.glb` whose JSON names an external image opens the
     step after loading as though the model were sound - headed LOADED ASSET,
@@ -1107,3 +1038,75 @@ how the simulator got here rather than as a list still to be worked.
     `docs/terrain.html:320` now holds for a file named `.glb` as well, and the
     paragraph says so.
   - From: UI/UX Override - a refusal a short phone never shows
+- [x] `showStatus` is held by regex pins, not by anything that runs it
+  - **Issue**: `PanelView.showStatus` in `js/panel-view.js` is the whole of
+    what a pilot sees in this turn's fix - it is what puts a refusal at the
+    top of a 62px window instead of at 541-598 below it.
+    `test/panel-view.test.js` holds it by reading the module as text and
+    pinning three of its lines with `assert.match`, which is the only way this
+    project can hold a module that touches the DOM. A pin catches a line that
+    is edited or deleted; it cannot catch a guard no pin names. Both of the
+    method's early returns are in that class, run as mutants against the whole
+    suite rather than argued: `if (box.height === 0) return;` deleted leaves
+    2432 passing and 0 failing, `if (!line || !this.fields) return;` deleted
+    leaves 2432 passing and 0 failing, and swapping the two guards so a line
+    with no height is scrolled to leaves 2432 passing and 0 failing. The
+    second is not cosmetic - without that guard, `showStatus` called for a
+    section whose line was never drawn reaches `getBoundingClientRect` on
+    `undefined` and throws inside `update`, which runs on every frame the dock
+    is open. The fix itself was verified and passed on every count this run:
+    30 checks at 360x640, 375x667 and 390x844, 13 on the scroll that must not
+    fight the pilot, 16 on the `.glb` that is really glTF text, 17 on the
+    address cut.
+  - **Goal**: Resolve to [show-status-untested.prompt.md](.claude/prompts/show-status-untested.prompt.md)
+  - **Settled**: the method is executed rather than read. `PanelView` is
+    already exported and `showStatus` touches no global, so
+    `PanelView.prototype.showStatus.call(stub, 'environment')` runs under Node
+    against a stub whose `drawn` and `fields` answer boxes - seven assertions
+    in `test/panel-view.test.js` covering the window the phone measured: a
+    line already inside it left where it is, the 541-598 refusal coming up by
+    71 to the window's own top, a line taller than the window landing first
+    line first rather than foot on the fold, one above it coming down by a
+    negative step, a line of no height left alone, a section with no line
+    drawn left alone rather than throwing, and a view with no fields having
+    nothing to scroll. The three source pins stay as they are - they hold what
+    a stub cannot, which is that the page's own scroll is read off
+    `this.fields` and that `scrollIntoView` is never reached for. All three
+    mutants the issue names are now caught, each by the new test alone and
+    each having left the suite green before it: the height guard deleted, the
+    drawn-and-fields guard deleted, and the height guard moved below the
+    scroll so a line with no height is scrolled to. The fourth mutant the
+    prompt recorded as equivalent was not spent.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] **Derived Cut**: The address cut states both of its figures instead of deriving one
+  - **Issue**: `js/asset-fit.js` exports `NAMED_ADDRESS_LIMIT` as 120 and
+    `NAMED_ADDRESS_KEPT` as 117, two independent figures whose whole
+    relationship is the width of the `...` that joins them - a cut address
+    comes back exactly `NAMED_ADDRESS_LIMIT` characters long, which is the
+    invariant `test/assets.test.js` asserts twice ("121 comes back 120 long",
+    "however long it was") without anything in the module saying it. Nothing
+    is wrong today, and the test would catch either figure moved on its own;
+    the drift is against a convention this repository settled on 11.08.2026
+    for exactly this shape, where `SOFT_EDGE` was changed from a stated 0.5 to
+    a derived `FEATHER_SHARE / 2` so that the constant could no longer
+    disagree with the rule that bounds it - see `Held Feather 1` in
+    `TODO-archive.md`.
+  - **Goal**: name the ellipsis once and read the kept length off the limit -
+    `NAMED_ADDRESS_KEPT = NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, with
+    `namedAddress` appending that same `ELLIPSIS` - so the figure a refusal is
+    cut to is one decision rather than two that have to agree. Leave both
+    exports and both of their asserted values as they are: 120 and 117 are
+    what the pilot reads and what the tests pin, and this changes only where
+    the 117 comes from.
+  - **Settled**: `ELLIPSIS` names `'...'` once in `js/asset-fit.js`,
+    `NAMED_ADDRESS_KEPT` reads as `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and
+    `namedAddress` appends that same constant instead of a second literal. Both
+    exports stay, both values stay 120 and 117, and what a pilot reads is
+    unchanged - `docs/terrain.html:320` still states the behaviour correctly
+    and needed no edit. `test/assets.test.js` gained the one line the figures
+    had never said out loud, that the limit less the kept length is the width
+    of the ellipsis, which is what catches a kept length written back as a
+    figure of its own. Held by three mutants, all caught: a two dot ellipsis,
+    the kept length restated as 116, and the limit moved to 200 with the kept
+    length following it.
+  - From: UI/UX Override - the dock's scroll, read on a phone
