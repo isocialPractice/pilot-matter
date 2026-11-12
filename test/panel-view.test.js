@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { statusLines, statusToShow, statusSaid, rowKey, dockRows, fieldFigure } from '../js/panel-view.js';
+import { PanelView, statusLines, statusToShow, statusSaid, rowKey, dockRows, fieldFigure } from '../js/panel-view.js';
 
 const source = name => readFileSync(fileURLToPath(new URL(`../js/${name}`, import.meta.url)), 'utf8');
 
@@ -142,6 +142,47 @@ test('the view scrolls a changed status into its fields\' window, its first line
         'a line already read is left alone');
     assert.match(view, /this\.fields\.scrollTop \+= box\.top - view\.top;/);
     assert.doesNotMatch(view, /scrollIntoView/, 'and not by the browser\'s own, which puts a long line\'s foot on the fold');
+});
+
+test('what the scroll does with a line, run against the boxes the page measured', () => {
+    // The pins above hold the lines; this runs them. `showStatus` reads
+    // `this.drawn` and `this.fields` and touches no global, so the method
+    // itself goes against a stub with no DOM behind it - which is what holds
+    // its two early returns, neither of them a line any pin can name.
+    const boxOf = ({ top, bottom }) => ({ top, bottom, height: bottom - top });
+    const stub = (line, fields, scrollTop = 0) => ({
+        drawn: new Map(line === null ? [] : [[`status:${ENVIRONMENT}`, { status: { getBoundingClientRect: () => boxOf(line) } }]]),
+        fields: fields === null ? null : { getBoundingClientRect: () => boxOf(fields), scrollTop }
+    });
+    const scrolled = (view) => {
+        PanelView.prototype.showStatus.call(view, ENVIRONMENT);
+        return view.fields?.scrollTop;
+    };
+
+    // The window a four line refusal is read in on a short phone: 62 px of
+    // 210, with the fields left where the pilot left them.
+    const WINDOW = { top: 470, bottom: 532 };
+
+    assert.equal(scrolled(stub({ top: 480, bottom: 500 }, WINDOW, 40)), 40, 'a line already in the window is left where it is');
+
+    // The measured case: the refusal drawn below the fold comes up by exactly
+    // the step that puts its own top at the window's.
+    assert.equal(scrolled(stub({ top: 541, bottom: 598 }, WINDOW)), 71, 'a line below the fold comes to the top of the window');
+    assert.equal(scrolled(stub({ top: 541, bottom: 640 }, WINDOW)), 71,
+        'a line taller than the window lands first line first, not foot on the fold');
+    assert.equal(scrolled(stub({ top: 400, bottom: 457 }, WINDOW, 120)), 50, 'and one above it comes down, by a negative step');
+
+    // A line drawn with nothing in it measures zero high and sits wherever
+    // the last row left it, so it is outside the window as often as not.
+    // Scrolling to it takes the pilot off what they were reading to read
+    // nothing.
+    assert.equal(scrolled(stub({ top: 600, bottom: 600 }, WINDOW, 30)), 30, 'a line with no height is left alone');
+
+    // Both of the method's early returns, which are what a redraw hits rather
+    // than a scroll: `update` runs on every frame the dock is open, and a
+    // section whose line was never drawn would reach a box on `undefined`.
+    assert.equal(scrolled(stub(null, WINDOW, 30)), 30, 'a section with no line drawn is left alone rather than throwing');
+    assert.equal(scrolled(stub({ top: 541, bottom: 598 }, null)), undefined, 'and a view with no fields has nothing to scroll');
 });
 
 test('a row is found by its range, its part and the section it is in', () => {

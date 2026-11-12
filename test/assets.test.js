@@ -527,6 +527,9 @@ test('a long address is cut before it is named, and the sentence after it surviv
     // is the half that says what to do about it.
     assert.equal(NAMED_ADDRESS_LIMIT, 120);
     assert.equal(NAMED_ADDRESS_KEPT, 117);
+    // And the one relationship there is between them, which the module reads
+    // the second figure off rather than stating it twice.
+    assert.equal(NAMED_ADDRESS_LIMIT - NAMED_ADDRESS_KEPT, '...'.length, 'what is kept is the limit less the ellipsis that follows it');
 
     const address = length => `https://example.com/textures/${'a'.repeat(Math.max(0, length - 30))}.png`.slice(0, length);
     const at120 = address(120), at121 = address(121), at180 = address(180);

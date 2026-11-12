@@ -5746,3 +5746,87 @@ still be found by name.
     from 1 px to 488 px in Chromium, and 40 units - the least Extrude takes -
     is one closed run of 269 points where it was four segments.
   - From: UI/UX Override - the top a click cannot reach
+
+## Archived 11-12-26
+
+- [x] A `.glb` asset can make the page fetch a URL it names
+  - **Issue**: `selfContained` is applied to `.gltf` only, so a `.glb` reaches
+    `parseAsync` unchecked, and a GLB's JSON chunk may name an external `uri`
+    for any buffer but the first and for every image. In the pinned
+    `three@0.160.0`, `GLTFLoader.js:2948` and `:3247` fetch those addresses,
+    with `options.path` empty so an absolute URL is fetched as given. An
+    environment file carries its assets' bytes and `adoptAssets` hands each to
+    `registerAsset`, so a shared world is an untrusted input that reaches this
+    path and one crafted `.glb` beacons for every pilot who opens it. The
+    SHA-256 check does not help - it proves the bytes are the ones the file's
+    author shipped. Written up with the reproduction, the two fix shapes and
+    the prose it contradicts in
+    [KNOWN_RISKS.md](KNOWN_RISKS.md#2026-11-07-a-glb-asset-can-make-the-page-fetch-a-url-it-names).
+  - **Goal**: hold both glTF formats to the same rule - a `LoadingManager`
+    whose `setURLModifier` refuses anything not beginning `data:` is the
+    recommendation, since it covers whatever a later extension adds a `uri` to
+    and fails closed through the `AssetRefused` path that already exists. Fix
+    the refusal message, which currently tells the pilot to save as a `.glb`,
+    and `docs/terrain.html:320`, which states the narrow claim. Not fixed in
+    review because it cannot be verified here: `three` is a CDN import with no
+    local install and `readModel` has no test that executes it, so this needs
+    a vendored `three` or a Chromium check that serves a crafted `.glb` and
+    asserts no request leaves the page.
+  - **Settled**: both formats held at a `THREE.LoadingManager` whose
+    `setURLModifier` refuses every address but `data:` and `blob:`, which is
+    the recommendation, with the scheme matched either case. `blob:` is in the
+    rule because three hands a GLB's embedded texture to the image loader as a
+    blob the page made from its own bytes - a `data:`-only rule would refuse
+    most textured GLBs. The modifier throws `AssetRefused`, which three turns
+    into a rejected parse and `readModel` passes through, so the read fails
+    closed with the address named. `selfContained` stays as the early, named
+    refusal for a `.gltf` and now reads the same rule; its message no longer
+    steers the pilot at `.glb`. Verified in Chromium against a crafted GLB
+    naming an external buffer: no request leaves the page, while the same bytes
+    through a bare `GLTFLoader` do fetch it - and a GLB with its PNG in the BIN
+    chunk, and one with it as a `data:` uri, both still read with their texture
+    (`.tmp/ui-ux/t28/glb-no-fetch.mjs`, `glb-embedded-texture.mjs`).
+    `KNOWN_RISKS.md` and `docs/terrain.html` follow.
+  - From: UI/UX Override - the top a click cannot reach
+- [x] A runway asset's strip is not the width the asset is
+  - **Issue**: `placeAssetRunway` says it builds "a real runway of the asset's
+    length and width - so landing, scoring and takeoff work on it unchanged",
+    but `assetFit`'s runway test bounds width only against `depth / 4` while
+    the strip can only be built between `GROUP_RANGES.width.low` and `.high`,
+    which are 80 and 600. The two disagree in both directions, and nothing
+    warns. Run through the real path: a 600 by 20 m asset fits and is given an
+    80 m strip, so the landable ground is four times the model's width and a
+    pilot can land well clear of what they can see; a 5000 by 1200 m asset
+    fits and is given a 600 m strip, so the model's edges hang over ground
+    that is not runway; and a 600 by 0 m asset - a flat plan - fits and is
+    given an 80 m strip out of nothing, because the runway branch has no
+    "nothing to place" guard where the city branch does. The suite misses all
+    of it: every runway case in `test/assets.test.js` uses a 60 m width, which
+    is already under the 80 m floor, and the one over-wide case tests 601 at
+    depth 2400 where `depth / 4` and `width.high` both happen to be 600.
+    `test/assets.test.js:171` does assert the 80 m strip and calls it "at
+    least the narrowest strip", so the clamp was seen on the way in; what was
+    not is that the fit check lets through what the strip cannot be built at.
+  - **Goal**: make `assetFit`'s runway bounds the bounds the strip can be built
+    at - width held to `GROUP_RANGES.width` as well as to a quarter of the
+    length, with a named reason either side, and a guard for a width of
+    nothing - so an asset that cannot be placed faithfully is refused with a
+    reason rather than silently clamped. Decide separately whether the
+    hardcoded 5000 m ceiling should be `GROUP_RANGES.length.high`, which is
+    8000; the module docstring and `test/assets.test.js` both state 5000, so
+    it reads as deliberate. Expect the five runway assertions in
+    `test/assets.test.js` to need their widths moved above 80, and correct the
+    docstring table and `placeAssetRunway`'s own sentence, which both claim
+    the strip is the asset's width.
+  - **Settled**: `assetFit`'s runway bounds are the strip's own bounds -
+    width held to `GROUP_RANGES.width` as well as to a quarter of the length,
+    each with its own reason - and a width or length of nothing is `nothing to
+    place`, as the city branch already had. The 5000 m ceiling stays, now the
+    named `RUNWAY_LENGTH_LIMIT`: it is deliberately under
+    `GROUP_RANGES.length.high`, since 5 km is past every runway there is and a
+    model longer than that has its units guessed wrong. So the clamp in
+    `placeAssetRunway` is a guard rather than a resize, and the docstring
+    table and its own sentence now say so. The five runway cases in
+    `test/assets.test.js` moved above the 80 m floor, and a test of its own
+    holds the three sizes that used to be let through and silently resized.
+  - From: UI/UX Override - the top a click cannot reach

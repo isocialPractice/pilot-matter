@@ -5,6 +5,61 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.65.5] - 2026-11-12
+
+### Changed
+
+- **The scroll that puts a refusal where it can be read is now run, not
+  read.** `PanelView.showStatus` is the whole of what a pilot sees in the fix
+  the version before this one shipped, and `test/panel-view.test.js` held it
+  the only way a module touching the DOM can be held here: by reading
+  `js/panel-view.js` as text and pinning three of its lines. A pin catches a
+  line that is edited or deleted and cannot catch a guard no pin names, which
+  both of the method's early returns were. The method reads `this.drawn` and
+  `this.fields` and touches no global, so it now runs under Node against a
+  stub whose boxes are the ones the phone measured -
+  `PanelView.prototype.showStatus.call(stub, 'environment')`, with
+  `stub.fields.scrollTop` read back. The three source pins stay: they hold
+  what a stub cannot, which is that the page's own scroll is read off
+  `this.fields` rather than an element that merely happens to be the same one
+  today, and that the browser's `scrollIntoView` is never reached for.
+- **The length a long address is cut to is one decision rather than two that
+  have to agree.** `js/asset-fit.js` stated `NAMED_ADDRESS_LIMIT` as 120 and
+  `NAMED_ADDRESS_KEPT` as 117, two figures whose whole relationship is the
+  width of the ellipsis between them: a cut address comes back exactly the
+  limit long. `ELLIPSIS` now names `'...'` once, `NAMED_ADDRESS_KEPT` reads as
+  `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and `namedAddress` appends that
+  same constant instead of a second literal of its own. Nothing a pilot reads
+  moves - both exports stay and both are still 120 and 117 - and it is the
+  shape this repository settled on for `SOFT_EDGE`, which was changed from a
+  stated 0.5 to a derived `FEATHER_SHARE / 2` for the same reason: a constant
+  read off the rule that bounds it can no longer disagree with it.
+
+Held in Node by seven assertions on what the scroll does, in the window the
+phone measured - 62px of 210, at 470-532. A line already inside it is left
+where it is; the four line refusal at 541-598 comes up by 71, which puts its
+own top at the window's; a line taller than the window moves by that same 71
+rather than by `box.bottom - view.bottom`, which is the difference between
+reading a refusal and reading the end of a sentence whose start is missing; a
+line above the window comes down by a negative step; a line of no height is
+left alone, having nothing in it to read; a section whose line was never drawn
+is left alone rather than reaching a box on `undefined` and throwing inside
+`update`, which runs on every frame the dock is open; and a view with no
+fields has nothing to scroll. `test/assets.test.js` gained the one line the
+address figures had never said out loud, that the limit less the kept length
+is the width of the ellipsis.
+
+Six mutants were each caught by the test named for it, every one of the first
+three having left the suite green before this. The height guard deleted, the
+drawn-and-fields guard deleted, and the height guard moved below the scroll so
+that a line of no height is scrolled to; then a two dot ellipsis, the kept
+length written back as 116 as a figure of its own, and the limit moved to 200
+with the kept length left to follow it. The fourth mutant the issue recorded
+as equivalent - the window read from `line.parentElement` rather than
+`this.fields` - was not spent: `drawStatus` appends the line straight to
+`this.fields`, so the two are the same element today, and it is the source pin
+rather than the stub that holds it.
+
 ## [1.0.0-alpha.1.65.4] - 2026-11-11
 
 ### Fixed

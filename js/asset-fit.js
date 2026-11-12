@@ -199,9 +199,22 @@ export function gltfJson(bytes) {
     return glbJson(bytes) ?? jsonObject(bytes);
 }
 
-/** How long an address a refusal names whole, and how much of a longer one it keeps before the ellipsis. */
+/** What a cut address ends in, so the length it is cut to and the mark that fills the rest are one decision. */
+const ELLIPSIS = '...';
+
+/**
+ * How long an address a refusal names whole, and how much of a longer one it
+ * keeps before the ellipsis.
+ *
+ * The second is read off the first rather than written as a figure of its own,
+ * because the whole relationship between them is the width of what joins
+ * them: a cut address comes back exactly `NAMED_ADDRESS_LIMIT` characters
+ * long, so what is kept is the limit less the ellipsis that follows it. Stated
+ * as 117 the two could disagree - a limit moved and a kept length left behind
+ * would cut to the wrong length while both figures still read as deliberate.
+ */
 export const NAMED_ADDRESS_LIMIT = 120;
-export const NAMED_ADDRESS_KEPT = 117;
+export const NAMED_ADDRESS_KEPT = NAMED_ADDRESS_LIMIT - ELLIPSIS.length;
 
 /**
  * An address as it is named in a refusal: enough of it to recognise, never the
@@ -213,7 +226,7 @@ export const NAMED_ADDRESS_KEPT = 117;
  */
 export function namedAddress(url) {
     const address = String(url ?? '');
-    return address.length > NAMED_ADDRESS_LIMIT ? `${address.slice(0, NAMED_ADDRESS_KEPT)}...` : address;
+    return address.length > NAMED_ADDRESS_LIMIT ? `${address.slice(0, NAMED_ADDRESS_KEPT)}${ELLIPSIS}` : address;
 }
 
 /**
