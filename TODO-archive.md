@@ -5830,3 +5830,71 @@ still be found by name.
     `test/assets.test.js` moved above the 80 m floor, and a test of its own
     holds the three sizes that used to be let through and silently resized.
   - From: UI/UX Override - the top a click cannot reach
+
+## Archived 11-13-26
+
+- [x] A `.glb` naming an external image loads instead of being refused
+  - **Issue**: loading a `.glb` whose JSON names an external image opens the
+    step after loading as though the model were sound - headed LOADED ASSET,
+    `glTF binary, 12 triangles`, no refusal drawn - and the model is kept
+    untextured with nothing said to the pilot. The other three ways of
+    reaching outside the file are all refused: a `.gltf` naming a buffer or an
+    image is refused by name, and a `.glb` naming a buffer is refused with the
+    address `scene.bin`. `embeddedOnly` does fire for the image, and nothing
+    leaves for the network - that half holds - but three catches the thrown
+    `AssetRefused` inside its texture loading, drops the texture and resolves
+    the parse, so `readModel` answers with a model. `test/assets.test.js`
+    checks this area by reading `js/asset-loader.js` as text, so it passes
+    with the defect in place.
+  - **Goal**: Resolve to [glb-external-image.prompt.md](.claude/prompts/glb-external-image.prompt.md)
+  - **Settled**: the GLB's own JSON is read before it is parsed, which is the
+    fix the prompt recommended. `glbJson` in `js/asset-fit.js` returns the
+    first chunk parsed, or null for bytes that are not a GLB, so the check a
+    `.gltf` already went through covers a `.glb` too and does not depend on
+    what three swallows. The pure half moved to `js/asset-fit.js` to be
+    testable at all - `js/asset-loader.js` cannot be imported in Node - taking
+    `selfContained` with it and gaining `outsideAddress`, so the refusal names
+    the address the way the `.glb` buffer case already did. `embeddedOnly`
+    stays exactly as it was: it is the backstop that holds a field a later
+    extension adds a `uri` to, and it is what stops the fetch. Settled in
+    Chromium over a textured triangle built in the page: the external image is
+    refused naming the address and makes no request, while the same bytes
+    through a bare `GLTFLoader` do fetch it; a `.glb` with its image in the BIN
+    chunk and one with it as a `data:` uri both still read textured
+    (`.tmp/ui-ux/t29/glb-external-image.mjs`). Eight mutants caught, the
+    dropped `glb` branch among them.
+  - From: UI/UX Override - a .glb that points at another file
+- [x] **Brush Crossover**: `docs/terrain.html` says a hard and a soft brush
+  come to the same band at the ordinary zoom, which the figures do not support
+  - **Issue**: the Free Paint paragraph now ends "on a brush 640 units across
+    or narrower, which at the ordinary zoom is every brush the slider offers,
+    the two edges come to the same band and the axis reads only on a stroke
+    laid from far enough out to be wider than that". The 640 unit crossover is
+    right - `test/footprints.test.js` pins it - but the clause about the zoom
+    is not. `SIZE` is 5 to 400 screen pixels (`PAINT_BRUSH` in
+    `js/build-tools.js`) and a brush is laid at `unitsPerPixel(distance, fov,
+    viewHeight)`. On the default 16,000 unit canvas `createBuildCamera` opens
+    at its furthest, 15,200, which is 26.6 units a pixel across an 800 pixel
+    view: 640 units is reached at 24 px, so the default 25 px brush is already
+    665 units and the slider's widest is 10,643. The whole slider stays under
+    640 units only within 914 of the target, the innermost 4% of the 320 to
+    15,200 zoom range. So the sentence tells a reader the EDGE axis does
+    nothing in ordinary use when at the opening view it reads for all but the
+    smallest brushes, and "from far enough out" points the wrong way, since
+    the opening view is the furthest out there is.
+  - **Goal**: state it in the units the crossover is in and let the zoom
+    follow - a hard edge and a soft one come to the same band on a stroke 640
+    units across or narrower, which is a small brush at the opening view and
+    most of the slider once zoomed in. `CHANGELOG.md` already words it that
+    way, in world units with no claim about the zoom; leave that entry alone.
+  - **Settled**: the crossover is stated in world units and the zoom follows
+    it - "on a stroke 640 units across or narrower the two edges come to the
+    same band, and the axis reads only on a wider one", then the brush being
+    set in pixels and laid in units, so at the opening view of a 16000 unit
+    canvas, where a pixel is 27 units, it is a brush under 24 of the slider's
+    5 to 400, and zoomed in far enough it is every brush the slider offers.
+    Every figure re-measured against `createBuildCamera(16000)` and
+    `unitsPerPixel`: 15200 units out, 26.608 a pixel, the crossover at 24.1 px,
+    the whole slider under it within 914 of the target - 4.0% of the 320 to
+    15200 range. The 1.0.0-alpha.1.54.0 changelog entry was left as it was.
+  - From: UI/UX Override - a .glb that points at another file

@@ -11,7 +11,7 @@ import {
     draftUsable, fitReasons, assetRecipe, placeAssetObject, placeAssetRunway, assetsFor, libraryAsset, assetsUsed, withoutAsset,
     toBase64, fromBase64, assetHash, assetForFile, readAsset, flyablePlanes,
     insideFile, outsideAddress, glbJson, gltfJson, namedAddress, outsideFileSentence,
-    NAMED_ADDRESS_LIMIT, NAMED_ADDRESS_KEPT
+    NAMED_ADDRESS_LIMIT, NAMED_ADDRESS_KEPT, ELLIPSIS
 } from '../js/asset-fit.js';
 import { readRecipe, recipeBounds, recipeGeometry, isAssetRecipe, ASSET_RECIPE_FIELDS } from '../js/prefabs.js';
 import { expandGroup, GROUP_RANGES } from '../js/templates.js';
@@ -527,9 +527,17 @@ test('a long address is cut before it is named, and the sentence after it surviv
     // is the half that says what to do about it.
     assert.equal(NAMED_ADDRESS_LIMIT, 120);
     assert.equal(NAMED_ADDRESS_KEPT, 117);
-    // And the one relationship there is between them, which the module reads
-    // the second figure off rather than stating it twice.
-    assert.equal(NAMED_ADDRESS_LIMIT - NAMED_ADDRESS_KEPT, '...'.length, 'what is kept is the limit less the ellipsis that follows it');
+    // And the one relationship there is between them, read off the module's
+    // own exports rather than restated here as a second `...` of its own.
+    //
+    // That line says the relationship; it cannot hold it. A kept length
+    // written back as a bare 117 is this same value at runtime, so no
+    // assertion against the exports can tell a derived figure from a stated
+    // one - the two differ only in the source. The pin under it is what
+    // rejects that revert, the way the loader's own checks below are pinned.
+    assert.equal(NAMED_ADDRESS_KEPT, NAMED_ADDRESS_LIMIT - ELLIPSIS.length, 'what is kept is the limit less the ellipsis that follows it');
+    assert.match(source('asset-fit.js'), /^export const NAMED_ADDRESS_KEPT = NAMED_ADDRESS_LIMIT - ELLIPSIS\.length;$/m,
+        'and the module derives it, rather than stating a second figure that has to agree');
 
     const address = length => `https://example.com/textures/${'a'.repeat(Math.max(0, length - 30))}.png`.slice(0, length);
     const at120 = address(120), at121 = address(121), at180 = address(180);

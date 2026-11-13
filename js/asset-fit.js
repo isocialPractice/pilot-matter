@@ -199,8 +199,15 @@ export function gltfJson(bytes) {
     return glbJson(bytes) ?? jsonObject(bytes);
 }
 
-/** What a cut address ends in, so the length it is cut to and the mark that fills the rest are one decision. */
-const ELLIPSIS = '...';
+/**
+ * What a cut address ends in, so the length it is cut to and the mark that
+ * fills the rest are one decision.
+ *
+ * Exported so a test can read the kept length off the same two things this
+ * module reads it off, rather than restating the mark as a literal of its own
+ * and asserting a figure against itself.
+ */
+export const ELLIPSIS = '...';
 
 /**
  * How long an address a refusal names whole, and how much of a longer one it
