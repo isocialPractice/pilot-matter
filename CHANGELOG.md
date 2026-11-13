@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.65.6] - 2026-11-13
+
+### Changed
+
+- **The derived address length is now held where the derivation is visible,
+  which is the source.** The version before this one read
+  `NAMED_ADDRESS_KEPT` off `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` so that the
+  length a long address is cut to and the mark that fills the rest could no
+  longer disagree, and added a line to `test/assets.test.js` saying the limit
+  less the kept length is the width of the ellipsis. That line states the
+  relationship; it cannot hold it. Sitting three lines under the pins at 120
+  and 117 it reads `120 - 117 === 3`, and a kept length written back as a bare
+  `117` is the same value at runtime, so no assertion against the exports can
+  tell a derived figure from a stated one. `ELLIPSIS` is now exported as well,
+  so the test reads the kept length off the module's own two constants with no
+  second `'...'` of its own, and the derivation itself is pinned by an
+  `assert.match` on the module's source - the way the loader's own checks in
+  the next test below it are already held. The runtime line stays, labelled in
+  the test as stating the relationship rather than catching a change to it.
+
+Held in Node by `test/assets.test.js`, which asserts the kept length off
+`NAMED_ADDRESS_LIMIT - ELLIPSIS.length` and then matches the derivation line
+in the module's text. Four mutants, each found once and each caught: the kept
+length written back as a bare `117`, which the suite was green through before
+this and which now fails the source pin alone and by its own message; a two
+dot ellipsis; the limit moved to 200; and the export taken off again, which
+fails the file at its import and so shows the export is load-bearing. Nothing
+in the page moved, so there was nothing to settle in Chromium.
+
 ## [1.0.0-alpha.1.65.5] - 2026-11-12
 
 ### Changed

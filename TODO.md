@@ -38,65 +38,37 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### Code Review Override - the derived cut nothing holds
+### Code Review Override - the note that settled the derived cut
 
 #### Resolve Issues
 
-- [ ] Derived Cut 1: the kept length can be written back as a figure of its own
-  and the suite stays green
-  - **Issue**: the module change is right and does what the item asked -
-    `ELLIPSIS` names `'...'` once, `NAMED_ADDRESS_KEPT` reads as
-    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and `namedAddress` appends that
-    same constant. What is not held is the derivation itself. The line added
-    to `test/assets.test.js:530`,
-    `assert.equal(NAMED_ADDRESS_LIMIT - NAMED_ADDRESS_KEPT, '...'.length)`,
-    sits three lines under `assert.equal(NAMED_ADDRESS_LIMIT, 120)` and
-    `assert.equal(NAMED_ADDRESS_KEPT, 117)`, so given those two it reads
-    `120 - 117 === 3` and can never be the assertion that fails - it is a
-    tautology, not a hold. Run as a mutant: `NAMED_ADDRESS_KEPT` put back to a
-    bare `117` leaves the whole suite at 2434 passing and 0 failing. The three
-    mutants the item's **Settled** note reports as caught - a two dot
-    ellipsis, the kept length restated as 116, the limit moved to 200 - are
-    each caught by the two absolute pins that were already there before this
-    run, not by the line added to hold the derivation. So the drift the item
-    was raised to close is open in its new form: the figure is one decision
-    today and nothing notices it becoming two again.
-  - **Goal**: hold it the way the precedent it cites is held, and the way this
-    file holds what a runtime cannot show. `test/footprints.test.js:529`
-    asserts `SOFT_EDGE` against `FEATHER_SHARE / 2` - the imported constant,
-    not a restated figure - which is only possible because both are exported;
-    export `ELLIPSIS` and assert `NAMED_ADDRESS_KEPT` off
-    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` so the test stops restating the
-    mark as its own `'...'` literal, which is the second copy the item set out
-    to remove. That still cannot tell a derived 117 from a written one, since
-    the two are the same value at runtime, so add the pin this project already
-    uses for exactly that: `test/assets.test.js:35` has a `source` helper and
-    `:564` already matches `source('asset-fit.js')`, so an `assert.match` on
-    the derivation line catches the revert the mutant above walks through.
-    Either make the tautology at `:530` carry weight through the exported
-    constant or drop it - as it stands it reports a hold the suite does not
-    have.
-  - From: UI/UX Override - the dock's scroll, read on a phone
-- [ ] Derived Cut 2: the settled note credits the new line with a catch it
-  cannot make
-  - **Issue**: the **Settled** note on `Derived Cut` in `## Complete` says
-    `test/assets.test.js` "gained the one line the figures had never said out
-    loud ... which is what catches a kept length written back as a figure of
-    its own". That is the one mutant the line cannot catch, and the suite is
-    green through it, as `Derived Cut 1` shows. The archive is where this
-    project reads its own precedent back - this very item cites
-    `Held Feather 1` in `TODO-archive.md` as the convention it was following -
-    so a note claiming a hold that is not there is read later as a hold that
-    is, and the next run to touch these figures will trust it.
-  - **Goal**: correct the clause to say what the line does, which is state the
-    relationship between the two figures rather than catch a change to it, and
-    let whatever `Derived Cut 1` lands be what the note credits. Leave the
-    rest of the note as it is - the module description, the unchanged exports
-    and the `docs/terrain.html:320` sentence are all accurate, that last one
-    checked against the file and still reading "named as far as its first 117
-    and an ellipsis". `CHANGELOG.md` needs no edit: it attributes the six
-    catches to "the test named for it" and claims the suite-was-green-before
-    property only for the first three, which is true as written.
+- [ ] Derived Cut 3: the settled note points at a test that is not there and
+  claims the mark is named once
+  - **Issue**: two clauses of the **Settled** note on `Derived Cut 1` state
+    things the files do not support, and that note is what a later run reads
+    this precedent back off. First, "which is the pattern three tests below it
+    already hold the loader's checks by": the loader's source pins are in the
+    test at `test/assets.test.js:570`, the one immediately after the edited
+    test ends at `:566`, and there is no test three below it at all - from
+    `:524` the file holds only `:570` and `:622`, so a reader counting down
+    three runs off the end of it. Second, "so the mark is named once across
+    both files": `'...'` is still written as a literal at `:548`, `:550`,
+    `:552` and `:563`, and `117` at `:550`, `:552` and `:563`. Those are the
+    behavioural assertions and they are right to pin the observable output by
+    value rather than rebuild it out of the constants under test, so what is
+    wrong is the claim and not the test - but as written the note tells the
+    next run that moving `ELLIPSIS` alone would carry, when four literals
+    would have to move with it.
+  - **Goal**: name the next test rather than a third one, and narrow the
+    "named once" clause to the kept-length assertion it is actually about,
+    saying that the behavioural assertions below write the mark and the figure
+    out by value on purpose. Change nothing else in the note and nothing in
+    the test: every other claim the note makes was re-run at review and holds
+    - the bare `117` fails the source pin alone and by its own message, a two
+    dot ellipsis and the limit moved to 200 each fail one of the two absolute
+    pins, and the export taken off fails the file at its import.
+    `CHANGELOG.md` carried the same wrong pointer and the review corrected it
+    there in place, so `TODO.md` is the only file left to edit.
   - From: UI/UX Override - the dock's scroll, read on a phone
 
 ## Game UI/UX
@@ -740,73 +712,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 413 earlier items in `TODO-archive.md`, newest last.
+> 415 earlier items in `TODO-archive.md`, newest last.
 
-- [x] A `.glb` naming an external image loads instead of being refused
-  - **Issue**: loading a `.glb` whose JSON names an external image opens the
-    step after loading as though the model were sound - headed LOADED ASSET,
-    `glTF binary, 12 triangles`, no refusal drawn - and the model is kept
-    untextured with nothing said to the pilot. The other three ways of
-    reaching outside the file are all refused: a `.gltf` naming a buffer or an
-    image is refused by name, and a `.glb` naming a buffer is refused with the
-    address `scene.bin`. `embeddedOnly` does fire for the image, and nothing
-    leaves for the network - that half holds - but three catches the thrown
-    `AssetRefused` inside its texture loading, drops the texture and resolves
-    the parse, so `readModel` answers with a model. `test/assets.test.js`
-    checks this area by reading `js/asset-loader.js` as text, so it passes
-    with the defect in place.
-  - **Goal**: Resolve to [glb-external-image.prompt.md](.claude/prompts/glb-external-image.prompt.md)
-  - **Settled**: the GLB's own JSON is read before it is parsed, which is the
-    fix the prompt recommended. `glbJson` in `js/asset-fit.js` returns the
-    first chunk parsed, or null for bytes that are not a GLB, so the check a
-    `.gltf` already went through covers a `.glb` too and does not depend on
-    what three swallows. The pure half moved to `js/asset-fit.js` to be
-    testable at all - `js/asset-loader.js` cannot be imported in Node - taking
-    `selfContained` with it and gaining `outsideAddress`, so the refusal names
-    the address the way the `.glb` buffer case already did. `embeddedOnly`
-    stays exactly as it was: it is the backstop that holds a field a later
-    extension adds a `uri` to, and it is what stops the fetch. Settled in
-    Chromium over a textured triangle built in the page: the external image is
-    refused naming the address and makes no request, while the same bytes
-    through a bare `GLTFLoader` do fetch it; a `.glb` with its image in the BIN
-    chunk and one with it as a `data:` uri both still read textured
-    (`.tmp/ui-ux/t29/glb-external-image.mjs`). Eight mutants caught, the
-    dropped `glb` branch among them.
-  - From: UI/UX Override - a .glb that points at another file
-- [x] **Brush Crossover**: `docs/terrain.html` says a hard and a soft brush
-  come to the same band at the ordinary zoom, which the figures do not support
-  - **Issue**: the Free Paint paragraph now ends "on a brush 640 units across
-    or narrower, which at the ordinary zoom is every brush the slider offers,
-    the two edges come to the same band and the axis reads only on a stroke
-    laid from far enough out to be wider than that". The 640 unit crossover is
-    right - `test/footprints.test.js` pins it - but the clause about the zoom
-    is not. `SIZE` is 5 to 400 screen pixels (`PAINT_BRUSH` in
-    `js/build-tools.js`) and a brush is laid at `unitsPerPixel(distance, fov,
-    viewHeight)`. On the default 16,000 unit canvas `createBuildCamera` opens
-    at its furthest, 15,200, which is 26.6 units a pixel across an 800 pixel
-    view: 640 units is reached at 24 px, so the default 25 px brush is already
-    665 units and the slider's widest is 10,643. The whole slider stays under
-    640 units only within 914 of the target, the innermost 4% of the 320 to
-    15,200 zoom range. So the sentence tells a reader the EDGE axis does
-    nothing in ordinary use when at the opening view it reads for all but the
-    smallest brushes, and "from far enough out" points the wrong way, since
-    the opening view is the furthest out there is.
-  - **Goal**: state it in the units the crossover is in and let the zoom
-    follow - a hard edge and a soft one come to the same band on a stroke 640
-    units across or narrower, which is a small brush at the opening view and
-    most of the slider once zoomed in. `CHANGELOG.md` already words it that
-    way, in world units with no claim about the zoom; leave that entry alone.
-  - **Settled**: the crossover is stated in world units and the zoom follows
-    it - "on a stroke 640 units across or narrower the two edges come to the
-    same band, and the axis reads only on a wider one", then the brush being
-    set in pixels and laid in units, so at the opening view of a 16000 unit
-    canvas, where a pixel is 27 units, it is a brush under 24 of the slider's
-    5 to 400, and zoomed in far enough it is every brush the slider offers.
-    Every figure re-measured against `createBuildCamera(16000)` and
-    `unitsPerPixel`: 15200 units out, 26.608 a pixel, the crossover at 24.1 px,
-    the whole slider under it within 914 of the target - 4.0% of the 320 to
-    15200 range. The 1.0.0-alpha.1.54.0 changelog entry was left as it was.
-  - From: UI/UX Override - a .glb that points at another file
 - [x] `selfContained` accepts a `blob:` address, which its docstring says it
   does not
   - **Issue**: `js/asset-loader.js` reads both uses of an address through one
@@ -1105,8 +1012,95 @@ how the simulator got here rather than as a list still to be worked.
     unchanged - `docs/terrain.html:320` still states the behaviour correctly
     and needed no edit. `test/assets.test.js` gained the one line the figures
     had never said out loud, that the limit less the kept length is the width
-    of the ellipsis, which is what catches a kept length written back as a
-    figure of its own. Held by three mutants, all caught: a two dot ellipsis,
-    the kept length restated as 116, and the limit moved to 200 with the kept
-    length following it.
+    of the ellipsis - which states the relationship rather than catching a
+    change to it, since a kept length written back as a bare 117 is the same
+    value at runtime and no assertion against the exports can tell a derived
+    figure from a stated one. The three mutants caught here - a two dot
+    ellipsis, the kept length restated as 116, and the limit moved to 200 with
+    the kept length following it - are each caught by the two absolute pins
+    that were already in the file, not by the line this run added. What holds
+    the derivation is `Derived Cut 1`, whose own **Settled** note has it.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Derived Cut 1: the kept length can be written back as a figure of its own
+  and the suite stays green
+  - **Issue**: the module change is right and does what the item asked -
+    `ELLIPSIS` names `'...'` once, `NAMED_ADDRESS_KEPT` reads as
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and `namedAddress` appends that
+    same constant. What is not held is the derivation itself. The line added
+    to `test/assets.test.js:530`,
+    `assert.equal(NAMED_ADDRESS_LIMIT - NAMED_ADDRESS_KEPT, '...'.length)`,
+    sits three lines under `assert.equal(NAMED_ADDRESS_LIMIT, 120)` and
+    `assert.equal(NAMED_ADDRESS_KEPT, 117)`, so given those two it reads
+    `120 - 117 === 3` and can never be the assertion that fails - it is a
+    tautology, not a hold. Run as a mutant: `NAMED_ADDRESS_KEPT` put back to a
+    bare `117` leaves the whole suite at 2434 passing and 0 failing. The three
+    mutants the item's **Settled** note reports as caught - a two dot
+    ellipsis, the kept length restated as 116, the limit moved to 200 - are
+    each caught by the two absolute pins that were already there before this
+    run, not by the line added to hold the derivation. So the drift the item
+    was raised to close is open in its new form: the figure is one decision
+    today and nothing notices it becoming two again.
+  - **Goal**: hold it the way the precedent it cites is held, and the way this
+    file holds what a runtime cannot show. `test/footprints.test.js:529`
+    asserts `SOFT_EDGE` against `FEATHER_SHARE / 2` - the imported constant,
+    not a restated figure - which is only possible because both are exported;
+    export `ELLIPSIS` and assert `NAMED_ADDRESS_KEPT` off
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` so the test stops restating the
+    mark as its own `'...'` literal, which is the second copy the item set out
+    to remove. That still cannot tell a derived 117 from a written one, since
+    the two are the same value at runtime, so add the pin this project already
+    uses for exactly that: `test/assets.test.js:35` has a `source` helper and
+    `:564` already matches `source('asset-fit.js')`, so an `assert.match` on
+    the derivation line catches the revert the mutant above walks through.
+    Either make the tautology at `:530` carry weight through the exported
+    constant or drop it - as it stands it reports a hold the suite does not
+    have.
+  - **Settled**: held in the source, which is the only place the derivation is
+    visible at all. `ELLIPSIS` is exported from `js/asset-fit.js`, its comment
+    saying why it is, and the test now reads the kept length off
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` - the module's own two exports,
+    with no second `'...'` of its own - so the mark is named once across both
+    files. Under it is an `assert.match` on `source('asset-fit.js')` pinning
+    the derivation line itself, which is the pattern three tests below it
+    already hold the loader's checks by. The runtime line is kept and
+    labelled, in the test, as stating the relationship rather than holding it,
+    so the next reader credits it with what it does; nothing in the test
+    asserts a figure against itself any more. Four mutants, each found once
+    and each caught: the kept length written back as a bare 117, which left
+    the suite at 23 passing before this run and now fails the source pin
+    alone, by its own message; a two dot ellipsis; the limit moved to 200; and
+    the export taken off again, which fails the file at its import and so
+    proves the export is load-bearing rather than decorative.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Derived Cut 2: the settled note credits the new line with a catch it
+  cannot make
+  - **Issue**: the **Settled** note on `Derived Cut` in `## Complete` says
+    `test/assets.test.js` "gained the one line the figures had never said out
+    loud ... which is what catches a kept length written back as a figure of
+    its own". That is the one mutant the line cannot catch, and the suite is
+    green through it, as `Derived Cut 1` shows. The archive is where this
+    project reads its own precedent back - this very item cites
+    `Held Feather 1` in `TODO-archive.md` as the convention it was following -
+    so a note claiming a hold that is not there is read later as a hold that
+    is, and the next run to touch these figures will trust it.
+  - **Goal**: correct the clause to say what the line does, which is state the
+    relationship between the two figures rather than catch a change to it, and
+    let whatever `Derived Cut 1` lands be what the note credits. Leave the
+    rest of the note as it is - the module description, the unchanged exports
+    and the `docs/terrain.html:320` sentence are all accurate, that last one
+    checked against the file and still reading "named as far as its first 117
+    and an ellipsis". `CHANGELOG.md` needs no edit: it attributes the six
+    catches to "the test named for it" and claims the suite-was-green-before
+    property only for the first three, which is true as written.
+  - **Settled**: the clause now says the line states the relationship between
+    the two figures rather than catching a change to it, says why no runtime
+    assertion can catch it, names the two absolute pins as what caught the
+    three mutants the note had credited to the new line, and points at
+    `Derived Cut 1` for what does hold the derivation. The rest of the note is
+    word for word as it was. Both the things the issue said to recheck hold:
+    `docs/terrain.html:320` still reads "named as far as its first 117 and an
+    ellipsis", and `CHANGELOG.md` needed no edit - its own sentence says what
+    the line says rather than what it catches, and it claims the
+    suite-was-green-before property only of the first three of its six
+    mutants.
   - From: UI/UX Override - the dock's scroll, read on a phone
