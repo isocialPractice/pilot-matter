@@ -38,39 +38,6 @@ its context survives being archived.
     behind, and the archive that then double-counts it.
   - From: Documentation & Polish `->` Pruning the Roadmap
 
-### Code Review Override - the note that settled the derived cut
-
-#### Resolve Issues
-
-- [ ] Derived Cut 3: the settled note points at a test that is not there and
-  claims the mark is named once
-  - **Issue**: two clauses of the **Settled** note on `Derived Cut 1` state
-    things the files do not support, and that note is what a later run reads
-    this precedent back off. First, "which is the pattern three tests below it
-    already hold the loader's checks by": the loader's source pins are in the
-    test at `test/assets.test.js:570`, the one immediately after the edited
-    test ends at `:566`, and there is no test three below it at all - from
-    `:524` the file holds only `:570` and `:622`, so a reader counting down
-    three runs off the end of it. Second, "so the mark is named once across
-    both files": `'...'` is still written as a literal at `:548`, `:550`,
-    `:552` and `:563`, and `117` at `:550`, `:552` and `:563`. Those are the
-    behavioural assertions and they are right to pin the observable output by
-    value rather than rebuild it out of the constants under test, so what is
-    wrong is the claim and not the test - but as written the note tells the
-    next run that moving `ELLIPSIS` alone would carry, when four literals
-    would have to move with it.
-  - **Goal**: name the next test rather than a third one, and narrow the
-    "named once" clause to the kept-length assertion it is actually about,
-    saying that the behavioural assertions below write the mark and the figure
-    out by value on purpose. Change nothing else in the note and nothing in
-    the test: every other claim the note makes was re-run at review and holds
-    - the bare `117` fails the source pin alone and by its own message, a two
-    dot ellipsis and the limit moved to 200 each fail one of the two absolute
-    pins, and the export taken off fails the file at its import.
-    `CHANGELOG.md` carried the same wrong pointer and the review corrected it
-    there in place, so `TODO.md` is the only file left to edit.
-  - From: UI/UX Override - the dock's scroll, read on a phone
-
 ## Game UI/UX
 
 Player-facing interface and experience around the flight model, beyond the
@@ -712,41 +679,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 415 earlier items in `TODO-archive.md`, newest last.
+> 416 earlier items in `TODO-archive.md`, newest last.
 
-- [x] `selfContained` accepts a `blob:` address, which its docstring says it
-  does not
-  - **Issue**: `js/asset-loader.js` reads both uses of an address through one
-    predicate, `embeddedAddress`, whose rule is `/^(?:data|blob):/i`. `blob:`
-    belongs in the manager, where three hands an embedded texture to the image
-    loader as a blob the page made from the file's own bytes. It does not
-    belong in `selfContained`, which reads the file's own JSON: a `.gltf`
-    carrying `"images": [{ "uri": "blob:https://example.com/abc" }]` passes a
-    check documented as "True for a glTF whose buffers and images are all
-    inside it", and a blob address can never be inside a file, since only the
-    page that made one can name it. Nothing escapes - the manager allows the
-    same two schemes and no request leaves for a blob the page did not make -
-    so this is the early, named refusal reading wider than it says rather than
-    an exposure.
-  - **Goal**: give `selfContained` the `data:`-only rule its docstring states
-    and leave `blob:` to the manager, or keep the one predicate and say in the
-    docstring why `blob:` is in it. Verifying it needs the Chromium harness or
-    a vendored `three`: `js/asset-loader.js` cannot be imported in Node, since
-    `three` is CDN-only, which is why `test/assets.test.js` reads it as source
-    text.
-  - **Settled**: the first option - the one predicate is now two, each named
-    for whose rule it is. `insideFile` in `js/asset-fit.js` is `/^data:/i`,
-    what a *file* may name, and `selfContained` reads through it; the manager's
-    `EMBEDDED_ADDRESS` stays `/^(?:data|blob):/i`, what the *page* may ask for
-    while it reads a model it was handed. Both docstrings say why they differ
-    and point at each other, since the names are close enough to be swapped by
-    mistake. A `.gltf` or a `.glb` carrying a `blob:` image is now refused
-    early and by name where it used to pass the check and be stopped at the
-    manager, so nothing widened. Verified in the same Chromium harness as the
-    item above, which reads both predicates in the page, and pinned in Node now
-    that `insideFile` and `selfContained` are importable - a mutant widening
-    the file's rule back to `blob:` is caught.
-  - From: UI/UX Override - a .glb that points at another file
 - [x] Brush Crossover 1: the paragraph's slider figure leaves a 24 pixel brush
   on the wrong side of the crossover
   - **Issue**: the `FREE PAINT` paragraph in `docs/terrain.html` now reads "at
@@ -1059,18 +993,22 @@ how the simulator got here rather than as a list still to be worked.
     visible at all. `ELLIPSIS` is exported from `js/asset-fit.js`, its comment
     saying why it is, and the test now reads the kept length off
     `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` - the module's own two exports,
-    with no second `'...'` of its own - so the mark is named once across both
-    files. Under it is an `assert.match` on `source('asset-fit.js')` pinning
-    the derivation line itself, which is the pattern three tests below it
-    already hold the loader's checks by. The runtime line is kept and
-    labelled, in the test, as stating the relationship rather than holding it,
-    so the next reader credits it with what it does; nothing in the test
-    asserts a figure against itself any more. Four mutants, each found once
-    and each caught: the kept length written back as a bare 117, which left
-    the suite at 23 passing before this run and now fails the source pin
-    alone, by its own message; a two dot ellipsis; the limit moved to 200; and
-    the export taken off again, which fails the file at its import and so
-    proves the export is load-bearing rather than decorative.
+    with no second `'...'` of its own - so the mark is named once in the
+    assertion that reads the kept length. Under it is an `assert.match` on
+    `source('asset-fit.js')` pinning the derivation line itself, which is the
+    pattern the next test below it already holds the loader's checks by. The
+    behavioural assertions further down the test write the mark and the 117
+    out by value on purpose: what they pin is the output a pilot reads, and
+    that is right to state as a figure rather than rebuild out of the
+    constants under test. The runtime line is kept and labelled, in the test,
+    as stating the relationship rather than holding it, so the next reader
+    credits it with what it does; nothing in the test asserts a figure against
+    itself any more. Four mutants, each found once and each caught: the kept
+    length written back as a bare 117, which left the suite at 23 passing
+    before this run and now fails the source pin alone, by its own message; a
+    two dot ellipsis; the limit moved to 200; and the export taken off again,
+    which fails the file at its import and so proves the export is
+    load-bearing rather than decorative.
   - From: UI/UX Override - the dock's scroll, read on a phone
 - [x] Derived Cut 2: the settled note credits the new line with a catch it
   cannot make
@@ -1103,4 +1041,48 @@ how the simulator got here rather than as a list still to be worked.
     the line says rather than what it catches, and it claims the
     suite-was-green-before property only of the first three of its six
     mutants.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Derived Cut 3: the settled note points at a test that is not there and
+  claims the mark is named once
+  - **Issue**: two clauses of the **Settled** note on `Derived Cut 1` state
+    things the files do not support, and that note is what a later run reads
+    this precedent back off. First, "which is the pattern three tests below it
+    already hold the loader's checks by": the loader's source pins are in the
+    test at `test/assets.test.js:570`, the one immediately after the edited
+    test ends at `:566`, and there is no test three below it at all - from
+    `:524` the file holds only `:570` and `:622`, so a reader counting down
+    three runs off the end of it. Second, "so the mark is named once across
+    both files": `'...'` is still written as a literal at `:548`, `:550`,
+    `:552` and `:563`, and `117` at `:550`, `:552` and `:563`. Those are the
+    behavioural assertions and they are right to pin the observable output by
+    value rather than rebuild it out of the constants under test, so what is
+    wrong is the claim and not the test - but as written the note tells the
+    next run that moving `ELLIPSIS` alone would carry, when four literals
+    would have to move with it.
+  - **Goal**: name the next test rather than a third one, and narrow the
+    "named once" clause to the kept-length assertion it is actually about,
+    saying that the behavioural assertions below write the mark and the figure
+    out by value on purpose. Change nothing else in the note and nothing in
+    the test: every other claim the note makes was re-run at review and holds
+    - the bare `117` fails the source pin alone and by its own message, a two
+    dot ellipsis and the limit moved to 200 each fail one of the two absolute
+    pins, and the export taken off fails the file at its import.
+    `CHANGELOG.md` carried the same wrong pointer and the review corrected it
+    there in place, so `TODO.md` is the only file left to edit.
+  - **Settled**: both clauses of the `Derived Cut 1` note now say what the
+    files hold. The pointer names the next test below the edited one, which is
+    the test at `test/assets.test.js:570` that pins the loader's checks the
+    same way - the edited test ends at `:566`, and `:570` and `:622` are all
+    that follow it, so there was never a third one to count down to. The
+    "named once" clause is narrowed to the assertion that reads the kept
+    length, and a sentence after it says the behavioural assertions further
+    down write the mark and the 117 out by value on purpose, because what they
+    pin is the output a pilot reads rather than the constants under test. Both
+    readings were checked against the file first: `'...'` is written at
+    `:548`, `:550`, `:552` and `:563` and `117` at `:550`, `:552` and `:563`,
+    all of them inside those behavioural assertions. Nothing else in the note
+    moved, nothing in `test/assets.test.js` or `js/asset-fit.js` moved, and
+    `CHANGELOG.md` already read "the next test below it" from the review's own
+    correction, so `TODO.md` was the only file edited. The suite is green at
+    2434 passing, 0 failing.
   - From: UI/UX Override - the dock's scroll, read on a phone

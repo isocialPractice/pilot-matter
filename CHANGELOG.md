@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The note that settled the derived address cut now points at the test that
+  really holds the loader's checks, and says which of its assertions names the
+  mark once.** The `Derived Cut 1` note in `TODO.md` credited the
+  `assert.match` on the module's source with being "the pattern three tests
+  below it already hold the loader's checks by", and there is no third test
+  below it: the edited test ends at `test/assets.test.js:566`, and `:570` and
+  `:622` are all that follow, so a reader counting down three runs off the end
+  of the file. The pointer now names the next test, `:570`, which is where the
+  loader's source pins are. The same note said the mark was "named once across
+  both files" while `'...'` is still written at `:548`, `:550`, `:552` and
+  `:563` and `117` at `:550`, `:552` and `:563`; the claim is now narrowed to
+  the assertion that reads the kept length off `NAMED_ADDRESS_LIMIT -
+  ELLIPSIS.length`, and a sentence after it says the behavioural assertions
+  further down write the mark and the figure out by value on purpose, because
+  what they pin is the output a pilot reads rather than the constants under
+  test. As written the note told the next run that moving `ELLIPSIS` alone
+  would carry, when four literals would have to move with it.
+
+Nothing in `js/asset-fit.js` or `test/assets.test.js` moved: what was wrong
+was the account of the test and not the test. No version applies: the whole
+diff is `TODO.md`, its archive and this entry, and nothing in it runs. The
+suite was re-run whole and is green at 2434 passing, 0 failing.
+
 ## [1.0.0-alpha.1.65.6] - 2026-11-13
 
 ### Changed

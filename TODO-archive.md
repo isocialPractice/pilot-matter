@@ -5898,3 +5898,39 @@ still be found by name.
     the whole slider under it within 914 of the target - 4.0% of the 320 to
     15200 range. The 1.0.0-alpha.1.54.0 changelog entry was left as it was.
   - From: UI/UX Override - a .glb that points at another file
+
+## Archived 11-14-26
+
+- [x] `selfContained` accepts a `blob:` address, which its docstring says it
+  does not
+  - **Issue**: `js/asset-loader.js` reads both uses of an address through one
+    predicate, `embeddedAddress`, whose rule is `/^(?:data|blob):/i`. `blob:`
+    belongs in the manager, where three hands an embedded texture to the image
+    loader as a blob the page made from the file's own bytes. It does not
+    belong in `selfContained`, which reads the file's own JSON: a `.gltf`
+    carrying `"images": [{ "uri": "blob:https://example.com/abc" }]` passes a
+    check documented as "True for a glTF whose buffers and images are all
+    inside it", and a blob address can never be inside a file, since only the
+    page that made one can name it. Nothing escapes - the manager allows the
+    same two schemes and no request leaves for a blob the page did not make -
+    so this is the early, named refusal reading wider than it says rather than
+    an exposure.
+  - **Goal**: give `selfContained` the `data:`-only rule its docstring states
+    and leave `blob:` to the manager, or keep the one predicate and say in the
+    docstring why `blob:` is in it. Verifying it needs the Chromium harness or
+    a vendored `three`: `js/asset-loader.js` cannot be imported in Node, since
+    `three` is CDN-only, which is why `test/assets.test.js` reads it as source
+    text.
+  - **Settled**: the first option - the one predicate is now two, each named
+    for whose rule it is. `insideFile` in `js/asset-fit.js` is `/^data:/i`,
+    what a *file* may name, and `selfContained` reads through it; the manager's
+    `EMBEDDED_ADDRESS` stays `/^(?:data|blob):/i`, what the *page* may ask for
+    while it reads a model it was handed. Both docstrings say why they differ
+    and point at each other, since the names are close enough to be swapped by
+    mistake. A `.gltf` or a `.glb` carrying a `blob:` image is now refused
+    early and by name where it used to pass the check and be stopped at the
+    manager, so nothing widened. Verified in the same Chromium harness as the
+    item above, which reads both predicates in the page, and pinned in Node now
+    that `insideFile` and `selfContained` are importable - a mutant widening
+    the file's rule back to `blob:` is caught.
+  - From: UI/UX Override - a .glb that points at another file
