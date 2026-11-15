@@ -17,26 +17,61 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] Write the request against the automation tool that `### Pruning the
-  Roadmap` says to queue in place of a seventh pruning item
-  - The record under that heading settled this on 10.29.2026: every run that
-    completes a queued item leaves its roadmap original behind, so pruning is a
-    pass that comes round rather than a job that finishes, and the fix belongs
-    in the tool rather than in this file. The 10.31.2026 run met it three more
-    times - the two mountain footprint items and the weather lift - and closed
-    each original inline rather than writing an eighth, ninth and tenth pruning
-    item for them.
-  - What the request has to say: section 5 of the instructions copies an item
-    into `## Current` and leaves the original in place, `todo.mjs` carries no
-    notion of item identity across those two copies, and no rule covers the
-    original once the copy archives. The archive already shows the cost - grep
-    it for `**Mountain** length` and it answers twice, which is one item
-    recorded as two pieces of finished work.
-  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
-    automation, and what shape the fix takes there is theirs to decide. Write
-    it where the user will find it and name both halves - the copy that is left
-    behind, and the archive that then double-counts it.
-  - From: Documentation & Polish `->` Pruning the Roadmap
+- [ ] **Kept builds survive a reload**: the world ACCEPT AND EXIT keeps - its
+  placements, start point, plane and the assets it uses - written to IndexedDB
+  beside the asset library and put back when the page opens, so the world
+  flown after a reload is still the one built
+  - Today it lives only in the page, and closing the tab loses it unless it was
+    saved to a file. Keep one world, the last kept, under a key of its own in
+    the `pilot-matter` database `js/asset-store.js` opens, read before the
+    first tile is drawn; the Settings environment row says the world flown is
+    the kept one, with a way back to the preset.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [ ] **The Matter API stands objects**: `createEnvironment` and
+  `createTiledEnvironment` in `js/api/matter.js` stand a world's objects and
+  roads as the simulator does, and answer `obstacleTop` for them, so a host
+  loading a built world gets its buildings as well as its ground
+  - Today the API draws a world's ground and leaves its objects out, so a
+    host's aircraft flies through a city it cannot see. Reuse
+    `standingObjects` and `objectGroup`; an `objects: false` option keeps
+    today's drawing for a host that stands its own. A worked example in
+    `docs/api.md` loads a built world's file under an external aircraft.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [ ] **Select picks a roof**: a click on an object picks it by the object's
+  own bounds under the pointer rather than by the ground point the pointer's
+  ray meets, so a tall building is picked where it is seen
+  - The ray ends on the ground today, so a click on a tower's upper floors
+    picks whatever stands on the ground behind it, or nothing. Test the ray
+    against each object's turned and scaled `recipeBounds`, nearest first,
+    before the ground.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [ ] **Every plane opens flying**: each plane in `js/planes.js` starts a
+  flight at the start point above its own stall speed and trimmed level,
+  rather than the jet opening slightly stalled
+  - Give each recipe its own start speed and trim, held by a test that steps
+    every plane a few seconds from the start point and expects it neither
+    stalled nor sinking.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [ ] **A pick reaches a summit narrower than the sampling**: `pickGround`
+  finds the ground under the pointer on a region too small to raise more than
+  one vertex, rather than stepping over it onto the flat ground beyond
+  - The march steps half a cell, 40 units. A 200 unit extrusion is raised at
+    one vertex of the 80 unit grid, so its sides fall about 5 units per unit
+    while a ray at 55 degrees comes down 1.4: a ray aimed a pixel off the peak
+    meets the flank 0.8 units from it, and the first step jumps from 3.5 units
+    in front of the peak to 19 units past it. Driven in Chromium on 11-08-26,
+    one 200 unit block alone on a blank canvas: the pick answers the peak when
+    aimed at its exact point and answers the ground 450 units beyond for every
+    pixel either side, so `EDIT EXTRUSION` cannot be pointed at its top.
+    `.tmp/ui-ux/t28/top-and-rim.log`, phase C, is the measurement, and the 320
+    unit block beside it in the same log is reached at every try.
+  - The ceiling boundary is settled and is not this: a ray aimed at the peak
+    is answered at the entry, which is what `PICK_SURFACE` is for. What is
+    left is the step. Refining between the entry and the first step, or
+    stepping by a share of the ray's own descent rather than of a cell, are
+    the two shapes - and the cost is paid on every pointer move, since the
+    hover outline asks the same question, so measure before choosing.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
 
 ## Game UI/UX
 
@@ -654,113 +689,13 @@ has always left this file, so the record of what was built survives in
 `TODO-archive.md`. An item that turns out not to be built stays unchecked and
 in place, and the pruning item says which ones those were.
 
-- [ ] Write the request against the automation tool that `### Pruning the
-  Roadmap` says to queue in place of a seventh pruning item
-  - The record under that heading settled this on 10.29.2026: every run that
-    completes a queued item leaves its roadmap original behind, so pruning is a
-    pass that comes round rather than a job that finishes, and the fix belongs
-    in the tool rather than in this file. The 10.31.2026 run met it three more
-    times - the two mountain footprint items and the weather lift - and closed
-    each original inline rather than writing an eighth, ninth and tenth pruning
-    item for them.
-  - What the request has to say: section 5 of the instructions copies an item
-    into `## Current` and leaves the original in place, `todo.mjs` carries no
-    notion of item identity across those two copies, and no rule covers the
-    original once the copy archives. The archive already shows the cost - grep
-    it for `**Mountain** length` and it answers twice, which is one item
-    recorded as two pieces of finished work.
-  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
-    automation, and what shape the fix takes there is theirs to decide. Write
-    it where the user will find it and name both halves - the copy that is left
-    behind, and the archive that then double-counts it.
-
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 416 earlier items in `TODO-archive.md`, newest last.
+> 418 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Brush Crossover 1: the paragraph's slider figure leaves a 24 pixel brush
-  on the wrong side of the crossover
-  - **Issue**: the `FREE PAINT` paragraph in `docs/terrain.html` now reads "at
-    the opening view of a 16000 unit canvas, where a pixel is 27 units, it is a
-    brush under 24 of the slider's 5 to 400". A 24 pixel brush is inside the
-    crossover, not outside it. Drawn in Chromium at 1280x800 on a blank canvas,
-    the brush taken to each size by the panel's own `SIZE` slider and each
-    stroke measured alone off its draft's footprint through `footprintWeight`:
-    at 23 px a stroke is 612 units across and the two edges come to the same
-    band, 152.847 either way; at 24 px it is 639 units and they are still the
-    same, 159.75 either way; at 25 px it is 665 units and they part, 159.932
-    hard against 166.25 soft. A pixel is 26.608 units there, so the 640 unit
-    crossover is reached at 24.05 px and the bound is 24 or under, not under
-    24. The item's own settled note has the right figure in it - "the crossover
-    at 24.1 px" - so the measurement was sound and only the rounding to a whole
-    brush went the wrong way; 640 / 27 is 23.7, and the paragraph divides by
-    the figure it rounded rather than the one it measured. Everything else in
-    the paragraph holds: 665 units at the default brush, 27 units a pixel, the
-    two edges differing there, and both of them coming to 3.5 units zoomed all
-    the way in, where even the slider's widest 400 px brush is 224 units across
-    and inside the crossover.
-  - **Goal**: Resolve to [brush-crossover-figure.prompt.md](.claude/prompts/brush-crossover-figure.prompt.md)
-  - **Settled**: the prompt's first option, which keeps the per-pixel figure
-    round and hedges it - "where a pixel is a little under 27 units, it is a
-    brush of 24 or under of the slider's 5 to 400". The hedge is what makes the
-    two figures agree: 640 / 27 is 23.7 and 640 / 26.608 is 24.05, so dividing
-    by the rounded figure is what moved the bound by a whole brush. Nothing
-    else in the paragraph moved, and the 1.0.0-alpha.1.54.0 changelog entry was
-    left alone as the completed item before this one left it. The figure is now
-    held rather than written down: a new test in `test/site.test.js` reads the
-    Free Paint paragraph and compares the brush it names with what
-    `createBuildCamera(16000)`, `unitsPerPixel` at an 800 pixel view and
-    `paintStamp` actually give against the crossover read off the footprint
-    hold - 26.60788 units a pixel, 639 units at 24 px and 665 at 25, so the
-    widest brush inside 640 is 24. It reads the direction of the bound as well
-    as the number, since the number was never what was wrong, and takes either
-    phrasing as the same inclusive maximum so the wording can still change.
-    Three mutants caught: the bound back as "under 24", the bound at 23, and
-    the per-pixel figure stated as a round 27 with no hedge. The paragraph's
-    figures are an 800 pixel view's - the bound is 18 px in a 600 px view and
-    27 at 900 - which the paragraph does not say and did not say before; the
-    test names the view it holds them at.
-  - From: UI/UX Override - a .glb that points at another file
-- [x] A `.gltf`'s refusal names no address, and the asset table says it does
-  - **Issue**: the `.glb` / `.gltf` row of the formats table in
-    `docs/terrain.html` now says the refusal "names the address it points at -
-    a `.gltf` is that JSON, and a `.glb` carries the same JSON in its first
-    chunk, so the two are held to it alike". Read off the dock in Chromium, a
-    `.glb` does name it - "the model points at another file,
-    `https://example.com/textures/apron.png`; everything it uses has to be
-    inside it" - while a `.gltf` naming the same image says "the glTF points at
-    other files; save it with its buffers and images inside it, as a .glb or as
-    `data:` addresses", which names no address at all. The rule is held alike:
-    all four files are refused before the parse, nothing leaves for the
-    network, and every refusal is drawn in the refused amber at 11.46:1 without
-    clipping. It is the sentence that is not. `selfContained`'s docstring in
-    `js/asset-fit.js` still carries the reasoning behind the older `.gltf`
-    wording - a pilot "is told which file rather than being told about an
-    address they never wrote" - which the `.glb` branch no longer follows.
-  - **Goal**: Resolve to [gltf-refusal-address.prompt.md](.claude/prompts/gltf-refusal-address.prompt.md)
-  - **Settled**: the prompt's first option - the `.gltf` names the address too,
-    so the table needs no edit and the two formats say one thing. Both branches
-    now go through one `refuseOutside(json)` in `js/asset-loader.js`, handed a
-    `.gltf`'s own JSON or a `.glb`'s first chunk through `glbJson`, and all
-    three places an outside address is found - those two and the loading
-    manager behind them - throw one `outsideFileRefusal`, so the sentence is
-    written once and cannot drift again. `selfContained` went with it rather
-    than keeping a corrected docstring: it was the predicate form of
-    `outsideAddress` and had no caller left once both branches wanted the
-    address rather than a yes or no, so the reasoning the prompt quoted is gone
-    rather than reworded. Its assertions in `test/assets.test.js` are now
-    `outsideAddress`'s and say which address was found. Settled in Chromium in
-    33 checks over all four files that reach outside themselves, read off the
-    dock through the builder's own route: each is refused before the step
-    opens, names its address, no longer steers the pilot at a `.glb`, draws in
-    the refused amber at 11.46:1 without clipping, and makes no request - and
-    shaped by replacing the file and the address, all four sentences are now
-    one (`.tmp/run1110/refusals.mjs`). Five mutants caught in Node, including
-    a second wording put back for a `.gltf`.
-  - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it
 - [x] The dock's status line is drawn below the fold on a short phone, so a
   refused file looks like nothing happened
   - **Issue**: the SAVE / LOAD dock writes what the last save, load or refusal
@@ -1086,3 +1021,43 @@ how the simulator got here rather than as a list still to be worked.
     correction, so `TODO.md` was the only file edited. The suite is green at
     2434 passing, 0 failing.
   - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Write the request against the automation tool that `### Pruning the
+  Roadmap` says to queue in place of a seventh pruning item
+  - The record under that heading settled this on 10.29.2026: every run that
+    completes a queued item leaves its roadmap original behind, so pruning is a
+    pass that comes round rather than a job that finishes, and the fix belongs
+    in the tool rather than in this file. The 10.31.2026 run met it three more
+    times - the two mountain footprint items and the weather lift - and closed
+    each original inline rather than writing an eighth, ninth and tenth pruning
+    item for them.
+  - What the request has to say: section 5 of the instructions copies an item
+    into `## Current` and leaves the original in place, `todo.mjs` carries no
+    notion of item identity across those two copies, and no rule covers the
+    original once the copy archives. The archive already shows the cost - grep
+    it for `**Mountain** length` and it answers twice, which is one item
+    recorded as two pieces of finished work.
+  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
+    automation, and what shape the fix takes there is theirs to decide. Write
+    it where the user will find it and name both halves - the copy that is left
+    behind, and the archive that then double-counts it.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Write the request against the automation tool that `### Pruning the
+  Roadmap` says to queue in place of a seventh pruning item
+  - The record under that heading settled this on 10.29.2026: every run that
+    completes a queued item leaves its roadmap original behind, so pruning is a
+    pass that comes round rather than a job that finishes, and the fix belongs
+    in the tool rather than in this file. The 10.31.2026 run met it three more
+    times - the two mountain footprint items and the weather lift - and closed
+    each original inline rather than writing an eighth, ninth and tenth pruning
+    item for them.
+  - What the request has to say: section 5 of the instructions copies an item
+    into `## Current` and leaves the original in place, `todo.mjs` carries no
+    notion of item identity across those two copies, and no rule covers the
+    original once the copy archives. The archive already shows the cost - grep
+    it for `**Mountain** length` and it answers twice, which is one item
+    recorded as two pieces of finished work.
+  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
+    automation, and what shape the fix takes there is theirs to decide. Write
+    it where the user will find it and name both halves - the copy that is left
+    behind, and the archive that then double-counts it.
+  - From: Documentation & Polish `->` Pruning the Roadmap

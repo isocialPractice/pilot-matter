@@ -5934,3 +5934,86 @@ still be found by name.
     that `insideFile` and `selfContained` are importable - a mutant widening
     the file's rule back to `blob:` is caught.
   - From: UI/UX Override - a .glb that points at another file
+
+## Archived 11-15-26
+
+- [x] Brush Crossover 1: the paragraph's slider figure leaves a 24 pixel brush
+  on the wrong side of the crossover
+  - **Issue**: the `FREE PAINT` paragraph in `docs/terrain.html` now reads "at
+    the opening view of a 16000 unit canvas, where a pixel is 27 units, it is a
+    brush under 24 of the slider's 5 to 400". A 24 pixel brush is inside the
+    crossover, not outside it. Drawn in Chromium at 1280x800 on a blank canvas,
+    the brush taken to each size by the panel's own `SIZE` slider and each
+    stroke measured alone off its draft's footprint through `footprintWeight`:
+    at 23 px a stroke is 612 units across and the two edges come to the same
+    band, 152.847 either way; at 24 px it is 639 units and they are still the
+    same, 159.75 either way; at 25 px it is 665 units and they part, 159.932
+    hard against 166.25 soft. A pixel is 26.608 units there, so the 640 unit
+    crossover is reached at 24.05 px and the bound is 24 or under, not under
+    24. The item's own settled note has the right figure in it - "the crossover
+    at 24.1 px" - so the measurement was sound and only the rounding to a whole
+    brush went the wrong way; 640 / 27 is 23.7, and the paragraph divides by
+    the figure it rounded rather than the one it measured. Everything else in
+    the paragraph holds: 665 units at the default brush, 27 units a pixel, the
+    two edges differing there, and both of them coming to 3.5 units zoomed all
+    the way in, where even the slider's widest 400 px brush is 224 units across
+    and inside the crossover.
+  - **Goal**: Resolve to [brush-crossover-figure.prompt.md](.claude/prompts/brush-crossover-figure.prompt.md)
+  - **Settled**: the prompt's first option, which keeps the per-pixel figure
+    round and hedges it - "where a pixel is a little under 27 units, it is a
+    brush of 24 or under of the slider's 5 to 400". The hedge is what makes the
+    two figures agree: 640 / 27 is 23.7 and 640 / 26.608 is 24.05, so dividing
+    by the rounded figure is what moved the bound by a whole brush. Nothing
+    else in the paragraph moved, and the 1.0.0-alpha.1.54.0 changelog entry was
+    left alone as the completed item before this one left it. The figure is now
+    held rather than written down: a new test in `test/site.test.js` reads the
+    Free Paint paragraph and compares the brush it names with what
+    `createBuildCamera(16000)`, `unitsPerPixel` at an 800 pixel view and
+    `paintStamp` actually give against the crossover read off the footprint
+    hold - 26.60788 units a pixel, 639 units at 24 px and 665 at 25, so the
+    widest brush inside 640 is 24. It reads the direction of the bound as well
+    as the number, since the number was never what was wrong, and takes either
+    phrasing as the same inclusive maximum so the wording can still change.
+    Three mutants caught: the bound back as "under 24", the bound at 23, and
+    the per-pixel figure stated as a round 27 with no hedge. The paragraph's
+    figures are an 800 pixel view's - the bound is 18 px in a 600 px view and
+    27 at 900 - which the paragraph does not say and did not say before; the
+    test names the view it holds them at.
+  - From: UI/UX Override - a .glb that points at another file
+- [x] A `.gltf`'s refusal names no address, and the asset table says it does
+  - **Issue**: the `.glb` / `.gltf` row of the formats table in
+    `docs/terrain.html` now says the refusal "names the address it points at -
+    a `.gltf` is that JSON, and a `.glb` carries the same JSON in its first
+    chunk, so the two are held to it alike". Read off the dock in Chromium, a
+    `.glb` does name it - "the model points at another file,
+    `https://example.com/textures/apron.png`; everything it uses has to be
+    inside it" - while a `.gltf` naming the same image says "the glTF points at
+    other files; save it with its buffers and images inside it, as a .glb or as
+    `data:` addresses", which names no address at all. The rule is held alike:
+    all four files are refused before the parse, nothing leaves for the
+    network, and every refusal is drawn in the refused amber at 11.46:1 without
+    clipping. It is the sentence that is not. `selfContained`'s docstring in
+    `js/asset-fit.js` still carries the reasoning behind the older `.gltf`
+    wording - a pilot "is told which file rather than being told about an
+    address they never wrote" - which the `.glb` branch no longer follows.
+  - **Goal**: Resolve to [gltf-refusal-address.prompt.md](.claude/prompts/gltf-refusal-address.prompt.md)
+  - **Settled**: the prompt's first option - the `.gltf` names the address too,
+    so the table needs no edit and the two formats say one thing. Both branches
+    now go through one `refuseOutside(json)` in `js/asset-loader.js`, handed a
+    `.gltf`'s own JSON or a `.glb`'s first chunk through `glbJson`, and all
+    three places an outside address is found - those two and the loading
+    manager behind them - throw one `outsideFileRefusal`, so the sentence is
+    written once and cannot drift again. `selfContained` went with it rather
+    than keeping a corrected docstring: it was the predicate form of
+    `outsideAddress` and had no caller left once both branches wanted the
+    address rather than a yes or no, so the reasoning the prompt quoted is gone
+    rather than reworded. Its assertions in `test/assets.test.js` are now
+    `outsideAddress`'s and say which address was found. Settled in Chromium in
+    33 checks over all four files that reach outside themselves, read off the
+    dock through the builder's own route: each is refused before the step
+    opens, names its address, no longer steers the pilot at a `.glb`, draws in
+    the refused amber at 11.46:1 without clipping, and makes no request - and
+    shaped by replacing the file and the address, all four sentences are now
+    one (`.tmp/run1110/refusals.mjs`). Five mutants caught in Node, including
+    a second wording put back for a `.gltf`.
+  - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it

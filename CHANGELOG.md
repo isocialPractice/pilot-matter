@@ -32,6 +32,42 @@ was the account of the test and not the test. No version applies: the whole
 diff is `TODO.md`, its archive and this entry, and nothing in it runs. The
 suite was re-run whole and is green at 2434 passing, 0 failing.
 
+- **The request `### Pruning the Roadmap` has been asking for since 10.29.2026
+  is now written, in the automation tool rather than in this file.** It is an
+  unchecked item under `## Core Tool Fidelity` in `%MCP_TODO_HOME%\TODO.md`,
+  the section whose charter is how faithfully `todo.mjs` gives back the file it
+  was handed, and the one the operator works from a session started in that
+  folder. It names both halves the item asked for. The copy that is left
+  behind: section 5 of `instructions/lib/automate-todo.instructions.md` copies
+  a roadmap item into `## Current` and leaves the original in place on purpose,
+  `todo.mjs` stamps provenance without carrying any notion of identity across
+  the two copies (`todo.mjs:1288-1303`), and no rule covers the original once
+  the copy archives - so it is either re-queued as work already built, or
+  closed again by a later pruning pass. The archive that then double-counts
+  it: `TODO-archive.md` records one finished item as two rows. The request
+  carries the evidence from this repository and three candidate shapes with
+  what each costs - stamping the copy with its origin so the archiver carries
+  both, moving rather than copying, or a flag that reports originals already
+  archived - and chooses none of them, because the item said the shape is the
+  operator's to decide and `MCP_TODO_HOME` is their own automation.
+
+The cost the request describes was measured here before it was written, and it
+is wider than the one pair the item cites: 50 of the 418 items in
+`TODO-archive.md` are titles appearing twice - 25 pairs, each a queued copy and
+its roadmap original - and the six `Prune ...` items are themselves among them.
+
+Both copies of the completed item were checked off in the same run, the one
+under `## Current` and its original under `### Pruning the Roadmap`, which is
+the convention that heading records and that at least two earlier runs applied.
+That makes this item the 26th such pair - this one still in `## Complete`,
+where `recentsByNumber` keeps the ten most recent, and bound for the archive
+with the next roll. Closing it any other way would have been this run choosing
+the shape of a fix the item reserves for the operator.
+
+No version applies: the whole diff is `TODO.md`, its archive and this entry,
+and nothing in it runs. The one file the run wrote outside this repository is
+the operator's automation, which carries its own version.
+
 ## [1.0.0-alpha.1.65.6] - 2026-11-13
 
 ### Changed
