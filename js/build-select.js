@@ -28,7 +28,7 @@ import { footprintSampler, isFootprint } from './environment/footprints.js';
 import { mountainBump } from './terrain-math.js';
 import { isGroup, groupStrips, groupLots } from './templates.js';
 import { isErase } from './environment/erase.js';
-import { isObject, objectFootprint } from './objects.js';
+import { isObject, objectFootprint, objectHeight, objectErased, footprintGround } from './objects.js';
 
 /**
  * How strongly a placement has to reach a point for a click there to find it,
@@ -139,6 +139,132 @@ function pointReach(placement, size) {
         peak.radius,
         1
     );
+}
+
+/**
+ * The box an object stands in, in the canvas's frame: `{ x, z, width, depth,
+ * angle, bottom, top }` - its footprint, which is its recipe's reach across and
+ * along, scaled and turned to its heading, standing on the ground under it and
+ * reaching to the height of its highest part. Null for a placement that is no
+ * object, or whose recipe holds nothing.
+ *
+ * `groundAt(x, z)` is the ground, read through `footprintGround` - the same
+ * reading `standingObjects` stands the building by, so the box is where the
+ * building was drawn rather than near it.
+ *
+ * It reaches down to the lowest ground under the footprint rather than to the
+ * height it stands at, because that is what is drawn: the plinth fills the gap
+ * between the two on a slope, and a click on the plinth is a click on the
+ * building it holds up.
+ */
+export function objectBox(placement, groundAt = () => 0) {
+    if (!isObject(placement)) return null;
+    const footprint = objectFootprint(placement);
+    if (footprint == null) return null;
+
+    const { stand, base } = footprintGround(footprint, groundAt);
+    return {
+        x: footprint.x,
+        z: footprint.z,
+        width: footprint.width,
+        depth: footprint.depth,
+        angle: footprint.angle,
+        bottom: base,
+        top: stand + objectHeight(placement)
+    };
+}
+
+/**
+ * How far along a ray it enters a box, or null where it never does.
+ *
+ * The slab test, in the box's own frame: the ray is turned back by the box's
+ * angle so the box is square to the axes, and the stretch of ray inside each
+ * pair of faces is intersected with the other two. A ray that starts inside
+ * answers 0, which is the camera being inside the building.
+ *
+ * `origin` and `direction` are `{ x, y, z }` in the canvas's frame; the
+ * direction need not be of unit length, and the distance comes back in its
+ * lengths rather than in world units - which is all a nearest-first comparison
+ * between boxes needs.
+ */
+export function rayEntersBox(origin, direction, box) {
+    if (box == null) return null;
+
+    const cos = Math.cos(-box.angle), sin = Math.sin(-box.angle);
+    const dx = (Number(origin?.x) || 0) - box.x;
+    const dz = (Number(origin?.z) || 0) - box.z;
+
+    // The ray in the box's frame: across its width, up, and along its depth.
+    const from = [
+        dx * cos - dz * sin,
+        (Number(origin?.y) || 0) - box.bottom,
+        dx * sin + dz * cos
+    ];
+    const along = [
+        (Number(direction?.x) || 0) * cos - (Number(direction?.z) || 0) * sin,
+        Number(direction?.y) || 0,
+        (Number(direction?.x) || 0) * sin + (Number(direction?.z) || 0) * cos
+    ];
+    const half = [box.width / 2, (box.top - box.bottom) / 2, box.depth / 2];
+    const middle = [0, (box.top - box.bottom) / 2, 0];
+
+    let near = 0;
+    let far = Infinity;
+    for (let axis = 0; axis < 3; axis++) {
+        const low = middle[axis] - half[axis];
+        const high = middle[axis] + half[axis];
+        if (Math.abs(along[axis]) < 1e-12) {
+            // Parallel to this pair of faces: inside them or never.
+            if (from[axis] < low || from[axis] > high) return null;
+            continue;
+        }
+        const first = (low - from[axis]) / along[axis];
+        const second = (high - from[axis]) / along[axis];
+        near = Math.max(near, Math.min(first, second));
+        far = Math.min(far, Math.max(first, second));
+        if (near > far) return null;
+    }
+
+    // A box behind the ray is already answered: `near` never falls below 0, so
+    // a box whose far face is behind the origin leaves `near > far` and is
+    // refused inside the loop. There is nothing left here for a test of the
+    // far face to catch, which a mutation run on 11.16.2026 is what showed -
+    // `return near` on its own passed the whole suite.
+    return near;
+}
+
+/**
+ * The object a ray meets, as its index in `placements`, or null where it meets
+ * none - the nearest where it meets several, so a ray crossing two picks the
+ * one in front of the other.
+ *
+ * This is asked before the ground, and it is what lets a tall building be
+ * picked where it is seen. A pick by ground point ends the ray on the ground
+ * and asks what reaches there, so a click on a tower's upper floors is answered
+ * with whatever stands on the ground behind it, or with nothing - the roof of
+ * a 200 unit tower is 200 units from the ground its own click lands on.
+ *
+ * An object erased by a later batch is not there to be picked, which is the
+ * same reading `standingObjects` makes of the list.
+ *
+ * `groundAt(x, z)` is the ground each box stands on; `size` is the canvas's
+ * width, which an erase batch's region wraps across.
+ */
+export function objectRayAt(placements, origin, direction, { groundAt = () => 0, size = 0 } = {}) {
+    const list = Array.isArray(placements) ? placements : [];
+    let best = null;
+
+    list.forEach((placement, index) => {
+        if (!isObject(placement)) return;
+        if (objectErased(placement, list.slice(index + 1), size)) return;
+        const distance = rayEntersBox(origin, direction, objectBox(placement, groundAt));
+        if (distance == null) return;
+        // Nearer wins, and a tie goes to the later committed, which is the one
+        // drawn over the other - the same way `placementAt` breaks one.
+        if (best == null || distance <= best.distance) best = { index, distance };
+    });
+
+    return best?.index ?? null;
 }
 
 /**

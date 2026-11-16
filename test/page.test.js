@@ -3731,13 +3731,20 @@ test('a canvas opens on a camera seeded from the hold', () => {
 test('a pick is cast from the camera as it stands, against the canvas alone', () => {
     const pick = methodBody(mainSource, 'pickCanvasPoint');
     assert.ok(pick, 'js/main.js should define pickCanvasPoint()');
+    assert.match(pick, /const ray = this\.aimCanvasRay\(clientX, clientY\);\s*return ray \? this\.pickGroundAlong\(ray\) : null;/,
+        'aimed once and read against the ground, so a pick that asks both questions aims once');
 
-    const placed = pick.indexOf('this.placeCanvasCamera();');
-    const cast   = pick.indexOf('this.pointerRay.setFromCamera(');
+    // The ray is aimed from the camera as the state says it stands rather than
+    // as the last frame drew it, and nothing is aimed off a canvas at all.
+    const aim = methodBody(mainSource, 'aimCanvasRay');
+    const placed = aim.indexOf('this.placeCanvasCamera();');
+    const cast   = aim.indexOf('this.pointerRay.setFromCamera(');
     assert.ok(placed >= 0 && cast > placed, 'the camera is stood where the state says before the ray is cast');
-    assert.match(pick, /if \(!buildModeDrawing\(this\.builder\)/, 'and nothing is picked off a canvas');
-    assert.match(pick, /bounds: this\.canvasGround\.bounds/, 'and only the canvas may be picked');
-    assert.match(pick, /pickGround\(origin, direction, \(x, z\) => this\.terrain\.getTerrainHeightAt\(x, z\)/,
+    assert.match(aim, /if \(!buildModeDrawing\(this\.builder\)/, 'and nothing is picked off a canvas');
+
+    const along = methodBody(mainSource, 'pickGroundAlong');
+    assert.match(along, /bounds: this\.canvasGround\.bounds/, 'and only the canvas may be picked');
+    assert.match(along, /pickGround\(ray\.origin, ray\.direction, \(x, z\) => this\.terrain\.getTerrainHeightAt\(x, z\)/,
         'against the ground the canvas is drawn from');
 
     assert.match(methodBody(mainSource, 'showCanvas'), /this\.canvasGround = this\.readCanvasGround\(\);/,
@@ -4046,12 +4053,21 @@ test('a Select press that does not travel is a click, and picks; one that travel
 
 test('a click picks the committed placement under it through its reach, not off the scene', () => {
     const pick = methodBody(mainSource, 'pickAt');
-    assert.match(pick, /const point = this\.pickCanvasPoint\(clientX, clientY\);/);
-    assert.match(pick,
-        /placementAt\(pickablePlacements\(this\.builder\), point\.x, point\.z, this\.terrain\.size\) : null;/,
-        'the placement whose reach the ground point is in, or bare ground');
-    assert.match(pick, /const answer = selectPlacement\(this\.builder, index\);/);
+    assert.match(pick, /const answer = selectPlacement\(this\.builder, this\.pickPlacementAt\(clientX, clientY\)\);/);
     assert.match(pick, /if \(answer\?\.confirm\) this\.confirmOpened\(\);/, 'a changed pick asks before it is let go');
+
+    // An object stands over the ground as a box, so the ray is tested against
+    // those boxes before the ground is asked what reaches the point the ray
+    // ends on - which is how a tall building is picked where it is seen.
+    const found = methodBody(mainSource, 'pickPlacementAt');
+    assert.match(found, /const standing = objectRayAt\(placements, ray\.origin, ray\.direction, \{ groundAt: ground, size: this\.terrain\.size \}\);/);
+    assert.match(found, /if \(standing != null\) return standing;/);
+    assert.match(found,
+        /return point \? placementAt\(placements, point\.x, point\.z, this\.terrain\.size\) : null;/,
+        'the placement whose reach the ground point is in, or bare ground');
+    assert.ok(found.indexOf('objectRayAt(') < found.indexOf('this.pickGroundAlong(ray)'),
+        'the boxes first: the ground point under a click on a roof is the ground beyond the building');
+    assert.equal(found.split('this.aimCanvasRay(').length - 1, 1, 'and the ray is aimed once for both questions');
 });
 
 test('the hover follows the pointer every frame, with Select, and never for a finger or under a question', () => {
@@ -4063,7 +4079,7 @@ test('the hover follows the pointer every frame, with Select, and never for a fi
     assert.match(hover, /buildModeTool\(this\.builder\) === SELECT_TOOL/, 'Select is what a click picks with');
     assert.match(hover, /!confirmOpen\(this\.builder\)/, 'a question holds the canvas still');
     assert.match(hover, /!dragging/, 'and an orbit is not a hover');
-    assert.match(hover, /placementAt\(pickablePlacements\(this\.builder\), point\.x, point\.z, this\.terrain\.size\)/,
+    assert.match(hover, /hovered = this\.pickPlacementAt\(pointer\.x, pointer\.y\);/,
         'found the way a click finds it, so what is outlined is what a click takes');
 
     assert.match(mainSource, /surface\.addEventListener\('pointerleave', +\(\) => \{ this\.canvasPointer = null; \}\);/,
@@ -4996,7 +5012,10 @@ test('a file row and the loaded world are worked before a choice is applied as a
     assert.match(choose, /if \(applied === LOAD_ENVIRONMENT_ID\) \{\s*this\.loadEnvironmentFromSettings\(\);\s*return;\s*\}/);
     assert.match(choose, /if \(applied === SAVE_ENVIRONMENT_ID\) \{\s*this\.saveEnvironmentFromSettings\(\);\s*return;\s*\}/);
     assert.match(choose, /if \(applied === LOADED_ENVIRONMENT_ID\) \{\s*this\.chooseLoaded\(\);\s*return;\s*\}/);
-    assert.match(choose, /const loaded  = loadedChosen\(this\.settings\);\s*const applied = chooseSetting\(this\.settings, id, step\);/);
+    const was = choose.indexOf('const loaded  = loadedChosen(this.settings);');
+    const applied = choose.indexOf('const applied = chooseSetting(this.settings, id, step);');
+    assert.ok(was >= 0 && applied >= 0 && was < applied,
+        'what the panel was holding is read before the press changes it');
     assert.match(choose, /if \(loaded && !loadedChosen\(this\.settings\)\) releaseBuiltWorld\(this\.editor\);/,
         'a preset chosen over the loaded world lets go of what the file built, even on its own preset');
 });

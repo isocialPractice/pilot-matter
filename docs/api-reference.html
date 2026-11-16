@@ -351,6 +351,7 @@ renderer.setAnimationLoop(() =&gt; {
         <tr><td><code>size</code></td><td>number</td><td><code>16000</code></td><td>The square the world covers</td></tr>
         <tr><td><code>segments</code></td><td>number</td><td><code>200</code></td><td>How finely that square is sampled</td></tr>
         <tr><td><code>elements</code></td><td>array</td><td>the preset's</td><td>Element placements, instead of the preset's</td></tr>
+        <tr><td><code>objects</code></td><td>boolean</td><td><code>true</code></td><td><code>false</code> to leave the description's objects unbuilt</td></tr>
         <tr><td><code>runway</code></td><td>boolean or object</td><td><code>false</code></td><td>A landable strip in the world, or a configuration for one</td></tr>
         <tr><td><code>tile</code></td><td><code>{x, z}</code></td><td><code>{0, 0}</code></td><td>Which square of a larger assembly this world is</td></tr>
         <tr><td><code>seed</code></td><td>number</td><td>the preset's</td><td>Builds the same description as different ground</td></tr>
@@ -368,6 +369,8 @@ renderer.setAnimationLoop(() =&gt; {
     <tbody>
         <tr><td><code>group</code></td><td>The world as one <code>Group</code> any scene can add</td></tr>
         <tr><td><code>sampleHeight(x, z)</code></td><td>The ground under a point - the terrain contract itself</td></tr>
+        <tr><td><code>objects</code></td><td>What stands on the world - its buildings, parks and roads</td></tr>
+        <tr><td><code>obstacleTop(x, z)</code></td><td>The top of the solid object over a point, or <code>null</code> for none</td></tr>
         <tr><td><code>bounds</code></td><td>The square the world covers</td></tr>
         <tr><td><code>runways</code></td><td>The strips cut into it, empty for a world built without one</td></tr>
         <tr><td><code>field</code></td><td>The height and colour field behind the mesh</td></tr>
@@ -391,6 +394,16 @@ renderer.setAnimationLoop(() =&gt; {
 <pre><code>world.register(myWindsock, { x: 400, z: -900, offset: 2 });</code></pre>
 
 <p><code>attach</code> checks the aircraft against the contract and throws with every problem at once rather than one per reload. What it returns is the aircraft and a <code>groundHeight()</code> for whatever is flying it.</p>
+
+<p>A world is its ground and what stands on it. A description's objects - its buildings, its parks, its roads, the models a pilot loaded into the builder - are stood on the ground the world draws and answered for by <code>obstacleTop</code>, so a host loading a world that was built in the builder gets the city as well as the valley it was built in. Each entry of <code>objects</code> carries the point it stands at, the ground it stands on, the height of its highest part and its footprint in the world, which is enough for a chart, a camera that should not clip a roof, or a collision pass of the host's own.</p>
+
+<p><code>obstacleTop(x, z)</code> is the other half of the terrain contract once a world has buildings in it: <code>sampleHeight</code> says where the ground is, and this says where the roof over it is. Below it, inside the footprint, is inside the building. Read the two together and an aircraft flies into the city rather than through it:</p>
+
+<pre><code>const ground = world.sampleHeight(x, z);
+const roof   = world.obstacleTop(x, z);   // null where nothing stands there
+const floor  = roof ?? ground;            // what a descent has to stop above</code></pre>
+
+<p>A road is draped over the ground rather than standing on it, so it is in <code>objects</code> and never answers <code>obstacleTop</code>. Build with <code>objects: false</code> and neither is offered: the world is its ground alone, which is what a host standing its own buildings over it wants.</p>
 
 <p><code>applyDepth</code> is the world's depth without the world: the sky it fades to and the fog that fades it, applied to any scene. An environment created with <code>fog: false</code> leaves the scene's own depth alone.</p>
 
@@ -464,6 +477,72 @@ renderer.setAnimationLoop(() =&gt; {
 document.querySelector('#world-picker').addEventListener('change', (event) =&gt; {
     world.setEnvironment(event.target.value);
 });</code></pre>
+
+<h3 id="worked-example-a-built-worlds-file-under-an-external-aircraft">Worked example: a built world's file under an external aircraft</h3>
+
+<p>A world built in the builder is saved as one JSON file holding its description: the environment it was built on, that environment's own elements as they were kept, the placements committed over them, and the models any of them refer to. <code>readEnvironmentDocument</code> reads one back, and what it hands over is exactly what <code>createEnvironment</code> takes - so a host opens a pilot's own world and flies its own aircraft over it.</p>
+
+<pre><code>import * as THREE from 'three';
+import { createEnvironment, readEnvironmentDocument } from 'pilot-matter';
+
+const scene    = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// A file chosen by the person at the page, read as text and nothing else: the
+// reader parses it as JSON, checks it, and never runs a word of it.
+const [file] = document.querySelector('#world-file').files;
+const read = readEnvironmentDocument(await file.text());
+
+// A file is refused whole, with a list of what is wrong with it, first problem
+// first - a world half read is a world nobody built.
+if (!read.ok) throw new Error(`${file.name}: ${read.problems[0]}`);
+
+// `read.world` is `{ environment, placements, world }`, with `start` and
+// `plane` where the file carries them. The description goes straight in: its
+// elements are the ground, and the objects among them are stood on that ground
+// with their roofs answered for.
+const world = createEnvironment({
+    environment: read.world.environment,
+    elements: [...read.world.world, ...read.world.placements]
+});
+
+scene.add(world.group);
+world.applyDepth(scene);
+
+console.log(`${read.name}: ${world.objects.length} standing`);
+
+// The host's own aircraft, opened where the world's own start point says when
+// it has one, and over the middle of the world when it does not.
+const myAircraft = new THREE.Group();
+const start = read.world.start;
+myAircraft.position.set(
+    start ? start.at[0] : 0,
+    (start ? world.sampleHeight(start.at[0], start.at[1]) + start.heightFeet / 3.28 : 900),
+    start ? start.at[1] : 0
+);
+
+const flown = world.attach(myAircraft);
+
+const clock = new THREE.Clock();
+
+renderer.setAnimationLoop(() =&gt; {
+    const at = myAircraft.position;
+
+    // The two halves of the terrain contract, read together: where the ground
+    // is, and where the roof over it is. A descent stops above whichever is
+    // the higher, so the aircraft lands on the car park and not through it.
+    const roof  = world.obstacleTop(at.x, at.z);
+    const floor = roof ?? flown.groundHeight();
+
+    myFlightModel.update(clock.getDelta(), floor);
+
+    renderer.render(scene, camera);
+});</code></pre>
+
+<p>Two things are worth knowing about a file's objects. One referring to a model the pilot loaded into the builder is drawn as a box of the model's size unless the host registers the model itself, because reading a model needs a loader and the Matter API does not take one. And a road is draped over the ground rather than standing on it, so it is in <code>objects</code> and never answers <code>obstacleTop</code> - nothing should ever have to climb over a road.</p>
 
 <h3 id="one-tile-of-a-larger-world">One tile of a larger world</h3>
 
@@ -1089,6 +1168,43 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now</
     </tbody>
 </table>
 </div>
+
+<p>What stands on a world's ground rather than being written into it. A host using <code>createEnvironment</code> is handed the answers - <code>objects</code> and <code>obstacleTop(x, z)</code> - and these are the same readings for a host standing a built world itself, one square at a time, on ground of its own:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>OBJECT_TYPE</code></td><td>The <code>type</code> an object placement carries</td></tr>
+        <tr><td><code>isObject(placement)</code></td><td>True for one</td></tr>
+        <tr><td><code>placeObject(prefabId, at, options)</code></td><td>An object placement from the catalogue, at a point, with a <code>heading</code> and a <code>scale</code></td></tr>
+        <tr><td><code>objectFootprint(placement)</code></td><td>Its rectangle in the square's frame, turned to its heading</td></tr>
+        <tr><td><code>objectHeight(placement)</code></td><td>How high its highest part stands over the ground it is on</td></tr>
+        <tr><td><code>standingObjects(placements, options)</code></td><td>Every object a description places, laid out on the ground a <code>groundAt</code> reads</td></tr>
+        <tr><td><code>insideObject(object, x, z)</code></td><td>True for a point inside a standing object's footprint</td></tr>
+        <tr><td><code>obstacleTop(objects, x, z)</code></td><td>The top of the solid object over a point, or <code>null</code> for none</td></tr>
+        <tr><td><code>OBJECT_REACH</code></td><td>How far past a square's edge an object standing on it may reach, and so how far round a point the squares beside it have to be asked</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>A world built in the builder is saved as one JSON file holding its description, and read back through the same format whoever wrote it:</p>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Export</th><th>Is</th></tr></thead>
+    <tbody>
+        <tr><td><code>readEnvironmentDocument(text)</code></td><td>A file's text read back as <code>{ ok, world, name, savedAt, problems }</code> - refused whole, with what is wrong with it, and never throwing</td></tr>
+        <tr><td><code>environmentDocument(world, options)</code></td><td>A description written as the document a file carries</td></tr>
+        <tr><td><code>environmentText(document)</code></td><td>That document as the text of its file, indented so a person can read it</td></tr>
+        <tr><td><code>ENVIRONMENT_FORMAT</code></td><td>What a file says it is, so JSON that is something else is refused by name</td></tr>
+        <tr><td><code>ENVIRONMENT_VERSION</code></td><td>The version of the format this build writes, and the newest it reads</td></tr>
+        <tr><td><code>ENVIRONMENT_FILE_SUFFIX</code></td><td>What a saved world's file name ends in</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p><code>schemas/environment.schema.json</code> in the repository is the same format as JSON Schema, for whoever writes one of these by hand or by another program. Nothing in a file is ever run: it is parsed as JSON and checked, and what is kept is data the generators read.</p>
 
 <p>The five worlds a host can ask for by name:</p>
 

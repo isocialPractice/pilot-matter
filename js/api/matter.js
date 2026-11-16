@@ -8,6 +8,13 @@
  * placed by the generator, so an external asset sits on the ground rather than
  * hovering over it.
  *
+ * A world is its ground and what stands on it. A description's objects - its
+ * buildings, its parks, its roads, the models a pilot loaded - are stood on the
+ * ground this draws and answered for by `obstacleTop`, the way the simulator's
+ * own tiles stand them, so a host loading a built world gets the city as well
+ * as the valley it was built in. `objects: false` leaves them unbuilt, for a
+ * host standing its own.
+ *
  * A world can also be one square of a larger one. Given the place it takes in a
  * grid, an environment is generated in the world's coordinates rather than in
  * its own, which is what lets the ground it is shaped on run on across a join,
@@ -22,6 +29,10 @@ import {
 } from '../environment/elements.js';
 import { getEnvironment, environmentElements } from '../environment/presets.js';
 import { applyFootprintedElement } from '../environment/footprinted.js';
+import { resolveErasures } from '../environment/erase.js';
+import { expandGroups } from '../templates.js';
+import { isObject, standingObjects, obstacleTop, OBJECT_REACH } from '../objects.js';
+import { objectGroup, disposeObjectGroup } from '../object-mesh.js';
 import { applyDepth, applyDaylight, SKY_COLOR, FOG_DENSITY } from '../sky.js';
 import { animateWater } from '../water.js';
 import { holdGroundColor } from '../ground-material.js';
@@ -37,6 +48,7 @@ import {
  * @param {number} [options.size]        the square the world covers
  * @param {number} [options.segments]    how finely that square is sampled
  * @param {Array}  [options.elements]    element placements, instead of the preset's
+ * @param {boolean} [options.objects]   false to leave the description's objects unbuilt
  * @param {boolean|object} [options.runway] a landable strip in the world
  * @param {object} [options.tile]        `{ x, z }`, the square this world is of a larger one
  * @param {number} [options.seed]        build the same description as other ground
@@ -59,10 +71,20 @@ export function createEnvironment(options = {}) {
     let depthScene = null;
     let sun = null;
     let ambient = null;
+    // What stands on the ground rather than being written into it: the
+    // objects the description places, laid out on the ground this square
+    // drew, and the one group they are drawn as.
+    let objects = [];
+    let objectMesh = null;
 
     /** The stream this square of the world is laid out from. */
     function seed() {
         return tileSeed(resolved.seed ?? preset.seed, resolved.tile.x, resolved.tile.z);
+    }
+
+    /** The description this square is laid from, whoever named it. */
+    function described() {
+        return resolved.elements ?? environmentElements(preset, resolved.runway);
     }
 
     function generate() {
@@ -74,16 +96,57 @@ export function createEnvironment(options = {}) {
         });
         applyBase(field, preset.base);
 
-        // A placement with a footprint is drawn only where it reaches, in the
-        // square's own frame, through the same pass the simulator builds with -
-        // so a host and the game lay the same world from the same description.
+        // The same pipeline `buildEnvironment` puts a description through, so a
+        // host and the game lay the same world from the same description: a
+        // placed template becomes the placements it stands for, an erase batch
+        // is cut out of the placements listed before it, and an object is left
+        // out here because it changes no ground - it stands on the field this
+        // draws. Without the three, a built world's own description throws on
+        // the first group, batch or object in it.
+        //
+        // A placement with a footprint is then drawn only where it reaches, in
+        // the square's own frame.
         const random = createRandom(seed());
-        const placements = resolved.elements ?? environmentElements(preset, resolved.runway);
+        const placements = resolveErasures(
+            expandGroups(described(), field.size).filter(placement => !isObject(placement))
+        );
         for (const placement of orderPlacements(placements)) {
             applyFootprintedElement(field, placement, random);
         }
 
         draw();
+    }
+
+    /**
+     * Lays out what stands on the ground, on the ground as it now is: every
+     * object the description places, at its point of this square, standing on
+     * the height this square's field reads there. Worked out again after a join
+     * has settled the edges, because an object by an edge stands on ground that
+     * moved.
+     *
+     * A world built with `objects: false` stands none and answers `obstacleTop`
+     * for none, which is the drawing a host had before objects existed.
+     */
+    function stand() {
+        if (objectMesh) {
+            group.remove(objectMesh);
+            disposeObjectGroup(objectMesh);
+            objectMesh = null;
+        }
+        if (!resolved.objects) {
+            objects = [];
+            return;
+        }
+
+        const ground = (x, z) => sampleHeight(field, x, z);
+        objects = standingObjects(expandGroups(described(), resolved.size), {
+            groundAt: ground,
+            originX: origin.x,
+            originZ: origin.z,
+            size: resolved.size
+        });
+        objectMesh = objectGroup(objects, { groundAt: ground });
+        if (objectMesh) group.add(objectMesh);
     }
 
     /**
@@ -101,6 +164,12 @@ export function createEnvironment(options = {}) {
         mesh  = buildMesh(field, resolved, origin);
         water = waterSurface(field);
         group.add(mesh);
+
+        // What stands on the ground is stood on it once the ground is drawn,
+        // for the reason the simulator's tiles do it in that order: an object
+        // reads the height under its own footprint, and the ground a join
+        // settled is not the ground the last pass read.
+        stand();
 
         // Anything a host registered was placed against the old ground, so it
         // is set back down on the new ground rather than left in mid-air.
@@ -142,6 +211,29 @@ export function createEnvironment(options = {}) {
 
         /** The terrain contract the Pilot API and any other flight model reads. */
         sampleHeight(x, z) { return sampleHeight(field, x, z); },
+
+        /**
+         * The objects standing on this world, as `js/objects.js` lays them out -
+         * each with the point it stands at, the ground it stands on, the height
+         * of its highest part and its footprint in the world. Empty for a world
+         * built with `objects: false`, and for one whose description places
+         * none.
+         *
+         * Read by a host that wants to know what is down there: a chart, a
+         * collision pass of its own, a camera that should not clip a roof.
+         */
+        get objects() { return objects; },
+
+        /**
+         * The top of whatever solid object stands over a place in this world, or
+         * null where nothing does - the other half of the terrain contract once
+         * a world has buildings in it. A host's aircraft reads it beside
+         * `sampleHeight` and flies into the city rather than through it.
+         *
+         * A road is draped on the ground rather than standing over it, so it is
+         * never in the way and never answers here.
+         */
+        obstacleTop(x, z) { return obstacleTop(objects, x, z); },
 
         /** Regenerates the ground as a different assembled environment. */
         setEnvironment(id) {
@@ -288,6 +380,12 @@ export function createEnvironment(options = {}) {
             for (const extra of extras) group.remove(extra.object);
             extras.length = 0;
             water = null;
+            objects = [];
+            if (objectMesh) {
+                group.remove(objectMesh);
+                disposeObjectGroup(objectMesh);
+                objectMesh = null;
+            }
             if (mesh) {
                 group.remove(mesh);
                 mesh.geometry.dispose();
@@ -404,6 +502,30 @@ export function createTiledEnvironment(options = {}) {
          */
         sampleHeight(x, z) {
             return tileAt(x, z)?.sampleHeight(x, z) ?? 0;
+        },
+
+        /** Every object standing on the assembly, whichever square it stands on. */
+        get objects() { return built.flatMap(tile => tile.objects); },
+
+        /**
+         * The top of the solid object over a point, taken across the assembly.
+         *
+         * Every square the point could be reached from is asked rather than
+         * only the one it falls on, because an object standing near an edge
+         * reaches over it - which is the same reason `obstacleTopAt` in
+         * js/terrain.js asks a tile's neighbours.
+         */
+        obstacleTop(x, z) {
+            const seen = new Set();
+            let top = null;
+            for (const [dx, dz] of [[0, 0], [-OBJECT_REACH, 0], [OBJECT_REACH, 0], [0, -OBJECT_REACH], [0, OBJECT_REACH]]) {
+                const tile = tileAt(x + dx, z + dz);
+                if (!tile || seen.has(tile)) continue;
+                seen.add(tile);
+                const over = tile.obstacleTop(x, z);
+                if (over != null && (top == null || over > top)) top = over;
+            }
+            return top;
         },
 
         /**

@@ -47,7 +47,7 @@ import {
     createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK,
     BUILDER_SETTINGS_MARK, BUILDER_SETTINGS_NAME
 } from './build-palette.js';
-import { placementAt, travelledPast } from './build-select.js';
+import { placementAt, objectRayAt, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
@@ -99,10 +99,11 @@ import {
     createSettingsState, openSettings, closeSettings, settingsShowing,
     typedSettingRow, beginTypedSetting, applyTypedSettingKey, cancelTypedSetting,
     chooseSetting, adjustSetting, currentEnvironment, currentOption, startSettings,
-    isSettingsCloseKey, isSettingsOpenKey,
+    isSettingsCloseKey, isSettingsOpenKey, isEnvironmentId,
     SETTINGS_BACK_ID, ENVIRONMENT_ENTRY, START_GROUP, BUILDER_GROUP, BUILDER_SETTINGS_ID,
     FILE_GROUP, LOADED_ENVIRONMENT_ID, LOAD_ENVIRONMENT_ID, SAVE_ENVIRONMENT_ID,
     setSettingsWorlds, loadedChosen, chooseLoadedWorld, setFileNotice, holdStartFields,
+    setSettingsBuilt, builtChosen,
     SENSITIVITY_OPTION, ORBIT_RATE_OPTION, FOG_OPTION, WEATHER_OPTION,
     SPEED_UNIT_OPTION, ALTITUDE_UNIT_OPTION
 } from './settings.js';
@@ -169,7 +170,7 @@ import {
     assetDraft, assetFormat, assetHash, assetSize, libraryAsset, refAsset, ASSET_FILE_LIMIT, ASSET_FILE_ACCEPT
 } from './asset-fit.js';
 import { readModel, registerAsset, keepModel, forgetModel, hasAssetModel, assetModel, placedModel, AssetRefused } from './asset-loader.js';
-import { readKeptAssets, keepAsset, forgetAsset } from './asset-store.js';
+import { readKeptAssets, keepAsset, forgetAsset, readKeptWorld, keepWorld, forgetKeptWorld } from './asset-store.js';
 import { readLoadedWorld, writeLoadedWorld, loadedWorldOf, loadedWorldEntry } from './loaded-world.js';
 import { LoopCourse } from './rings.js';
 import { CanyonWalls } from './walls.js';
@@ -794,6 +795,11 @@ class FlightSimulator {
      * the ones a world it keeps carries: each read into its model, handed to
      * the builder as its library, and drawn in place of the box that stood for
      * it. A model that will not read is left out rather than stopping the rest.
+     *
+     * The world the builder last kept is read back with them, after the library
+     * and before anything is drawn again, because the world is what says which
+     * models are wanted and the library is what lets its own be read without
+     * being decoded a second time.
      */
     async restoreAssets() {
         const kept = await readKeptAssets();
@@ -806,7 +812,83 @@ class FlightSimulator {
             }
         }
         await this.adoptAssets(this.loadedWorld?.world?.assets ?? []);
+        const restored = await this.restoreKeptWorld();
         this.assetsChanged();
+        if (restored) {
+            this.redrawEditor();
+            this.applySettings();
+        }
+    }
+
+    // --- The world kept for the next session -----------------------------------
+
+    /**
+     * The world the builder last kept, put back on the editor as the build it
+     * is - its placements, the environment's own rows as the canvas left them,
+     * its start point, its plane, and the models it uses.
+     *
+     * IndexedDB is answered after the page is up rather than before the first
+     * tile is laid, so the world arrives while the title screen is still
+     * holding and the ground is drawn again under it - the same way the asset
+     * library arrives and the same way a world chosen in the settings is put in
+     * force. Nothing has been flown by then.
+     *
+     * Four things leave the preset being flown instead, and none of them is an
+     * error: the world a file brought is the one chosen, nothing is kept, what
+     * is kept is text this version refuses, or a model it carries will not
+     * read. The first two are the ordinary cases. The third lets the kept world
+     * go, because a world this version cannot read is not one a later run of it
+     * will read either; the fourth leaves it kept, because a model that failed
+     * to decode once may be the browser rather than the file.
+     *
+     * Returns true when the editor is now holding the kept world.
+     */
+    async restoreKeptWorld() {
+        if (loadedChosen(this.settings)) return false;
+
+        const text = await readKeptWorld();
+        if (text == null) return false;
+
+        const read = loadedWorldOf(text);
+        if (!read.loaded) {
+            await forgetKeptWorld();
+            return false;
+        }
+
+        const world = read.loaded.world;
+        if (await this.adoptAssets(world.assets)) return false;
+
+        keepBuiltWorld(this.editor, world.environment, runwayWanted(startSettings(this.settings)),
+            world.placements, currentEnvironment(this.settings), world.world, world);
+        return true;
+    }
+
+    /**
+     * Puts what the browser keeps for the next session in step with what the
+     * editor is holding: the built world written as the environment document it
+     * would be saved to a file as, or nothing kept where the editor has let go
+     * of one.
+     *
+     * The world a file brought is not kept here even while it is the one being
+     * flown. It already has a home of its own - its file's text in
+     * localStorage, per js/loaded-world.js - and is chosen again from there on
+     * the next reload, so keeping a second copy would be the same world twice
+     * and the models in it twice over.
+     *
+     * Returns whether a world is now kept.
+     */
+    async syncKeptWorld() {
+        const world = loadedChosen(this.settings) ? null : builtWorld(this.editor);
+        if (world == null) {
+            await forgetKeptWorld();
+            return false;
+        }
+
+        const document = environmentDocument(world, {
+            name: defaultEnvironmentName(world.environment),
+            library: this.assets
+        });
+        return keepWorld(environmentText(document));
     }
 
     /** The library handed on to everything that offers it, and every model read so far drawn in place of its box. */
@@ -993,6 +1075,10 @@ class FlightSimulator {
         // The start rows a world's own start point sets are drawn held while
         // it is the world being flown.
         holdStartFields(this.settings, this.worldStartPoint() != null);
+        // And the chosen preset's own row says when what is flown on it is the
+        // build kept on it rather than the preset as it is - which is also
+        // what makes a second press of that row the way back to the preset.
+        setSettingsBuilt(this.settings, builtWorld(this.editor) != null);
         const flight  = this.buildStart();
         const changed = !sameStart(flight, this.start);
 
@@ -1781,6 +1867,11 @@ class FlightSimulator {
 
     chooseSettingsEntry(id, step = 1) {
         const loaded  = loadedChosen(this.settings);
+        // Whether the row about to be pressed is the chosen preset's own with a
+        // build kept on it, read before the press rather than after: that is
+        // the one press whose meaning is the build rather than the world, and
+        // the press is what settles it.
+        const back    = builtChosen(this.settings) && id === currentEnvironment(this.settings);
         const applied = chooseSetting(this.settings, id, step);
         if (!applied || applied === SETTINGS_BACK_ID) return;
 
@@ -1805,6 +1896,13 @@ class FlightSimulator {
         // was built on lets go of what the file built there.
         if (loaded && !loadedChosen(this.settings)) releaseBuiltWorld(this.editor);
 
+        // The chosen preset pressed again over a build kept on it: the preset
+        // as it is, which is the same letting go, asked for the same way. The
+        // environment itself has not changed, so nothing else about the press
+        // has any work to do - and the world the browser keeps goes with the
+        // build, or a reload would put back what was just let go of.
+        if (back) releaseBuiltWorld(this.editor);
+
         // The builder's own settings, opened in this panel's place.
         if (applied === BUILDER_SETTINGS_ID) {
             this.openBuilderSettingsPanel(BUILDER_SETTINGS_FROM_SETTINGS);
@@ -1816,6 +1914,14 @@ class FlightSimulator {
         // together, so a new world resets the flight, a new start waits for
         // one, and nothing here has to know which kind of choice was made.
         this.applySettings();
+
+        // Then what the browser keeps for the next session is put in step with
+        // what the editor is now holding, which a world chosen here can have
+        // let go of - and which `applySettings` has by now worked out. Only a
+        // world; every other row on the panel leaves the editor alone, and
+        // opening the database to be told so on every weather change would be
+        // a write for nothing.
+        if (isEnvironmentId(applied)) this.syncKeptWorld();
     }
 
     // --- Saving and loading a world -----------------------------------------
@@ -1838,6 +1944,10 @@ class FlightSimulator {
         chooseLoadedWorld(this.settings, true, this.loadedWorld.base);
         this.keepLoadedWorld();
         this.applySettings();
+        // The build the file's world replaced on the editor is not the world
+        // being flown any more, so the browser lets go of it: the file's own
+        // world is chosen again from its own storage on the next reload.
+        this.syncKeptWorld();
         return true;
     }
 
@@ -2400,7 +2510,7 @@ class FlightSimulator {
         const applied = chooseEditorEntry(this.editor, id, step);
         this.redrawEditor();
 
-        if (applied && applied !== EDITOR_BACK_ID) this.refreshWorld();
+        if (applied && applied !== EDITOR_BACK_ID) this.applyEditor(false);
     }
 
     /**
@@ -2408,10 +2518,17 @@ class FlightSimulator {
      * The world goes back through the same place every other world does, so an
      * edited environment is generated by the algorithm rather than patched into
      * the one already on screen.
+     *
+     * The rows this panel steps are the built world's own, so what the browser
+     * keeps for the next session is put in step with them: a row moved over a
+     * kept build changes that build, and a kept copy of how it used to read
+     * would be the world a reload flew. `redraw` is for the caller that has
+     * drawn the panel already.
      */
-    applyEditor() {
-        this.redrawEditor();
+    applyEditor(redraw = true) {
+        if (redraw) this.redrawEditor();
         this.refreshWorld();
+        if (builtWorld(this.editor) != null) this.syncKeptWorld();
     }
 
     // --- The builder -----------------------------------------------------
@@ -2560,6 +2677,13 @@ class FlightSimulator {
             currentEnvironment(this.settings), world, flight);
         this.redrawEditor();
 
+        // And kept where a reload can find it, with the models it uses, so the
+        // world flown after one is still the world that was built. Answered
+        // while the flight is resumed rather than waited for: a browser that
+        // refuses the write costs the world its place across a reload and
+        // nothing about the flight now going on over it.
+        this.syncKeptWorld();
+
         return this.flightWorldKey() !== before;
     }
 
@@ -2617,17 +2741,25 @@ class FlightSimulator {
      * What a pick reads the canvas's ground against, worked out once per canvas:
      * the highest the ground stands, so a ray is only walked through the air the
      * ground could be in; the square of the canvas, which is all a pick may land
-     * on; and a step of half a cell, so no rise in the ground is stepped over.
+     * on; and the grid the ground is sampled on, which is what lets a crossing
+     * be solved cell by cell rather than stepped over.
+     *
+     * The grid is the field's own: `step` apart, with a vertex at the low corner
+     * of the square the field covers. A canvas with no field drawn yet has no
+     * grid to name, and a pick on it falls back to marching.
      */
     readCanvasGround() {
         const field = this.terrain.tileAt(0, 0)?.field;
         let top = -Infinity;
         for (const height of field?.height ?? []) if (height > top) top = height;
 
+        const half = (field?.size ?? 0) / 2;
         return {
             top: Number.isFinite(top) ? top : Infinity,
             bounds: canvasPickBounds(this.terrain.size),
-            step: pickStep(field?.step)
+            step: pickStep(field?.step),
+            cell: field?.step ?? 0,
+            cellOrigin: { x: (field?.originX ?? 0) - half, z: (field?.originZ ?? 0) - half }
         };
     }
 
@@ -2641,19 +2773,73 @@ class FlightSimulator {
      * view.
      */
     pickCanvasPoint(clientX, clientY) {
+        const ray = this.aimCanvasRay(clientX, clientY);
+        return ray ? this.pickGroundAlong(ray) : null;
+    }
+
+    /**
+     * The ray through a point of the screen, or null where there is no canvas
+     * to cast one over.
+     *
+     * Aimed once and handed on, because a pick asks the objects standing on the
+     * canvas and then the ground, and both want the same ray. Aiming it stands
+     * the camera where the state says, which is a `lookAt` and a matrix the
+     * hover would otherwise pay for twice on every frame the pointer is over a
+     * canvas.
+     */
+    aimCanvasRay(clientX, clientY) {
         if (!buildModeDrawing(this.builder) || !this.buildCamera || !this.canvasGround) return null;
 
         this.placeCanvasCamera();
         const device = pointerDevice(clientX, clientY, this.renderer.domElement.getBoundingClientRect());
         this.pointerRay.setFromCamera(device, this.camera);
+        return this.pointerRay.ray;
+    }
 
-        const { origin, direction } = this.pointerRay.ray;
-        return pickGround(origin, direction, (x, z) => this.terrain.getTerrainHeightAt(x, z), {
+    /**
+     * Where a ray cast over the canvas first meets its ground, or null where it
+     * meets none - read against the canvas's own grid, so the crossing is
+     * solved cell by cell rather than stepped over.
+     */
+    pickGroundAlong(ray) {
+        return pickGround(ray.origin, ray.direction, (x, z) => this.terrain.getTerrainHeightAt(x, z), {
             step: this.canvasGround.step,
             maxDistance: this.camera.far,
             top: this.canvasGround.top,
-            bounds: this.canvasGround.bounds
+            bounds: this.canvasGround.bounds,
+            cell: this.canvasGround.cell,
+            cellOrigin: this.canvasGround.cellOrigin
         });
+    }
+
+    /**
+     * The committed placement under the pointer, as its index among the ones a
+     * click may take, or null for bare ground and for the sky.
+     *
+     * Two questions in the order they have to be asked. An object stands over
+     * the ground as a box, so the ray is tested against those boxes first,
+     * nearest first: a click on a tower's upper floors picks the tower. Only
+     * where the ray meets none of them is the ground asked what reaches the
+     * point the ray ends on, which is how a mountain, a stroke or an erase
+     * batch is picked - none of them is a thing in the scene to be hit.
+     *
+     * Asked both ways round would be the defect this fixed: the ground point
+     * under a click on a roof is the ground beyond the building, 450 units past
+     * it for a 200 unit tower, and whatever reaches there is what the pick
+     * would answer.
+     */
+    pickPlacementAt(clientX, clientY) {
+        const ray = this.aimCanvasRay(clientX, clientY);
+        if (!ray) return null;
+
+        const placements = pickablePlacements(this.builder);
+        const ground = (x, z) => this.terrain.getTerrainHeightAt(x, z);
+
+        const standing = objectRayAt(placements, ray.origin, ray.direction, { groundAt: ground, size: this.terrain.size });
+        if (standing != null) return standing;
+
+        const point = this.pickGroundAlong(ray);
+        return point ? placementAt(placements, point.x, point.z, this.terrain.size) : null;
     }
 
     /**
@@ -2738,8 +2924,7 @@ class FlightSimulator {
 
         let hovered = null;
         if (looking && handle == null && buildModeTool(this.builder) === SELECT_TOOL && this.builder.placements.length > 0) {
-            const point = this.pickCanvasPoint(pointer.x, pointer.y);
-            if (point) hovered = placementAt(pickablePlacements(this.builder), point.x, point.z, this.terrain.size);
+            hovered = this.pickPlacementAt(pointer.x, pointer.y);
         }
 
         if (hovered !== this.hovered || handle !== this.gumballHover) {
@@ -3837,10 +4022,7 @@ class FlightSimulator {
      * go of. A pick that was changed asks `ACCEPT EDITS` before it is let go.
      */
     pickAt(clientX, clientY) {
-        const point = this.pickCanvasPoint(clientX, clientY);
-        const index = point ? placementAt(pickablePlacements(this.builder), point.x, point.z, this.terrain.size) : null;
-
-        const answer = selectPlacement(this.builder, index);
+        const answer = selectPlacement(this.builder, this.pickPlacementAt(clientX, clientY));
         if (answer?.confirm) this.confirmOpened();
         else if (answer) this.syncOverlays();
     }

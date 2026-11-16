@@ -5,11 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 import {
     PLANES, PART_SHAPES, DEFAULT_PLANE_ID, CHASE_DISTANCE, CHASE_HEIGHT,
-    planeById, isPlaneId, planeIds, chaseFor, planeSensitivity
+    planeById, isPlaneId, planeIds, chaseFor, planeSensitivity, planeStart
 } from '../js/planes.js';
 import {
     MIN_SPEED, CRUISE_SPEED, MAX_SPEED, MIN_SENSITIVITY, MAX_SENSITIVITY,
-    convergeSpeed, targetSpeed, descentRate
+    convergeSpeed, targetSpeed, descentRate, isStalled, updateThrottle, pitchForClimb
 } from '../js/flight-model.js';
 import { CRASH_IMPACT_SPEED, RUNWAY_IMPACT_SPEED } from '../js/crash.js';
 import { runwayTemplate } from '../js/templates.js';
@@ -19,8 +19,11 @@ import {
     cleanStartPoint, placeStartPoint, turnStartPoint, sameStartPoint, startHeightField, startRanges,
     startRowValues, startFromRows, startAtPoint, startKnobPoint, startDiscLoop, START_DISC_RADIUS, START_KNOB_REACH
 } from '../js/start-point.js';
-import { feetToAltitude, headingToYaw, bearingToDirection, directionToBearing, METERS_PER_FOOT } from '../js/units.js';
-import { START_FIELD_IDS } from '../js/config.js';
+import {
+    feetToAltitude, headingToYaw, bearingToDirection, directionToBearing,
+    knotsToSpeed, feetPerMinuteToVerticalSpeed, METERS_PER_FOOT
+} from '../js/units.js';
+import { START_FIELD_IDS, DEFAULT_CONFIG, START_TAKEOFF } from '../js/config.js';
 import {
     createBuildState, openBuildMode, beginCanvas, chooseBuildTool, buildModeTool, requestLeave, answerConfirm,
     requestLoad, loadCanvas, replacesBuild, sessionWorld, CONFIRM_YES, CONFIRM_NO, REPLACE_WORLD,
@@ -150,7 +153,11 @@ test('a plane\'s span and length are its recipe\'s own, to a metre', () => {
 test('the trainer flies on the figures the flight model and the crash rules were tuned at', () => {
     assert.deepEqual({ ...planeById('trainer').flight }, {
         minSpeed: MIN_SPEED, cruiseSpeed: CRUISE_SPEED, maxSpeed: MAX_SPEED,
-        impactSpeed: CRASH_IMPACT_SPEED, runwayImpactSpeed: RUNWAY_IMPACT_SPEED, handling: 1
+        impactSpeed: CRASH_IMPACT_SPEED, runwayImpactSpeed: RUNWAY_IMPACT_SPEED,
+        // And opens where the configured start opens, which is what keeps the
+        // trainer's flight the one the simulator has always flown.
+        startSpeed: knotsToSpeed(DEFAULT_CONFIG.start.airspeedKnots),
+        handling: 1
     });
 });
 
@@ -716,7 +723,9 @@ test('a free flight opens at the world\'s start point, on the strip nearest it f
 test('the world put in force puts the pilot in its plane and holds the start rows its start point sets', () => {
     const refresh = methodBody(mainSource, 'refreshWorld');
     assert.match(refresh, /const rebuilt = this\.buildWorld\(\);\s*this\.flyPlane\(\);/);
-    assert.match(refresh, /holdStartFields\(this\.settings, this\.worldStartPoint\(\) != null\);\s*const flight\s*= this\.buildStart\(\);/,
+    assert.ok(refresh.indexOf('holdStartFields(this.settings, this.worldStartPoint() != null);') >= 0,
+        'the rows a world\'s start point sets are held');
+    assert.ok(refresh.indexOf('holdStartFields(') < refresh.indexOf('const flight  = this.buildStart();'),
         'held before the start is read from them');
 
     const fly = methodBody(mainSource, 'flyPlane');
@@ -769,4 +778,181 @@ test('the world\'s flight is kept with the build it was made with, and handed ba
     assert.match(methodBody(mainSource, 'startCanvas'), /canvasWorld\(this\.editor, environmentId\), keptFlight\(this\.editor, environmentId\)\)/);
     assert.match(methodBody(mainSource, 'saveBuiltWorld'), /currentEnvironment\(this\.settings\), world, flight\);/);
     assert.match(methodBody(mainSource, 'keepLoadedWorld'), /currentEnvironment\(this\.settings\), world\.world, world\);/);
+});
+
+// --- Every plane opens flying -----------------------------------------------
+//
+// The pilot's START AIRSPEED is one figure for every plane and the planes do
+// not share a stall speed, so the figure a fresh install opens at is a shade
+// above the trainer's stall and well under the jet's. `planeStart` raises a
+// start to what the plane flying it can hold.
+
+/** The start the settings ask for, at a world's own start point. */
+function askedStart(point = { at: [1200, -800], heading: 90, heightFeet: 1000 }) {
+    return startAtPoint(flightStart(DEFAULT_CONFIG.start, {}), point, () => 200);
+}
+
+/** The figures a plane is flown on, as the aircraft hands them to `planeStart`. */
+function figuresFor(plane) {
+    const { minSpeed, cruiseSpeed, maxSpeed, startSpeed } = plane.flight;
+    return { minSpeed, cruiseSpeed, maxSpeed, startSpeed };
+}
+
+/**
+ * `seconds` of flight with nothing touched, from an opening state: the throttle
+ * where it was left, the speed converging on what that throttle asks for, and
+ * the height moving by the descent at the opening attitude. The frame loop as
+ * `js/aircraft.js` runs it, in the pure functions it runs it with.
+ */
+function flyOn(open, figures, seconds = 3, dt = 1 / 60) {
+    let speed = open.speed;
+    let throttle = open.throttle;
+    let height = 0;
+    let lowest = 0;
+    let stalled = 0;
+
+    for (let frame = 0; frame < Math.round(seconds / dt); frame++) {
+        throttle = updateThrottle(throttle, {}, dt);
+        speed = convergeSpeed(speed, targetSpeed(throttle, figures.maxSpeed), dt);
+        if (isStalled(speed, figures.minSpeed)) stalled++;
+        height -= descentRate(open.pitch, speed, figures) * dt;
+        lowest = Math.min(lowest, height);
+    }
+
+    return { speed, throttle, height, lowest, stalled };
+}
+
+test('every plane opens above its own stall speed, whatever the settings asked for', () => {
+    const asked = askedStart();
+
+    for (const plane of PLANES) {
+        const open = planeStart(asked, figuresFor(plane));
+
+        assert.equal(isStalled(open.speed, plane.flight.minSpeed), false,
+            `${plane.id} opens at ${open.speed}, and stalls below ${plane.flight.minSpeed}`);
+        assert.ok(open.speed >= asked.speed,
+            `${plane.id} is never opened slower than the pilot asked for`);
+        assert.ok(open.speed >= plane.flight.startSpeed,
+            `${plane.id} opens at its own speed or the pilot's, whichever is the greater`);
+
+        // Everything else about the start is the one the settings asked for.
+        assert.equal(open.altitude, asked.altitude);
+        assert.equal(open.yaw, asked.yaw);
+        assert.equal(open.x, asked.x);
+        assert.equal(open.z, asked.z);
+        assert.equal(open.verticalSpeed, asked.verticalSpeed);
+    }
+});
+
+test('every plane holds the speed it opened at, so none settles back into its stall', () => {
+    const asked = askedStart();
+
+    for (const plane of PLANES) {
+        const figures = figuresFor(plane);
+        const open = planeStart(asked, figures);
+
+        assert.equal(targetSpeed(open.throttle, plane.flight.maxSpeed), open.speed,
+            `${plane.id}'s lever asks for exactly the speed it opened at`);
+
+        const flown = flyOn(open, figures);
+        assert.equal(flown.speed, open.speed, `${plane.id} is doing the same speed three seconds later`);
+        assert.equal(flown.stalled, 0, `${plane.id} was never stalled in those three seconds`);
+    }
+});
+
+test('every plane opens trimmed for the climb the settings asked for, and none sinks', () => {
+    const asked = askedStart();
+    const climb = feetPerMinuteToVerticalSpeed(DEFAULT_CONFIG.start.verticalSpeedFpm);
+
+    for (const plane of PLANES) {
+        const figures = figuresFor(plane);
+        const open = planeStart(asked, figures);
+
+        // Trimmed means the attitude whose vertical is the one asked for, with
+        // the sink the wing is losing at that speed already taken off it.
+        assert.ok(Math.abs(descentRate(open.pitch, open.speed, figures) + climb) < 1e-9,
+            `${plane.id} opens climbing at ${-descentRate(open.pitch, open.speed, figures)}, not ${climb}`);
+        assert.equal(open.pitch, pitchForClimb(climb, open.speed, figures),
+            `${plane.id} is trimmed on its own figures rather than the model's defaults`);
+
+        const flown = flyOn(open, figures);
+        assert.ok(flown.height > 0, `${plane.id} is higher than it started`);
+        assert.ok(flown.lowest > -1e-9, `${plane.id} never dipped below where it started`);
+    }
+});
+
+test('trimmed on the defaults rather than its own figures, the jet climbs at a third of what it was asked for', () => {
+    // The defect the trim half of this fixed, written down. The pitch that
+    // holds a climb has to out-climb the sink the wing is already losing, and
+    // that sink is read off the plane's cruise speed - so the trainer's answer
+    // is the wrong attitude for the jet by seven degrees.
+    const jet = planeById('jet');
+    const figures = figuresFor(jet);
+    const asked = askedStart();
+    const climb = feetPerMinuteToVerticalSpeed(DEFAULT_CONFIG.start.verticalSpeedFpm);
+
+    const theirs = pitchForClimb(climb, asked.speed);
+    const own = pitchForClimb(climb, asked.speed, figures);
+    assert.ok(Math.abs((own - theirs) * 180 / Math.PI) > 6,
+        'the two attitudes are more than six degrees apart at the same speed');
+
+    // At the attitude the defaults worked out, the jet climbs at well under
+    // what the START CLIMB row says.
+    const got = -descentRate(theirs, asked.speed, figures);
+    assert.ok(got > 0 && got < climb / 2, `${got} is less than half the ${climb} asked for`);
+
+    // And at its own, exactly it.
+    assert.ok(Math.abs(-descentRate(own, asked.speed, figures) - climb) < 1e-9);
+});
+
+test('a start held on a runway is left as it is: stopped, level, on the ground', () => {
+    const strip = { x: 0, z: 0, heading: 0, length: 2400, width: 240, elevation: 120 };
+    const held = flightStart({ ...DEFAULT_CONFIG.start, startMode: START_TAKEOFF }, { runway: strip });
+    assert.equal(held.grounded, true, 'the start this is about');
+
+    for (const plane of PLANES) {
+        assert.deepEqual(planeStart(held, figuresFor(plane)), held, `${plane.id} rolls from where every plane rolls from`);
+    }
+});
+
+test('a caller flying figures of its own keeps the start it asked for', () => {
+    const asked = askedStart();
+
+    assert.deepEqual(planeStart(asked, {}), {
+        ...asked,
+        // Nothing to raise to, so the speed and the throttle stand - and the
+        // trim is the flight model's own answer, which is what it already was.
+        pitch: pitchForClimb(asked.verticalSpeed, asked.speed)
+    });
+
+    assert.equal(planeStart(null, figuresFor(planeById('jet'))), null, 'and nothing has no start to raise');
+    assert.equal(planeStart(undefined, {}), undefined);
+
+    // A host naming a stall speed and no opening speed is raised to the stall
+    // speed itself, which is the least a wing can open at and still be flying.
+    const fast = planeStart(asked, { minSpeed: 100, cruiseSpeed: 300, maxSpeed: 500 });
+    assert.equal(fast.speed, 100);
+    assert.equal(fast.throttle, 100 / 500);
+    assert.equal(isStalled(fast.speed, 100), false);
+});
+
+test('the aircraft reads the raise off the figures in force, so a plane chosen under a start is flown on its own', () => {
+    const aircraft = source('aircraft.js');
+
+    assert.match(aircraft, /import \{ planeById, planeSensitivity, planeStart, DEFAULT_PLANE_ID \} from '\.\/planes\.js';/);
+    assert.match(aircraft, /this\.startSpeed = flight\.startSpeed \?\? this\.minSpeed;/, 'in hand from the first frame');
+    assert.match(aircraft, /this\.startSpeed  = figures\.startSpeed  \?\? this\.minSpeed;/, 'and again for a plane chosen later');
+
+    const figures = methodBody(aircraft, 'startFigures');
+    assert.match(figures, /minSpeed: this\.minSpeed,/);
+    assert.match(figures, /cruiseSpeed: this\.cruiseSpeed,/);
+    assert.match(figures, /maxSpeed: this\.maxSpeed,/);
+    assert.match(figures, /startSpeed: this\.startSpeed/);
+
+    // Worked out where the start is read rather than written in when one is
+    // set, so a plane chosen under a start nobody touched is still flown on its
+    // own figures.
+    assert.match(methodBody(aircraft, 'startState'),
+        /const flight = this\.options\.flight \? planeStart\(this\.options\.flight, this\.startFigures\(\)\) : null;/);
+    assert.doesNotMatch(methodBody(aircraft, 'setStart'), /planeStart\(/, 'and not written into the start as it is set');
 });

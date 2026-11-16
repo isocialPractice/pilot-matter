@@ -286,6 +286,7 @@ createEnvironment(options) -> environment
 | `size` | number | `16000` | The square the world covers |
 | `segments` | number | `200` | How finely that square is sampled |
 | `elements` | array | the preset's | Element placements, instead of the preset's |
+| `objects` | boolean | `true` | `false` to leave the description's objects unbuilt |
 | `runway` | boolean or object | `false` | A landable strip in the world, or a configuration for one |
 | `tile` | `{x, z}` | `{0, 0}` | Which square of a larger assembly this world is |
 | `seed` | number | the preset's | Builds the same description as different ground |
@@ -298,6 +299,8 @@ createEnvironment(options) -> environment
 |--------|-----|
 | `group` | The world as one `Group` any scene can add |
 | `sampleHeight(x, z)` | The ground under a point - the terrain contract itself |
+| `objects` | What stands on the world - its buildings, parks and roads |
+| `obstacleTop(x, z)` | The top of the solid object over a point, or `null` for none |
 | `bounds` | The square the world covers |
 | `runways` | The strips cut into it, empty for a world built without one |
 | `field` | The height and colour field behind the mesh |
@@ -326,6 +329,32 @@ world.register(myWindsock, { x: 400, z: -900, offset: 2 });
 `attach` checks the aircraft against the contract and throws with every problem
 at once rather than one per reload. What it returns is the aircraft and a
 `groundHeight()` for whatever is flying it.
+
+A world is its ground and what stands on it. A description's objects - its
+buildings, its parks, its roads, the models a pilot loaded into the builder -
+are stood on the ground the world draws and answered for by `obstacleTop`, so a
+host loading a world that was built in the builder gets the city as well as the
+valley it was built in. Each entry of `objects` carries the point it stands at,
+the ground it stands on, the height of its highest part and its footprint in the
+world, which is enough for a chart, a camera that should not clip a roof, or a
+collision pass of the host's own.
+
+`obstacleTop(x, z)` is the other half of the terrain contract once a world has
+buildings in it: `sampleHeight` says where the ground is, and this says where
+the roof over it is. Below it, inside the footprint, is inside the building.
+Read the two together and an aircraft flies into the city rather than through
+it:
+
+```javascript
+const ground = world.sampleHeight(x, z);
+const roof   = world.obstacleTop(x, z);   // null where nothing stands there
+const floor  = roof ?? ground;            // what a descent has to stop above
+```
+
+A road is draped over the ground rather than standing on it, so it is in
+`objects` and never answers `obstacleTop`. Build with `objects: false` and
+neither is offered: the world is its ground alone, which is what a host standing
+its own buildings over it wants.
 
 `applyDepth` is the world's depth without the world: the sky it fades to and the
 fog that fades it, applied to any scene. An environment created with
@@ -400,6 +429,84 @@ document.querySelector('#world-picker').addEventListener('change', (event) => {
     world.setEnvironment(event.target.value);
 });
 ```
+
+### Worked example: a built world's file under an external aircraft
+
+A world built in the builder is saved as one JSON file holding its description:
+the environment it was built on, that environment's own elements as they were
+kept, the placements committed over them, and the models any of them refer to.
+`readEnvironmentDocument` reads one back, and what it hands over is exactly what
+`createEnvironment` takes - so a host opens a pilot's own world and flies its
+own aircraft over it.
+
+```javascript
+import * as THREE from 'three';
+import { createEnvironment, readEnvironmentDocument } from 'pilot-matter';
+
+const scene    = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// A file chosen by the person at the page, read as text and nothing else: the
+// reader parses it as JSON, checks it, and never runs a word of it.
+const [file] = document.querySelector('#world-file').files;
+const read = readEnvironmentDocument(await file.text());
+
+// A file is refused whole, with a list of what is wrong with it, first problem
+// first - a world half read is a world nobody built.
+if (!read.ok) throw new Error(`${file.name}: ${read.problems[0]}`);
+
+// `read.world` is `{ environment, placements, world }`, with `start` and
+// `plane` where the file carries them. The description goes straight in: its
+// elements are the ground, and the objects among them are stood on that ground
+// with their roofs answered for.
+const world = createEnvironment({
+    environment: read.world.environment,
+    elements: [...read.world.world, ...read.world.placements]
+});
+
+scene.add(world.group);
+world.applyDepth(scene);
+
+console.log(`${read.name}: ${world.objects.length} standing`);
+
+// The host's own aircraft, opened where the world's own start point says when
+// it has one, and over the middle of the world when it does not.
+const myAircraft = new THREE.Group();
+const start = read.world.start;
+myAircraft.position.set(
+    start ? start.at[0] : 0,
+    (start ? world.sampleHeight(start.at[0], start.at[1]) + start.heightFeet / 3.28 : 900),
+    start ? start.at[1] : 0
+);
+
+const flown = world.attach(myAircraft);
+
+const clock = new THREE.Clock();
+
+renderer.setAnimationLoop(() => {
+    const at = myAircraft.position;
+
+    // The two halves of the terrain contract, read together: where the ground
+    // is, and where the roof over it is. A descent stops above whichever is
+    // the higher, so the aircraft lands on the car park and not through it.
+    const roof  = world.obstacleTop(at.x, at.z);
+    const floor = roof ?? flown.groundHeight();
+
+    myFlightModel.update(clock.getDelta(), floor);
+
+    renderer.render(scene, camera);
+});
+```
+
+Two things are worth knowing about a file's objects. One referring to a model
+the pilot loaded into the builder is drawn as a box of the model's size unless
+the host registers the model itself, because reading a model needs a loader and
+the Matter API does not take one. And a road is draped over the ground rather
+than standing on it, so it is in `objects` and never answers `obstacleTop` -
+nothing should ever have to climb over a road.
 
 ### One tile of a larger world
 
@@ -1251,6 +1358,40 @@ const lit = chartNext(run);                    // 0 - the leg it is flying now
 | `matchWater(surfaces)` | Settles an assembly's water wherever its tiles share a wet vertex |
 | `SEAM_BLEND` | How far a join is eased back into the ground, in vertices |
 | `waterSurface(field)` | The water a world settled at, as the vertices at or under their own water line |
+
+What stands on a world's ground rather than being written into it. A host using
+`createEnvironment` is handed the answers - `objects` and `obstacleTop(x, z)` -
+and these are the same readings for a host standing a built world itself, one
+square at a time, on ground of its own:
+
+| Export | Is |
+|--------|-----|
+| `OBJECT_TYPE` | The `type` an object placement carries |
+| `isObject(placement)` | True for one |
+| `placeObject(prefabId, at, options)` | An object placement from the catalogue, at a point, with a `heading` and a `scale` |
+| `objectFootprint(placement)` | Its rectangle in the square's frame, turned to its heading |
+| `objectHeight(placement)` | How high its highest part stands over the ground it is on |
+| `standingObjects(placements, options)` | Every object a description places, laid out on the ground a `groundAt` reads |
+| `insideObject(object, x, z)` | True for a point inside a standing object's footprint |
+| `obstacleTop(objects, x, z)` | The top of the solid object over a point, or `null` for none |
+| `OBJECT_REACH` | How far past a square's edge an object standing on it may reach, and so how far round a point the squares beside it have to be asked |
+
+A world built in the builder is saved as one JSON file holding its description,
+and read back through the same format whoever wrote it:
+
+| Export | Is |
+|--------|-----|
+| `readEnvironmentDocument(text)` | A file's text read back as `{ ok, world, name, savedAt, problems }` - refused whole, with what is wrong with it, and never throwing |
+| `environmentDocument(world, options)` | A description written as the document a file carries |
+| `environmentText(document)` | That document as the text of its file, indented so a person can read it |
+| `ENVIRONMENT_FORMAT` | What a file says it is, so JSON that is something else is refused by name |
+| `ENVIRONMENT_VERSION` | The version of the format this build writes, and the newest it reads |
+| `ENVIRONMENT_FILE_SUFFIX` | What a saved world's file name ends in |
+
+`schemas/environment.schema.json` in the repository is the same format as JSON
+Schema, for whoever writes one of these by hand or by another program. Nothing
+in a file is ever run: it is parsed as JSON and checked, and what is kept is
+data the generators read.
 
 The five worlds a host can ask for by name:
 

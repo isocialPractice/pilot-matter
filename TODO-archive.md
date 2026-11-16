@@ -6017,3 +6017,371 @@ still be found by name.
     one (`.tmp/run1110/refusals.mjs`). Five mutants caught in Node, including
     a second wording put back for a `.gltf`.
   - From: UI/UX Override - a .glb refused in the dock, and the brush figure beside it
+
+## Archived 11-16-26
+
+- [x] The dock's status line is drawn below the fold on a short phone, so a
+  refused file looks like nothing happened
+  - **Issue**: the SAVE / LOAD dock writes what the last save, load or refusal
+    came to as the ENVIRONMENT section's status line, inside the fields that
+    scroll. Under 640px wide the dock takes the foot of the screen at
+    `top: max(60vh, palette bottom + 10px)`, and on a short phone the palette's
+    foot wins that `max`: at 360x640 the fields come to 62px, which holds the
+    ENVIRONMENT heading and the NAME row and nothing else. Read off the page in
+    Chromium through the builder's own route with a file that is refused, the
+    refusal is drawn at 541-598 in a window of 470-532 with `scrollTop` left at
+    0 - so the dock looks exactly as it did before and the pilot is told
+    nothing. The same at 375x667, where the window is 470-559. The boundary is
+    a viewport 708px tall at 360 wide: at 704 the refusal is below the fold, at
+    708 it is read. It is not the refusal's doing - measured before any file is
+    handed over, the empty status slot is already below the fold - and it costs
+    the same for every status the dock writes; the refusal is only the one that
+    matters most. Everything else on the dock holds at these sizes: the four
+    answers stay pinned, on screen and reachable, every palette tile is
+    reachable, ASSETS is reached by scrolling, and at 390x844 the refusal reads
+    perfectly - 3 lines, inside the dock, amber at 11.46:1.
+  - **Goal**: Resolve to [dock-status-below-the-fold.prompt.md](.claude/prompts/dock-status-below-the-fold.prompt.md)
+  - **Settled**: the line is brought into the fields' window when its words
+    have just changed - the smallest of the prompt's two options, the dock's
+    status keeping the place in the ENVIRONMENT section it belongs to.
+    `statusLines` and `statusToShow` are exported from `js/panel-view.js`,
+    since which line changed and which of two changed lines to show are both
+    decidable without a browser, and `PanelView.update` reads them before it
+    writes the lines - writing one is what takes it out of being news.
+    `showStatus` puts the line's first line at the top of the window rather
+    than reaching for `scrollIntoView({ block: 'nearest' })`, which on a 62px
+    window leaves a four line refusal reading as the end of a sentence whose
+    start is missing. Three redraws are deliberately not news, so the scroll
+    cannot take back a view the pilot set by hand: a line unchanged, a line
+    gone empty, and the line a section opens on - the second of the prompt's
+    two questions, answered by what each section always says rather than by
+    which section it is. The phone pass is at 121 passing and 0 failing where
+    it was at 117 and 4, the height sweep's boundary at 704 is gone, and seven
+    new checks read the three that are not news.
+  - From: UI/UX Override - a refusal a short phone never shows
+- [x] The address cut in a refusal is held by no test, only by a browser check
+  - **Issue**: `namedAddress` in `js/asset-loader.js` cuts an address over 120
+    characters to 117 and `...`, and every refusal a pilot reads is built
+    through it. `test/assets.test.js` reads the module as text and pins the
+    sentence's shape and that `namedAddress` is called in it, but asserts
+    nothing about 120, 117, the trailing `...`, or the tail of the sentence
+    surviving the cut. Run as a mutant rather than argued:
+    `address.slice(0, 117)` changed to `address.slice(0, 17)` leaves the suite
+    at 2426 passing and 0 failing. The rule was verified instead by driving the
+    dock in Chromium over files built for it - 120 drawn whole, 121 and 180 cut
+    to 117 and `...`, a `.gltf` and a `.glb` cut alike, and
+    `; everything it uses has to be inside it` surviving each cut, 53 checks
+    all passing - which means it is checked when this agent runs and at no
+    other time. The reason is structural: `js/asset-loader.js` imports Three.js
+    so the suite cannot import it, and `namedAddress` is private inside it.
+  - **Goal**: Resolve to [address-cut-untested.prompt.md](.claude/prompts/address-cut-untested.prompt.md)
+  - **Settled**: `namedAddress` and the sentence it is written into moved to
+    `js/asset-fit.js` as `namedAddress` and `outsideFileSentence`, with
+    `NAMED_ADDRESS_LIMIT` and `NAMED_ADDRESS_KEPT` naming the two figures.
+    `outsideFileRefusal` keeps the `AssetRefused` class in
+    `js/asset-loader.js` and takes its words from there, so the sentence is
+    asserted by value rather than pinned as the shape of a line of source, and
+    the source-text assertions follow it: the sentence is counted once in
+    `js/asset-fit.js` and asserted absent from `js/asset-loader.js`. All six
+    of the prompt's assertions are in `test/assets.test.js`, and four mutants
+    name the test that catches them - the cut at 17, the limit at 1200, `>`
+    as `>=`, and the slice taken on the finished sentence rather than the
+    address.
+  - From: UI/UX Override - a refusal a short phone never shows
+- [x] A `.glb` that is really glTF JSON skips the refusal before the parse
+  - **Issue**: `assetFormat` in `js/asset-fit.js` reads the format off the
+    filename's extension alone, so a glTF JSON file named `scene.glb` is read
+    down the `.glb` branch. There `refuseOutside(glbJson(bytes))` refuses
+    nothing: `glbJson` answers null for any bytes without the `glTF` magic, and
+    `refuseOutside` passes a null through by design. Measured in Node on the
+    bytes of `{"asset":{"version":"2.0"},"images":[{"uri":"https://example.com/textures/apron.png"}]}`
+    - `glbJson` answers null while `outsideAddress` on the same JSON answers
+    the address - so the check that is meant to catch both formats catches
+    neither for this one file. The loading manager is then the only guard left.
+    It stops the fetch, so nothing leaves for the network; but the docstring on
+    `embeddedOnly` records why that is not enough on its own - three catches an
+    image's throw inside its own texture loading, drops the texture and resolves
+    the parse anyway - which is the whole reason the check before the parse
+    exists. If three parses such a file, the formats table at
+    `docs/terrain.html:320` promises "one pointing at another file is refused"
+    and the pilot instead gets an untextured model with nothing said on the
+    dock. The behaviour is not new - the branch this turn rewrote handled null
+    the same way - but nothing exercises it, and the turn's five mutants all pin
+    the source's shape rather than what such a file does.
+  - **Goal**: settle first whether three's `GLTFLoader` falls back to parsing a
+    non-GLB `ArrayBuffer` as JSON text. It cannot be answered in Node - `three`
+    is CDN-only, `import('three')` answers `ERR_MODULE_NOT_FOUND`, and that is
+    why the suite reads `js/asset-loader.js` as source text - so read it in the
+    browser through the builder's own route, with a `.gltf` renamed `.glb`
+    naming an outside image and another naming an outside buffer. If it parses:
+    on the `.glb` branch, when `glbJson` answers null and the bytes still decode
+    as a glTF object, read the refusal off that object, so one `refuseOutside`
+    covers both formats and the sentence does not change. If it refuses the
+    bytes outright, the gap is only in the wording and the table's promise
+    holds - say so where `glbJson`'s null case is already described. Either way
+    pin the premise in Node, where it is cheap: `glbJson` answers null for glTF
+    JSON text.
+  - **Settled**: it parses. Read in Chromium on 11.11.2026, three's
+    `GLTFLoader` handed the bytes of a `.gltf` renamed `.glb` as an
+    `ArrayBuffer` answered a box of one mesh, and the same file through the
+    builder's own route opened the step headed LOADED ASSET with the model
+    drawn untextured, nothing on the dock and one console line from three.
+    The buffer variant was refused by the manager, as a buffer always is, so
+    the image was the whole of the gap - which is the case the backstop cannot
+    cover. So the first branch of the goal: the `.glb` branch now reads
+    `gltfJson` in `js/asset-fit.js`, which answers a GLB's first chunk or, for
+    bytes that are not a GLB, the bytes read as the JSON text a `.gltf` is.
+    One `refuseOutside` covers all three cases and the sentence is unchanged.
+    The premise is pinned in Node as asked - `glbJson` answers null for glTF
+    JSON text while `outsideAddress` on the same bytes answers the address -
+    and two mutants name the test that catches them. The promise at
+    `docs/terrain.html:320` now holds for a file named `.glb` as well, and the
+    paragraph says so.
+  - From: UI/UX Override - a refusal a short phone never shows
+- [x] `showStatus` is held by regex pins, not by anything that runs it
+  - **Issue**: `PanelView.showStatus` in `js/panel-view.js` is the whole of
+    what a pilot sees in this turn's fix - it is what puts a refusal at the
+    top of a 62px window instead of at 541-598 below it.
+    `test/panel-view.test.js` holds it by reading the module as text and
+    pinning three of its lines with `assert.match`, which is the only way this
+    project can hold a module that touches the DOM. A pin catches a line that
+    is edited or deleted; it cannot catch a guard no pin names. Both of the
+    method's early returns are in that class, run as mutants against the whole
+    suite rather than argued: `if (box.height === 0) return;` deleted leaves
+    2432 passing and 0 failing, `if (!line || !this.fields) return;` deleted
+    leaves 2432 passing and 0 failing, and swapping the two guards so a line
+    with no height is scrolled to leaves 2432 passing and 0 failing. The
+    second is not cosmetic - without that guard, `showStatus` called for a
+    section whose line was never drawn reaches `getBoundingClientRect` on
+    `undefined` and throws inside `update`, which runs on every frame the dock
+    is open. The fix itself was verified and passed on every count this run:
+    30 checks at 360x640, 375x667 and 390x844, 13 on the scroll that must not
+    fight the pilot, 16 on the `.glb` that is really glTF text, 17 on the
+    address cut.
+  - **Goal**: Resolve to [show-status-untested.prompt.md](.claude/prompts/show-status-untested.prompt.md)
+  - **Settled**: the method is executed rather than read. `PanelView` is
+    already exported and `showStatus` touches no global, so
+    `PanelView.prototype.showStatus.call(stub, 'environment')` runs under Node
+    against a stub whose `drawn` and `fields` answer boxes - seven assertions
+    in `test/panel-view.test.js` covering the window the phone measured: a
+    line already inside it left where it is, the 541-598 refusal coming up by
+    71 to the window's own top, a line taller than the window landing first
+    line first rather than foot on the fold, one above it coming down by a
+    negative step, a line of no height left alone, a section with no line
+    drawn left alone rather than throwing, and a view with no fields having
+    nothing to scroll. The three source pins stay as they are - they hold what
+    a stub cannot, which is that the page's own scroll is read off
+    `this.fields` and that `scrollIntoView` is never reached for. All three
+    mutants the issue names are now caught, each by the new test alone and
+    each having left the suite green before it: the height guard deleted, the
+    drawn-and-fields guard deleted, and the height guard moved below the
+    scroll so a line with no height is scrolled to. The fourth mutant the
+    prompt recorded as equivalent was not spent.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] **Derived Cut**: The address cut states both of its figures instead of deriving one
+  - **Issue**: `js/asset-fit.js` exports `NAMED_ADDRESS_LIMIT` as 120 and
+    `NAMED_ADDRESS_KEPT` as 117, two independent figures whose whole
+    relationship is the width of the `...` that joins them - a cut address
+    comes back exactly `NAMED_ADDRESS_LIMIT` characters long, which is the
+    invariant `test/assets.test.js` asserts twice ("121 comes back 120 long",
+    "however long it was") without anything in the module saying it. Nothing
+    is wrong today, and the test would catch either figure moved on its own;
+    the drift is against a convention this repository settled on 11.08.2026
+    for exactly this shape, where `SOFT_EDGE` was changed from a stated 0.5 to
+    a derived `FEATHER_SHARE / 2` so that the constant could no longer
+    disagree with the rule that bounds it - see `Held Feather 1` in
+    `TODO-archive.md`.
+  - **Goal**: name the ellipsis once and read the kept length off the limit -
+    `NAMED_ADDRESS_KEPT = NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, with
+    `namedAddress` appending that same `ELLIPSIS` - so the figure a refusal is
+    cut to is one decision rather than two that have to agree. Leave both
+    exports and both of their asserted values as they are: 120 and 117 are
+    what the pilot reads and what the tests pin, and this changes only where
+    the 117 comes from.
+  - **Settled**: `ELLIPSIS` names `'...'` once in `js/asset-fit.js`,
+    `NAMED_ADDRESS_KEPT` reads as `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and
+    `namedAddress` appends that same constant instead of a second literal. Both
+    exports stay, both values stay 120 and 117, and what a pilot reads is
+    unchanged - `docs/terrain.html:320` still states the behaviour correctly
+    and needed no edit. `test/assets.test.js` gained the one line the figures
+    had never said out loud, that the limit less the kept length is the width
+    of the ellipsis - which states the relationship rather than catching a
+    change to it, since a kept length written back as a bare 117 is the same
+    value at runtime and no assertion against the exports can tell a derived
+    figure from a stated one. The three mutants caught here - a two dot
+    ellipsis, the kept length restated as 116, and the limit moved to 200 with
+    the kept length following it - are each caught by the two absolute pins
+    that were already in the file, not by the line this run added. What holds
+    the derivation is `Derived Cut 1`, whose own **Settled** note has it.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Derived Cut 1: the kept length can be written back as a figure of its own
+  and the suite stays green
+  - **Issue**: the module change is right and does what the item asked -
+    `ELLIPSIS` names `'...'` once, `NAMED_ADDRESS_KEPT` reads as
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length`, and `namedAddress` appends that
+    same constant. What is not held is the derivation itself. The line added
+    to `test/assets.test.js:530`,
+    `assert.equal(NAMED_ADDRESS_LIMIT - NAMED_ADDRESS_KEPT, '...'.length)`,
+    sits three lines under `assert.equal(NAMED_ADDRESS_LIMIT, 120)` and
+    `assert.equal(NAMED_ADDRESS_KEPT, 117)`, so given those two it reads
+    `120 - 117 === 3` and can never be the assertion that fails - it is a
+    tautology, not a hold. Run as a mutant: `NAMED_ADDRESS_KEPT` put back to a
+    bare `117` leaves the whole suite at 2434 passing and 0 failing. The three
+    mutants the item's **Settled** note reports as caught - a two dot
+    ellipsis, the kept length restated as 116, the limit moved to 200 - are
+    each caught by the two absolute pins that were already there before this
+    run, not by the line added to hold the derivation. So the drift the item
+    was raised to close is open in its new form: the figure is one decision
+    today and nothing notices it becoming two again.
+  - **Goal**: hold it the way the precedent it cites is held, and the way this
+    file holds what a runtime cannot show. `test/footprints.test.js:529`
+    asserts `SOFT_EDGE` against `FEATHER_SHARE / 2` - the imported constant,
+    not a restated figure - which is only possible because both are exported;
+    export `ELLIPSIS` and assert `NAMED_ADDRESS_KEPT` off
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` so the test stops restating the
+    mark as its own `'...'` literal, which is the second copy the item set out
+    to remove. That still cannot tell a derived 117 from a written one, since
+    the two are the same value at runtime, so add the pin this project already
+    uses for exactly that: `test/assets.test.js:35` has a `source` helper and
+    `:564` already matches `source('asset-fit.js')`, so an `assert.match` on
+    the derivation line catches the revert the mutant above walks through.
+    Either make the tautology at `:530` carry weight through the exported
+    constant or drop it - as it stands it reports a hold the suite does not
+    have.
+  - **Settled**: held in the source, which is the only place the derivation is
+    visible at all. `ELLIPSIS` is exported from `js/asset-fit.js`, its comment
+    saying why it is, and the test now reads the kept length off
+    `NAMED_ADDRESS_LIMIT - ELLIPSIS.length` - the module's own two exports,
+    with no second `'...'` of its own - so the mark is named once in the
+    assertion that reads the kept length. Under it is an `assert.match` on
+    `source('asset-fit.js')` pinning the derivation line itself, which is the
+    pattern the next test below it already holds the loader's checks by. The
+    behavioural assertions further down the test write the mark and the 117
+    out by value on purpose: what they pin is the output a pilot reads, and
+    that is right to state as a figure rather than rebuild out of the
+    constants under test. The runtime line is kept and labelled, in the test,
+    as stating the relationship rather than holding it, so the next reader
+    credits it with what it does; nothing in the test asserts a figure against
+    itself any more. Four mutants, each found once and each caught: the kept
+    length written back as a bare 117, which left the suite at 23 passing
+    before this run and now fails the source pin alone, by its own message; a
+    two dot ellipsis; the limit moved to 200; and the export taken off again,
+    which fails the file at its import and so proves the export is
+    load-bearing rather than decorative.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Derived Cut 2: the settled note credits the new line with a catch it
+  cannot make
+  - **Issue**: the **Settled** note on `Derived Cut` in `## Complete` says
+    `test/assets.test.js` "gained the one line the figures had never said out
+    loud ... which is what catches a kept length written back as a figure of
+    its own". That is the one mutant the line cannot catch, and the suite is
+    green through it, as `Derived Cut 1` shows. The archive is where this
+    project reads its own precedent back - this very item cites
+    `Held Feather 1` in `TODO-archive.md` as the convention it was following -
+    so a note claiming a hold that is not there is read later as a hold that
+    is, and the next run to touch these figures will trust it.
+  - **Goal**: correct the clause to say what the line does, which is state the
+    relationship between the two figures rather than catch a change to it, and
+    let whatever `Derived Cut 1` lands be what the note credits. Leave the
+    rest of the note as it is - the module description, the unchanged exports
+    and the `docs/terrain.html:320` sentence are all accurate, that last one
+    checked against the file and still reading "named as far as its first 117
+    and an ellipsis". `CHANGELOG.md` needs no edit: it attributes the six
+    catches to "the test named for it" and claims the suite-was-green-before
+    property only for the first three, which is true as written.
+  - **Settled**: the clause now says the line states the relationship between
+    the two figures rather than catching a change to it, says why no runtime
+    assertion can catch it, names the two absolute pins as what caught the
+    three mutants the note had credited to the new line, and points at
+    `Derived Cut 1` for what does hold the derivation. The rest of the note is
+    word for word as it was. Both the things the issue said to recheck hold:
+    `docs/terrain.html:320` still reads "named as far as its first 117 and an
+    ellipsis", and `CHANGELOG.md` needed no edit - its own sentence says what
+    the line says rather than what it catches, and it claims the
+    suite-was-green-before property only of the first three of its six
+    mutants.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Derived Cut 3: the settled note points at a test that is not there and
+  claims the mark is named once
+  - **Issue**: two clauses of the **Settled** note on `Derived Cut 1` state
+    things the files do not support, and that note is what a later run reads
+    this precedent back off. First, "which is the pattern three tests below it
+    already hold the loader's checks by": the loader's source pins are in the
+    test at `test/assets.test.js:570`, the one immediately after the edited
+    test ends at `:566`, and there is no test three below it at all - from
+    `:524` the file holds only `:570` and `:622`, so a reader counting down
+    three runs off the end of it. Second, "so the mark is named once across
+    both files": `'...'` is still written as a literal at `:548`, `:550`,
+    `:552` and `:563`, and `117` at `:550`, `:552` and `:563`. Those are the
+    behavioural assertions and they are right to pin the observable output by
+    value rather than rebuild it out of the constants under test, so what is
+    wrong is the claim and not the test - but as written the note tells the
+    next run that moving `ELLIPSIS` alone would carry, when four literals
+    would have to move with it.
+  - **Goal**: name the next test rather than a third one, and narrow the
+    "named once" clause to the kept-length assertion it is actually about,
+    saying that the behavioural assertions below write the mark and the figure
+    out by value on purpose. Change nothing else in the note and nothing in
+    the test: every other claim the note makes was re-run at review and holds
+    - the bare `117` fails the source pin alone and by its own message, a two
+    dot ellipsis and the limit moved to 200 each fail one of the two absolute
+    pins, and the export taken off fails the file at its import.
+    `CHANGELOG.md` carried the same wrong pointer and the review corrected it
+    there in place, so `TODO.md` is the only file left to edit.
+  - **Settled**: both clauses of the `Derived Cut 1` note now say what the
+    files hold. The pointer names the next test below the edited one, which is
+    the test at `test/assets.test.js:570` that pins the loader's checks the
+    same way - the edited test ends at `:566`, and `:570` and `:622` are all
+    that follow it, so there was never a third one to count down to. The
+    "named once" clause is narrowed to the assertion that reads the kept
+    length, and a sentence after it says the behavioural assertions further
+    down write the mark and the 117 out by value on purpose, because what they
+    pin is the output a pilot reads rather than the constants under test. Both
+    readings were checked against the file first: `'...'` is written at
+    `:548`, `:550`, `:552` and `:563` and `117` at `:550`, `:552` and `:563`,
+    all of them inside those behavioural assertions. Nothing else in the note
+    moved, nothing in `test/assets.test.js` or `js/asset-fit.js` moved, and
+    `CHANGELOG.md` already read "the next test below it" from the review's own
+    correction, so `TODO.md` was the only file edited. The suite is green at
+    2434 passing, 0 failing.
+  - From: UI/UX Override - the dock's scroll, read on a phone
+- [x] Write the request against the automation tool that `### Pruning the
+  Roadmap` says to queue in place of a seventh pruning item
+  - The record under that heading settled this on 10.29.2026: every run that
+    completes a queued item leaves its roadmap original behind, so pruning is a
+    pass that comes round rather than a job that finishes, and the fix belongs
+    in the tool rather than in this file. The 10.31.2026 run met it three more
+    times - the two mountain footprint items and the weather lift - and closed
+    each original inline rather than writing an eighth, ninth and tenth pruning
+    item for them.
+  - What the request has to say: section 5 of the instructions copies an item
+    into `## Current` and leaves the original in place, `todo.mjs` carries no
+    notion of item identity across those two copies, and no rule covers the
+    original once the copy archives. The archive already shows the cost - grep
+    it for `**Mountain** length` and it answers twice, which is one item
+    recorded as two pieces of finished work.
+  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
+    automation, and what shape the fix takes there is theirs to decide. Write
+    it where the user will find it and name both halves - the copy that is left
+    behind, and the archive that then double-counts it.
+  - From: Documentation & Polish `->` Pruning the Roadmap
+- [x] Write the request against the automation tool that `### Pruning the
+  Roadmap` says to queue in place of a seventh pruning item
+  - The record under that heading settled this on 10.29.2026: every run that
+    completes a queued item leaves its roadmap original behind, so pruning is a
+    pass that comes round rather than a job that finishes, and the fix belongs
+    in the tool rather than in this file. The 10.31.2026 run met it three more
+    times - the two mountain footprint items and the weather lift - and closed
+    each original inline rather than writing an eighth, ninth and tenth pruning
+    item for them.
+  - What the request has to say: section 5 of the instructions copies an item
+    into `## Current` and leaves the original in place, `todo.mjs` carries no
+    notion of item identity across those two copies, and no rule covers the
+    original once the copy archives. The archive already shows the cost - grep
+    it for `**Mountain** length` and it answers twice, which is one item
+    recorded as two pieces of finished work.
+  - It is a request rather than a change: `MCP_TODO_HOME` is the user's own
+    automation, and what shape the fix takes there is theirs to decide. Write
+    it where the user will find it and name both halves - the copy that is left
+    behind, and the archive that then double-counts it.
+  - From: Documentation & Polish `->` Pruning the Roadmap

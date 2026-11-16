@@ -63,6 +63,18 @@ export const DRAPE_LIFT = 0.25;
 /** How many points across and along its footprint the ground under an object is read at. */
 export const STAND_SAMPLES = 5;
 
+/**
+ * How far past the edge of the square it stands on, in world units, an object
+ * may reach - and so how far round a point the squares beside it have to be
+ * asked about what stands there.
+ *
+ * One copy, read by everything that asks a grid of squares what is over a
+ * point: the simulator's tiles in js/terrain.js and an assembly built through
+ * the Matter API. Two copies of it would be two different answers to the same
+ * question at a join.
+ */
+export const OBJECT_REACH = 300;
+
 /** True for an object placement. */
 export function isObject(placement) {
     return placement?.type === OBJECT_TYPE;
@@ -148,6 +160,22 @@ export function objectErased(placement, later = [], size = 0) {
     return taken;
 }
 
+/**
+ * The ground an object's footprint stands on: `{ stand, base }`, the highest
+ * ground under it and the lowest - the plinth runs between them.
+ *
+ * `footprint` is in the world rather than in a canvas's frame, and
+ * `groundAt(x, z)` reads the ground there. One copy of the reading, because two
+ * things ask it and have to agree: `standingObjects` stands the building on it,
+ * and `objectBox` in js/build-select.js puts the box a click is tested against
+ * where that building was drawn. A pick reading the ground a different way is a
+ * pick that misses the roof it is aimed at.
+ */
+export function footprintGround(footprint, groundAt = () => 0) {
+    const heights = footprintPoints(footprint).map(([x, z]) => Number(groundAt(x, z)) || 0);
+    return { stand: Math.max(...heights), base: Math.min(...heights) };
+}
+
 /** The corners and the inside of a footprint, as `STAND_SAMPLES` by `STAND_SAMPLES` points. */
 function footprintPoints(footprint) {
     const points = [];
@@ -190,9 +218,7 @@ export function standingObjects(placements = [], { groundAt = () => 0, originX =
 
         const { at, heading, scale } = objectConfig(placement);
         const world = { ...footprint, x: footprint.x + originX, z: footprint.z + originZ };
-        const heights = footprintPoints(world).map(([x, z]) => Number(groundAt(x, z)) || 0);
-        const stand = Math.max(...heights);
-        const base = Math.min(...heights);
+        const { stand, base } = footprintGround(world, groundAt);
 
         standing.push({
             key: recipeKey(placement.recipe),

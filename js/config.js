@@ -112,7 +112,7 @@ export const START_FIELDS = Object.freeze([
     {
         id: 'airspeedKnots',
         label: 'START AIRSPEED',
-        note: 'the airspeed the flight opens at',
+        note: 'the airspeed the flight opens at, raised to the plane\'s own',
         default: DEFAULT_CONFIG.start.airspeedKnots,
         min: 0, max: 200, step: 5,
         unit: ' KTS'

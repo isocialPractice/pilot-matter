@@ -179,6 +179,12 @@ export function resolveEnvironmentOptions(options = {}) {
         fog: options.fog !== false,
         lights: options.lights !== false,
         elements: Array.isArray(options.elements) ? options.elements : null,
+        // Whether the objects a world's description stands - its buildings, its
+        // parks, its roads - are drawn and answered for. On, because a host
+        // handing over a built world's description is asking for that world;
+        // `objects: false` is for a host that stands its own over this ground
+        // and wants only what the generator writes into it.
+        objects: options.objects !== false,
         // Which square of a larger assembly this world is, counted in squares
         // off the middle of it. A world nobody placed is the whole of what
         // there is, which is the square in the middle.

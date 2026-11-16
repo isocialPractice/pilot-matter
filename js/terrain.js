@@ -14,15 +14,8 @@ import {
     tilesTouching
 } from './world-tiles.js';
 import { recordWorld, sameWorld } from './world-record.js';
-import { standingObjects, obstacleTop } from './objects.js';
+import { standingObjects, obstacleTop, OBJECT_REACH } from './objects.js';
 import { objectGroup, disposeObjectGroup } from './object-mesh.js';
-
-/**
- * How far past a tile's edge, in world units, an object standing on it may
- * reach - which is how far round a point the tiles beside it are asked about
- * what stands there.
- */
-const OBJECT_REACH = 300;
 
 /**
  * The ground, as the mesh side of an assembled environment. Everything about

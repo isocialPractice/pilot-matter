@@ -20,7 +20,7 @@ import {
 } from './crash.js';
 import { isOnRunway, nearestRunway } from './environment/elements.js';
 import { wrapPosition } from './world-edge.js';
-import { planeById, planeSensitivity, DEFAULT_PLANE_ID } from './planes.js';
+import { planeById, planeSensitivity, planeStart, DEFAULT_PLANE_ID } from './planes.js';
 
 /**
  * The aircraft: a model in a scene, and the frame loop the flight model drives
@@ -44,6 +44,10 @@ export class Aircraft {
         this.clearance   = flight.clearance   ?? GROUND_CLEARANCE;
         this.impactSpeed = flight.impactSpeed ?? CRASH_IMPACT_SPEED;
         this.runwayImpactSpeed = flight.runwayImpactSpeed ?? RUNWAY_IMPACT_SPEED;
+        // The speed a flight in this aircraft opens at, which a start asked for
+        // slower than is raised to - see `planeStart`. Nothing named leaves it
+        // the stall speed, which is the least a wing can open at and be flying.
+        this.startSpeed = flight.startSpeed ?? this.minSpeed;
 
         // The strips in the world being flown over. Empty until something hands
         // them over, which is what leaves a host flying its own terrain with the
@@ -95,14 +99,31 @@ export class Aircraft {
         if (options.controls !== false) this.setupControls();
     }
 
+    /** The figures a start in this aircraft is held to: its speeds, and the speed it opens at. */
+    startFigures() {
+        return {
+            minSpeed: this.minSpeed,
+            cruiseSpeed: this.cruiseSpeed,
+            maxSpeed: this.maxSpeed,
+            startSpeed: this.startSpeed
+        };
+    }
+
     /**
      * The condition a flight starts from and resets back to: the configured
      * start state, with anything the caller asked to change about it applied
-     * over the top.
+     * over the top, raised to what the plane being flown can hold.
+     *
+     * The raise is `planeStart` in js/planes.js, and it is worked out here
+     * rather than written into the start when one is set, because the plane can
+     * change under a start that nobody touched: a world flown in the jet is
+     * chosen, and the start the settings asked for is suddenly under a stall
+     * speed half as high again. Read off the figures in force every time, the
+     * answer cannot go stale.
      */
     startState() {
         const start  = createFlightState();
-        const flight = this.options.flight;
+        const flight = this.options.flight ? planeStart(this.options.flight, this.startFigures()) : null;
         if (!flight) return start;
 
         return {
@@ -227,6 +248,7 @@ export class Aircraft {
         this.maxSpeed    = figures.maxSpeed    ?? MAX_SPEED;
         this.impactSpeed = figures.impactSpeed ?? CRASH_IMPACT_SPEED;
         this.runwayImpactSpeed = figures.runwayImpactSpeed ?? RUNWAY_IMPACT_SPEED;
+        this.startSpeed  = figures.startSpeed  ?? this.minSpeed;
         this.setSensitivity(this.sensitivity);
 
         if (this.group && !this.external && !this.custom) {

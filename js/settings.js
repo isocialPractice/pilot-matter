@@ -59,6 +59,12 @@ export const SETTINGS_OPEN_KEYS = ['KeyO'];
 // browser keeps. Its id is no preset's, so it can be told from every one.
 export const LOADED_ENVIRONMENT_ID = 'loaded';
 
+// What a preset's row says while the world flown on it is a build the builder
+// kept rather than the preset as it is, and what pressing that row does about
+// it. The row is the only place a pilot who never opens the builder would find
+// out that the ground under them is not the preset's own.
+export const BUILT_WORLD_NOTE = 'flying the world built on it - choose again for the preset as it is';
+
 // The two rows that end the worlds: a saved world opened from a file, and the
 // world as it would be flown written to one. Each is a verb and an object, and
 // the ellipsis that says a file dialog comes next.
@@ -481,6 +487,11 @@ export function createSettingsState(storage = null, environments = ENVIRONMENTS,
         // whether the two file rows are on the panel. See `setSettingsWorlds`.
         loaded: worlds.loaded ?? null,
         files: worlds.files !== false,
+        // Whether the world flown on the chosen preset is a build kept on it
+        // rather than the preset as it is. Written where that row's note goes,
+        // and what makes a second press of the row the way back. See
+        // `setSettingsBuilt`.
+        built: false,
         // What the last file row pressed came to, written where its note is.
         fileNotice: null,
         // The start rows a world's own start point is setting while it is
@@ -525,6 +536,32 @@ export function setSettingsWorlds(state, { loaded = state.loaded, files = state.
 /** True while the world a file brought is the one chosen - and so the one flown. */
 export function loadedChosen(state) {
     return state?.values?.loaded === true && state.loaded != null;
+}
+
+/**
+ * Tells the panel whether the world flown on the chosen preset is a build the
+ * builder kept on it. The row then says so in place of the preset's own
+ * description, and a second press of it is the way back to the preset - which
+ * is the only way back there is, since choosing the row a build is kept on has
+ * always been the one environment press that did nothing.
+ *
+ * Not remembered between sessions: it is a reading of what the editor is
+ * holding, taken whenever the world is put in force, rather than a choice.
+ *
+ * Returns true when it changed, which is the caller's cue to draw the panel
+ * again.
+ */
+export function setSettingsBuilt(state, built = true) {
+    const wanted = built === true;
+    if (state.built === wanted) return false;
+    state.built = wanted;
+    syncSettingsEntries(state);
+    return true;
+}
+
+/** True while a build kept on the chosen preset is the world being flown. */
+export function builtChosen(state) {
+    return state?.built === true && !loadedChosen(state);
 }
 
 /**
@@ -585,9 +622,23 @@ export function syncSettingsEntries(state) {
     const start   = startSettings(state);
 
     const loaded = loadedChosen(state);
+    const built  = builtChosen(state);
+    const environments = state.environments ?? ENVIRONMENTS;
     for (const entry of state.entries) {
         entry.current = entry.kind === ENVIRONMENT_ENTRY
             && (entry.id === LOADED_ENVIRONMENT_ID ? loaded : !loaded && entry.id === state.values.environment);
+
+        // The preset being flown says so when what is flown on it is a build
+        // kept on it rather than the preset as it is. Written here rather than
+        // where the entries are made, because it is a reading of the editor
+        // that changes without the list changing - and read back off the
+        // preset when the build goes, so the row is its own description again.
+        if (entry.kind === ENVIRONMENT_ENTRY && entry.id !== LOADED_ENVIRONMENT_ID) {
+            entry.built = built && entry.current;
+            entry.note = entry.built
+                ? BUILT_WORLD_NOTE
+                : environments.find(environment => environment.id === entry.id)?.description ?? entry.note;
+        }
 
         // A file row reads what it last came to, in place of what it does.
         if (entry.kind === FILE_ENTRY) {
@@ -789,7 +840,12 @@ export function chooseSetting(state, id, step = 1) {
         return id;
     }
 
-    if (state.values.environment === id) return null;
+    // The preset already chosen, pressed again. With the preset itself being
+    // flown there is nothing to choose, as there never was. With a build kept
+    // on it there is: the preset as it is, which the caller gets to by letting
+    // the build go. So the row answers as itself, and `builtChosen` is what the
+    // caller reads to know which of the two it was asked for.
+    if (state.values.environment === id) return builtChosen(state) ? id : null;
 
     // A world answers as itself rather than as the setting holding it, because
     // what a caller does about a new world depends on which world it is.

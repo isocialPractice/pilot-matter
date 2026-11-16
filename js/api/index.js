@@ -151,6 +151,27 @@ export {
     createField, sampleHeight
 } from '../environment/elements.js';
 
+// A world built in the builder, as the file it is saved to: the reader, so a
+// host can open one and hand its description straight to `createEnvironment`,
+// and the writer, so a host can save a description of its own in the same
+// format. The reader refuses a file whole, with a list of what is wrong with
+// it - a world half read is a world nobody built - and nothing a file carries
+// is ever run.
+export {
+    ENVIRONMENT_FORMAT, ENVIRONMENT_VERSION, ENVIRONMENT_FILE_SUFFIX,
+    readEnvironmentDocument, environmentDocument, environmentText
+} from '../environment-file.js';
+
+// What stands on a world's ground rather than being written into it: how the
+// objects a description places are laid out on it, and what is over a point.
+// A host standing a built world itself - one tile at a time, on ground of its
+// own - reads these; a host using `createEnvironment` is handed the answers.
+export {
+    OBJECT_TYPE, OBJECT_REACH,
+    isObject, placeObject, objectFootprint, objectHeight,
+    standingObjects, insideObject, obstacleTop
+} from '../objects.js';
+
 // Laying one world beside another: where a tile's ground sits, what it is
 // generated from, and the pass that settles what its elements drew at the edges
 // against what its neighbours drew at theirs.

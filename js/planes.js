@@ -17,7 +17,7 @@
  * Pure module with no DOM or Three.js dependency.
  */
 
-import { MIN_SENSITIVITY, MAX_SENSITIVITY } from './flight-model.js';
+import { MIN_SENSITIVITY, MAX_SENSITIVITY, pitchForClimb } from './flight-model.js';
 
 /** The plane a world is flown in until one is chosen for it: the one the simulator has always flown. */
 export const DEFAULT_PLANE_ID = 'trainer';
@@ -56,9 +56,19 @@ function cone(radius, length, at, color, turn = FORWARD, segments = 8) {
  * The five, in the order Insert Plane's cards draw them. `span` and `length`
  * are the plane's extent across and along, in metres, which the chase camera
  * stands back by. `flight` is what the aircraft is handed: the three speeds the
- * flight model reads, the two arrival speeds a touchdown is judged against, and
- * `handling`, a share of the pilot's own control sensitivity - so a biplane
- * answers quicker than a twin whatever the pilot has set.
+ * flight model reads, the two arrival speeds a touchdown is judged against,
+ * `startSpeed`, the speed a flight in it opens at, and `handling`, a share of
+ * the pilot's own control sensitivity - so a biplane answers quicker than a
+ * twin whatever the pilot has set.
+ *
+ * `startSpeed` is a floor on the pilot's own START AIRSPEED rather than a
+ * replacement for it: the setting is one figure for every plane and the planes
+ * do not share a stall speed, so a figure that opens the trainer a shade above
+ * its stall opens the jet well under its own. Each is a figure the plane can
+ * hold with the throttle `planeStart` sets, and far enough above its stall to
+ * leave the wing some margin - the trainer's is its stall speed exactly,
+ * because that is what the simulator has always opened at and what the
+ * configured 80 knots comes to.
  */
 export const PLANES = Object.freeze([
     Object.freeze({
@@ -73,7 +83,7 @@ export const PLANES = Object.freeze([
             box([0.1, 2, 1.5], [0, 1, -3.5], 0x3366aa),
             cone(0.5, 1.5, [0, 0, 4.5], 0xdddddd, BLUNT)
         ]),
-        flight: Object.freeze({ minSpeed: 40, cruiseSpeed: 120, maxSpeed: 200, impactSpeed: 30, runwayImpactSpeed: 48, handling: 1 }),
+        flight: Object.freeze({ minSpeed: 40, cruiseSpeed: 120, maxSpeed: 200, impactSpeed: 30, runwayImpactSpeed: 48, startSpeed: 40, handling: 1 }),
     }),
     Object.freeze({
         id: 'bush',
@@ -91,7 +101,7 @@ export const PLANES = Object.freeze([
             cylinder(0.45, 0.45, 0.35, [1.1, -1.1, 1.2], 0x2e3439, ACROSS, 12),
             cone(0.6, 1.1, [0, 0, 4.2], 0x3b444a)
         ]),
-        flight: Object.freeze({ minSpeed: 32, cruiseSpeed: 100, maxSpeed: 160, impactSpeed: 34, runwayImpactSpeed: 54, handling: 1.1 }),
+        flight: Object.freeze({ minSpeed: 32, cruiseSpeed: 100, maxSpeed: 160, impactSpeed: 34, runwayImpactSpeed: 54, startSpeed: 40, handling: 1.1 }),
     }),
     Object.freeze({
         id: 'twin',
@@ -107,7 +117,7 @@ export const PLANES = Object.freeze([
             box([0.1, 2.4, 1.8], [0, 1.2, -4.2], 0x5a6f86),
             cone(0.55, 1.6, [0, 0, 5.2], 0xdddddd)
         ]),
-        flight: Object.freeze({ minSpeed: 48, cruiseSpeed: 140, maxSpeed: 240, impactSpeed: 30, runwayImpactSpeed: 48, handling: 0.85 }),
+        flight: Object.freeze({ minSpeed: 48, cruiseSpeed: 140, maxSpeed: 240, impactSpeed: 30, runwayImpactSpeed: 48, startSpeed: 60, handling: 0.85 }),
     }),
     Object.freeze({
         id: 'jet',
@@ -125,7 +135,7 @@ export const PLANES = Object.freeze([
             box([0.1, 2.4, 2], [0, 1.3, -4.8], 0x5f6970, [-0.35, 0, 0]),
             cone(0.75, 3, [0, 0, 7], 0x2e3439)
         ]),
-        flight: Object.freeze({ minSpeed: 60, cruiseSpeed: 180, maxSpeed: 300, impactSpeed: 26, runwayImpactSpeed: 42, handling: 0.9 }),
+        flight: Object.freeze({ minSpeed: 60, cruiseSpeed: 180, maxSpeed: 300, impactSpeed: 26, runwayImpactSpeed: 42, startSpeed: 80, handling: 0.9 }),
     }),
     Object.freeze({
         id: 'biplane',
@@ -144,7 +154,7 @@ export const PLANES = Object.freeze([
             cylinder(0.4, 0.4, 0.3, [-1, -1.1, 1], 0x2e3439, ACROSS, 12),
             cylinder(0.4, 0.4, 0.3, [1, -1.1, 1], 0x2e3439, ACROSS, 12)
         ]),
-        flight: Object.freeze({ minSpeed: 30, cruiseSpeed: 90, maxSpeed: 150, impactSpeed: 32, runwayImpactSpeed: 50, handling: 1.3 }),
+        flight: Object.freeze({ minSpeed: 30, cruiseSpeed: 90, maxSpeed: 150, impactSpeed: 32, runwayImpactSpeed: 50, startSpeed: 40, handling: 1.3 }),
     })
 ]);
 
@@ -187,4 +197,65 @@ export function chaseFor(plane = planeById()) {
 export function planeSensitivity(sensitivity, plane = planeById()) {
     const base = Number.isFinite(sensitivity) ? sensitivity : 1;
     return Math.min(Math.max(base * (plane?.flight?.handling ?? 1), MIN_SENSITIVITY), MAX_SENSITIVITY);
+}
+
+/**
+ * The condition a flight opens in, raised to what the plane flying it can
+ * actually hold - the start the pilot asked for where the plane can hold it,
+ * and the plane's own where it cannot.
+ *
+ * Three things, and the third is the one easiest to miss:
+ *
+ * - **The speed** is the greater of the one asked for and the plane's own
+ *   `startSpeed`. The pilot's START AIRSPEED is one figure for every plane, so
+ *   the 80 knots a fresh install opens at is a shade above the trainer's stall
+ *   speed and well under the jet's - which is the jet opening stalled.
+ * - **The throttle** is raised to what holds that speed, because the lever
+ *   picks a target and the speed converges on it. Left alone, a plane opened
+ *   faster than its lever asks for slows back to the lever's figure within a
+ *   second or two: at the configured 20 per cent that is 32 for the bush plane
+ *   and 30 for the biplane, which is each one's stall speed exactly.
+ * - **The trim** is worked out again from this plane's own figures. The pitch
+ *   that holds a climb has to out-climb the sink the wing is already losing at
+ *   that speed, and that sink is read off the plane's cruise speed - so a trim
+ *   worked out from the flight model's default figures asks the jet for a climb
+ *   it does not get. At the same speed the two want attitudes seven degrees
+ *   apart, and the start's own START CLIMB row is what reads wrong for it.
+ *
+ * `figures` is what the aircraft is flying on - its three speeds and its
+ * `startSpeed` - rather than a plane, so a host flying figures of its own gets
+ * them honoured rather than a plane's. Without a `startSpeed` the floor is the
+ * stall speed itself, which is the least a wing can open at and still be
+ * flying.
+ *
+ * A start held on a runway is handed back exactly as it came: it is stopped on
+ * the ground with the engine idling, and every figure above is about being in
+ * the air. So is a start with nothing in it.
+ */
+export function planeStart(start, figures = {}) {
+    if (start == null || typeof start !== 'object' || start.grounded === true) return start;
+
+    // Left out rather than defaulted to zero: the flight model fills a figure
+    // nobody named with the one the controls were tuned at, and a zero stall
+    // speed would read as a wing that cannot stall.
+    const named = name => (Number.isFinite(figures[name]) ? figures[name] : undefined);
+    const maxSpeed = named('maxSpeed') ?? 0;
+
+    // The floor a start is raised to. Without a `startSpeed` it is the stall
+    // speed itself, and without that either there is nothing to raise to: a
+    // caller flying figures of its own keeps the start it asked for.
+    const floor = named('startSpeed') ?? named('minSpeed') ?? 0;
+
+    const speed = Math.max(Number(start.speed) || 0, floor, 0);
+    const holds = maxSpeed > 0 ? Math.min(speed / maxSpeed, 1) : 0;
+
+    return {
+        ...start,
+        speed,
+        throttle: Math.max(Number(start.throttle) || 0, holds),
+        pitch: pitchForClimb(Number(start.verticalSpeed) || 0, speed, {
+            minSpeed: named('minSpeed'),
+            cruiseSpeed: named('cruiseSpeed')
+        })
+    };
 }

@@ -5,7 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-alpha.1.66.0] - 2026-11-16
+
+The builder's five open gaps closed: a build that outlives the page, a world's
+objects through the Matter API, a roof a click can reach, a plane that opens
+flying, and a summit a pick can be pointed at.
 
 ### Changed
 
@@ -67,6 +71,221 @@ the shape of a fix the item reserves for the operator.
 No version applies: the whole diff is `TODO.md`, its archive and this entry,
 and nothing in it runs. The one file the run wrote outside this repository is
 the operator's automation, which carries its own version.
+
+The two entries above were written on turns that applied no version and sat
+under `## [Unreleased]` until one came along. This is that version, so they
+ship with it; "no version applies" is the account of the turn that wrote each
+of them rather than of this release.
+
+- **`START AIRSPEED`'s note says it is a floor.** The row reads *the airspeed
+  the flight opens at, raised to the plane's own*, which is what it now does.
+- **`OBJECT_REACH` moved from `js/terrain.js` to `js/objects.js`**, so the
+  simulator's tiles and an assembly built through the Matter API read one
+  figure for how far past a square's edge an object standing on it may reach.
+  Two copies of it would have been two answers to the same question at a join.
+
+### Added
+
+- **Kept builds survive a reload.** The world `ACCEPT AND EXIT` keeps is
+  written to IndexedDB beside the asset library and read back as the page
+  comes up, so the world flown after a reload is still the one that was built:
+  placements, start point, plane and the models any of them use. The database
+  is the `pilot-matter` one `js/asset-store.js` already opens, at version 2
+  with a `worlds` store created beside `assets` - the upgrade touches neither
+  store's contents, so a browser holding models kept by version 1 still has
+  them. One world is kept, under one key, and the next replaces it: a pilot's
+  library of worlds is their files, and this is the one world in hand.
+  - **It is kept as its file's text rather than as the world**, which is how
+    `js/loaded-world.js` has always held the world a file brought, and for the
+    same reason: it is read back through `readEnvironmentDocument` every time,
+    so a kept world some later version would refuse in a file is refused here
+    too rather than trusted for having been kept. A world refused that way is
+    let go of, since a version that cannot read it will not read it tomorrow
+    either; a world carrying a model that will not decode is left kept, since
+    that may be the browser rather than the file.
+  - **Three things let it go, and they are the three that let the build go.**
+    Another preset chosen in the settings, the world a file brought chosen
+    over it - that has a home of its own in localStorage and is not kept twice
+    - and the preset's own row pressed again. Nothing else opens the database:
+    a weather setting changed is not a world changed, and `syncKeptWorld` is
+    called only from the way out of the builder, an environment press, and an
+    element editor row applied over a build, which are the three places what
+    the editor holds can change.
+  - **The chosen preset's row says what is being flown on it.** While a build
+    is kept on it the row reads *flying the world built on it - choose again
+    for the preset as it is* in place of the preset's description, and
+    pressing it again lets the build go and lays the preset. That press used
+    to be the one environment press that did nothing at all - `chooseSetting`
+    answered `null` for the world already chosen - so a pilot who built on
+    Highlands could only get the bare preset back by choosing another world
+    and coming back to it. The row is read off the editor whenever a world is
+    put in force, so it is never a stored choice that can go stale, and the
+    world a file brought keeps its own row rather than being reported as a
+    build on a preset.
+- **The Matter API stands a world's objects, and answers for the roof over a
+  point.** `createEnvironment` and `createTiledEnvironment` now put a
+  description through the pipeline `buildEnvironment` puts one through - a
+  placed template expanded into the placements it stands for, an erase batch
+  cut out of the placements before it, and an object left out of the field
+  because it changes no ground - and then stand the objects on the ground that
+  pass drew, through the same `standingObjects` and `objectGroup` the
+  simulator's own tiles use. A host loading a world that was built in the
+  builder gets the city as well as the valley it was built in.
+  - The world it hands back carries `objects`, each with the point it stands
+    at, the ground it stands on, the height of its highest part and its
+    footprint in the world, and `obstacleTop(x, z)`, the other half of the
+    terrain contract once a world has buildings in it: `sampleHeight` says
+    where the ground is and this says where the roof over it is. An assembly
+    answers it across its joins, asking every square a point could be reached
+    from rather than only the one it falls on, which is what `obstacleTopAt`
+    in `js/terrain.js` does for the same reason - so `OBJECT_REACH` now has
+    one home, in `js/objects.js`, read by both instead of a copy in each.
+  - `objects: false` leaves them unbuilt, for a host standing its own
+    buildings over this ground.
+  - **What a host could do before this was throw.** `getElement` raises
+    `Unknown environment element` for a type the registry does not hold, and
+    `generate` applied every placement it was handed, so the first object,
+    placed template or erase batch in a built world's description ended the
+    call. The changelog's own wording for the gap - a host's aircraft flying
+    through a city it cannot see - described the state after the fix to the
+    pipeline rather than the state that shipped.
+  - The API now publishes `readEnvironmentDocument`, `environmentDocument` and
+    `environmentText` with the format's three constants, and the object
+    module's reading calls, so a host can open a pilot's own world file and
+    hand its description straight to `createEnvironment`. `docs/api.md` works
+    that as an example under an external aircraft, reading `sampleHeight` and
+    `obstacleTop` together so a descent stops above whichever is the higher.
+
+### Fixed
+
+- **A click on a tall building picks the building.** An object is the one
+  thing on a canvas that is in the scene rather than written into the ground,
+  and Select was picking it the way it picks a write into the ground: by the
+  point the pointer's ray ends on, asking which placement reaches there. The
+  ray ends on the ground, so a click on a tower's upper floors asked about
+  ground well behind the tower - 140 units beyond a 200 unit tower, with the
+  view 55 degrees over it - and was answered with whatever stands there, or
+  with nothing. The ray is now tested against the box each object stands in
+  first: its footprint turned to its heading, from the lowest ground under
+  that footprint, which is the foot of its plinth, to the top of its highest
+  part. The nearest box the ray enters is what the click takes, and only where
+  it enters none is the ground asked what reaches the point the ray ends on -
+  which is still how a mountain, a stroke, an extrusion or an erase batch is
+  picked, none of them being a thing in the scene to be hit. The hover reads
+  the same way, through the same call, so what is outlined is what a click
+  takes.
+  - The box is put where the building was drawn rather than near it: the
+    ground under a footprint is read once, by `footprintGround` in
+    `js/objects.js`, which `standingObjects` now stands the building by and
+    `objectBox` now measures the box by. On a slope the two would otherwise
+    differ by the fall across the footprint.
+  - An object a later batch erased is not drawn, so it is not there to be
+    picked - the same reading `standingObjects` makes of the list.
+- **Every plane opens flying.** `START AIRSPEED` is one figure for every plane
+  and the planes do not share a stall speed, so the 80 knots a fresh install
+  opens at is a shade above the trainer's stall and well under the jet's.
+  Measured frame by frame from the configured start, the twin opened stalled
+  for 7 frames and the jet for 19, and the bush plane and the biplane settled
+  back to 32 and 30 - which is each one's stall speed exactly, with no margin
+  left in the wing. Each plane now carries the speed a flight in it opens at -
+  40 for the trainer, which is the 80 knots it has always opened at, 40 for
+  the bush plane, 60 for the twin, 80 for the jet and 40 for the biplane - and
+  `planeStart` raises a start asked for slower than that to it. The throttle
+  is raised with it, to exactly what holds that speed, because the lever picks
+  a target and the speed converges on it: left alone, a plane opened faster
+  than its lever asks for slows back to the lever's figure within a second or
+  two. The speed is a floor and never a ceiling, so a pilot who asks for 200
+  knots gets 200 in every plane.
+  - **And the opening attitude is trimmed on the plane's own figures.** The
+    pitch that holds a climb has to out-climb the sink the wing is already
+    losing at its speed, and that sink is read off the plane's cruise speed -
+    but `flightStart` worked the pitch out with the flight model's defaults,
+    which are the trainer's. At the configured start the jet wanted an
+    attitude seven degrees from the one it was handed, and climbed at 1.86
+    units per second against the 6.40 the `START CLIMB` row asked for. Every
+    plane now opens at exactly the climb that row says, and none of the five
+    dips below the height it opened at over its first three seconds.
+  - The raise is worked out where the start is read rather than written in
+    when one is set, so a plane chosen under a start nobody touched is flown
+    on its own figures - which is what choosing a world with a plane in it
+    does. `startSpeed` is a figure the aircraft carries like its three speeds,
+    so a host flying figures of its own is raised to its own stall speed and
+    no further, and a runway takeoff is handed back exactly as it came: it is
+    stopped on the ground with the engine idling, and none of this is about
+    that.
+- **A pick reaches a summit narrower than the sampling.** The ground is
+  sampled every 80 metres and interpolated between its vertices, so an
+  extrusion over a region too small to reach more than one vertex is one
+  vertex high and falls away inside a single cell. `pickGround` walked the ray
+  in steps of half a cell and halved the step that crossed, which cannot see
+  such a summit at all: the stretch along the ray where the ground stands
+  above it is under three units wide. Measured against one vertex raised 200
+  units, with the view 55 degrees over it and the aim swept at a quarter of a
+  unit, the march answered the flat ground 140 metres beyond for every aim
+  within 9.8 metres of the summit, so `EDIT EXTRUSION` could not be pointed at
+  the top of a small block.
+  - **The two shapes the item named were measured and neither works.**
+    Stepping by a share of the ray's own descent rather than of a cell reached
+    the same one aim of 185 across the face, because the notch is narrow in
+    the ray's own length and not only in the cell's; and refining the first
+    stretch out of the ceiling fixes only a summit standing at the highest
+    ground, while a second block further along the same ray has a notch just
+    as narrow. No step small enough to find one is affordable on every pointer
+    move, and a pointer move is what asks.
+  - **So a pick told the grid is not stepped at all.** The ray is walked cell
+    by cell over the grid the ground is sampled on, and inside one cell the
+    ground is the bilinear patch of its four corners - which makes the ray's
+    clearance over it exactly a quadratic in the distance along the ray, whose
+    first root inside that cell is the crossing. A cell with no root in its
+    stretch has no crossing in it, rather than none that was sampled. A summit
+    standing in a cell is a corner of that cell, so its height is in the
+    quadratic whether or not anything was stepped onto it: the sweep above
+    goes from 1 aim of 185 to all 185, and reads the ground 6,076 times
+    against the march's 19,615, with its dearest ray reading 14 heights
+    against 33. The walk is bounded at 1,600 cells, so a ray very nearly along
+    a grid line answers rather than running on.
+  - A ray aimed past a summit one vertex wide still passes over it, because
+    the ground behind such a summit falls away two and a half units per unit
+    while the ray comes down one and a half: that is the shape of the ground
+    rather than a limit of the pick, and both readings agree about it.
+  - The stepped walk is kept for a caller that names no grid - a test's
+    made-up hill, a host's own sampler - which is what `step` is still an
+    option for. Swept across a flat top one cell wide, where the march already
+    worked, the two readings land in the same place.
+
+Held in Node by `test/kept-world.test.js` (12 tests, the kept world's own
+store driven against a standing-in IndexedDB), `test/api-objects.test.js` (8,
+the pipeline and the roof over a point), and new tests in
+`test/build-select.test.js` (7, the box a ray enters),
+`test/insert-plane.test.js` (7, every plane stepped three seconds from the
+start point) and `test/build-picking.test.js` (11, the grid solved and the
+march it replaced). The suite is 2,479 passing, 0 failing.
+
+**Three mutation rounds, and what they took out.** 44 mutants across the ten
+files this touched, each putting one defect back and running the whole suite:
+37 were caught, and the seven that were not had three different answers. Four
+were missing assertions, now written - the crossing solved on the grid is
+measured against the same ray marched at a twentieth of a unit, and the walk's
+cell limit is held by counting the heights a ray that meets nothing reads
+(6,401 with the limit, 50,000,001 without it). Two described no defect at all,
+and are written down in the round's own notes as what they turned out to be
+rather than dropped. And three were code that did nothing, which came out
+rather than being tested around:
+
+- `rayEntersBox` ended `far >= 0 ? near : null`. `near` never falls below 0 and
+  the `near > far` guard inside the loop refuses every box behind the ray
+  first, so the tail could not be reached.
+- `firstRoot` scanned both roots of a cell's quadratic in order. A cell is only
+  ever reached with the clearance above zero, which puts 0 outside an upward
+  parabola's roots and between a downward one's - so the crossing is the nearer
+  root of one and the further root of the other, and both are the same
+  expression. 3,840 rays swept diagonally over a raised vertex answered
+  identically with the order reversed. One expression now.
+- The walk guarded a cell of no length, which `firstRoot` already answers
+  nothing for. The guard saved four reads on a ray that crosses an exact grid
+  corner and nothing else.
+
+A fourth round of 11 mutants against the code as it now stands caught all 11.
 
 ## [1.0.0-alpha.1.65.6] - 2026-11-13
 

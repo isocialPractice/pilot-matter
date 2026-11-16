@@ -14,9 +14,11 @@ import {
 } from '../js/environment/elements.js';
 import { applyFootprintedElement } from '../js/environment/footprinted.js';
 import {
-    placementReach, placementAt, clickTravel, travelledPast,
+    placementReach, placementAt, objectBox, rayEntersBox, objectRayAt, clickTravel, travelledPast,
     PICK_WEIGHT, CLICK_TRAVEL, TOUCH_CLICK_TRAVEL
 } from '../js/build-select.js';
+import { standingObjects } from '../js/objects.js';
+import { ERASE_TYPE } from '../js/environment/erase.js';
 
 const HALF = DEFAULT_SIZE / 2;
 
@@ -156,4 +158,174 @@ test('a tie goes to the one drawn on top: later in the element order, then later
     const first = disc('grass', 0, 0, 2000);
     const again = disc('grass', 100, 0, 2000);
     assert.equal(placementAt([first, again], 0, 0, DEFAULT_SIZE), 1, 'between two of a kind, the later is drawn over the first');
+});
+
+// --- An object picked by its own box ----------------------------------------
+//
+// A built element is a write into the ground and is picked by what reaches a
+// point of it. An object is not: it stands over the ground, so a click on its
+// upper floors has to be answered by the object rather than by whatever reaches
+// the ground the click's ray carries on to.
+
+/**
+ * A tower `height` units tall and `width` across, standing at a point. A box
+ * part sits with its base at its own `at` and rises by its height, so a tower
+ * standing on the ground is one at the origin of its recipe's frame.
+ */
+function tower(at, width = 80, height = 200, heading = 0) {
+    return {
+        type: 'object',
+        recipe: { parts: [{ shape: 'box', size: [width, height, width], at: [0, 0, 0], color: 0x888888 }] },
+        config: { at, heading, scale: 1 }
+    };
+}
+
+test('an object stands in a box from the ground under it to the top of its highest part', () => {
+    const box = objectBox(tower([400, -600], 80, 200), () => 0);
+
+    assert.equal(box.x, 400);
+    assert.equal(box.z, -600);
+    assert.equal(box.width, 80);
+    assert.equal(box.depth, 80);
+    assert.equal(box.bottom, 0);
+    assert.equal(box.top, 200, 'the height of its highest part, over the ground it stands on');
+
+    // On ground that stands somewhere, the box stands on it rather than at sea
+    // level - and reaches down to the lowest ground under its footprint, which
+    // is what the plinth fills.
+    const slope = (x) => 100 + x / 100;
+    const sloped = objectBox(tower([0, 0], 80, 200), (x) => slope(x));
+    assert.equal(sloped.bottom, slope(-40), 'the lowest ground under the footprint');
+    assert.equal(sloped.top, slope(40) + 200, 'and the top above the highest');
+
+    assert.equal(objectBox(dropped([0, 0]), () => 0), null, 'a built element is no object');
+    assert.equal(objectBox({ type: 'object', recipe: { parts: [] }, config: { at: [0, 0] } }, () => 0), null,
+        'nor is an object with nothing in its recipe');
+});
+
+test('a ray meets a box where it enters it, and misses one it goes past', () => {
+    const box = objectBox(tower([0, 0], 80, 200), () => 0);
+
+    // Straight down the middle from above: it enters at the top.
+    assert.equal(rayEntersBox({ x: 0, y: 1000, z: 0 }, { x: 0, y: -1, z: 0 }, box), 800,
+        'at the roof, 800 units down from 1000');
+
+    // And from the side: at the near face.
+    assert.equal(rayEntersBox({ x: -1000, y: 100, z: 0 }, { x: 1, y: 0, z: 0 }, box), 960, 'at the near wall');
+
+    assert.equal(rayEntersBox({ x: 0, y: 1000, z: 0 }, { x: 0, y: 1, z: 0 }, box), null, 'a ray climbing away misses');
+    assert.equal(rayEntersBox({ x: 500, y: 1000, z: 0 }, { x: 0, y: -1, z: 0 }, box), null, 'as does one coming down beside it');
+    assert.equal(rayEntersBox({ x: 0, y: 300, z: 0 }, { x: 1, y: 0, z: 0 }, box), null, 'and one passing over the roof');
+    assert.equal(rayEntersBox({ x: 0, y: 100, z: 0 }, { x: 0, y: -1, z: 0 }, box), 0,
+        'a ray starting inside is inside: the camera is in the building');
+    assert.equal(rayEntersBox({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, box), 0,
+        'a direction of nothing, from inside, is still inside');
+    assert.equal(rayEntersBox({ x: 500, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, box), null, 'and from outside it reaches nothing');
+    assert.equal(rayEntersBox({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, null), null, 'nothing has no box to enter');
+
+    // The direction need not be of unit length: the distance comes back in its
+    // own lengths, which is all a nearest-first comparison needs.
+    assert.equal(rayEntersBox({ x: 0, y: 1000, z: 0 }, { x: 0, y: -2, z: 0 }, box), 400,
+        'half as many lengths of a direction twice as long');
+});
+
+test('a box turned to its heading is entered on its own faces, not on the axes', () => {
+    // A tower turned 45 degrees. A ray down a point near the corner of the
+    // square box is inside it; the same point is outside the box turned under
+    // it, because a corner swept round is nearer the middle.
+    const turned = objectBox(tower([0, 0], 80, 200, 45), () => 0);
+    const square = objectBox(tower([0, 0], 80, 200, 0), () => 0);
+
+    assert.equal(turned.angle, 45 * Math.PI / 180);
+    assert.equal(square.angle, 0);
+
+    const corner = { x: 38, y: 1000, z: 38 };
+    assert.equal(rayEntersBox(corner, { x: 0, y: -1, z: 0 }, square), 800, 'inside the square box, near its corner');
+    assert.equal(rayEntersBox(corner, { x: 0, y: -1, z: 0 }, turned), null, 'and outside the same box turned under it');
+});
+
+test('a click on a tall object picks it, not the ground its ray carries on to', () => {
+    // The defect this fixed, as the item measured it: a 200 unit tower standing
+    // on flat ground, and a ray coming down at 55 degrees. The ray crosses the
+    // tower well above the ground and carries on to ground far beyond it.
+    const standing = tower([0, 0], 80, 200);
+
+    const fall = Math.tan(55 * Math.PI / 180);
+    const aimed = { x: -300, y: 200 + 300 * fall, z: 0 };
+    const direction = { x: 1, y: -fall, z: 0 };
+
+    // Where the ray meets the flat ground, which is where a pick by ground
+    // point would have asked its question: well past the tower.
+    const beyond = aimed.x + aimed.y / fall;
+    assert.ok(beyond > 100, `the ground point lands ${Math.round(beyond)} units past the tower`);
+
+    const ground = disc('grass', beyond, 0, 300);
+    const placements = [ground, standing];
+
+    // The ray's own geometry next, so what follows is a test of the pick rather
+    // than of this test's arithmetic: it crosses the tower's box well up its
+    // side.
+    const met = rayEntersBox(aimed, direction, objectBox(standing, () => 0));
+    assert.ok(met != null, 'the ray does cross the tower');
+    assert.ok(aimed.y + direction.y * met > 100, 'well up its side rather than at its foot');
+
+    assert.equal(objectRayAt(placements, aimed, direction, { size: DEFAULT_SIZE }), 1, 'the tower is what is picked');
+    assert.equal(placementAt(placements, beyond, 0, DEFAULT_SIZE), 0,
+        'where the ground pick answered the patch of grass the ray carried on to');
+});
+
+test('where a ray crosses two objects it picks the one in front', () => {
+    const near = tower([-400, 0], 200, 300);
+    const far  = tower([400, 0], 200, 300);
+
+    // Level, from the left: it enters the near one first, whichever order they
+    // were committed in.
+    const from = { x: -2000, y: 150, z: 0 };
+    assert.equal(objectRayAt([near, far], from, { x: 1, y: 0, z: 0 }, { size: DEFAULT_SIZE }), 0);
+    assert.equal(objectRayAt([far, near], from, { x: 1, y: 0, z: 0 }, { size: DEFAULT_SIZE }), 1);
+
+    // And from the right, the other one.
+    assert.equal(objectRayAt([near, far], { x: 2000, y: 150, z: 0 }, { x: -1, y: 0, z: 0 }, { size: DEFAULT_SIZE }), 1);
+
+    assert.equal(objectRayAt([near, far], { x: 0, y: 1000, z: 0 }, { x: 0, y: -1, z: 0 }, { size: DEFAULT_SIZE }), null,
+        'and a ray down the gap between them meets neither');
+});
+
+test('only an object is picked this way, and never one a later batch erased', () => {
+    const standing = tower([0, 0], 80, 200);
+    const from = { x: 0, y: 1000, z: 0 };
+    const down = { x: 0, y: -1, z: 0 };
+
+    assert.equal(objectRayAt([dropped([0, 0]), standing], from, down, { size: DEFAULT_SIZE }), 1,
+        'a mountain is no box to be hit: it is ground that stands higher');
+    assert.equal(objectRayAt([dropped([0, 0])], from, down, { size: DEFAULT_SIZE }), null);
+    assert.equal(objectRayAt([], from, down, { size: DEFAULT_SIZE }), null);
+    assert.equal(objectRayAt(null, from, down, { size: DEFAULT_SIZE }), null);
+
+    // An object a later batch took is not drawn, so it is not there to pick -
+    // the same reading `standingObjects` makes of the list.
+    const erased = [standing, {
+        type: ERASE_TYPE,
+        config: {},
+        footprint: { kind: 'disc', x: 0, z: 0, radius: 400 }
+    }];
+    assert.equal(objectRayAt(erased, from, down, { size: DEFAULT_SIZE }), null);
+    assert.equal(objectRayAt([standing], from, down, { size: DEFAULT_SIZE }), 0, 'and is picked again without the batch');
+});
+
+test('the box a click is tested against is where the building was drawn', () => {
+    // One reading of the ground under a footprint, so the box and the building
+    // cannot disagree about where the building is. On a slope they would
+    // otherwise differ by the fall across the footprint.
+    const slope = (x, z) => 200 + x / 20 + z / 40;
+    const standing = tower([600, -300], 240, 180, 25);
+
+    const [drawn] = standingObjects([standing], { groundAt: slope, size: DEFAULT_SIZE });
+    const box = objectBox(standing, slope);
+
+    assert.equal(box.top, drawn.top, 'the roof a click meets is the roof that was drawn');
+    assert.equal(box.bottom, drawn.base, 'and the foot of it is the foot of the plinth');
+    assert.equal(box.x, drawn.footprint.x);
+    assert.equal(box.z, drawn.footprint.z);
+    assert.equal(box.angle, drawn.footprint.angle);
 });

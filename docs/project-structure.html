@@ -141,15 +141,15 @@
 │   ├── objects.js      # Pure objects on the ground: a prefab placed with its recipe copied in, its footprint turned to its heading, standing on the highest ground under it over a plinth to the lowest on every tile, taken whole by an erase over its middle, a road laid over the ground corner by corner, and the top the aircraft hits
 │   ├── asset-fit.js    # Pure loaded assets: the formats read and their limits, what a glTF names outside itself - a GLB's own JSON chunk included - a model's size through its scale, up and facing, which insert menus it fits and why not, the step after loading, a building or a runway placed from one, and an asset carried in a file as base64, known by the SHA-256 of its bytes
 │   ├── asset-loader.js # A loaded model read by three's own loaders in the page - a glTF only when it carries everything, a plan extruded and never put into the page - and kept by its asset's id, handed out as copies stood or anchored as its step said
-│   ├── asset-store.js  # The loaded assets the browser keeps in IndexedDB, every call answering rather than throwing
+│   ├── asset-store.js  # What the browser keeps in IndexedDB: the loaded assets, and beside them the one world the builder last kept, every call answering rather than throwing
 │   ├── roads.js        # Pure roads: a road piece's connectors where its heading and scale put them, which are open, and the move and turn that snap a piece end to end to the nearest open one within 30 metres
-│   ├── planes.js       # Pure planes: the five a world can be flown in - trainer, bush plane, twin, jet and biplane - each a recipe of boxes, cylinders and cones with the figures it flies on, and the chase distance its size calls for
+│   ├── planes.js       # Pure planes: the five a world can be flown in - trainer, bush plane, twin, jet and biplane - each a recipe of boxes, cylinders and cones with the figures it flies on, the speed and trim a flight in it opens at, and the chase distance its size calls for
 │   ├── start-point.js  # Pure start point: where on a world a flight begins, which way and how high above the ground, held to the world, written out as Insert Plane's rows in the settings' altitude unit, and opened as a flying start
 │   ├── templates.js    # Pure runway templates: the cards Insert Runway offers - two runways and two airports - a template placed as one group of the registry's own elements, an airport's apron and buildings laid out as lots from its strip's paving, and the group expanded, turned and kept on the canvas when the ground is built
 │   ├── build-picker.js # Pure picker: the six canvases a session can start from, and which is chosen
 │   ├── build-camera.js # Pure orbit camera over a canvas: the hold, every gesture, the air cleared over it, the ground a screen pixel spans, and the bearing the view looks along
-│   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground
-│   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach - a placed runway's by its strips - and whether a press was a click
+│   ├── build-picking.js # Pure ground picking: where the ray through the pointer first meets the canvas's ground - solved cell by cell on the grid the ground is sampled on, and marched where no grid is named
+│   ├── build-select.js # Pure selection: which built placement a point of the canvas is in, through each one's reach - a placed runway's by its strips - the object a ray meets by its own standing box, nearest first, and whether a press was a click
 │   ├── build-overlay.js # Pure outlines and gumball: a placement's reach traced as a contour, a region's own edge stood on the ground for the selection and a shape being drawn, a combined selection's edge traced and chained into runs, a stroke tool's brush and the region a stroke being laid will cover, an extrusion's top or wall traced at the weights a click reads them at, projected onto the screen and stroked over the canvas, and the gumball drawn in the art's colours, and the start point's green disc, heading arrow and knob
 │   ├── build-palette.js # Pure palette fold: whether the tools are folded away, and the stored choice; the gear's mark and name
 │   ├── gumball.js      # Pure gumball: the two handle sets the art declares, what each handle is bound to - a batch of strokes by its frame, a placed runway by its heading and its strip's size, an extrusion's height by the blue arrow - what a drag writes, and where each handle lies on the screen
@@ -179,7 +179,7 @@
 │   │   ├── index.js    # The public entry point, re-exporting both halves
 │   │   ├── contract.js # Pure option defaults, contract checks, and telemetry
 │   │   ├── pilot.js    # Pilot API: the aircraft, without the world
-│   │   └── matter.js   # Matter API: the world, without the aircraft
+│   │   └── matter.js   # Matter API: the world, without the aircraft - its ground, the objects standing on it and the roof over a point
 │   ├── camera-math.js  # Pure camera modes and framerate-independent damping
 │   ├── camera.js       # Chase, cockpit, and orbit cameras, the chase stood back by the size of the plane flown
 │   ├── sky.js          # Lighting, atmospheric fog, the day cycle, and the standalone depth
