@@ -85,6 +85,61 @@ its context survives being archived.
     of how long the list is. It needs no browser, and it is the assertion the
     code above fails and its fix passes.
   - From: UI/UX Override - the hover over a built canvas
+- [ ] **`pickPlacementAt`'s docstring puts the ground 450 units past a 200
+  unit tower**, where every other reading of the same geometry says 140
+  - **Issue**: the docstring on `pickPlacementAt` in `js/main.js` ends *the
+    ground point under a click on a roof is the ground beyond the building,
+    450 units past it for a 200 unit tower*. At the builder's own 55 degrees
+    over the ground a ray leaving a 200 unit roof reaches the ground after
+    200 / tan(55) = 140 units, which is the figure `CHANGELOG.md` and
+    `docs/terrain.html` both give for the same tower and the same view, and
+    the figure `test/build-select.test.js` works out for itself as `beyond`.
+    450 is the figure the summit item measured for a different scene and a
+    different view. Nothing names an angle beside it, so a reader has no way
+    to tell it is not the 140 everything else says - and the next model to
+    read it is as likely to carry it on as to check it.
+  - **Goal**: 140 units, in the one place that says otherwise. Leave the
+    reading in `js/build-select.js` - *the roof of a 200 unit tower is 200
+    units from the ground its own click lands on* - alone: that is the height
+    of the tower rather than a distance along the ground, and it is true.
+  - From: UI/UX Override - the hover over a built canvas
+
+#### Resolve Issues
+
+- [ ] Roof Occlusion 1: an object behind the ground is picked through it
+  - **Issue**: `pickPlacementAt` asks the object boxes and then the ground,
+    and never compares the two distances, so a box the terrain hides is taken
+    as readily as one in plain view. Measured in Node against the real
+    modules, with the builder's camera at 12 degrees over the ground - 2
+    degrees off `MIN_PITCH`, so a view a pilot can hold: a 400 unit extrusion
+    at `x = -600` and a 200 unit tower on the flat ground at `x = 100`. Of 39
+    aims across the cliff's face, 11 answered the tower. On the first the
+    ground is met 6,134 units along the ray, on the cliff's near face, and the
+    tower's box is entered 7,156 units along - 1,022 units further on and out
+    of sight. The hover reads through the same call, so the outline goes to
+    the hidden building first and the pick looks like a fault in the outline.
+    Asking the boxes first is right and is not the defect; the missing
+    comparison is.
+  - **Goal**: Resolve to [object-picked-through-the-ground.prompt.md](.claude/prompts/object-picked-through-the-ground.prompt.md)
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [ ] Opening Lever 1: the throttle is raised past what the plane's floor
+  needed, over a setting the pilot entered
+  - **Issue**: `planeStart` reads the throttle it raises to off the speed the
+    start ends up carrying rather than off the plane's own floor, so a pilot
+    who asks for a speed above the floor has `START THROTTLE` raised as well -
+    in a case where no plane was near its stall and nothing needed holding.
+    `START AIRSPEED` 200 knots with `START THROTTLE` 20 per cent opens the
+    trainer's lever at 50 per cent, the jet's at 33 and the biplane's at 67,
+    each asking for 100 rather than the 40, 60 and 30 the pilot set.
+    `docs/controls/settings.html` - a file this turn edited - still says *a
+    start whose throttle asks for a different speed than it was given is flown
+    exactly as written*, and `START THROTTLE`'s note in `js/config.js`, in the
+    object whose `START AIRSPEED` note this turn rewrote, still reads *the
+    lever setting the flight opens with*. The suite cannot see it: every
+    assertion is built from `DEFAULT_CONFIG.start`, where the asked speed and
+    the floor are the same figure for all five planes.
+  - **Goal**: Resolve to [opening-lever-overrides-the-pilot.prompt.md](.claude/prompts/opening-lever-overrides-the-pilot.prompt.md)
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
 
 ## Game UI/UX
 
@@ -695,7 +750,7 @@ how the simulator got here rather than as a list still to be worked.
     assembly, and `OBJECT_REACH` moved to `js/objects.js` so the tiles and an
     assembly read one figure.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Select picks a roof**: a click on an object picks it by the object's
+- [x] **Roof Occlusion**: **Select picks a roof**: a click on an object picks it by the object's
   own bounds under the pointer rather than by the ground point the pointer's
   ray meets, so a tall building is picked where it is seen
   - The ray ends on the ground today, so a click on a tower's upper floors
@@ -708,7 +763,7 @@ how the simulator got here rather than as a list still to be worked.
     footprint is read once, by `footprintGround`, so the box is where the
     building was drawn.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Every plane opens flying**: each plane in `js/planes.js` starts a
+- [x] **Opening Lever**: **Every plane opens flying**: each plane in `js/planes.js` starts a
   flight at the start point above its own stall speed and trimmed level,
   rather than the jet opening slightly stalled
   - Give each recipe its own start speed and trim, held by a test that steps
@@ -784,7 +839,7 @@ how the simulator got here rather than as a list still to be worked.
     assembly, and `OBJECT_REACH` moved to `js/objects.js` so the tiles and an
     assembly read one figure.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Select picks a roof**: a click on an object picks it by the object's
+- [x] **Roof Occlusion**: **Select picks a roof**: a click on an object picks it by the object's
   own bounds under the pointer rather than by the ground point the pointer's
   ray meets, so a tall building is picked where it is seen
   - The ray ends on the ground today, so a click on a tower's upper floors
@@ -797,7 +852,7 @@ how the simulator got here rather than as a list still to be worked.
     footprint is read once, by `footprintGround`, so the box is where the
     building was drawn.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Every plane opens flying**: each plane in `js/planes.js` starts a
+- [x] **Opening Lever**: **Every plane opens flying**: each plane in `js/planes.js` starts a
   flight at the start point above its own stall speed and trimmed level,
   rather than the jet opening slightly stalled
   - Give each recipe its own start speed and trim, held by a test that steps
