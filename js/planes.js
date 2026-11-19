@@ -210,11 +210,16 @@ export function planeSensitivity(sensitivity, plane = planeById()) {
  *   `startSpeed`. The pilot's START AIRSPEED is one figure for every plane, so
  *   the 80 knots a fresh install opens at is a shade above the trainer's stall
  *   speed and well under the jet's - which is the jet opening stalled.
- * - **The throttle** is raised to what holds that speed, because the lever
- *   picks a target and the speed converges on it. Left alone, a plane opened
- *   faster than its lever asks for slows back to the lever's figure within a
- *   second or two: at the configured 20 per cent that is 32 for the bush plane
- *   and 30 for the biplane, which is each one's stall speed exactly.
+ * - **The throttle** is raised to what holds the plane's own floor, because the
+ *   lever picks a target and the speed converges on it. Left alone, a plane
+ *   opened faster than its lever asks for slows back to the lever's figure
+ *   within a second or two: at the configured 20 per cent that is 32 for the
+ *   bush plane and 30 for the biplane, which is each one's stall speed exactly.
+ *   The floor and never the speed, so a pilot who asks for a speed above the
+ *   floor keeps the lever they set and the start settles back toward it, which
+ *   is what a lever is. Raised to hold `speed` instead - which at every
+ *   configured default is the floor, so nothing shows there - 200 knots at 20
+ *   per cent opened the trainer's lever at 50 per cent and the biplane's at 67.
  * - **The trim** is worked out again from this plane's own figures. The pitch
  *   that holds a climb has to out-climb the sink the wing is already losing at
  *   that speed, and that sink is read off the plane's cruise speed - so a trim
@@ -247,7 +252,13 @@ export function planeStart(start, figures = {}) {
     const floor = named('startSpeed') ?? named('minSpeed') ?? 0;
 
     const speed = Math.max(Number(start.speed) || 0, floor, 0);
-    const holds = maxSpeed > 0 ? Math.min(speed / maxSpeed, 1) : 0;
+
+    // Read off the floor rather than off `speed`, which is the greater of the
+    // floor and what the pilot asked for. Where the pilot's figure is the
+    // greater one the floor played no part, so there is nothing to hold and
+    // the lever they set stands: 200 knots at 20 per cent is a start that
+    // settles back toward 20 per cent, which is what the lever means.
+    const holds = maxSpeed > 0 ? Math.min(Math.max(floor, 0) / maxSpeed, 1) : 0;
 
     return {
         ...start,

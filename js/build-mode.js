@@ -661,9 +661,31 @@ export function pickedIndex(state) {
  * right now - the one picked with whatever has been done to it, so the reach a
  * click is measured against is the ground on the canvas. Indexed as the
  * committed list is, which is what a pick hands back.
+ *
+ * **The session's own placements, not copies**, which is the one reading here
+ * that hands them out uncopied. Everything that asks for this only measures
+ * them - `objectRayAt` and `placementAt` answer with an index and write
+ * nothing - and a pick runs on every pointer move with Select live, so the
+ * copying was the single most expensive thing a hover did: `structuredClone`
+ * over a city canvas's 300 placements and the 20,460 recipe parts inside them
+ * cost 17.1 ms of a 39.1 ms pick. Keeping the objects is also what lets the
+ * arithmetic read off them be held from one move to the next - `recipeBounds`
+ * is held per recipe, and a fresh clone a move would miss every time.
+ *
+ * So anything that means to *change* a placement asks `committedPlacements`,
+ * which copies, and never this.
  */
 export function pickablePlacements(state) {
-    return builtPlacements(state).slice(0, state?.placements?.length ?? 0);
+    const committed = state?.placements ?? [];
+
+    // A draft drawn on bare ground is not committed and so is not pickable, and
+    // that covers an extrusion still being drawn without naming it: a stage is
+    // only ever set on a draft `startDraft` made, which replaces nothing.
+    // `builtPlacements` has to name it because it pushes the draft onto the
+    // list; this one only ever stands a draft in for the placement it replaces.
+    const replaces = draftPending(state) ? state.draft.replaces : null;
+    if (!Number.isInteger(replaces) || replaces < 0 || replaces >= committed.length) return committed;
+    return committed.map((placement, index) => (index === replaces ? state.draft.placement : placement));
 }
 
 /**

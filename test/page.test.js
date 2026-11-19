@@ -4058,16 +4058,25 @@ test('a click picks the committed placement under it through its reach, not off 
 
     // An object stands over the ground as a box, so the ray is tested against
     // those boxes before the ground is asked what reaches the point the ray
-    // ends on - which is how a tall building is picked where it is seen.
+    // ends on - which is how a tall building is picked where it is seen. But
+    // the ground is *read* first, because how far the ray travels before the
+    // land stops it is what bounds the boxes: one entered beyond that is behind
+    // a cliff or a ridge and is not there to be clicked on.
     const found = methodBody(mainSource, 'pickPlacementAt');
-    assert.match(found, /const standing = objectRayAt\(placements, ray\.origin, ray\.direction, \{ groundAt: ground, size: this\.terrain\.size \}\);/);
-    assert.match(found, /if \(standing != null\) return standing;/);
+    assert.match(found, /const point = this\.pickGroundAlong\(ray\);\s*const within = point \? rayDistance\(ray\.origin, ray\.direction, point\) : Infinity;/,
+        'the ground read first, as a distance along the ray, and nothing where the ray meets none');
+    assert.match(found, /const standing = objectRayAt\(placements, ray\.origin, ray\.direction, \{ groundAt: ground, size: this\.terrain\.size, within \}\);/,
+        'and handed to the box pass as its limit');
+    assert.match(found, /if \(standing != null\) return standing;/, 'a box in front of the ground is the answer');
     assert.match(found,
         /return point \? placementAt\(placements, point\.x, point\.z, this\.terrain\.size\) : null;/,
-        'the placement whose reach the ground point is in, or bare ground');
-    assert.ok(found.indexOf('objectRayAt(') < found.indexOf('this.pickGroundAlong(ray)'),
-        'the boxes first: the ground point under a click on a roof is the ground beyond the building');
+        'and where the ray entered none, the placement whose reach the ground point is in, or bare ground');
+    assert.ok(found.indexOf('this.pickGroundAlong(ray)') < found.indexOf('objectRayAt('),
+        'the ground read before the boxes it bounds, so an object behind it is not picked through it');
+    assert.ok(found.indexOf('const standing =') < found.indexOf('return point ? placementAt('),
+        'and the boxes answered before the ground point is: the ground under a click on a roof is the ground beyond the building');
     assert.equal(found.split('this.aimCanvasRay(').length - 1, 1, 'and the ray is aimed once for both questions');
+    assert.equal(found.split('this.pickGroundAlong(').length - 1, 1, 'and the ground marched once for both uses of it');
 });
 
 test('the hover follows the pointer every frame, with Select, and never for a finger or under a question', () => {

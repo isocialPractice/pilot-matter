@@ -1019,6 +1019,31 @@ test('a pick looks through the committed placements as they stand, the picked on
 
     const drawing = withMountainDropped();
     assert.deepEqual(pickablePlacements(drawing), [], 'and a placement not yet committed is not one to pick');
+
+    // The session's own placements rather than copies of them. A pick only
+    // measures them and runs on every pointer move, and copying them was the
+    // single most expensive thing a hover over a city canvas did.
+    assert.equal(shown[1], state.placements[1], 'the committed placement itself, uncopied');
+    assert.equal(shown[0], state.draft.placement, 'and the draft standing on the one picked, uncopied');
+    assert.equal(pickablePlacements(withTwoToPick()).length, 2);
+    assert.equal(pickablePlacements(drawing), drawing.placements,
+        'with a draft that replaces nothing, the committed list itself');
+
+    const untouched = withTwoToPick();
+    assert.equal(pickablePlacements(untouched), untouched.placements,
+        'and with no draft in hand at all, that same list rather than a copy of it');
+
+    // A draft drawn on bare ground beside committed placements stands in for
+    // none of them: it is not committed, so it is not there to be picked.
+    const beside = withTwoToPick();
+    assert.equal(startDraft(beside, { type: 'mountain', config: { at: [500, 500] } }, 'mountain'), true);
+    assert.deepEqual(pickablePlacements(beside), [PEAK, MEADOW], 'the two committed, and neither of them the draft');
+    assert.equal(pickablePlacements(beside), beside.placements);
+
+    // And the reading that hands out copies still does, because what asks for
+    // that means to change them.
+    assert.notEqual(committedPlacements(state)[1], state.placements[1]);
+    assert.deepEqual(committedPlacements(state)[1], state.placements[1]);
 });
 
 // --- Back to the built world --------------------------------------------------------

@@ -9,7 +9,7 @@ import {
 } from '../js/prefabs.js';
 import {
     OBJECT_TYPE, OBJECT_RANGES, OBJECT_ERASE_STRENGTH, isObject, objectConfig, placeObject, objectFootprint, objectHeight,
-    objectErased, standingObjects, insideObject, obstacleTop
+    objectErased, erasedObjects, standingObjects, insideObject, obstacleTop
 } from '../js/objects.js';
 import { buildEnvironment, getEnvironment, environmentElements } from '../js/environment/presets.js';
 import { ERASE_TYPE, ERASE_ALL } from '../js/environment/erase.js';
@@ -140,6 +140,33 @@ test('a part stands its base on its point, and turns about its own upright', () 
     assert.equal(ridge.top, 2);
     assert.equal(recipeBounds({ parts: [] }), null);
     assert.deepEqual(WEDGE_RIDGES, ['middle', 'edge']);
+});
+
+test('a recipe is measured once and the answer held, since the pick asks for it every pointer move', () => {
+    // The walk is every corner of every face of every part, and the pick reads
+    // it through `objectFootprint` and `objectHeight` on every pointer move
+    // while Select is live. A city canvas's 300 objects carry 20,460 parts
+    // between them, and walking all of them cost 12.0 ms of a 39.1 ms pick.
+    const recipe = copyRecipe(prefabById('cottage').recipe);
+    const first = recipeBounds(recipe);
+
+    assert.equal(recipeBounds(recipe), first, 'the same recipe is handed back the same answer, not a second walk');
+    assert.equal(Object.isFrozen(first), true, 'which is frozen, since every caller shares the one answer');
+
+    // Held on the recipe itself, so a recipe that is a copy of another is its
+    // own question - and a recipe is never written into, which is what makes
+    // holding it safe: every change to a building makes a new one.
+    const copied = copyRecipe(recipe);
+    assert.notEqual(recipeBounds(copied), first, 'a copy is measured for itself');
+    assert.deepEqual(recipeBounds(copied), first, 'and comes to the same answer');
+
+    // A recipe with nothing in it holds its null, and anything that is no
+    // recipe is answered without being held at all.
+    const empty = { parts: [] };
+    assert.equal(recipeBounds(empty), null);
+    assert.equal(recipeBounds(empty), null);
+    assert.equal(recipeBounds(null), null);
+    assert.equal(recipeBounds('cottage'), null);
 });
 
 test('a colour is read as sRGB and handed on as the linear light a vertex colour is', () => {
@@ -422,4 +449,34 @@ test('each recipe is one instanced mesh, lit and fogged by the ground\'s own mat
     assert.match(mesh, /matrix\.compose\(position\.set\(object\.x, object\.stand, object\.z\), turn, scale\.setScalar\(object\.scale\)\);/);
     assert.match(mesh, /const plinths = objects\.filter\(object => !object\.drape && object\.stand - object\.base > 0\.05\);/);
     assert.match(mesh, /scale\.set\(footprint\.width, object\.stand - object\.base \+ PLINTH_DEPTH, footprint\.depth\)/);
+});
+
+test('a whole list is weighed against the erase batches in one pass, with the same answer per object', () => {
+    // `erasedObjects` is `objectErased` asked for a list rather than for an
+    // object: both callers have a whole list in hand, and a pick asks on every
+    // pointer move, so the tail of the list is no longer sliced per object.
+    const lists = [
+        [],
+        [placeObject('cottage', [0, 0])],
+        [placeObject('cottage', [0, 0]), eraseAll([0, 0], 20)],
+        [eraseAll([0, 0], 20), placeObject('cottage', [0, 0])],
+        [placeObject('cottage', [0, 0]), eraseAll([0, 0], 20), placeObject('cottage', [0, 0])],
+        [placeObject('cottage', [0, 0]), eraseAll([0, 0], 20), eraseAll([0, 0], 20, { restore: true })],
+        [placeObject('cottage', [0, 0]), eraseAll([0, 0], 20, { restore: true }), eraseAll([0, 0], 20)],
+        [placeObject('cottage', [0, 0]), eraseAll([0, 0], 20, { target: 'grass' })],
+        [placeObject('cottage', [0, 0]), eraseAll([0, 0], 20, { strength: 0.3 })],
+        [placeObject('cottage', [-400, 0]), placeObject('cottage', [400, 0]), eraseAll([400, 0], 20)],
+        [{ type: 'mountain', config: {} }, placeObject('cottage', [0, 0]), eraseAll([0, 0], 20)]
+    ];
+
+    for (const list of lists) {
+        const taken = erasedObjects(list);
+        const named = list.map((placement, index) =>
+            isObject(placement) && objectErased(placement, list.slice(index + 1)) ? index : null).filter(index => index != null);
+        assert.deepEqual([...taken].sort((a, b) => a - b), named,
+            `the list [${list.map(p => p.type).join(', ')}] is read the same both ways`);
+    }
+
+    assert.deepEqual([...erasedObjects(null)], [], 'and nothing is a list with nothing taken out of it');
+    assert.deepEqual([...erasedObjects([{ type: 'mountain', config: {} }])], []);
 });

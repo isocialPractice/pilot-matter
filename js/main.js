@@ -47,7 +47,7 @@ import {
     createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK,
     BUILDER_SETTINGS_MARK, BUILDER_SETTINGS_NAME
 } from './build-palette.js';
-import { placementAt, objectRayAt, travelledPast } from './build-select.js';
+import { placementAt, objectRayAt, rayDistance, travelledPast } from './build-select.js';
 import {
     placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
@@ -2781,8 +2781,8 @@ class FlightSimulator {
      * The ray through a point of the screen, or null where there is no canvas
      * to cast one over.
      *
-     * Aimed once and handed on, because a pick asks the objects standing on the
-     * canvas and then the ground, and both want the same ray. Aiming it stands
+     * Aimed once and handed on, because a pick asks the canvas's ground and
+     * then the objects standing on it, and both want the same ray. Aiming it stands
      * the camera where the state says, which is a `lookAt` and a matrix the
      * hover would otherwise pay for twice on every frame the pointer is over a
      * canvas.
@@ -2816,17 +2816,24 @@ class FlightSimulator {
      * The committed placement under the pointer, as its index among the ones a
      * click may take, or null for bare ground and for the sky.
      *
-     * Two questions in the order they have to be asked. An object stands over
-     * the ground as a box, so the ray is tested against those boxes first,
-     * nearest first: a click on a tower's upper floors picks the tower. Only
-     * where the ray meets none of them is the ground asked what reaches the
-     * point the ray ends on, which is how a mountain, a stroke or an erase
-     * batch is picked - none of them is a thing in the scene to be hit.
+     * Three questions in the order they have to be asked.
      *
-     * Asked both ways round would be the defect this fixed: the ground point
-     * under a click on a roof is the ground beyond the building, 450 units past
-     * it for a 200 unit tower, and whatever reaches there is what the pick
-     * would answer.
+     * **The ground first**, which is not the answer here but the bound: how far
+     * the ray travels before the land stops it. An object stands over the
+     * ground as a box, and a box the ray enters beyond that distance is behind
+     * a cliff, a mountain or a ridge and is not there to be clicked on. A ray
+     * that meets no ground at all is bounded by nothing.
+     *
+     * **Then the boxes**, nearest first and none of them taken past the bound:
+     * a click on a tower's upper floors picks the tower. Taking the ground
+     * point for the answer rather than for the bound is the defect that fixed -
+     * the ground under a click on a roof is the ground beyond the building,
+     * which at the builder's own 55 degrees over the ground is 140 units past a
+     * 200 unit tower, and whatever reaches there is what the pick would answer.
+     *
+     * **And the ground again**, where the ray entered no box: what reaches the
+     * point it ended on, which is how a mountain, a stroke or an erase batch is
+     * picked - none of them is a thing in the scene to be hit.
      */
     pickPlacementAt(clientX, clientY) {
         const ray = this.aimCanvasRay(clientX, clientY);
@@ -2835,10 +2842,12 @@ class FlightSimulator {
         const placements = pickablePlacements(this.builder);
         const ground = (x, z) => this.terrain.getTerrainHeightAt(x, z);
 
-        const standing = objectRayAt(placements, ray.origin, ray.direction, { groundAt: ground, size: this.terrain.size });
+        const point = this.pickGroundAlong(ray);
+        const within = point ? rayDistance(ray.origin, ray.direction, point) : Infinity;
+
+        const standing = objectRayAt(placements, ray.origin, ray.direction, { groundAt: ground, size: this.terrain.size, within });
         if (standing != null) return standing;
 
-        const point = this.pickGroundAlong(ray);
         return point ? placementAt(placements, point.x, point.z, this.terrain.size) : null;
     }
 

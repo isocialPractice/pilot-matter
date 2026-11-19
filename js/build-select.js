@@ -28,7 +28,7 @@ import { footprintSampler, isFootprint } from './environment/footprints.js';
 import { mountainBump } from './terrain-math.js';
 import { isGroup, groupStrips, groupLots } from './templates.js';
 import { isErase } from './environment/erase.js';
-import { isObject, objectFootprint, objectHeight, objectErased, footprintGround } from './objects.js';
+import { isObject, objectFootprint, objectHeight, erasedObjects, footprintGround } from './objects.js';
 
 /**
  * How strongly a placement has to reach a point for a click there to find it,
@@ -161,7 +161,19 @@ export function objectBox(placement, groundAt = () => 0) {
     if (!isObject(placement)) return null;
     const footprint = objectFootprint(placement);
     if (footprint == null) return null;
+    return footprintBox(footprint, objectHeight(placement), groundAt);
+}
 
+/**
+ * The box a footprint stands in, reaching `height` over the highest ground
+ * under it - `objectBox` with the footprint already in hand, which is how
+ * `objectRayAt` builds one it has just decided the ray could enter.
+ *
+ * It is the reading of the ground that costs: `footprintGround` samples
+ * `STAND_SAMPLES` by `STAND_SAMPLES` points, so this is 25 reads of the
+ * terrain for one box and the reason a box is built as late as it can be.
+ */
+function footprintBox(footprint, height, groundAt) {
     const { stand, base } = footprintGround(footprint, groundAt);
     return {
         x: footprint.x,
@@ -170,7 +182,7 @@ export function objectBox(placement, groundAt = () => 0) {
         depth: footprint.depth,
         angle: footprint.angle,
         bottom: base,
-        top: stand + objectHeight(placement)
+        top: stand + height
     };
 }
 
@@ -234,31 +246,122 @@ export function rayEntersBox(origin, direction, box) {
 }
 
 /**
+ * How far along a ray one of its own points stands, in the direction's own
+ * lengths - the same lengths `rayEntersBox` answers in, so the two can be
+ * compared against each other.
+ *
+ * `point` is taken to be on the ray, which is what the ground pick hands back:
+ * it is projected onto the direction rather than measured straight-line, so a
+ * direction of any length answers correctly. A direction of nothing is nowhere
+ * along anything and answers `Infinity`, which as a limit refuses no box.
+ */
+export function rayDistance(origin, direction, point) {
+    const dx = Number(direction?.x) || 0;
+    const dy = Number(direction?.y) || 0;
+    const dz = Number(direction?.z) || 0;
+    const square = dx * dx + dy * dy + dz * dz;
+    if (!(square > 0)) return Infinity;
+
+    const ox = (Number(point?.x) || 0) - (Number(origin?.x) || 0);
+    const oy = (Number(point?.y) || 0) - (Number(origin?.y) || 0);
+    const oz = (Number(point?.z) || 0) - (Number(origin?.z) || 0);
+    return (ox * dx + oy * dy + oz * dz) / square;
+}
+
+/**
+ * True where a ray could still enter the box over a footprint, read off the
+ * ray's horizontal path alone - and so without reading the ground at all.
+ *
+ * A box is a footprint extruded upwards, so the ray enters it only where its
+ * horizontal path crosses the footprint. The footprint sits inside the circle
+ * round its middle of its own half-diagonal, whatever it is turned to, so three
+ * comparisons on that circle refuse a footprint the path never reaches:
+ *
+ * - **Beside the path**, further from the line the ray runs along than its own
+ *   half-diagonal.
+ * - **Behind the origin**, its whole extent back along the path from where the
+ *   ray begins - a ray travels forwards only.
+ * - **Past `within`**, further along the path than the ray is allowed to
+ *   travel, which is where the ground stops it.
+ *
+ * Refusing is what matters and it is one-sided on purpose: a footprint the
+ * circle lets through may still miss the box, which `rayEntersBox` then says,
+ * and nothing the circle refuses could have been entered. That is what makes
+ * this safe to ask before the ground is read - it changes which boxes are
+ * built, never which one is answered.
+ *
+ * `within` is in the direction's own lengths, as `rayEntersBox` and
+ * `rayDistance` are; the horizontal path covers `hypot(dx, dz)` units of
+ * ground per length, which is what converts one to the other.
+ */
+export function rayNearsFootprint(origin, direction, footprint, within = Infinity) {
+    if (footprint == null) return false;
+    const reach = Math.hypot(Number(footprint.width) || 0, Number(footprint.depth) || 0) / 2;
+
+    const dx = Number(direction?.x) || 0, dz = Number(direction?.z) || 0;
+    const ox = (Number(footprint.x) || 0) - (Number(origin?.x) || 0);
+    const oz = (Number(footprint.z) || 0) - (Number(origin?.z) || 0);
+
+    // A ray going straight up or down has a point for its horizontal path, so
+    // only a footprint round that point can be entered.
+    const flat = Math.hypot(dx, dz);
+    if (!(flat > 0)) return Math.hypot(ox, oz) <= reach;
+
+    const across = Math.abs(ox * dz - oz * dx) / flat;
+    if (across > reach) return false;
+
+    const along = (ox * dx + oz * dz) / flat;
+    if (along < -reach) return false;
+
+    const travel = Number.isFinite(within) ? Math.max(within, 0) * flat : Infinity;
+    return along <= travel + reach;
+}
+
+/**
  * The object a ray meets, as its index in `placements`, or null where it meets
  * none - the nearest where it meets several, so a ray crossing two picks the
  * one in front of the other.
  *
- * This is asked before the ground, and it is what lets a tall building be
- * picked where it is seen. A pick by ground point ends the ray on the ground
- * and asks what reaches there, so a click on a tower's upper floors is answered
- * with whatever stands on the ground behind it, or with nothing - the roof of
- * a 200 unit tower is 200 units from the ground its own click lands on.
+ * The boxes are what lets a tall building be picked where it is seen. A pick by
+ * ground point ends the ray on the ground and asks what reaches there, so a
+ * click on a tower's upper floors is answered with whatever stands on the
+ * ground behind it, or with nothing - the roof of a 200 unit tower is 200 units
+ * from the ground its own click lands on.
+ *
+ * `within` is how far the ray may travel, in the direction's own lengths: a box
+ * entered beyond it is behind something and is not answered. The caller reads
+ * the ground first and hands over the distance to it, so ground standing
+ * between the camera and a building hides the building - without it a cliff's
+ * face picks a tower a thousand units behind it, which at a shallow view is a
+ * window 940 units wide for a 200 unit box.
+ *
+ * It is also what bounds the pass. A box is built only for an object the ray's
+ * horizontal path could still reach inside that distance, by
+ * `rayNearsFootprint`, because building one reads the ground 25 times - so a
+ * canvas's objects cost arithmetic each and its reachable few cost the terrain.
+ * Read every box instead and a hover over 300 objects is 7,500 terrain reads a
+ * pointer move, which is 52 ms of a frame and was measured at 20 fps.
  *
  * An object erased by a later batch is not there to be picked, which is the
- * same reading `standingObjects` makes of the list.
+ * same reading `standingObjects` makes of the list, through the same call.
  *
  * `groundAt(x, z)` is the ground each box stands on; `size` is the canvas's
  * width, which an erase batch's region wraps across.
  */
-export function objectRayAt(placements, origin, direction, { groundAt = () => 0, size = 0 } = {}) {
+export function objectRayAt(placements, origin, direction, { groundAt = () => 0, size = 0, within = Infinity } = {}) {
     const list = Array.isArray(placements) ? placements : [];
+    const erased = erasedObjects(list, size);
     let best = null;
 
     list.forEach((placement, index) => {
         if (!isObject(placement)) return;
-        if (objectErased(placement, list.slice(index + 1), size)) return;
-        const distance = rayEntersBox(origin, direction, objectBox(placement, groundAt));
-        if (distance == null) return;
+        if (erased.has(index)) return;
+
+        const footprint = objectFootprint(placement);
+        if (!rayNearsFootprint(origin, direction, footprint, within)) return;
+
+        const distance = rayEntersBox(origin, direction, footprintBox(footprint, objectHeight(placement), groundAt));
+        if (distance == null || !(distance <= within)) return;
         // Nearer wins, and a tie goes to the later committed, which is the one
         // drawn over the other - the same way `placementAt` breaks one.
         if (best == null || distance <= best.distance) best = { index, distance };

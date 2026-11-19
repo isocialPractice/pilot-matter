@@ -10,14 +10,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    createField, fieldX, fieldZ, DEFAULT_SIZE
+    createField, fieldX, fieldZ, sampleHeight, DEFAULT_SIZE, DEFAULT_SEGMENTS
 } from '../js/environment/elements.js';
 import { applyFootprintedElement } from '../js/environment/footprinted.js';
 import {
-    placementReach, placementAt, objectBox, rayEntersBox, objectRayAt, clickTravel, travelledPast,
+    placementReach, placementAt, objectBox, rayEntersBox, objectRayAt,
+    rayNearsFootprint, rayDistance, clickTravel, travelledPast,
     PICK_WEIGHT, CLICK_TRAVEL, TOUCH_CLICK_TRAVEL
 } from '../js/build-select.js';
-import { standingObjects } from '../js/objects.js';
+import { standingObjects, objectFootprint, STAND_SAMPLES } from '../js/objects.js';
+import { pickGround } from '../js/build-picking.js';
 import { ERASE_TYPE } from '../js/environment/erase.js';
 
 const HALF = DEFAULT_SIZE / 2;
@@ -328,4 +330,251 @@ test('the box a click is tested against is where the building was drawn', () => 
     assert.equal(box.x, drawn.footprint.x);
     assert.equal(box.z, drawn.footprint.z);
     assert.equal(box.angle, drawn.footprint.angle);
+});
+
+// --- What the box pass reads, and how far it reaches -------------------------
+//
+// Building a box reads the ground `STAND_SAMPLES` by `STAND_SAMPLES` times
+// through `footprintGround`, so the box pass is the expensive half of a pick -
+// and a pick runs on every pointer move while Select is live. Two things hold
+// it: the ray's own path refuses a footprint it cannot reach before any ground
+// is read, and the ground the ray met bounds how far along it a box may be
+// taken.
+
+test('a footprint the ray cannot reach is refused, and nothing it could is', () => {
+    const near = objectFootprint(tower([0, 0], 80, 200));
+    const from = { x: -1000, y: 100, z: 0 };
+    const along = { x: 1, y: 0, z: 0 };
+
+    assert.equal(rayNearsFootprint(from, along, near), true, 'straight at it');
+    assert.equal(rayNearsFootprint(from, along, objectFootprint(tower([0, 400], 80, 200))), false, 'well off to the side');
+    assert.equal(rayNearsFootprint(from, along, objectFootprint(tower([-4000, 0], 80, 200))), false, 'behind where the ray begins');
+    assert.equal(rayNearsFootprint(from, along, null), false, 'and nothing is nowhere near anything');
+
+    // The half-diagonal and not the half-width: a square turned 45 degrees
+    // reaches its own corner, which is further out than its face.
+    const reach = Math.hypot(80, 80) / 2;
+    assert.equal(rayNearsFootprint(from, along, objectFootprint(tower([0, reach - 1], 80, 200))), true);
+    assert.equal(rayNearsFootprint(from, along, objectFootprint(tower([0, reach + 1], 80, 200))), false);
+
+    // A ray going straight down has a point for its horizontal path, so only a
+    // footprint round that point can be entered.
+    const down = { x: 0, y: -1, z: 0 };
+    assert.equal(rayNearsFootprint({ x: 0, y: 900, z: 0 }, down, near), true);
+    assert.equal(rayNearsFootprint({ x: 300, y: 900, z: 0 }, down, near), false);
+
+    // And the limit is in the direction's own lengths: a direction twice as
+    // long covers twice the ground per length of it.
+    assert.equal(rayNearsFootprint(from, along, near, 900), false, 'the ray stops short of it');
+    assert.equal(rayNearsFootprint(from, along, near, 1100), true, 'and reaches it');
+    assert.equal(rayNearsFootprint(from, { x: 2, y: 0, z: 0 }, near, 550), true,
+        'half as many lengths of a direction twice as long');
+});
+
+test('the path refuses only boxes the slab test would refuse anyway', () => {
+    // The cull may let a footprint through that the box then misses; it may
+    // never refuse one the box would have answered. Swept over a grid of
+    // footprints and a fan of rays, every box the slab test enters inside the
+    // limit is one the path let through.
+    const rays = [];
+    for (const pitch of [0, 12, 35, 55, 89, 90]) {
+        for (const yaw of [0, 37, 90, 153, 211, 300]) {
+            const fall = Math.sin(pitch * Math.PI / 180), flat = Math.cos(pitch * Math.PI / 180);
+            rays.push({
+                origin: { x: -900, y: 420, z: 260 },
+                direction: { x: flat * Math.cos(yaw * Math.PI / 180), y: -fall, z: flat * Math.sin(yaw * Math.PI / 180) }
+            });
+        }
+    }
+
+    let entered = 0;
+    for (const { origin, direction } of rays) {
+        for (let x = -1600; x <= 1600; x += 160) {
+            for (let z = -1600; z <= 1600; z += 160) {
+                for (const heading of [0, 30, 45]) {
+                    const placement = tower([x, z], 240, 300, heading);
+                    const footprint = objectFootprint(placement);
+                    const distance = rayEntersBox(origin, direction, objectBox(placement, () => 0));
+                    for (const within of [Infinity, 2000, 800]) {
+                        if (distance == null || !(distance <= within)) continue;
+                        entered++;
+                        assert.equal(rayNearsFootprint(origin, direction, footprint, within), true,
+                            `a box entered ${distance} along, within ${within}, was refused at (${x}, ${z}) turned ${heading}`);
+                    }
+                }
+            }
+        }
+    }
+
+    assert.ok(entered > 200, `the sweep has to actually enter some boxes, and entered ${entered}`);
+});
+
+test('a pick reads the ground for what the ray could reach, not for the length of the list', () => {
+    // The defect this holds: `objectRayAt` built every object's box before
+    // testing any of them against the ray, and a box is 25 reads of the
+    // terrain. Measured in Chromium, a canvas with 300 objects on it cost
+    // 7,500 reads a pointer move and swept at 20 fps, against the 60 the same
+    // scene holds with no pick running.
+    const reached = tower([0, 0], 80, 200);
+    const from = { x: -2000, y: 100, z: 0 };
+    const along = { x: 1, y: 0, z: 0 };
+
+    const counted = (placements, within = Infinity) => {
+        let reads = 0;
+        const index = objectRayAt(placements, from, along, {
+            groundAt: () => { reads++; return 0; }, size: DEFAULT_SIZE, within
+        });
+        return { index, reads };
+    };
+
+    const one = counted([reached]);
+    assert.equal(one.index, 0, 'the ray reaches it');
+    assert.equal(one.reads, STAND_SAMPLES * STAND_SAMPLES, 'one box, read at the sampling a footprint stands by');
+
+    // The same ray, and 300 more objects in a crowd nowhere near its path. The
+    // answer is the same and so is the reading: the crowd costs arithmetic.
+    const crowd = [];
+    for (let i = 0; i < 300; i++) crowd.push(tower([-4000 + (i % 20) * 300, 1600 + Math.floor(i / 20) * 300], 80, 200));
+    const many = counted([...crowd, reached]);
+    assert.equal(many.index, crowd.length, 'the one on the ray is still what is picked');
+    assert.equal(many.reads, one.reads, `300 objects beside the ray are refused unread, not read in ${many.reads}`);
+
+    // A box past where the ray stops is refused unread too, so the limit pays
+    // for itself in the pass it was added to.
+    const far = counted([tower([4000, 0], 80, 200)], 2000);
+    assert.equal(far.index, null);
+    assert.equal(far.reads, 0, 'a box beyond the ground is never measured');
+});
+
+test('a box entered past the limit is not answered, and the limit refuses boxes rather than the pass', () => {
+    const near = tower([-400, 0], 200, 300);
+    const far  = tower([400, 0], 200, 300);
+    const from = { x: -2000, y: 150, z: 0 };
+    const along = { x: 1, y: 0, z: 0 };
+
+    // Where each is entered, so what follows is about the limit rather than
+    // about this test's arithmetic.
+    assert.equal(rayEntersBox(from, along, objectBox(near, () => 0)), 1500);
+    assert.equal(rayEntersBox(from, along, objectBox(far, () => 0)), 2300);
+
+    assert.equal(objectRayAt([far], from, along, { size: DEFAULT_SIZE, within: 2299 }), null,
+        'a box entered beyond where the ground was met is behind it');
+    assert.equal(objectRayAt([far], from, along, { size: DEFAULT_SIZE, within: 2300 }), 0,
+        'and one entered exactly there is in front of it');
+    assert.equal(objectRayAt([far], from, along, { size: DEFAULT_SIZE, within: 2301 }), 0);
+
+    // The nearer inside the limit and the further outside it: a limit refuses
+    // boxes rather than the whole pass.
+    assert.equal(objectRayAt([near, far], from, along, { size: DEFAULT_SIZE, within: 2000 }), 0);
+
+    // `Infinity` is what a ray meeting no ground hands over, and answers what
+    // no limit at all answers.
+    for (const list of [[near, far], [far, near], [far], []]) {
+        assert.equal(objectRayAt(list, from, along, { size: DEFAULT_SIZE, within: Infinity }),
+            objectRayAt(list, from, along, { size: DEFAULT_SIZE }));
+    }
+});
+
+test('a point of a ray is read back as how far along it stands, in the lengths of its own direction', () => {
+    const from = { x: 100, y: 800, z: -200 };
+    const along = { x: 3, y: -4, z: 0 };
+    const at = t => ({ x: from.x + along.x * t, y: from.y + along.y * t, z: from.z + along.z * t });
+
+    assert.equal(rayDistance(from, along, at(0)), 0, 'the origin is nowhere along it');
+    assert.equal(rayDistance(from, along, at(17)), 17);
+    assert.equal(rayDistance(from, along, at(-3)), -3, 'and a point behind it is behind it');
+
+    // The distance is in the direction's lengths, which is what makes it
+    // comparable with `rayEntersBox`.
+    const unit = { x: 3 / 5, y: -4 / 5, z: 0 };
+    assert.equal(rayDistance(from, unit, at(17)), 17 * 5, '17 lengths of a 5-long direction is 85 unit lengths');
+
+    assert.equal(rayDistance(from, { x: 0, y: 0, z: 0 }, at(1)), Infinity,
+        'a direction of nothing is nowhere along anything, and as a limit refuses no box');
+});
+
+// --- An object behind the ground -------------------------------------------
+//
+// A cliff and a tower, built on a real field through the real compositor, with
+// the view orbited down to 12 degrees over the ground - `MIN_PITCH` in
+// js/build-camera.js is 10, so this is a view a pilot can hold. The three calls
+// each sweep makes are the three `pickPlacementAt` makes, in its order.
+
+/** A flat field with an `EDIT EXTRUSION` block raised on it, as the builder raises one. */
+function cliffField() {
+    const field = createField({ size: DEFAULT_SIZE, segments: DEFAULT_SEGMENTS });
+    applyFootprintedElement(field, {
+        type: 'extrude',
+        config: { height: 400, flatten: 1 },
+        footprint: { kind: 'rect', x: -600, z: 0, width: 800, depth: 2400, angle: 0, corner: 0 }
+    });
+    return field;
+}
+
+/** Where a ray meets a field's ground, read as the canvas's own grid, as the page reads it. */
+function groundAlong(field, origin, direction) {
+    return pickGround(origin, direction, (x, z) => sampleHeight(field, x, z), {
+        step: field.step,
+        cell: field.step,
+        cellOrigin: { x: -field.size / 2, z: -field.size / 2 }
+    });
+}
+
+test('an object the ground hides is not picked through it', () => {
+    const field = cliffField();
+    const ground = (x, z) => sampleHeight(field, x, z);
+    const placements = [tower([100, 0], 200, 200)];
+
+    // The block is where it was asked for and the tower stands on the flat
+    // ground past it, so what follows is about the pick and not about the scene.
+    assert.ok(ground(-600, 0) > 399, 'the block stands 400 units up');
+    assert.equal(ground(100, 0), 0, 'and the tower is on the flat ground beyond it');
+
+    const fall = Math.sin(12 * Math.PI / 180), flat = Math.cos(12 * Math.PI / 180);
+    const direction = { x: flat, y: -fall, z: 0 };
+
+    let hidden = 0;
+    for (let i = 0; i < 39; i++) {
+        const origin = { x: -7000, y: 1270 + i * 12, z: 0 };
+        const point = groundAlong(field, origin, direction);
+        // Only the aims whose ground is the block's own face: an aim that
+        // carries over the top of it has nothing hiding the tower.
+        if (point == null || point.x > -100) continue;
+
+        // The defect: asked over the whole ray, the box pass answers a tower
+        // the block is standing in front of.
+        if (objectRayAt(placements, origin, direction, { groundAt: ground, size: DEFAULT_SIZE }) == null) continue;
+        hidden++;
+
+        const within = rayDistance(origin, direction, point);
+        assert.equal(objectRayAt(placements, origin, direction, { groundAt: ground, size: DEFAULT_SIZE, within }), null,
+            `aimed from y ${origin.y} the ground is met at x ${Math.round(point.x)} and the tower is behind it`);
+    }
+
+    assert.ok(hidden >= 8, `the sweep has to find the defect to hold the fix, and found it ${hidden} times`);
+});
+
+test('a tower in plain view is still picked, bound by the ground behind it', () => {
+    const field = cliffField();
+    const ground = (x, z) => sampleHeight(field, x, z);
+    const placements = [tower([100, 0], 200, 200)];
+
+    // From the east, where nothing stands between the camera and the tower,
+    // down the same 12 degrees.
+    const fall = Math.sin(12 * Math.PI / 180), flat = Math.cos(12 * Math.PI / 180);
+    const direction = { x: -flat, y: -fall, z: 0 };
+
+    let picked = 0;
+    for (let i = 0; i < 39; i++) {
+        const origin = { x: 7000, y: 1460 + i * 8, z: 0 };
+        if (objectRayAt(placements, origin, direction, { groundAt: ground, size: DEFAULT_SIZE }) == null) continue;
+        picked++;
+
+        const point = groundAlong(field, origin, direction);
+        const within = point ? rayDistance(origin, direction, point) : Infinity;
+        assert.equal(objectRayAt(placements, origin, direction, { groundAt: ground, size: DEFAULT_SIZE, within }), 0,
+            `aimed from y ${origin.y} the tower is in plain view and is what is picked`);
+    }
+
+    assert.ok(picked >= 8, `the sweep has to cross the tower to hold anything, and crossed it ${picked} times`);
 });

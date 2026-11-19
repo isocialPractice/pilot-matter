@@ -140,6 +140,23 @@ export function objectHeight(placement) {
 }
 
 /**
+ * The region a batch takes objects with and whether it is putting them back, or
+ * null for a batch that reaches no object at all - one that is no erase, too
+ * weak to take a building, or taking a named cover rather than everything.
+ *
+ * One reading of the rule, because both `objectErased` and `erasedObjects`
+ * apply it and have to agree about which batches count.
+ */
+function objectErasing(batch) {
+    if (!isErase(batch)) return null;
+    const { target, strength, restore } = eraseConfig(batch);
+    const region = eraseRegion(batch);
+    if (region == null || !(strength >= OBJECT_ERASE_STRENGTH)) return null;
+    if (!restore && target !== ERASE_ALL) return null;
+    return { region, restore };
+}
+
+/**
  * True when the erase batches after an object take it: the last batch whose
  * region reaches its middle decides, an erase of everything taking it and a
  * put-back giving it back. `later` is the placements committed after it, in
@@ -149,14 +166,55 @@ export function objectErased(placement, later = [], size = 0) {
     const { at } = objectConfig(placement);
     let taken = false;
     for (const batch of later) {
-        if (!isErase(batch)) continue;
-        const { target, strength, restore } = eraseConfig(batch);
-        const region = eraseRegion(batch);
-        if (region == null || !(strength >= OBJECT_ERASE_STRENGTH)) continue;
-        if (!restore && target !== ERASE_ALL) continue;
-        if (!(footprintWeight(region, at[0], at[1], size) > 0)) continue;
-        taken = !restore;
+        const erasing = objectErasing(batch);
+        if (erasing == null) continue;
+        if (!(footprintWeight(erasing.region, at[0], at[1], size) > 0)) continue;
+        taken = !erasing.restore;
     }
+    return taken;
+}
+
+/**
+ * Which objects in a list the erase batches took, as a `Set` of their indices
+ * in it - the same answer `objectErased` gives one object at a time, for a
+ * whole list in one pass.
+ *
+ * Asked per object it is `objectErased(placement, list.slice(index + 1))`,
+ * which walks the tail of the list again for every object and allocates a copy
+ * of it each time: a canvas with 300 objects on it slices on the order of
+ * 45,000 elements to answer a question about 300. Both callers ask it about a
+ * whole list - `standingObjects` to draw a tile, `objectRayAt` to pick one -
+ * and a pick is asked on every pointer move, so the list is walked once here
+ * instead: each batch is weighed against the objects committed before it, and
+ * the last batch to reach one decides, which is the reading above read from
+ * the other side.
+ *
+ * `size` is the canvas's width, which a batch's region wraps across.
+ */
+export function erasedObjects(placements = [], size = 0) {
+    const list = Array.isArray(placements) ? placements : [];
+    const points = [];
+    list.forEach((placement, index) => {
+        if (isObject(placement)) points.push({ index, at: objectConfig(placement).at });
+    });
+
+    const taken = new Set();
+    if (points.length === 0) return taken;
+
+    list.forEach((batch, index) => {
+        const erasing = objectErasing(batch);
+        if (erasing == null) return;
+        for (const point of points) {
+            // The list is in order, so the first object committed after this
+            // batch is where its reach ends: a batch decides for the objects
+            // before it and says nothing about the ones after it.
+            if (point.index > index) break;
+            if (!(footprintWeight(erasing.region, point.at[0], point.at[1], size) > 0)) continue;
+            if (erasing.restore) taken.delete(point.index);
+            else taken.add(point.index);
+        }
+    });
+
     return taken;
 }
 
@@ -208,11 +266,12 @@ function footprintPoints(footprint) {
  */
 export function standingObjects(placements = [], { groundAt = () => 0, originX = 0, originZ = 0, size = 0 } = {}) {
     const list = Array.isArray(placements) ? placements : [];
+    const erased = erasedObjects(list, size);
     const standing = [];
 
     list.forEach((placement, index) => {
         if (!isObject(placement)) return;
-        if (objectErased(placement, list.slice(index + 1), size)) return;
+        if (erased.has(index)) return;
         const footprint = objectFootprint(placement);
         if (footprint == null) return;
 

@@ -851,12 +851,70 @@ test('every plane holds the speed it opened at, so none settles back into its st
         const figures = figuresFor(plane);
         const open = planeStart(asked, figures);
 
+        // The lever is raised to hold the plane's own floor, and at the
+        // configured start the floor is what every plane opens at - the asked
+        // 40 is at or under all five of them. So the lever asks for exactly
+        // the opening speed here because the two are the same figure, and the
+        // test below is what says which of them it is read off.
+        assert.equal(open.speed, plane.flight.startSpeed, `${plane.id} opens at its own floor from the configured start`);
         assert.equal(targetSpeed(open.throttle, plane.flight.maxSpeed), open.speed,
-            `${plane.id}'s lever asks for exactly the speed it opened at`);
+            `${plane.id}'s lever asks for its floor, which at this start is the speed it opened at`);
 
         const flown = flyOn(open, figures);
         assert.equal(flown.speed, open.speed, `${plane.id} is doing the same speed three seconds later`);
         assert.equal(flown.stalled, 0, `${plane.id} was never stalled in those three seconds`);
+    }
+});
+
+test('a start asked for faster than the plane needs raises its lever only as far as that plane needs', () => {
+    // The raise is for a plane that would otherwise open stalled, so it is read
+    // off the plane's own floor and never off the speed, which is the greater
+    // of the floor and what the pilot asked for. Read off the speed, START
+    // AIRSPEED at 200 knots with START THROTTLE at 20 per cent opened the
+    // trainer's lever at 50 per cent, the jet's at 33 and the biplane's at 67 -
+    // each asking for the 100 it was opened at, in a case where no plane was
+    // anywhere near its stall and nothing needed holding.
+    const fast = { ...askedStart(), speed: 100, throttle: 0.2 };
+
+    for (const plane of PLANES) {
+        const figures = figuresFor(plane);
+        const floorLever = plane.flight.startSpeed / plane.flight.maxSpeed;
+        assert.ok(fast.speed > plane.flight.startSpeed, `${plane.id} is asked for faster than its floor`);
+
+        const open = planeStart(fast, figures);
+        assert.equal(open.speed, fast.speed, `${plane.id} opens at the speed the pilot asked for`);
+        assert.equal(open.throttle, Math.max(fast.throttle, floorLever),
+            `${plane.id}'s lever is raised as far as its own floor needs and no further`);
+        assert.equal(targetSpeed(open.throttle, plane.flight.maxSpeed),
+            Math.max(targetSpeed(fast.throttle, plane.flight.maxSpeed), plane.flight.startSpeed),
+            `${plane.id}'s lever asks for its floor, never for the 100 it was opened at`);
+        assert.ok(open.throttle < fast.speed / plane.flight.maxSpeed,
+            `${plane.id}'s lever asks for less than the speed the pilot opened it at`);
+
+        // Which is a start that settles back toward its lever, and that is what
+        // a lever is - the paragraph `docs/controls/settings.html` closes the
+        // start fields with.
+        const flown = flyOn(open, figures);
+        assert.ok(flown.speed < open.speed, `${plane.id} settles back toward its lever rather than holding 100`);
+    }
+
+    // And a lever already above what the floor needs is left exactly where the
+    // pilot put it, in every plane.
+    for (const plane of PLANES) {
+        assert.equal(planeStart({ ...fast, throttle: 0.5 }, figuresFor(plane)).throttle, 0.5,
+            `${plane.id} keeps a lever already above its floor`);
+    }
+});
+
+test('a start asked for slower than the plane needs gets the lever that holds its floor', () => {
+    const slow = { ...askedStart(), speed: 10, throttle: 0 };
+
+    for (const plane of PLANES) {
+        const open = planeStart(slow, figuresFor(plane));
+        assert.equal(open.speed, plane.flight.startSpeed, `${plane.id} is raised to its own floor`);
+        assert.equal(open.throttle, plane.flight.startSpeed / plane.flight.maxSpeed,
+            `${plane.id}'s lever is raised to hold that floor and no further`);
+        assert.equal(targetSpeed(open.throttle, plane.flight.maxSpeed), plane.flight.startSpeed);
     }
 });
 
