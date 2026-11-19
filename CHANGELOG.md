@@ -5,6 +5,201 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.66.1] - 2026-11-19
+
+Three defects the review of the five gap closures found, and the two accounts
+that described them wrongly: a hover that read every building's ground on every
+pointer move, a building picked through the cliff hiding it, and an opening
+throttle raised over a setting the pilot entered.
+
+### Fixed
+
+- **The hover over a built canvas costs the frame rate nothing again.** With
+  `SELECT` live a pointer move runs a pick, and the pick was deriving
+  everything it needed from scratch every time. Measured in Chromium on a blank
+  canvas with 300 buildings stood on it 300 m apart, the view 50 degrees over
+  the ground: 20.0 fps while the pointer was swept, against the 60.2 of the
+  same scene with the mountain tool live so no pick runs. One move's pick was
+  52.2 ms, which is three frames. Four readings were being taken again on every
+  move, and all four are now taken once:
+  - **A box is built only for an object the ray could reach.** `objectRayAt`
+    built every object's box before testing any of them against the ray, and
+    building one is `objectBox` through `footprintGround`, which samples the
+    ground 25 times - so 300 objects was 7,500 terrain reads a move, with the
+    ray's own direction playing no part in any of them. `rayNearsFootprint` now
+    refuses a footprint the ray's horizontal path cannot reach before its
+    ground is read: one beside that path by more than the footprint's own
+    half-diagonal, one wholly behind where the ray begins, or one past how far
+    the ray may travel. Refusing is one-sided on purpose - a footprint it lets
+    through may still miss the box, and nothing it refuses could have been
+    entered - so it changes which boxes are built and never which one is
+    answered. The terrain reads for the boxes went from 7,500 a move to 0 on
+    the same rays.
+  - **A recipe is measured once.** `recipeBounds` walks every corner of every
+    face of every part, and the pick reads it through `objectFootprint` and
+    `objectHeight`. Those 300 buildings carry 20,460 parts between them, and
+    walking all of them was 12.0 ms a move - most of a frame, spent on an
+    answer that had not changed since the pointer last moved. It is now held
+    per recipe in a `WeakMap`, and frozen because every caller shares the one
+    answer. Holding it is safe because nothing writes into a recipe: every
+    change to a building makes a new one, through `copyRecipe` or `readRecipe`.
+  - **The pick reads the session's own placements rather than copies of them.**
+    `pickablePlacements` was a `structuredClone` of all 300 placements and the
+    parts inside them - 17.1 ms a move, the single most expensive thing a hover
+    did, and also what made the holding above miss every time, since a fresh
+    clone is a fresh key. Everything that asks for that list only measures it:
+    `objectRayAt` and `placementAt` answer with an index and write nothing. So
+    it is handed over uncopied, and anything meaning to *change* a placement
+    asks `committedPlacements`, which still copies.
+  - **The erase batches are weighed once for the whole list.** Both callers
+    have a list in hand and each asked `objectErased(placement, list.slice(index
+    + 1))` per object, slicing on the order of 45,000 elements to answer a
+    question about 300. `erasedObjects` walks the list once and answers which
+    objects the batches took; `standingObjects` and `objectRayAt` both read it.
+
+  Swept again, the 300-building canvas holds **60.1 fps against the 60.2 of the
+  same scene with no pick running**, and one move's pick is **0.13 ms** - under
+  a hundredth of a frame where it was three of them. By how many buildings are
+  on the canvas: 0 at 0.008 ms, 25 at 0.024, 100 at 0.048, 300 at 0.130, all
+  four sweeping at 60.
+
+- **An object the ground hides is no longer picked through it.**
+  `pickPlacementAt` asked the object boxes and then the ground and never
+  compared the two distances, so a box the terrain hid was taken as readily as
+  one in plain view - and the hover reads through the same call, so the outline
+  went to the hidden building first and the pick looked like a fault in the
+  outline. The review measured it in Node against the real modules with the
+  builder's camera at 12 degrees over the ground - `MIN_PITCH` in
+  `js/build-camera.js` is 10, so a view a pilot can hold: a 400 unit extrusion
+  at `x = -600` and a 200 unit tower on the flat ground at `x = 100`. Of 39
+  aims across the cliff's face 11 answered the tower, the first of them meeting
+  the ground 6,134 units along the ray and entering the tower's box 1,022 units
+  further on and out of sight. The ground is now read **first** and its
+  distance along the ray handed to `objectRayAt` as a limit, so a box entered
+  beyond it is behind something and is not answered; a ray that meets no ground
+  at all hands over `Infinity`, which refuses nothing. The boxes are still
+  *answered* before the ground point, which is what lets a tall building be
+  picked where it is seen, and the limit pays for itself in the pass it was
+  added to: a box past where the ray stops is refused without its ground being
+  read. The shallower the view the wider the window was - at the 55 degree
+  default a 200 unit box spans 140 units of ground travel, and at 12 degrees it
+  spans 940.
+
+- **The opening lever is no longer raised past what the plane needed.**
+  `planeStart` read the throttle it raises to off the speed the start ends up
+  carrying rather than off the plane's own floor, so a pilot who asked for a
+  speed above the floor had their `START THROTTLE` raised as well, in a case
+  where no plane was anywhere near its stall and nothing needed holding.
+  `START AIRSPEED` at 200 knots with `START THROTTLE` at 20 per cent opened the
+  trainer's lever at 50 per cent, the jet's at 33 and the biplane's at 67, each
+  asking for the 100 it had been opened at rather than the 40, 60 and 30 the
+  pilot set. The raise is read off the floor now. A plane whose floor wants
+  more than the lever was set to still gets it - the bush plane's 25 per cent
+  against a 20 that would settle it back to 32, which is its stall speed
+  exactly - and a lever already above what the floor needs is left where the
+  pilot put it, so the start settles toward it over the next second or two,
+  which is what a lever is and what `docs/controls/settings.html` has always
+  said of one. Nothing shows at any configured default, where the asked speed
+  and the floor are the same figure for all five planes, which is why the suite
+  was green through it.
+
+### Changed
+
+- **`pickPlacementAt`'s docstring put the ground 450 units past a 200 unit
+  tower, where every other reading of the same geometry says 140.** At the
+  builder's own 55 degrees over the ground a ray leaving a 200 unit roof
+  reaches the ground after 200 / tan(55) = 140 units, which is the figure the
+  entry below gives for the same tower and the same view, the figure
+  `docs/terrain.html` gives, and the figure `test/build-select.test.js` works
+  out for itself as `beyond`. 450 was measured for a different scene and a
+  different view, and nothing named an angle beside it, so a reader had no way
+  to tell it was not the 140 everything else says. The docstring now says 140,
+  names the angle, and describes the three questions in the order they are now
+  asked. The reading in `js/build-select.js` - *the roof of a 200 unit tower is
+  200 units from the ground its own click lands on* - is left alone: that is
+  the height of the tower rather than a distance along the ground, and it is
+  true.
+
+- **The entry below said what the opening throttle meant rather than what it
+  did.** *the throttle is raised with it, to exactly what holds that speed* now
+  reads *to what holds the plane's own speed*, which is what `planeStart` does
+  as of this version and what that entry's own next sentence - *the speed is a
+  floor and never a ceiling, so a pilot who asks for 200 knots gets 200 in
+  every plane* - already promised of the whole start rather than of half of it.
+  `docs/terrain.html` and `docs/controls/settings.html` carry the same
+  correction, each gaining the sentence that says a lever above the floor is
+  the pilot's. `START THROTTLE`'s own note in `js/config.js` - *the lever
+  setting the flight opens with* - is true again without being touched.
+
+- **`docs/terrain.html` now says that the ground bounds the boxes**, in the
+  paragraph on what a click with `SELECT` finds: the boxes are answered first
+  but the ground is read first, an object out of sight behind a cliff is not
+  there to be clicked on, and the window a shallow view opens is 940 units at
+  12 degrees and 1,134 at the 10 `MIN_PITCH` allows, against 140 at the default
+  55.
+
+Held in Node by `test/build-select.test.js`, which hands `objectRayAt` a
+counting `groundAt` and expects its ground reads to be a function of what the
+ray could reach rather than of how long the list is - 25 reads for the one
+object on the ray's path, and the same 25 with 300 more beside it - and which
+sweeps a grid of footprints against a fan of rays to check the cull refuses
+only boxes the slab test would refuse anyway; by the limit's three cases, a box
+entered past it, one entered exactly at it, and `Infinity` answering what no
+limit answers; by `rayDistance` read back off points of a ray at any direction
+length; and by two sweeps over a cliff and a tower built on a real field
+through the real compositor, one finding the aims the defect answered the tower
+for and expecting none of them to now, the other from the side where nothing
+hides it and expecting the tower every time. By `test/objects.test.js`, which
+reads a list both ways round and expects `erasedObjects` and `objectErased` to
+agree about every object in eleven arrangements of batches and put-backs, and
+which expects a recipe to be handed back the same frozen answer rather than
+walked again. By `test/build-mode.test.js`, which expects the pick's reading to
+be the session's own placements and `committedPlacements` to still copy. And by
+`test/insert-plane.test.js`, which expects a start asked for faster than a
+plane's floor to raise the lever only as far as that floor needs and to leave a
+lever already above it alone, a start asked for slower to get the lever that
+holds the floor, and the assertion at the configured default to say that it
+holds there because the asked speed *is* the floor rather than as a general
+rule.
+
+Nineteen mutants, each found once in a dry run and each caught: the limit
+dropped from the box pass; every box built whatever the ray could reach; the
+limit read as ground units rather than as lengths of the direction; the
+footprint reaching its half-width rather than its half-diagonal; the behind-the
+-origin refusal dropped; a straight-down ray read as reaching every footprint;
+`rayDistance` measured straight-line rather than projected; a batch erasing the
+objects placed after it; a put-back taking an object instead of giving it back;
+the page handing the box pass no limit; the page reading the ground after the
+boxes again; the lever raised to hold the speed rather than the floor; a recipe
+walked again on every ask; the one answer handed out unfrozen; the held answer
+keyed on something every recipe shares; the pick copying the placements again;
+the draft copied rather than handed over itself; a draft drawn on bare ground
+made pickable; and a draft that replaces nothing standing in for the first
+committed placement. One mutant was withdrawn rather than counted: the
+`EXTRUDE_DRAWING` clause `builtPlacements` needs is unreachable in
+`pickablePlacements`, because a stage is only ever set on a draft that replaces
+nothing, so the clause was removed and the reason written where it stood.
+
+Settled in Chromium in three checks, the page served by `npm run serve` and
+driven with `--enable-gpu --ignore-gpu-blocklist --use-angle=d3d11`. The hover
+sweep re-run on the 300-building canvas, which is the measurement above - two
+of its own assertions fail now and are meant to: it was written to prove the
+defect, so it asks that Select be at least half as fast again as a tool running
+no pick, and that the pick be no dearer than the reading it replaced. Neither
+can hold once the pick is a tenth of a millisecond, and the second compares two
+figures 0.05 ms apart. Those two are re-asserted the other way round in the
+third check below, which is why the sweep was not edited. The
+review's own roof check re-run whole, so a click up a tower's face still picks
+the tower, the hover outlines the same answer at every step, bare ground beside
+the buildings still picks nothing, a pointer just outside a turned building's
+corner picks nothing where the same distance along a face picks the building,
+and a mountain is still picked by its reach. And a new check of the cliff: the
+block raised on a blank canvas with a tower past it, the camera orbited to 12
+degrees and stood west of the block, 7 of 31 aims across its face being ones
+the unbounded pass answers the tower for, none of them picking the tower now
+and all of them picking the block, and 21 of 21 aims from the other side still
+taking the tower.
+
 ## [1.0.0-alpha.1.66.0] - 2026-11-16
 
 The builder's five open gaps closed: a build that outlives the page, a world's
@@ -191,11 +386,11 @@ of them rather than of this release.
   40 for the trainer, which is the 80 knots it has always opened at, 40 for
   the bush plane, 60 for the twin, 80 for the jet and 40 for the biplane - and
   `planeStart` raises a start asked for slower than that to it. The throttle
-  is raised with it, to exactly what holds that speed, because the lever picks
-  a target and the speed converges on it: left alone, a plane opened faster
-  than its lever asks for slows back to the lever's figure within a second or
-  two. The speed is a floor and never a ceiling, so a pilot who asks for 200
-  knots gets 200 in every plane.
+  is raised with it, to what holds the plane's own speed, because the lever
+  picks a target and the speed converges on it: left alone, a plane opened
+  faster than its lever asks for slows back to the lever's figure within a
+  second or two. The speed is a floor and never a ceiling, so a pilot who asks
+  for 200 knots gets 200 in every plane, on the lever they set.
   - **And the opening attitude is trimmed on the plane's own figures.** The
     pitch that holds a climb has to out-climb the sink the wing is already
     losing at its speed, and that sink is read off the plane's cruise speed -
