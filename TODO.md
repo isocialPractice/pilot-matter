@@ -109,6 +109,49 @@ its context survives being archived.
     it; the `aria-label` there is the type's `"<TYPE> name"` and should stay
     as it is.
   - From: UI/UX Override - the editor workflow's four additions
+- [ ] The bar's label is written on an element no reader announces it for
+  - **Issue**: `index.html` draws the bar as
+    `<div id="build-dock-bar" data-dock="bar" aria-label="Edit bar">`. A bare
+    `div` maps to the `generic` role, which prohibits a name from the author,
+    so a screen reader drops the label and reads the bar as four loose
+    buttons between the heading and the fields. The file's own practice is the
+    other way - `<aside id="build-dock" aria-label="Tool controls">` labels an
+    element whose role takes a name - so this is the one label in the dock
+    that does nothing.
+  - **Goal**: give the bar a role its label belongs to. `role="toolbar"` is
+    the closer fit - it is a row of controls acting on the session - and
+    brings arrow-key navigation as an expectation; `role="group"` names it
+    without that promise. Either way the `aria-label` then reads, and the pin
+    in `test/page.test.js` that matches the bar's tag should name the role.
+  - From: UI/UX Override - the editor workflow's four additions
+- [ ] Nothing holds the outliner's rows or the dock's bar as they are drawn
+  - **Issue**: `js/panel-view.js` gained the bar's buttons, `drawOutlinerRow`,
+    `outlinerBox`, the bar and outliner branches of `update`, two branches of
+    `onClick` and one of `onChange`, and no test names
+    `dock-outliner-row`, `dock-outliner-pick`, `dock-outliner-box`,
+    `dock-outliner-name` or `dock-bar-answer` - nor do the styles those
+    classes are drawn by in `index.html`. The content both are drawn from is
+    held (`outlinerSection` in `test/outliner.test.js`, `dockBar` in
+    `test/build-history.test.js`); the drawing is not. So the `drawn` key
+    `outliner:${index}` could stop matching between the two methods, the
+    `onClick` branch could move below `dataset.section`, or a class could be
+    renamed out from under the stylesheet, and the suite would stay green.
+  - **Goal**: hold it the two ways this repository already holds drawing code.
+    Source pins in `test/page.test.js` for the row's four parts, the press
+    order in `onClick` and the `styled(indexHtml, ...)` rules behind the
+    classes; and a stub-driven run of the methods themselves in
+    `test/panel-view.test.js`, the way
+    `PanelView.prototype.showStatus.call(stub, ...)` already runs one against
+    a stub with no DOM behind it - `update` needs a `document.activeElement`
+    shim and nothing else.
+  - From: UI/UX Override - the editor workflow's four additions
+- [ ] `js/build-panel.js` imports `committedPlacements` and never reads it
+  - **Issue**: the import added at line 29 is unused - `outlinerSection`
+    reads `state?.placements ?? []` directly - so the module declares a
+    dependency it does not have.
+  - **Goal**: drop the name from the import, or read the placements through it
+    in `outlinerSection` if the copy was the intent.
+  - From: UI/UX Override - the editor workflow's four additions
 
 ## Game UI/UX
 
