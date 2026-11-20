@@ -793,6 +793,7 @@
         #settings-builder,
         #builder-settings-auto,
         #builder-settings-view,
+        #builder-settings-snap,
         #builder-settings-end,
         #control-settings-reference {
             list-style: none;
@@ -816,6 +817,7 @@
         #settings-builder li,
         #builder-settings-auto li,
         #builder-settings-view li,
+        #builder-settings-snap li,
         #builder-settings-end li,
         #control-settings-reference li {
             margin: 4px 0;
@@ -851,6 +853,7 @@
         #settings-builder li.selected,
         #builder-settings-auto li.selected,
         #builder-settings-view li.selected,
+        #builder-settings-snap li.selected,
         #builder-settings-end li.selected,
         #control-settings-reference li.selected {
             color: #000;
@@ -907,6 +910,7 @@
         #settings-builder,
         #builder-settings-auto,
         #builder-settings-view,
+        #builder-settings-snap,
         #builder-settings-end,
         #control-settings-reference,
         #element-editor-menu {
@@ -924,6 +928,7 @@
         #settings-builder li,
         #builder-settings-auto li,
         #builder-settings-view li,
+        #builder-settings-snap li,
         #builder-settings-end li,
         #control-settings-reference li,
         #element-editor-menu li {
@@ -977,6 +982,7 @@
         #settings-builder li[data-note]::after,
         #builder-settings-auto li[data-note]::after,
         #builder-settings-view li[data-note]::after,
+        #builder-settings-snap li[data-note]::after,
         #builder-settings-end li[data-note]::after,
         #control-settings-reference li[data-note]::after,
         #element-editor-menu li[data-note]::after,
@@ -1331,12 +1337,112 @@
             letter-spacing: 2px;
         }
 
+        /* The bar: the session's own answers - UNDO, REDO and the two snaps -
+           pinned under the heading, so they are in the same place whatever the
+           panel below them is pointed at. */
+        #build-dock-bar {
+            flex: none;
+            display: none;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 0 12px 8px;
+        }
+
+        .dock-bar-answer {
+            flex: 1 1 auto;
+            padding: 4px 6px;
+            color: #f0f2f3;
+            font: inherit;
+            letter-spacing: 1px;
+            background: rgba(0, 255, 0, 0.08);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .dock-bar-answer:hover:not(:disabled) {
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+        .dock-bar-answer:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        /* A snap that is on, lit the way a chosen tile is. */
+        .dock-bar-answer[aria-pressed="true"] {
+            color: #0f0;
+            background: rgba(0, 255, 0, 0.25);
+            border-color: #0f0;
+        }
+
         #build-dock-fields {
             flex: 1 1 auto;
             min-height: 0;
             overflow-y: auto;
             overscroll-behavior: contain;
             padding: 0 12px 8px;
+        }
+
+        /* One row of the outliner: the press that selects the placement, the
+           field its name is typed into, and the two boxes that hide it and
+           lock it. The name takes whatever width the other three leave. */
+        .dock-outliner-row {
+            display: grid;
+            grid-template-columns: 18px 1fr 22px 22px;
+            align-items: center;
+            gap: 3px;
+            margin: 2px 0;
+        }
+
+        /* A hidden placement reads as one, so the list says why the canvas
+           does not show it. */
+        .dock-outliner-row.hidden-placement .dock-outliner-name {
+            opacity: 0.45;
+        }
+
+        .dock-outliner-pick,
+        .dock-outliner-box {
+            padding: 2px 0;
+            color: #f0f2f3;
+            font: inherit;
+            text-align: center;
+            background: rgba(0, 255, 0, 0.08);
+            border: 1px solid rgba(0, 255, 0, 0.25);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .dock-outliner-pick:hover:not(:disabled),
+        .dock-outliner-box:hover {
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+        .dock-outliner-pick:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        .dock-outliner-pick[aria-pressed="true"],
+        .dock-outliner-box[aria-pressed="true"] {
+            color: #0f0;
+            background: rgba(0, 255, 0, 0.25);
+            border-color: #0f0;
+        }
+
+        .dock-outliner-name {
+            min-width: 0;
+            padding: 2px 4px;
+            color: #f0f2f3;
+            font: inherit;
+            letter-spacing: 1px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            border-radius: 3px;
+        }
+
+        .dock-outliner-name::placeholder {
+            color: rgba(240, 242, 243, 0.45);
         }
 
         #build-dock-actions {
@@ -2414,6 +2520,7 @@
 
     <aside id="build-dock" aria-label="Tool controls">
         <h3 data-dock="heading"></h3>
+        <div id="build-dock-bar" data-dock="bar" aria-label="Edit bar"></div>
         <div id="build-dock-fields" data-dock="fields"></div>
         <div id="build-dock-actions" data-dock="actions"></div>
     </aside>
@@ -2437,6 +2544,8 @@
             <ul id="builder-settings-auto"></ul>
             <h3>VIEW</h3>
             <ul id="builder-settings-view"></ul>
+            <h3>SNAPPING</h3>
+            <ul id="builder-settings-snap"></ul>
             <ul id="builder-settings-end"></ul>
             <small>W/S OR &uarr;/&darr; TO SELECT &middot; A/D OR &larr;/&rarr; TO ADJUST &middot; ENTER OR CLICK TO CHOOSE &middot; ESC OR O TO CLOSE</small>
         </div>

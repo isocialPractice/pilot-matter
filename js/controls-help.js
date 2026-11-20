@@ -8,8 +8,9 @@
 import { DEFAULT_BINDINGS, keyLabel, UNBOUND_LABEL } from './key-bindings.js';
 import { CANVAS_LEAVE_KEYS } from './build-mode.js';
 import {
-    CAMERA_GESTURES, CAMERA_ORBIT, CAMERA_PAN, BUILD_MOVE_KEYS, REFRAME_KEYS
+    CAMERA_GESTURES, CAMERA_ORBIT, CAMERA_PAN, BUILD_MOVE_KEYS, REFRAME_KEYS, FRAME_KEYS
 } from './build-camera.js';
+import { UNDO_COMBOS, REDO_COMBOS } from './build-history.js';
 import { PHOTO_KEY } from './photo.js';
 import { MENU_SELECT_KEYS } from './menu.js';
 import { SETTINGS_OPEN_KEYS } from './settings.js';
@@ -93,7 +94,9 @@ export const HELP_HINT = 'H - CONTROL REFERENCE';
  *
  * A key row's `keys` is a list of controls, each a list of the codes that work
  * it, read down the alternatives the way the flight's rows are: the move row is
- * four controls of two keys each, and reads `W/A/S/D or ↑/←/↓/→`.
+ * four controls of two keys each, and reads `W/A/S/D or ↑/←/↓/→`. A row's
+ * `combos` is for a key read with modifiers - the history's two - where each
+ * alternative carries its own, so `Ctrl+Shift+Z or Ctrl+Y` can be said.
  *
  * A row's `click` is the tool whose own click on the ground the row is, listed
  * while that tool is built, and its `drag` the tool's own drag on the ground -
@@ -123,6 +126,9 @@ export const BUILD_HELP_ROWS = Object.freeze([
         keys: [BUILD_MOVE_KEYS.forward, BUILD_MOVE_KEYS.left, BUILD_MOVE_KEYS.back, BUILD_MOVE_KEYS.right]
     },
     { id: 'reframe', label: 'Reframe',           keys: [REFRAME_KEYS] },
+    { id: 'frame',   label: 'Frame the Selection', keys: [FRAME_KEYS] },
+    { id: 'undo',    label: 'Undo',               combos: UNDO_COMBOS },
+    { id: 'redo',    label: 'Redo',               combos: REDO_COMBOS },
     { id: 'pick',    label: 'Pick a Built Element', click: SELECT_TOOL },
     ...(isBuiltTool('lasso') ? [
         { id: 'lasso-draw',   label: 'Draw a Selection, or Within One', drag: 'lasso' },
@@ -182,6 +188,17 @@ function keysText(controls) {
     return alternatives.join(' or ');
 }
 
+/**
+ * A row's key combinations, each spelt with the modifiers it is read with.
+ * `ctrl` is the platform's own modifier and is named for the one the list is
+ * most likely to be read on.
+ */
+function combosText(combos) {
+    return combos
+        .map(combo => `${combo.ctrl ? 'Ctrl+' : ''}${combo.shift ? 'Shift+' : ''}${keyLabel(combo.code)}`)
+        .join(' or ');
+}
+
 /** A row's presses, each named for its button, whether `shift` is held with it, and the tool it is for. */
 function pressText(presses) {
     return presses
@@ -204,6 +221,7 @@ function forTools(tools) {
 export function buildHelpLines() {
     return BUILD_HELP_ROWS.map(row => {
         const input = row.keys ? keysText(row.keys)
+            : row.combos ? combosText(row.combos)
             : row.presses ? pressText(row.presses)
             : row.click ? `${row.held ? `${row.held}+` : ''}Click${forTools([row.click])}`
             : row.drag ? `${row.held ? `${row.held}+` : ''}Drag${forTools([row.drag].flat())}${row.then ? `, then ${row.then}` : ''}`

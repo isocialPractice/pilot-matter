@@ -481,14 +481,18 @@ test('every panel carries DESELECT while something is selected, and none does wi
         assert.equal(actions.at(-1), DOCK_DESELECT, `${tool} with`);
     }
 
-    // Mountain has no panel before a click drops one: with a selection live it
-    // is its heading over the one answer.
+    // Mountain has no panel before a click drops one: it is its heading over
+    // the bar, and the one answer joins it once a selection is live.
     const before = onCanvas('mountain');
-    assert.equal(dockContent(before, {}), null);
+    const bar = dockContent(before, {}).bar;
+    assert.deepEqual(dockContent(before, {}), {
+        kind: DOCK_TOOL, heading: 'BUILD MOUNTAINS', ranges: {}, holder: { config: {} },
+        rows: [], nudges: [], actions: [], sections: [], bar
+    });
     setSelection(before, SELECTION);
     assert.deepEqual(dockContent(before, {}), {
         kind: DOCK_TOOL, heading: 'BUILD MOUNTAINS', ranges: {}, holder: { config: {} },
-        rows: [], nudges: [], actions: [DOCK_DESELECT], sections: []
+        rows: [], nudges: [], actions: [DOCK_DESELECT], sections: [], bar
     });
 
     const state = onCanvas('mountain');

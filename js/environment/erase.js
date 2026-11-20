@@ -22,6 +22,7 @@
 
 import { ELEMENTS, choice, scalar, isElementId, getElement } from './elements.js';
 import { combineFootprints, isFootprint } from './footprints.js';
+import { placementLocked } from '../outliner.js';
 
 /** The type an erase batch is placed as. Not in the registry, and never applied. */
 export const ERASE_TYPE = 'erase';
@@ -124,6 +125,16 @@ export function resolveErasures(placements = []) {
 
     list.forEach((placement, at) => {
         if (isErase(placement)) return;
+
+        // Locked against Erase: no batch cuts it, however many reach it. The
+        // lock is read here rather than when a stroke is laid, because a batch
+        // is a region and only finds out what it covers when the ground is
+        // composited - so a lock lifts the cut a batch was making and
+        // unlocking puts it back, which is what makes a lock reversible.
+        if (placementLocked(placement)) {
+            resolved.push(placement);
+            return;
+        }
 
         const cut = [];
         for (let later = at + 1; later < list.length; later++) {

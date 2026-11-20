@@ -148,6 +148,20 @@
         "footprint": { "$ref": "#/$defs/region" },
         "clip": { "$ref": "#/$defs/region" },
         "seed": { "type": "number" },
+        "name": {
+          "description": "The placement's own name, as the outliner shows it. Left out for one never named, which the outliner then shows by its type.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "hidden": {
+          "description": "Hidden from the canvas while the world is being built, and still flown. True, or left out - a box turned off is written by leaving the field out.",
+          "const": true
+        },
+        "locked": {
+          "description": "Locked against Select and Erase while the world is being built. True, or left out.",
+          "const": true
+        },
         "template": {
           "description": "A group's template, by its id.",
           "type": "string",

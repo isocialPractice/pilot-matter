@@ -6477,3 +6477,68 @@ still be found by name.
     corner: all 185 aims across the face, and a third of the ground reads. The
     stepped walk is kept for a caller that names no grid.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
+
+## Archived 11-20-26
+
+- [x] **Kept builds survive a reload**: the world ACCEPT AND EXIT keeps - its
+  placements, start point, plane and the assets it uses - written to IndexedDB
+  beside the asset library and put back when the page opens, so the world
+  flown after a reload is still the one built
+  - Today it lives only in the page, and closing the tab loses it unless it was
+    saved to a file. Keep one world, the last kept, under a key of its own in
+    the `pilot-matter` database `js/asset-store.js` opens, read before the
+    first tile is drawn; the Settings environment row says the world flown is
+    the kept one, with a way back to the preset.
+  - **Settled**: a `worlds` store beside `assets` in the `pilot-matter`
+    database, at version 2, holding the one last-kept world as the text of its
+    environment file - read back through `readEnvironmentDocument`, so a world
+    a later version would refuse in a file is refused here too. IndexedDB is
+    answered after the page is up rather than before the first tile, as the
+    asset library already is, so the world arrives while the title is holding
+    and the ground is laid again under it. The chosen preset's row reads
+    `BUILT_WORLD_NOTE` while a build is on it, and pressing it again releases
+    the build - the one environment press that used to answer nothing.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] **The Matter API stands objects**: `createEnvironment` and
+  `createTiledEnvironment` in `js/api/matter.js` stand a world's objects and
+  roads as the simulator does, and answer `obstacleTop` for them, so a host
+  loading a built world gets its buildings as well as its ground
+  - Today the API draws a world's ground and leaves its objects out, so a
+    host's aircraft flies through a city it cannot see. Reuse
+    `standingObjects` and `objectGroup`; an `objects: false` option keeps
+    today's drawing for a host that stands its own. A worked example in
+    `docs/api.md` loads a built world's file under an external aircraft.
+  - **Settled**: `generate` now puts a description through the same three
+    steps `buildEnvironment` does - groups expanded, erasures resolved,
+    objects left out of the field - which is what the goal needed and more
+    than it asked: before it, a built world's first object, template or erase
+    batch threw `Unknown environment element` rather than being quietly left
+    out. `objects` and `obstacleTop(x, z)` are on the world and on an
+    assembly, and `OBJECT_REACH` moved to `js/objects.js` so the tiles and an
+    assembly read one figure.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] **Roof Occlusion**: **Select picks a roof**: a click on an object picks it by the object's
+  own bounds under the pointer rather than by the ground point the pointer's
+  ray meets, so a tall building is picked where it is seen
+  - The ray ends on the ground today, so a click on a tower's upper floors
+    picks whatever stands on the ground behind it, or nothing. Test the ray
+    against each object's turned and scaled `recipeBounds`, nearest first,
+    before the ground.
+  - **Settled**: `objectBox`, `rayEntersBox` and `objectRayAt` in
+    `js/build-select.js`, asked by `pickPlacementAt` in `js/main.js` before
+    the ground and by the hover through the same call. The ground under a
+    footprint is read once, by `footprintGround`, so the box is where the
+    building was drawn.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] **Opening Lever**: **Every plane opens flying**: each plane in `js/planes.js` starts a
+  flight at the start point above its own stall speed and trimmed level,
+  rather than the jet opening slightly stalled
+  - Give each recipe its own start speed and trim, held by a test that steps
+    every plane a few seconds from the start point and expects it neither
+    stalled nor sinking.
+  - **Settled**: a `startSpeed` per recipe, raised to as a floor rather than
+    replacing the pilot's `START AIRSPEED`, with the throttle raised to hold
+    it and the trim worked out from the plane's own figures. `planeStart` is
+    applied in `Aircraft.startState`, where the start is read, so a plane
+    chosen under a start nobody touched is flown on its own figures.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps

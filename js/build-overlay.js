@@ -724,6 +724,93 @@ export const EXTRUDE_PENDING = Object.freeze({
 
 export const EXTRUDE_FILL = 'rgba(255, 64, 64, 0.22)';
 
+// --- The snapping grid ------------------------------------------------------------
+
+/**
+ * The grid drawn round the pointer while a snapped move is switched on: faint,
+ * thin and with nothing under it, because it is a guide the pointer is read
+ * against rather than a thing on the canvas.
+ */
+export const SNAP_GRID_LINES = Object.freeze({
+    width: 1,
+    colour: 'rgba(255, 255, 255, 0.22)'
+});
+
+/**
+ * How many cells of the grid are drawn either side of the pointer.
+ *
+ * The grid is a local guide and not a floor laid over the canvas: six cells
+ * each way is enough to see which line a placement is about to land on, and
+ * bounds what it costs - 13 lines each way at 13 points a line is 338 readings
+ * of the ground a frame, where a grid drawn over a 16,000 unit canvas at 10
+ * metres would be 1,601 lines.
+ */
+export const SNAP_GRID_CELLS = 6;
+
+/** How few screen pixels a drawn cell may come to before the grid is drawn coarser. */
+export const SNAP_GRID_LEAST_PIXELS = 12;
+
+/**
+ * How far apart the grid is *drawn*, which is the step it snaps to or a
+ * doubling of it - whichever is the first that a cell of it covers
+ * `SNAP_GRID_LEAST_PIXELS` on the screen.
+ *
+ * Measured in Chromium rather than reasoned about: at the hold's distance over
+ * a 16,000 unit canvas, one screen pixel is 27 units, so a 10 metre grid drawn
+ * six cells each way came to 36 lit pixels - a speck at the middle of the
+ * screen, which is a grid nobody can use. Drawing more cells is the wrong
+ * answer twice over: the cells would still be sub-pixel, and each one costs a
+ * reading of the ground every frame.
+ *
+ * **Every line drawn is still a line a snapped move lands on**, because a
+ * doubling of the step is on the grid. What a coarse view loses is the lines
+ * between them, which it could not have drawn anyway.
+ */
+export function snapGridStep(step, unitsPerPixel = 0, least = SNAP_GRID_LEAST_PIXELS) {
+    const size = Number(step);
+    if (!(size > 0)) return 0;
+
+    const want = Math.max(Number(unitsPerPixel) || 0, 0) * Math.max(Number(least) || 0, 0);
+    if (!(want > size)) return size;
+    return size * 2 ** Math.ceil(Math.log2(want / size));
+}
+
+/**
+ * The grid round a point, as runs of `[x, z]` points in the canvas's frame -
+ * the shape `screenRuns` takes, each run a line drawn across the cells.
+ *
+ * The lines are given a point at every crossing rather than two points each,
+ * so a line drapes over the ground it is drawn on instead of cutting through a
+ * hill between its ends - the same reason a region's edge is subdivided before
+ * it is projected.
+ *
+ * The grid is read off the point snapped to it, so the lines stand still while
+ * the pointer moves across a cell and step over when it crosses into the next
+ * one: a grid that followed the pointer exactly would never show which line a
+ * placement was about to land on, which is the whole of what it is for.
+ *
+ * `step` is what it is *drawn* at, which `snapGridStep` reads off the view -
+ * not necessarily what a drag snaps to. `[]` for a step of nothing, which is
+ * how a switch that is off is written.
+ */
+export function snapGridRuns(at, step = 0, cells = SNAP_GRID_CELLS) {
+    const size = Number(step);
+    const across = Math.max(Math.round(Number(cells) || 0), 1);
+    if (!(size > 0) || at == null) return [];
+
+    const originX = Math.round((Number(at.x) || 0) / size) * size;
+    const originZ = Math.round((Number(at.z) || 0) / size) * size;
+    const marks = [];
+    for (let i = -across; i <= across; i++) marks.push(i * size);
+
+    const runs = [];
+    for (const offset of marks) {
+        runs.push(marks.map(along => [originX + offset, originZ + along]));
+        runs.push(marks.map(along => [originX + along, originZ + offset]));
+    }
+    return runs;
+}
+
 export const EXTRUDE_PRISM = Object.freeze({
     width: 2,
     colour: '#ff4040',

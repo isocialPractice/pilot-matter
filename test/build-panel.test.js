@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     dockContent, draftHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_ACCEPT, DOCK_CANCEL, SELECT_HEADING,
-    DOCK_WORLD, PICK_SECTION, worldSection
+    DOCK_WORLD, PICK_SECTION, worldSection, DOCK_TOOL, DOCK_OUTLINER, OUTLINER_SECTION,
+    DOCK_UNDO, DOCK_REDO, DOCK_SNAP_GRID, DOCK_SNAP_ANGLE
 } from '../js/build-panel.js';
 import {
     createBuildState, openBuildMode, beginCanvas, startDraft, acceptDraft, BUILD_FROM_TITLE,
@@ -87,11 +88,19 @@ test('an edit of an element no tool places yet is headed by the element', () => 
     assert.equal(dockContent(state, {}).heading, 'BUILD FOREST');
 });
 
-test('a live tool with no panel yet shows nothing', () => {
+test('a live tool with no panel yet still shows the bar, which belongs to the session', () => {
     // Every tool has a panel now; a name that is no tool stands for one.
     const state = onCanvas();
     state.tool = 'hammer';
-    assert.equal(dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE) }), null);
+    const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE) });
+
+    assert.equal(shown.kind, DOCK_TOOL);
+    assert.deepEqual(shown.rows, [], 'it has no rows of its own');
+    assert.deepEqual(shown.sections, []);
+    assert.deepEqual(shown.actions, [], 'and nothing to settle');
+    assert.deepEqual(shown.bar.map(answer => answer.id),
+        [DOCK_UNDO.id, DOCK_REDO.id, DOCK_SNAP_GRID.id, DOCK_SNAP_ANGLE.id],
+        'the two histories and the two snaps are there whatever the tool is');
 });
 
 /**
@@ -269,30 +278,32 @@ test('with nothing picked, Select\'s panel is the camera and then each of the wo
 
     assert.equal(shown.kind, DOCK_SELECT, 'the camera is still its first part');
     assert.equal(shown.rows[0].row.label, 'CAMERA X');
-    assert.deepEqual(shown.sections.map(section => section.heading),
+    assert.equal(shown.sections[0].id, OUTLINER_SECTION, 'the outliner comes first, above what is looked at');
+    const world = shown.sections.slice(1);
+    assert.deepEqual(world.map(section => section.heading),
         state.world.map(row => `WORLD: ${row.label}`), 'one section an element, in the world\'s own order');
-    assert.ok(shown.sections.every(section => section.kind === DOCK_WORLD && section.folds && !section.open));
-    assert.ok(shown.sections.every(section => section.rows.length === 0), 'folded, they draw no rows');
+    assert.ok(world.every(section => section.kind === DOCK_WORLD && section.folds && !section.open));
+    assert.ok(world.every(section => section.rows.length === 0), 'folded, they draw no rows');
     assert.deepEqual(shown.actions, [], 'and there is nothing to accept');
 });
 
 test('an element of the world opened draws its ranges, written to the session\'s own row', () => {
     const state = onWorld();
     const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV, open: [0] });
-    const opened = shown.sections[0];
+    const opened = shown.sections[1];
 
     assert.equal(opened.id, worldSection(0));
     assert.equal(opened.holder, state.world[0], 'its holder is the row the session holds, not a copy of it');
     assert.deepEqual(opened.rows.map(entry => entry.name).filter((name, i, all) => all.indexOf(name) === i),
         Object.keys(getElement(state.world[0].type).ranges));
     assert.ok(opened.rows.every(entry => entry.section === opened.id));
-    assert.ok(shown.sections.slice(1).every(section => section.rows.length === 0), 'and only it');
+    assert.ok(shown.sections.slice(2).every(section => section.rows.length === 0), 'and only it');
 });
 
 test('a row stepped on an element of the world changes the ground the canvas is drawn from', () => {
     const state = onWorld();
     const shown = dockContent(state, { camera: createBuildCamera(DEFAULT_SIZE), fov: DEFAULT_FOV, open: [0] });
-    const mountains = shown.sections[0];
+    const mountains = shown.sections[1];
     const entry = mountains.rows.find(each => each.name === 'height' && each.row.part === 'max');
 
     const before = structuredClone(canvasElements(getEnvironment('highlands'), state)[0].config.height);
@@ -310,9 +321,10 @@ test('with a placement picked, Select\'s panel is the camera and then the pick, 
     assert.equal(shown.kind, DOCK_SELECT);
     assert.equal(shown.heading, 'SELECTION MODE', 'the camera fields stay on top');
     assert.deepEqual(shown.sections.map(section => [section.id, section.kind, section.heading]),
-        [[PICK_SECTION, DOCK_DRAFT, 'SELECTED MOUNTAIN']], 'the world\'s elements give way to what is picked');
-    assert.ok(shown.sections[0].rows.some(entry => entry.name === 'height'));
-    assert.ok(!shown.sections[0].rows.some(entry => entry.name === 'count'), 'less the count its click settled');
+        [[OUTLINER_SECTION, DOCK_OUTLINER, 'OUTLINER (1)'], [PICK_SECTION, DOCK_DRAFT, 'SELECTED MOUNTAIN']],
+        'the world\'s elements give way to what is picked, under the outliner');
+    assert.ok(shown.sections[1].rows.some(entry => entry.name === 'height'));
+    assert.ok(!shown.sections[1].rows.some(entry => entry.name === 'count'), 'less the count its click settled');
     assert.deepEqual(shown.actions, [DOCK_ACCEPT, DOCK_CANCEL]);
 });
 

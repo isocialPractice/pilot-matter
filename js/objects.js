@@ -40,6 +40,7 @@ import { scalar, wrapOffset } from './environment/elements.js';
 import { footprintWeight } from './environment/footprints.js';
 import { isErase, eraseConfig, eraseRegion, ERASE_ALL } from './environment/erase.js';
 import { recipeBounds, recipeKey, recipeSolid, copyRecipe, prefabById, recipeGeometry } from './prefabs.js';
+import { placementLocked } from './outliner.js';
 
 /** The placement type an object is. */
 export const OBJECT_TYPE = 'object';
@@ -195,7 +196,9 @@ export function erasedObjects(placements = [], size = 0) {
     const list = Array.isArray(placements) ? placements : [];
     const points = [];
     list.forEach((placement, index) => {
-        if (isObject(placement)) points.push({ index, at: objectConfig(placement).at });
+        // A locked object is not weighed against any batch, so no erase reaches
+        // it - the same refusal `resolveErasures` makes for everything else.
+        if (isObject(placement) && !placementLocked(placement)) points.push({ index, at: objectConfig(placement).at });
     });
 
     const taken = new Set();

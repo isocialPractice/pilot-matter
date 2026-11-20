@@ -24,11 +24,13 @@ import {
     mountainPeaks, ellipticalDistance, wrapOffset
 } from './environment/elements.js';
 import { placementRandom } from './environment/footprinted.js';
-import { footprintSampler, isFootprint } from './environment/footprints.js';
+import { footprintSampler, isFootprint, footprintBounds } from './environment/footprints.js';
 import { mountainBump } from './terrain-math.js';
 import { isGroup, groupStrips, groupLots } from './templates.js';
 import { isErase } from './environment/erase.js';
 import { isObject, objectFootprint, objectHeight, erasedObjects, footprintGround } from './objects.js';
+import { placementPickable } from './outliner.js';
+import { canvasPickBounds } from './build-picking.js';
 
 /**
  * How strongly a placement has to reach a point for a click there to find it,
@@ -102,6 +104,10 @@ const NOWHERE = () => 0;
  * which is the box round the building it stands for.
  */
 export function placementReach(placement, size = 0) {
+    // Hidden or locked, it is not on the canvas to be found: what is not drawn
+    // cannot be clicked on, and a lock is exactly a refusal to be picked. The
+    // outline is traced at this weight too, so neither is outlined either.
+    if (!placementPickable(placement)) return NOWHERE;
     if (isObject(placement)) {
         const footprint = objectFootprint(placement);
         return footprint ? footprintSampler(footprint, size) : NOWHERE;
@@ -123,15 +129,25 @@ export function placementReach(placement, size = 0) {
     return clip ? (x, z) => own(x, z) * clip(x, z) : own;
 }
 
-/** The reach of a mountain dropped at a point, or null for anything else. */
-function pointReach(placement, size) {
-    if (placement.type !== 'mountain') return null;
+/**
+ * The peak a mountain dropped at a point stands as - worked out again from its
+ * configuration and its own seeded stream, which is the peak the ground was
+ * raised by - or null for anything else.
+ */
+function pointPeak(placement, size) {
+    if (placement?.type !== 'mountain') return null;
 
     const config = resolveConfig(getElement(placement.type), placement.config);
     if (config.at == null) return null;
 
     const [peak] = mountainPeaks({ size, originX: 0, originZ: 0 }, config, placementRandom(placement));
-    if (peak == null || !(peak.radius > 0)) return null;
+    return peak != null && peak.radius > 0 ? peak : null;
+}
+
+/** The reach of a mountain dropped at a point, or null for anything else. */
+function pointReach(placement, size) {
+    const peak = pointPeak(placement, size);
+    if (peak == null) return null;
 
     const wrap = Number(size) > 0 ? Number(size) : 0;
     return (x, z) => mountainBump(
@@ -139,6 +155,103 @@ function pointReach(placement, size) {
         peak.radius,
         1
     );
+}
+
+// --- What a placement covers -------------------------------------------------------
+
+/**
+ * The square of canvas a placement covers: `{ minX, maxX, minZ, maxZ }`, or
+ * null for one that covers nothing in particular - a whole-world element, or a
+ * type the registry does not hold.
+ *
+ * It is the square round the same reach a pick is measured against, read
+ * cheaply: a footprint's own box, a peak's ellipse, the boxes of every strip
+ * and lot a placed template stands for, an object's footprint. Its one use is
+ * framing - `F` turns the view onto what is selected - so a square a little
+ * larger than the thing is right where a tight one would cost a contour trace.
+ *
+ * A clip narrows it, since a mountain cut at a lasso's edge is only where it
+ * stands; a clip that leaves nothing answers null, which is what the reach
+ * says of it too.
+ */
+export function placementBounds(placement, size = 0) {
+    if (!isPlacementShaped(placement)) return null;
+
+    if (isObject(placement)) return footprintBounds(objectFootprint(placement));
+    if (isGroup(placement)) {
+        return unionBounds([...groupStrips(placement, size), ...groupLots(placement, size)].map(footprintBounds));
+    }
+
+    const own = isFootprint(placement.footprint)
+        ? footprintBounds(placement.footprint)
+        : peakBounds(pointPeak(placement, size));
+    if (own == null) return null;
+
+    const clip = isFootprint(placement.clip) ? footprintBounds(placement.clip) : null;
+    return clip ? intersectBounds(own, clip) : own;
+}
+
+/** True for something `placementBounds` can read a square off at all. */
+function isPlacementShaped(placement) {
+    return placement != null && (isObject(placement) || isGroup(placement) || isElementId(placement.type) || isErase(placement));
+}
+
+/**
+ * The square of canvas every placement in a list covers together, or null for
+ * a list in which none covers anything - an empty canvas, whose framing is the
+ * canvas itself.
+ */
+export function placementsBounds(placements = [], size = 0) {
+    return unionBounds((placements ?? []).map(placement => placementBounds(placement, size)));
+}
+
+/** The square round a peak's ellipse: its radius, stretched along whichever way it is turned. */
+function peakBounds(peak) {
+    if (peak == null) return null;
+    const reach = peak.radius * Math.max(1, Number(peak.stretch) || 1);
+    return { minX: peak.x - reach, maxX: peak.x + reach, minZ: peak.z - reach, maxZ: peak.z + reach };
+}
+
+/** Every square in a list taken together, the nulls dropped, or null for nothing left. */
+function unionBounds(boxes) {
+    const read = (boxes ?? []).filter(box => box != null);
+    if (read.length === 0) return null;
+    return {
+        minX: Math.min(...read.map(box => box.minX)),
+        maxX: Math.max(...read.map(box => box.maxX)),
+        minZ: Math.min(...read.map(box => box.minZ)),
+        maxZ: Math.max(...read.map(box => box.maxZ))
+    };
+}
+
+/** Where two squares overlap, or null where they do not. */
+function intersectBounds(a, b) {
+    const box = {
+        minX: Math.max(a.minX, b.minX), maxX: Math.min(a.maxX, b.maxX),
+        minZ: Math.max(a.minZ, b.minZ), maxZ: Math.min(a.maxZ, b.maxZ)
+    };
+    return box.maxX > box.minX && box.maxZ > box.minZ ? box : null;
+}
+
+/**
+ * What `F` frames, as a square of canvas: the placement picked with Select,
+ * else the region the lasso has selected, else everything built on the canvas,
+ * else the canvas itself - which is always something to look at.
+ *
+ * Read in that order because that is the order of how particular the answer
+ * is: a pick is one thing the pilot pointed at, a selection is a region they
+ * drew, and with neither the question is "show me the work".
+ */
+export function framedBounds({ picked = null, selection = null, placements = [], size = 0 } = {}) {
+    if (picked != null) {
+        const box = placementBounds(picked, size);
+        if (box != null) return box;
+    }
+    if (isFootprint(selection)) {
+        const box = footprintBounds(selection);
+        if (box != null) return box;
+    }
+    return placementsBounds(placements, size) ?? canvasPickBounds(size);
 }
 
 /**
@@ -356,6 +469,9 @@ export function objectRayAt(placements, origin, direction, { groundAt = () => 0,
     list.forEach((placement, index) => {
         if (!isObject(placement)) return;
         if (erased.has(index)) return;
+        // A hidden or a locked object is not there to be hit, the same reading
+        // `placementReach` makes of every other kind of placement.
+        if (!placementPickable(placement)) return;
 
         const footprint = objectFootprint(placement);
         if (!rayNearsFootprint(origin, direction, footprint, within)) return;

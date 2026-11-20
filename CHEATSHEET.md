@@ -288,6 +288,9 @@ is for in brackets.
 | Wheel | Zoom |
 | W/A/S/D or ↑/←/↓/→ | Move |
 | Home | Reframe |
+| F | Frame the Selection |
+| Ctrl+Z | Undo |
+| Ctrl+Shift+Z or Ctrl+Y | Redo |
 | Click (Select) | Pick a Built Element |
 | Drag (Lasso) | Draw a Selection, or Within One |
 | Shift+Drag (Lasso) | Add to the Selection |

@@ -150,6 +150,19 @@ export const BUILD_MOVE_KEYS = Object.freeze({
 /** The key that puts the hold back. */
 export const REFRAME_KEYS = Object.freeze(['Home']);
 
+/**
+ * The key that frames what is selected, which engines' editors have made `F`.
+ *
+ * It is free to be taken. The builder reads its keys only while it is open and
+ * the flight is not being flown behind it, so a canvas's key only has to miss
+ * the ones the canvas itself reads - the move keys, `Home`, `O`, `H`, `Escape`
+ * and the two history combinations - and `F` misses all of them. It is not a
+ * reserved key either, for the same reason `W/A/S/D` are not: nothing outside
+ * the builder answers to it, so the key map may still bind a control onto it
+ * and the two can never both read one press.
+ */
+export const FRAME_KEYS = Object.freeze(['KeyF']);
+
 const RADIANS = Math.PI / 180;
 
 const clamp = (value, low, high) => Math.min(Math.max(value, low), high);
@@ -376,6 +389,36 @@ export function reframeBuildCamera(state) {
 }
 
 /**
+ * Frames a patch of ground: the view turns about the middle of `bounds` and
+ * stands as far back as it takes to see across them.
+ *
+ * The angles do not move, which is what makes this different from `Home` and
+ * is what an editor's `F` does: the pilot has arranged a view they can work
+ * in, and framing a thing in it should not take that arrangement away. What
+ * moves is the point the view turns about - so the camera does turn, by having
+ * something else to look at - and how far back it stands.
+ *
+ * The standoff is the hold's own: `CANVAS_STANDOFF` of the widest side, which
+ * is the relationship that frames the whole canvas, so framing one mountain
+ * and framing the canvas are one rule read at two sizes. Held between the
+ * nearest the view comes and the hold's distance, and the target held over the
+ * canvas, both by the bounds the state carries.
+ *
+ * `bounds` is `{ minX, maxX, minZ, maxZ }` in the canvas's frame, or null for
+ * nothing to frame - which leaves the view exactly as it is.
+ */
+export function frameBuildCamera(state, bounds) {
+    if (bounds == null) return state;
+    const { minX, maxX, minZ, maxZ } = bounds;
+    if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) return state;
+
+    const span = Math.max(maxX - minX, maxZ - minZ, 0);
+    const distance = clamp(span * CANVAS_STANDOFF, state.nearest, state.furthest);
+    const framed = { ...state, distance, target: { ...state.target, y: 0 } };
+    return withTarget(framed, (minX + maxX) / 2, (minZ + maxZ) / 2);
+}
+
+/**
  * Which gesture a press drives, from its button, whether `shift` was down, and
  * the live tool - or null for a press the camera does not take.
  */
@@ -433,6 +476,11 @@ export function isBuildMoveKey(code) {
 /** True for a key that puts the hold back. */
 export function isReframeKey(code) {
     return REFRAME_KEYS.includes(code);
+}
+
+/** True for a key that frames what is selected. */
+export function isFrameKey(code) {
+    return FRAME_KEYS.includes(code);
 }
 
 /**

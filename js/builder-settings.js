@@ -29,11 +29,13 @@ export const BUILDER_SETTINGS_STORAGE_KEY = 'pilot-matter.builder-settings';
 export const BUILDER_SETTINGS_TITLE = 'BUILDER SETTINGS';
 export const AUTO_ACCEPT_HEADING    = 'AUTO ACCEPT';
 export const VIEW_HEADING           = 'VIEW';
+export const SNAPPING_HEADING       = 'SNAPPING';
 
 // The headings the rows are drawn under. The cursor walks the screen as one
 // list whichever group a row is in, so a group is a heading rather than a mode.
 export const AUTO_ACCEPT_GROUP = 'autoAccept';
 export const VIEW_GROUP        = 'view';
+export const SNAPPING_GROUP    = 'snapping';
 export const BUILDER_END_GROUP = 'end';
 
 // A row that does something rather than holding a value.
@@ -46,6 +48,8 @@ export const AUTO_ACCEPT_DRAW_OPTION = 'autoAcceptDraw';
 export const AUTO_ACCEPT_EXIT_OPTION = 'autoAcceptExit';
 export const AUTO_ACCEPT_TOOL_OPTION = 'autoAcceptTool';
 export const CAMERA_SPEED_OPTION     = 'cameraSpeed';
+export const GRID_SIZE_OPTION        = 'gridSize';
+export const SNAP_ANGLE_OPTION       = 'snapAngle';
 
 /**
  * The moments a pending draft can be kept without the pilot being asked, each
@@ -89,6 +93,37 @@ export const CAMERA_SPEEDS = Object.freeze([
     Object.freeze({ value: 0.5, label: 'SLOW'   }),
     Object.freeze({ value: 1,   label: 'NORMAL' }),
     Object.freeze({ value: 2,   label: 'FAST'   })
+]);
+
+/**
+ * How far apart the grid a snapped move lands on sits, in metres - which are
+ * the canvas's own units.
+ *
+ * The switch is on the dock's bar rather than here, because it is turned on
+ * and off while building and the size is set once: a setting the pilot reaches
+ * for every other placement is a setting in the wrong place. These are the
+ * sizes that switch is for, and 10 metres is where it starts - fine enough to
+ * line a row of buildings up, coarse enough that lining them up is one drag
+ * rather than four.
+ */
+export const GRID_SIZES = Object.freeze([
+    Object.freeze({ value: 5,   label: '5 M'   }),
+    Object.freeze({ value: 10,  label: '10 M'  }),
+    Object.freeze({ value: 25,  label: '25 M'  }),
+    Object.freeze({ value: 50,  label: '50 M'  }),
+    Object.freeze({ value: 100, label: '100 M' })
+]);
+
+/**
+ * How far round a snapped turn lands, in degrees. 15 to start, which is the
+ * angle a runway's compass card is read in and divides every quarter turn.
+ */
+export const SNAP_ANGLES = Object.freeze([
+    Object.freeze({ value: 5,  label: '5°'  }),
+    Object.freeze({ value: 15, label: '15°' }),
+    Object.freeze({ value: 30, label: '30°' }),
+    Object.freeze({ value: 45, label: '45°' }),
+    Object.freeze({ value: 90, label: '90°' })
 ]);
 
 /**
@@ -139,6 +174,22 @@ export const BUILDER_OPTIONS = Object.freeze([
         group: VIEW_GROUP,
         default: 1,
         values: CAMERA_SPEEDS
+    },
+    {
+        id: GRID_SIZE_OPTION,
+        label: 'GRID SIZE',
+        note: 'how far apart a snapped move lands, with GRID on the dock',
+        group: SNAPPING_GROUP,
+        default: 10,
+        values: GRID_SIZES
+    },
+    {
+        id: SNAP_ANGLE_OPTION,
+        label: 'ANGLE SIZE',
+        note: 'how far round a snapped turn lands, with ANGLE on the dock',
+        group: SNAPPING_GROUP,
+        default: 15,
+        values: SNAP_ANGLES
     }
 ]);
 
@@ -422,4 +473,17 @@ export function builderAutoAccept(state) {
  */
 export function builderCameraSpeed(state) {
     return state?.values?.[CAMERA_SPEED_OPTION] ?? 1;
+}
+
+/**
+ * How far a snapped move and a snapped turn land apart: `{ grid, angle }`, in
+ * the canvas's units and in degrees. Read by `buildSnapSteps`, which is handed
+ * these and the session's two switches and answers what a drag snaps to.
+ */
+export function builderSnapSizes(state) {
+    const values = state?.values ?? {};
+    return {
+        grid: values[GRID_SIZE_OPTION] ?? GRID_SIZES[1].value,
+        angle: values[SNAP_ANGLE_OPTION] ?? SNAP_ANGLES[1].value
+    };
 }

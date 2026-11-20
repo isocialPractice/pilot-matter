@@ -11,7 +11,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import {
-    BUILDER_SETTINGS_STORAGE_KEY, BUILDER_OPTIONS, AUTO_ACCEPT_GROUP, VIEW_GROUP, BUILDER_END_GROUP, ACTION_ENTRY,
+    BUILDER_SETTINGS_STORAGE_KEY, BUILDER_OPTIONS, AUTO_ACCEPT_GROUP, VIEW_GROUP, SNAPPING_GROUP,
+    GRID_SIZE_OPTION, SNAP_ANGLE_OPTION, builderSnapSizes, BUILDER_END_GROUP, ACTION_ENTRY,
     AUTO_ACCEPT_ALL_OPTION, AUTO_ACCEPT_DRAW_OPTION, AUTO_ACCEPT_EXIT_OPTION, AUTO_ACCEPT_TOOL_OPTION, AUTO_ACCEPT_OPTIONS,
     CAMERA_SPEED_OPTION, CAMERA_SPEEDS, RESET_BUILDER_SETTINGS_ID, BUILDER_SETTINGS_BACK_ID,
     BUILDER_SETTINGS_FROM_BUILDER, BUILDER_SETTINGS_FROM_SETTINGS, BUILDER_SETTINGS_CLOSE_KEYS,
@@ -54,14 +55,17 @@ test('the rows come under their headings in the order the plan gives, each a kin
         [AUTO_ACCEPT_GROUP, TOGGLE_ENTRY, 'WHEN LEAVING'],
         [AUTO_ACCEPT_GROUP, TOGGLE_ENTRY, 'WHEN CHANGING TOOL'],
         [VIEW_GROUP, OPTION_ENTRY, 'CAMERA SPEED'],
+        [SNAPPING_GROUP, OPTION_ENTRY, 'GRID SIZE'],
+        [SNAPPING_GROUP, OPTION_ENTRY, 'ANGLE SIZE'],
         [BUILDER_END_GROUP, ACTION_ENTRY, 'RESET TO DEFAULTS'],
         [BUILDER_END_GROUP, BACK_ENTRY, 'BACK']
     ]);
     assert.deepEqual(AUTO_ACCEPT_OPTIONS, { draw: AUTO_ACCEPT_DRAW_OPTION, exit: AUTO_ACCEPT_EXIT_OPTION, tool: AUTO_ACCEPT_TOOL_OPTION });
     assert.deepEqual(defaultBuilderSettings(), {
         [AUTO_ACCEPT_ALL_OPTION]: false, [AUTO_ACCEPT_DRAW_OPTION]: false, [AUTO_ACCEPT_EXIT_OPTION]: false,
-        [AUTO_ACCEPT_TOOL_OPTION]: false, [CAMERA_SPEED_OPTION]: 1
-    }, 'every box off and the camera at its own speed');
+        [AUTO_ACCEPT_TOOL_OPTION]: false, [CAMERA_SPEED_OPTION]: 1,
+        [GRID_SIZE_OPTION]: 10, [SNAP_ANGLE_OPTION]: 15
+    }, 'every box off, the camera at its own speed, and the snaps at 10 metres and 15 degrees');
     assert.deepEqual(CAMERA_SPEEDS.map(speed => [speed.value, speed.label]), [[0.5, 'SLOW'], [1, 'NORMAL'], [2, 'FAST']]);
     const ids = builderSettingsEntries().map(entry => entry.id);
     assert.equal(new Set(ids).size, ids.length, 'every row its own id');

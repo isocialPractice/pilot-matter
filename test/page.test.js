@@ -3774,12 +3774,13 @@ test('a held row on the element editor is drawn dimmed', () => {
  * outside the part that scrolls, so a long panel can never push the accept and
  * the cancel below the fold.
  */
-test('the dock scrolls its fields between a pinned heading and pinned answers', () => {
+test('the dock scrolls its fields between a pinned heading, a pinned bar and pinned answers', () => {
     const dock = indexHtml.match(/<aside id="build-dock"[^>]*>([\s\S]*?)<\/aside>/);
     assert.ok(dock, 'index.html should carry the dock');
-    assert.match(dock[1], /^\s*<h3 data-dock="heading"><\/h3>\s*<div id="build-dock-fields" data-dock="fields"><\/div>\s*<div id="build-dock-actions" data-dock="actions"><\/div>\s*$/,
-        'heading, then the fields, then the answers - the answers outside the fields');
+    assert.match(dock[1], /^\s*<h3 data-dock="heading"><\/h3>\s*<div id="build-dock-bar" data-dock="bar"[^>]*><\/div>\s*<div id="build-dock-fields" data-dock="fields"><\/div>\s*<div id="build-dock-actions" data-dock="actions"><\/div>\s*$/,
+        'heading, the bar, then the fields, then the answers - all three outside the fields');
 
+    assert.ok(styled(indexHtml, '#build-dock-bar', /flex:\s*none/), 'the bar does not scroll with the fields');
     assert.ok(styled(indexHtml, '#build-dock-fields', /overflow-y:\s*auto/), 'the fields scroll');
     assert.ok(styled(indexHtml, '#build-dock-fields', /overscroll-behavior:\s*contain/),
         'and keep the wheel to themselves at either end');
@@ -3798,6 +3799,126 @@ test('the dock is drawn by the one panel view and read back every canvas frame',
 
     const sync = methodBody(mainSource, 'syncDock');
     assert.match(sync, /dockContent\(this\.builder, \{/, 'what it shows is the pure module\'s to say');
+});
+
+// --- The dock's bar, the outliner, and the two steps ------------------------------
+
+/**
+ * The bar is pressed through one handler, which is what keeps a step and a
+ * switch the session's rather than any panel's.
+ */
+test('the dock\'s bar is wired to the session rather than to a panel', () => {
+    assert.match(mainSource, /onBar:\s*\(id\) => this\.onDockBar\(id\)/);
+
+    const bar = methodBody(mainSource, 'onDockBar');
+    assert.match(bar, /if \(id === DOCK_UNDO\.id \|\| id === DOCK_REDO\.id\) \{\s*this\.stepHistory\(id === DOCK_UNDO\.id\);/,
+        'the two histories go to the one step');
+    assert.match(bar, /const snap = barSnap\(id\);\s*if \(snap == null \|\| !toggleBuildSnap\(this\.builder, snap\)\) return;\s*this\.syncDock\(\);/,
+        'and a snap is the pure module\'s to turn over, the dock drawn again from it');
+});
+
+/**
+ * A step changes the world, so the ground is drawn again from it - and the
+ * holders the dock was stepping go, because the pick they belonged to went
+ * with the step.
+ */
+test('a step of the history draws the ground again and lets go of the holders', () => {
+    const step = methodBody(mainSource, 'stepHistory');
+    assert.match(step, /if \(!\(back \? undoBuild\(this\.builder\) : redoBuild\(this\.builder\)\)\) return;/,
+        'nothing is drawn for a step that was refused');
+    assert.match(step, /this\.draftHolder = null;/);
+    assert.match(step, /this\.strokeHolder = null;/);
+    assert.match(step, /this\.redrawCanvas\(\);/);
+    assert.match(step, /this\.syncOverlays\(\);/);
+});
+
+test('the history keys are read off the whole combination, and only on a canvas', () => {
+    const keys = methodBody(mainSource, 'onBuilderKey');
+    assert.match(keys, /const step = historyKey\(e\);\s*if \(step != null\) \{\s*e\.preventDefault\(\);\s*this\.stepHistory\(step === HISTORY_UNDO\);/,
+        'the module says which step a key asks for');
+
+    const canvas = keys.indexOf('if (buildModeDrawing(this.builder)) {');
+    assert.ok(canvas >= 0 && canvas < keys.indexOf('const step = historyKey(e)'),
+        'inside the canvas branch, so the picker reads none of it');
+});
+
+/**
+ * `Ctrl+Z` carries a modifier, and the capture listener leaves a modified key
+ * to the browser - so the one that reaches the builder is the listener on the
+ * way back up. Pinned because moving the history check into the capture
+ * listener would make it dead code with nothing failing.
+ */
+test('a modified key reaches the builder by the bubbling listener', () => {
+    const wired = methodBody(mainSource, 'setupKeys');
+    const left = wired.indexOf('if (e.ctrlKey || e.altKey || e.metaKey) return;');
+    const up = wired.indexOf("window.addEventListener('keydown', (e) => this.onKeyDown(e));");
+    assert.ok(left >= 0, 'the capture listener leaves a modified key alone');
+    assert.ok(up > left, 'and the one after it reads every key, modified or not');
+    assert.match(methodBody(mainSource, 'onKeyDown'), /if \(buildModeShowing\(this\.builder\)\) \{\s*this\.onBuilderKey\(e\);/);
+});
+
+test('F frames what is selected, and the key alone so Ctrl+F is still the browser\'s', () => {
+    const keys = methodBody(mainSource, 'onBuilderKey');
+    assert.match(keys, /if \(isFrameKey\(e\.code\) && !e\.ctrlKey && !e\.metaKey\) \{\s*e\.preventDefault\(\);\s*this\.frameSelection\(\);/);
+
+    const framing = methodBody(mainSource, 'frameSelection');
+    assert.match(framing, /this\.buildCamera = frameBuildCamera\(this\.buildCamera, framedBounds\(\{/,
+        'where it lands is the two pure modules\' to say');
+    assert.match(framing, /picked: picked != null \? buildDraft\(this\.builder\) : null/,
+        'the pick is the draft standing on it, which is where its changes are');
+    assert.match(framing, /selection: this\.builder\.selection/);
+    assert.match(framing, /placements: this\.builder\.placements/);
+});
+
+test('the outliner\'s three answers are wired to the three the session writes', () => {
+    assert.match(mainSource, /onOutlinerPick:\s*\(index\) => this\.onOutlinerPick\(index\)/);
+    assert.match(mainSource, /onOutlinerName:\s*\(index, text\) => this\.onOutlinerName\(index, text\)/);
+    assert.match(mainSource, /onOutlinerBox:\s*\(index, field\) => this\.onOutlinerBox\(index, field\)/);
+
+    assert.match(methodBody(mainSource, 'onOutlinerPick'), /selectPlacement\(this\.builder, index\)/,
+        'a row picks the way a click on the canvas picks');
+    assert.match(methodBody(mainSource, 'onOutlinerName'), /renamePlacement\(this\.builder, index, text\)/);
+
+    // Either box is the ground drawn again: hiding takes it off the canvas, and
+    // a lock lifts whatever an erase batch was cutting out of it.
+    const box = methodBody(mainSource, 'onOutlinerBox');
+    assert.match(box, /const turn = field === 'hidden' \? hidePlacement : lockPlacement;/);
+    assert.match(box, /if \(!turn\(this\.builder, index, row\[field\] !== true\)\) return;/, 'turned by what the row says it is now');
+    assert.match(box, /this\.redrawCanvas\(\);/);
+});
+
+test('the outliner\'s fold is the page\'s, and it comes off with the canvas', () => {
+    assert.match(methodBody(mainSource, 'onDockFold'), /if \(section\.kind === DOCK_OUTLINER\) \{\s*this\.outlinerOpen = !this\.outlinerOpen;/);
+    assert.match(methodBody(mainSource, 'syncDock'), /outliner: this\.outlinerOpen,/, 'and the dock reads it');
+    assert.match(methodBody(mainSource, 'showCanvas'), /this\.outlinerOpen = false;/, 'a canvas opens with it shut');
+});
+
+/**
+ * The switch is the session's and the size is the builder's settings, and this
+ * is the one place the two meet - so a drag reads them through it rather than
+ * either one of them directly.
+ */
+test('a drag of a handle is snapped by the switch read against the setting', () => {
+    assert.match(methodBody(mainSource, 'dragGumball'), /\}, \{ size: this\.terrain\.size, snap: this\.snapSteps\(\) \}\);/);
+    assert.match(methodBody(mainSource, 'snapSteps'),
+        /return buildSnapSteps\(this\.builder, builderSnapSizes\(this\.builderSettings\)\);/);
+});
+
+test('the grid is drawn under everything else on the overlay, round the pointer', () => {
+    const drawn = methodBody(mainSource, 'drawBuildOverlay');
+    const grid = drawn.indexOf('this.drawSnapGrid(ctx, width, height);');
+    assert.ok(grid >= 0 && grid < drawn.indexOf('const selection = this.builder.selection;'),
+        'before the selection, so every outline is drawn over it');
+
+    const draw = methodBody(mainSource, 'drawSnapGrid');
+    assert.match(draw, /if \(!buildSnap\(this\.builder\)\.grid \|\| pointer == null \|\| pointer\.type === 'touch'\) return;/,
+        'nothing is drawn with the switch off, and a touch has no pointer to draw it round');
+    assert.match(draw, /const across = unitsPerPixel\(this\.buildCamera\.distance, this\.camera\.fov, height\);/,
+        'how much ground a pixel spans is what says how coarse the grid is drawn');
+    assert.match(draw, /snapGridRuns\(ground, snapGridStep\(this\.snapSteps\(\)\.grid, across\)\)/,
+        'at the step the view can show, read off the step the drag snaps to');
+    assert.match(draw, /strokePaths\(ctx, this\.screenRuns\(runs, width, height\), SNAP_GRID_LINES\)/,
+        'stood on the ground and projected, as every run over the canvas is');
 });
 
 /**
@@ -4867,8 +4988,12 @@ test('the builder\'s settings are a card on a layer of its own, its headings in 
     assert.ok(layer.includes('<div id="builder-settings-card" role="dialog" aria-modal="true" aria-labelledby="builder-settings-title">'));
     assert.match(layer, /<h2 id="builder-settings-title">BUILDER SETTINGS<\/h2>/);
     const drawn = [...layer.matchAll(/<h3>([^<]+)<\/h3>\s*<ul id="([^"]+)"><\/ul>/g)].map(([, heading, list]) => [heading, list]);
-    assert.deepEqual(drawn, [['AUTO ACCEPT', 'builder-settings-auto'], ['VIEW', 'builder-settings-view']]);
-    assert.match(layer, /<ul id="builder-settings-view"><\/ul>\s*<ul id="builder-settings-end"><\/ul>/, 'the reset and the way out under no heading, last');
+    assert.deepEqual(drawn, [
+        ['AUTO ACCEPT', 'builder-settings-auto'],
+        ['VIEW', 'builder-settings-view'],
+        ['SNAPPING', 'builder-settings-snap']
+    ]);
+    assert.match(layer, /<ul id="builder-settings-snap"><\/ul>\s*<ul id="builder-settings-end"><\/ul>/, 'the reset and the way out under no heading, last');
 
     // Modal over a canvas: a layer over the palette and the dock, under the confirms.
     const css = indexHtml.slice(indexHtml.indexOf('#builder-settings {'), indexHtml.indexOf('}', indexHtml.indexOf('#builder-settings {')));

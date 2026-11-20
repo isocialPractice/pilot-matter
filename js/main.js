@@ -36,8 +36,11 @@ import {
     buildStartPoint, setBuildStartPoint, turnBuildStartPoint, writeBuildStartPoint, clearBuildStartPoint, chooseBuildPlane,
     chooseCityPrefab, openCitySection, cityPlacement, insertObject, buildCityPrefab,
     setAssetLibrary, assetStep, beginAssetStep, writeAssetStep, setAssetStepName, finishAssetStep, cancelAssetStep,
-    chooseLibraryAsset, chosenLibraryAsset, requestRemoveAsset, removeAssetFromCanvas, runwayCard
+    chooseLibraryAsset, chosenLibraryAsset, requestRemoveAsset, removeAssetFromCanvas, runwayCard,
+    undoBuild, redoBuild, endBuildEditRun, buildSnap, toggleBuildSnap, buildSnapSteps,
+    renamePlacement, hidePlacement, lockPlacement
 } from './build-mode.js';
+import { historyKey, HISTORY_UNDO } from './build-history.js';
 import {
     paletteTools, BUILT_TOOLS, isPaletteBar, dropsAtClick, toolMark, toolName, isStrokeTool, isPaintTool, isEraseTool, isExtrudeTool, strokeStamp, buildTool,
     insertsTemplate, placesStartPoint, insertsCity, ACCEPT_TOOL, SELECT_TOOL
@@ -47,9 +50,9 @@ import {
     createPaletteState, paletteFolded, togglePalette, paletteFoldName, PALETTE_FOLD_MARK,
     BUILDER_SETTINGS_MARK, BUILDER_SETTINGS_NAME
 } from './build-palette.js';
-import { placementAt, objectRayAt, rayDistance, travelledPast } from './build-select.js';
+import { placementAt, objectRayAt, rayDistance, travelledPast, framedBounds } from './build-select.js';
 import {
-    placementOutline, projectOutline, strokeOutline, strokeGumball, HOVER_OUTLINE, CHOSEN_OUTLINE,
+    placementOutline, projectOutline, strokeOutline, strokeGumball, snapGridRuns, snapGridStep, SNAP_GRID_LINES, HOVER_OUTLINE, CHOSEN_OUTLINE,
     footprintLoop, subdividePath, canvasPieces, projectPath, strokePaths, SELECTION_OUTLINE, DRAWING_OUTLINE, PATH_STEP,
     regionEdges, contoured, stampOutline, strokeRibbon, fillRegion, paintTrailColour, COVER_TRAIL, ERASE_TRAIL,
     EXTRUDE_REGION, EXTRUDE_PENDING, EXTRUDE_FILL, EXTRUDE_PRISM, surfaceEdges, strokeStartPoint, START_KNOB_HIT,
@@ -65,15 +68,16 @@ import {
 } from './build-picker.js';
 import {
     canvasFarPlane, CANVAS_FOG, createBuildCamera, buildCameraPosition,
-    orbitBuildCamera, panBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera,
-    cameraGesture, pressMayClick, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, clearOfGround,
+    orbitBuildCamera, panBuildCamera, zoomBuildCameraToward, moveBuildCamera, reframeBuildCamera, frameBuildCamera,
+    cameraGesture, pressMayClick, wheelPixels, moveIntent, isBuildMoveKey, isReframeKey, isFrameKey, clearOfGround,
     writeCameraField, nudgeBuildCamera, unitsPerPixel, viewBearing, CAMERA_ORBIT, DEFAULT_FOV
 } from './build-camera.js';
 import {
     dockContent, draftHolderFor, strokeHolderFor, canvasElements, DOCK_SELECT, DOCK_DRAFT, DOCK_WORLD, DOCK_LASSO,
     DOCK_COVER, DOCK_PAINT, DOCK_ERASE, DOCK_EXTRUDE, DOCK_RUNWAY, DOCK_ACCEPT, DOCK_CANCEL, DOCK_DESELECT, DOCK_DEFAULT_BRUSH,
     DOCK_LOAD_ENVIRONMENT, DOCK_SAVE_ENVIRONMENT, FILES_NAME_FIELD, DOCK_PLANE, DOCK_START, DOCK_CLEAR_START, DOCK_CITY,
-    DOCK_FILES, DOCK_LOAD_ASSET, DOCK_REMOVE_ASSET, DOCK_ASSET, DOCK_ADD_ASSET, DOCK_CANCEL_ASSET, ASSET_NAME_FIELD
+    DOCK_FILES, DOCK_LOAD_ASSET, DOCK_REMOVE_ASSET, DOCK_ASSET, DOCK_ADD_ASSET, DOCK_CANCEL_ASSET, ASSET_NAME_FIELD,
+    DOCK_OUTLINER, OUTLINER_SECTION, DOCK_UNDO, DOCK_REDO, barSnap
 } from './build-panel.js';
 import {
     lassoTool, clickVertex, lassoOp, squareInDrag, LASSO_CLICKS, LASSO_DRAG, CLOSE_PIXELS
@@ -120,8 +124,9 @@ import {
 import {
     createBuilderSettingsState, openBuilderSettings, closeBuilderSettings, builderSettingsShowing,
     chooseBuilderSetting, adjustBuilderSetting, isBuilderSettingsCloseKey, isBuilderSettingsOpenKey, builderAutoAccept, builderCameraSpeed,
+    builderSnapSizes,
     BUILDER_SETTINGS_FROM_BUILDER, BUILDER_SETTINGS_FROM_SETTINGS, BUILDER_SETTINGS_BACK_ID,
-    AUTO_ACCEPT_GROUP, VIEW_GROUP
+    AUTO_ACCEPT_GROUP, VIEW_GROUP, SNAPPING_GROUP
 } from './builder-settings.js';
 import { aircraftBindings } from './key-bindings.js';
 import { runwayWanted } from './config.js';
@@ -465,6 +470,9 @@ class FlightSimulator {
         // Which of the world's own elements are open on Select's panel, by
         // their place in the world, so a section stays open across frames.
         this.worldOpen = new Set();
+        // Whether the outliner's section of Select's panel is open. One flag
+        // rather than a set, because the outliner is one section.
+        this.outlinerOpen = false;
 
         // The shape the lasso is drawing and has not finished: its tool, its
         // gesture, and the ground points it has so far - with the pointer it
@@ -674,15 +682,18 @@ class FlightSimulator {
         );
 
         // The builder's own settings the same way: auto accept under one
-        // heading, the view under the next, and the reset and the way out
-        // under neither.
+        // heading, the view under the next, snapping under the third, and the
+        // reset and the way out under none of them.
+        const grouped = [AUTO_ACCEPT_GROUP, VIEW_GROUP, SNAPPING_GROUP];
         this.builderSettingsMenus = [
             new MenuList(document.getElementById('builder-settings-auto'), this.builderSettingsMenuState,
                 entry => entry.group === AUTO_ACCEPT_GROUP),
             new MenuList(document.getElementById('builder-settings-view'), this.builderSettingsMenuState,
                 entry => entry.group === VIEW_GROUP),
+            new MenuList(document.getElementById('builder-settings-snap'), this.builderSettingsMenuState,
+                entry => entry.group === SNAPPING_GROUP),
             new MenuList(document.getElementById('builder-settings-end'), this.builderSettingsMenuState,
-                entry => entry.group !== AUTO_ACCEPT_GROUP && entry.group !== VIEW_GROUP)
+                entry => !grouped.includes(entry.group))
         ];
         followPointers(this.builderSettingsMenus, (index, choose, step) => this.onBuilderSettingsPointer(index, choose, step));
 
@@ -752,7 +763,11 @@ class FlightSimulator {
             onShape:  (id) => this.onDockShape(id),
             onColor:  (entry, rgb) => this.onDockColor(entry, rgb),
             onDropper: entry => this.onDockDropper(entry),
-            onText:   (id, text) => this.onDockText(id, text)
+            onText:   (id, text) => this.onDockText(id, text),
+            onBar:    (id) => this.onDockBar(id),
+            onOutlinerPick: (index) => this.onOutlinerPick(index),
+            onOutlinerName: (index, text) => this.onOutlinerName(index, text),
+            onOutlinerBox:  (index, field) => this.onOutlinerBox(index, field)
         });
 
         // The confirm is worked with the mouse as every menu here is, and a
@@ -2721,6 +2736,7 @@ class FlightSimulator {
      */
     showCanvas(environmentId) {
         this.worldOpen.clear();
+        this.outlinerOpen = false;
         this.strokeHolder = null;
         this.terrain.setCanvas(true);
         this.terrain.setEnvironment(environmentId, {
@@ -2994,6 +3010,12 @@ class FlightSimulator {
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         ctx.clearRect(0, 0, width, height);
         this.overlayDrawn = true;
+
+        // The snapping grid, under everything: where a snapped move would put
+        // what is being dragged. Drawn round the pointer rather than over the
+        // canvas, so it is a guide at the size the grid actually is - see
+        // `snapGridRuns`. A touch has no pointer to draw it round.
+        this.drawSnapGrid(ctx, width, height);
 
         // The selection, whatever tool is live - it outlives the one that drew
         // it - and the shape the lasso is drawing, under everything else. In
@@ -3584,6 +3606,9 @@ class FlightSimulator {
 
         if (this.startTurning && e.pointerId === this.startTurning.pointer) {
             this.startTurning = null;
+            // The drag is over, so the step it opened is closed: the next turn
+            // of the knob is a step of its own rather than part of this one.
+            endBuildEditRun(this.builder);
             this.syncOverlays();
             return;
         }
@@ -3692,7 +3717,7 @@ class FlightSimulator {
             along: alongAxis(drag.layout, drag.handle, drag.start, now),
             turn: sweepAround(drag.layout.centre, drag.start, now),
             uniform: drag.uniform
-        }, { size: this.terrain.size });
+        }, { size: this.terrain.size, snap: this.snapSteps() });
         if (changes) this.writeGumball(changes);
     }
 
@@ -4008,6 +4033,27 @@ class FlightSimulator {
         return this.surfaceTrace.runs;
     }
 
+    /**
+     * The snapping grid, where the grid snap is switched on and there is a
+     * pointer over the canvas to draw it round. The ground under the pointer
+     * is read once, as every other preview over the canvas reads it.
+     */
+    drawSnapGrid(ctx, width, height) {
+        const pointer = this.canvasPointer;
+        if (!buildSnap(this.builder).grid || pointer == null || pointer.type === 'touch') return;
+        if (confirmOpen(this.builder) || deselectPopup(this.builder) != null) return;
+
+        const ground = this.pickCanvasPoint(pointer.x, pointer.y);
+        if (ground == null) return;
+
+        // Drawn at the step the view can show rather than at the step a drag
+        // snaps to - see `snapGridStep`. Both are the same close in.
+        const across = unitsPerPixel(this.buildCamera.distance, this.camera.fov, height);
+        const runs = snapGridRuns(ground, snapGridStep(this.snapSteps().grid, across));
+        if (runs.length === 0) return;
+        strokePaths(ctx, this.screenRuns(runs, width, height), SNAP_GRID_LINES);
+    }
+
     /** A run of canvas points as it falls on a screen `width` by `height`, wherever on the canvas it repeats. */
     screenRegion(points, closed, width, height) {
         return this.screenRuns(canvasPieces(subdividePath(points, PATH_STEP, closed), this.terrain.size), width, height);
@@ -4083,6 +4129,7 @@ class FlightSimulator {
                 size: this.terrain.size,
                 holder: isStrokeTool(buildModeTool(this.builder)) ? this.currentStrokeHolder() : this.currentDraftHolder(),
                 open: [...this.worldOpen],
+                outliner: this.outlinerOpen,
                 altitude: currentOption(this.settings, ALTITUDE_UNIT_OPTION)
             })
             : null;
@@ -4243,6 +4290,13 @@ class FlightSimulator {
         // Insert City's categories: one open at a time, the session's to hold.
         if (section.kind === DOCK_CITY) {
             if (openCitySection(this.builder, section.category)) this.syncDock();
+            return;
+        }
+
+        // The outliner, which is one section rather than one per row.
+        if (section.kind === DOCK_OUTLINER) {
+            this.outlinerOpen = !this.outlinerOpen;
+            this.syncDock();
             return;
         }
 
@@ -4477,6 +4531,96 @@ class FlightSimulator {
     }
 
     /**
+     * One of the dock's bar answers pressed: a step of the history, or one of
+     * the two snaps turned over.
+     */
+    onDockBar(id) {
+        if (id === DOCK_UNDO.id || id === DOCK_REDO.id) {
+            this.stepHistory(id === DOCK_UNDO.id);
+            return;
+        }
+
+        const snap = barSnap(id);
+        if (snap == null || !toggleBuildSnap(this.builder, snap)) return;
+        this.syncDock();
+    }
+
+    /**
+     * One step of the history, back or forward: the world put back as it was,
+     * the ground drawn from it, and the dock and the overlays with it.
+     *
+     * The pick is let go of by the step itself, so the holder the dock was
+     * stepping goes with it.
+     */
+    stepHistory(back) {
+        if (!(back ? undoBuild(this.builder) : redoBuild(this.builder))) return;
+        this.draftHolder = null;
+        this.strokeHolder = null;
+        this.redrawCanvas();
+        this.syncOverlays();
+    }
+
+    /** An outliner row pressed: the placement it names picked, the way a click on the canvas picks one. */
+    onOutlinerPick(index) {
+        const answer = selectPlacement(this.builder, index);
+        if (answer?.confirm) this.confirmOpened();
+        else if (answer) this.syncOverlays();
+    }
+
+    /** An outliner row's name typed: the placement renamed, or its name taken away for an empty field. */
+    onOutlinerName(index, text) {
+        if (!renamePlacement(this.builder, index, text)) {
+            // Nothing changed - the name was already that, or the row is not
+            // one to write. The dock is drawn again anyway, so a field holding
+            // spaces reads back as the name that was kept.
+            this.syncDock();
+            return;
+        }
+        this.syncOverlays();
+    }
+
+    /** One of an outliner row's two boxes pressed: the placement hidden from the canvas, or locked. */
+    onOutlinerBox(index, field) {
+        const row = this.dockShown?.sections
+            ?.find(section => section.id === OUTLINER_SECTION)?.entries
+            ?.find(entry => entry.index === index);
+        if (row == null) return;
+
+        const turn = field === 'hidden' ? hidePlacement : lockPlacement;
+        if (!turn(this.builder, index, row[field] !== true)) return;
+        this.draftHolder = null;
+        // Hiding takes it off the canvas and showing it puts it back, and a
+        // lock lifts whatever an erase batch was cutting out of it - so either
+        // box is the ground drawn again.
+        this.redrawCanvas();
+        this.syncOverlays();
+    }
+
+    /**
+     * What a drag of a handle snaps to: the two switches on the dock's bar,
+     * read against the sizes in the builder's own settings.
+     */
+    snapSteps() {
+        return buildSnapSteps(this.builder, builderSnapSizes(this.builderSettings));
+    }
+
+    /**
+     * Frames what is selected, which is what `F` does: the placement picked
+     * with Select, else the lasso's region, else everything built, else the
+     * canvas. The angles stay as the pilot left them - see
+     * `frameBuildCamera`.
+     */
+    frameSelection() {
+        const picked = pickedIndex(this.builder);
+        this.buildCamera = frameBuildCamera(this.buildCamera, framedBounds({
+            picked: picked != null ? buildDraft(this.builder) : null,
+            selection: this.builder.selection,
+            placements: this.builder.placements,
+            size: this.terrain.size
+        }));
+    }
+
+    /**
      * Draws the canvas again from the environment's own placements and what
      * has been built on it, the edit in hand shown where it stands. The same
      * door a preset goes through: the built world is a description like any
@@ -4564,6 +4708,27 @@ class FlightSimulator {
             if (isReframeKey(e.code)) {
                 e.preventDefault();
                 this.buildCamera = reframeBuildCamera(this.buildCamera);
+                return;
+            }
+
+            // `F` frames what is selected, as engines' editors do - the key
+            // alone, so `Ctrl+F` is still the browser's find rather than a
+            // keystroke the canvas quietly swallows.
+            if (isFrameKey(e.code) && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                this.frameSelection();
+                return;
+            }
+
+            // The history, read off the whole combination rather than the code
+            // - `Ctrl+Z` back, `Ctrl+Shift+Z` or `Ctrl+Y` forward - and asked
+            // before anything else reads a modified key. Auto-repeat is taken,
+            // because a key held down is a pilot walking back through the
+            // session, which is what holding it is for.
+            const step = historyKey(e);
+            if (step != null) {
+                e.preventDefault();
+                this.stepHistory(step === HISTORY_UNDO);
                 return;
             }
         }

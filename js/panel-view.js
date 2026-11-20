@@ -130,7 +130,15 @@ function typed(row) {
     return isTypedRow(row) && !row.gate;
 }
 
-/** What the dock shows, as a string that changes only when its rows do. */
+/**
+ * What the dock shows, as a string that changes only when its rows do.
+ *
+ * What an entry *says* is left out on purpose - an answer's label, whether it
+ * can be pressed, a box's state, an outliner row's name - because those are
+ * written by `update` into the elements already on the screen. Only the list
+ * of elements is here, so a canvas built on for an hour redraws the dock when
+ * the panel changes and writes into it the rest of the time.
+ */
 function shapeOf(content) {
     return [
         content.kind, content.heading,
@@ -142,26 +150,32 @@ function shapeOf(content) {
             ...(section.text ? [`text:${section.id}/${section.text.id}`] : []),
             ...('status' in section ? [`status:${section.id}`] : []),
             ...(section.shapes ?? []).flatMap(row => row.tools.map(tool => `shape:${tool.id}`)),
+            ...(section.entries ?? []).map(entry => `outliner:${entry.index}`),
             ...(section.rows ?? []).map(rowKey)
         ]),
+        ...(content.bar ?? []).map(answer => `bar:${answer.id}`),
         ...(content.actions ?? []).map(action => `action:${action.id}`)
     ].join('|');
 }
 
 export class PanelView {
     /**
-     * `root` holds three parts, found by `data-dock`: the heading, the fields
-     * that scroll, and the answers. `handlers` are told what was done:
-     * `onStep(entry, step, coarse)`, `onType(entry, figure, field)`,
-     * `onNudge(id, sign)`, `onAction(id)`, `onFold(id)` for a section's
+     * `root` holds four parts, found by `data-dock`: the heading, the bar of
+     * session answers under it, the fields that scroll, and the answers.
+     * `handlers` are told what was done: `onStep(entry, step, coarse)`,
+     * `onType(entry, figure, field)`, `onNudge(id, sign)`, `onAction(id)`,
+     * `onBar(id)` for one of the bar's answers, `onFold(id)` for a section's
      * heading pressed, `onShape(id)` for one of a mode's own tools,
      * `onColor(entry, rgb)` for a colour chosen at a colour row,
-     * `onDropper(entry)` for its eye dropper pressed, and
-     * `onText(id, text, section)` for a section's line of text let go of.
+     * `onDropper(entry)` for its eye dropper pressed,
+     * `onText(id, text, section)` for a section's line of text let go of, and
+     * the outliner's three - `onOutlinerPick(index)`,
+     * `onOutlinerName(index, text)` and `onOutlinerBox(index, field)`.
      */
     constructor(root, handlers = {}) {
         this.root     = root;
         this.heading  = root.querySelector('[data-dock="heading"]');
+        this.bar      = root.querySelector('[data-dock="bar"]');
         this.fields   = root.querySelector('[data-dock="fields"]');
         this.answers  = root.querySelector('[data-dock="actions"]');
         this.handlers = handlers;
@@ -223,6 +237,7 @@ export class PanelView {
     render(content) {
         if (content == null) {
             this.root.style.display = 'none';
+            if (this.bar) this.bar.replaceChildren();
             this.shape = null;
             this.content = null;
             // Nothing is on the screen to have said anything, so the panel
@@ -245,6 +260,22 @@ export class PanelView {
         this.fields.replaceChildren();
         this.answers.replaceChildren();
         this.drawn.clear();
+
+        // The bar: the session's own answers, pinned under the heading, in the
+        // same place whatever the panel is pointed at.
+        if (this.bar) {
+            this.bar.replaceChildren();
+            for (const answer of content.bar ?? []) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'dock-bar-answer';
+                button.dataset.bar = answer.id;
+                button.textContent = answer.label;
+                if (answer.pressed != null) button.setAttribute('aria-pressed', String(answer.pressed));
+                this.bar.append(button);
+            }
+            this.bar.style.display = (content.bar ?? []).length ? 'flex' : 'none';
+        }
 
         // A mode with tools of its own - the lasso, or Insert Runway's
         // templates - draws them first, a row of tiles to each row the artwork
@@ -277,6 +308,7 @@ export class PanelView {
             }
             this.fields.append(heading);
             this.drawShapes(section.shapes);
+            for (const entry of section.entries ?? []) this.drawOutlinerRow(entry);
             for (const entry of section.rows ?? []) this.drawRow(entry);
             if (section.text) this.drawText(section);
             if ('status' in section) this.drawStatus(section);
@@ -290,6 +322,56 @@ export class PanelView {
             this.answers.append(answer);
         }
         this.answers.style.display = (content.actions ?? []).length ? 'flex' : 'none';
+    }
+
+    /**
+     * One row of the outliner: the press that selects the placement, the field
+     * its name is typed into - showing the type's own label until it has one -
+     * and the two boxes that hide it and lock it.
+     *
+     * The boxes are a letter each with the whole of what they do on
+     * `aria-label` and `title`, because the row is 276 pixels wide and the
+     * name is what a pilot is reading along it. Their state is on
+     * `aria-pressed`, which is also what the stylesheet lights them by.
+     */
+    drawOutlinerRow(entry) {
+        const line = document.createElement('div');
+        line.className = 'dock-outliner-row';
+        line.dataset.outliner = String(entry.index);
+
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'dock-outliner-pick';
+        pick.dataset.outlinerPick = String(entry.index);
+        pick.textContent = '\u25b8';
+        pick.title = `Select ${entry.label}`;
+        pick.setAttribute('aria-label', `Select ${entry.label}`);
+
+        const name = document.createElement('input');
+        name.type = 'text';
+        name.className = 'dock-outliner-name';
+        name.dataset.outlinerName = String(entry.index);
+        name.maxLength = entry.limit ?? 40;
+        name.spellcheck = false;
+        name.autocomplete = 'off';
+        name.setAttribute('aria-label', `${entry.label} name`);
+
+        line.append(pick, name, this.outlinerBox(entry, 'hidden', 'H', 'Hide'), this.outlinerBox(entry, 'locked', 'L', 'Lock'));
+        this.fields.append(line);
+        this.drawn.set(`outliner:${entry.index}`, { line, pick, name });
+    }
+
+    /** One of an outliner row's two boxes: a letter, its whole meaning on the label. */
+    outlinerBox(entry, field, letter, verb) {
+        const box = document.createElement('button');
+        box.type = 'button';
+        box.className = `dock-outliner-box dock-outliner-${field}`;
+        box.dataset.outlinerBox = field;
+        box.textContent = letter;
+        box.title = `${verb} ${entry.label}`;
+        box.setAttribute('aria-label', `${verb} ${entry.label}`);
+        box.setAttribute('aria-pressed', String(entry[field] === true));
+        return box;
     }
 
     /**
@@ -540,6 +622,37 @@ export class PanelView {
 
     /** Writes every reading, leaving alone the one being typed into. */
     update(content) {
+        // The bar reads whether there is a step to take and which snaps are
+        // on, both of which change under an unchanged panel.
+        for (const answer of content.bar ?? []) {
+            const button = this.bar?.querySelector(`.dock-bar-answer[data-bar="${answer.id}"]`);
+            if (!button) continue;
+            if (button.textContent !== answer.label) button.textContent = answer.label;
+            button.disabled = answer.disabled === true;
+            if (answer.pressed != null) button.setAttribute('aria-pressed', String(answer.pressed));
+        }
+
+        // An outliner row's name, whether it is the one picked, and its two
+        // boxes - written rather than redrawn, so the field being typed into
+        // is left alone the way every other field here is.
+        for (const section of content.sections ?? []) {
+            for (const entry of section.entries ?? []) {
+                const row = this.drawn.get(`outliner:${entry.index}`);
+                if (!row) continue;
+                if (document.activeElement !== row.name) {
+                    if (row.name.value !== (entry.name ?? '')) row.name.value = entry.name ?? '';
+                    if (row.name.placeholder !== entry.label) row.name.placeholder = entry.label;
+                }
+                row.pick.setAttribute('aria-pressed', String(entry.live === true));
+                row.pick.disabled = entry.selectable === false;
+                row.line.classList.toggle('hidden-placement', entry.hidden === true);
+                for (const field of ['hidden', 'locked']) {
+                    row.line.querySelector(`[data-outliner-box="${field}"]`)
+                        ?.setAttribute('aria-pressed', String(entry[field] === true));
+                }
+            }
+        }
+
         // An answer's label and whether it can be pressed can change without
         // the panel changing shape - Extrude's one button reads both off the
         // stage its draft is at.
@@ -649,6 +762,20 @@ export class PanelView {
             return;
         }
 
+        if (button.dataset.bar) {
+            this.handlers.onBar?.(button.dataset.bar);
+            return;
+        }
+
+        // An outliner row: the press that selects it, or one of its two boxes.
+        const outlined = button.closest('.dock-outliner-row');
+        if (outlined) {
+            const index = Number(outlined.dataset.outliner);
+            if (button.dataset.outlinerBox) this.handlers.onOutlinerBox?.(index, button.dataset.outlinerBox);
+            else if (button.dataset.outlinerPick) this.handlers.onOutlinerPick?.(index);
+            return;
+        }
+
         if (button.dataset.section) {
             this.handlers.onFold?.(button.dataset.section);
             return;
@@ -708,6 +835,12 @@ export class PanelView {
         const field = event.target;
         if (!(field instanceof HTMLInputElement) || this.content == null) return;
         if (field.type === 'range') return;
+
+        // An outliner row's name, taken as it stands when it is let go of.
+        if (field.dataset.outlinerName != null) {
+            this.handlers.onOutlinerName?.(Number(field.dataset.outlinerName), field.value);
+            return;
+        }
 
         // A section's line of text, taken as it stands when it is let go of.
         if (field.classList.contains('dock-text')) {

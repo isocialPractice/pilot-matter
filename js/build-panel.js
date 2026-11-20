@@ -25,8 +25,11 @@ import {
     pickedIndex, worldPlacements, selectionLive, buildLassoTool, lassoValues, strokeValues, buildRunwayTemplate,
     brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface,
     saveName, fileStatus, buildStartPoint, buildPlane, buildCityPrefab, buildCitySection,
-    assetLibrary, assetStep, chosenLibraryAsset
+    assetLibrary, assetStep, chosenLibraryAsset,
+    canUndoBuild, canRedoBuild, buildSnap, placementSelectable, committedPlacements,
+    SNAP_GRID, SNAP_ANGLE
 } from './build-mode.js';
+import { placementHidden, placementLocked, placementNamed, PLACEMENT_NAME_LIMIT } from './outliner.js';
 import {
     EXTRUDE_HEADING, EXTRUDE_DRAWING, EXTRUDE_SURFACES, EXTRUDE_STAGE_ROWS, EXTRUDE_BACK, extrudeRows, extrudeTool,
     extrudeToolArt, extrudeToolName, extrudeStageAction, surfaceRows
@@ -79,8 +82,11 @@ export const DOCK_PAINT = 'paint';
 /** What the dock shows with Erase live: what it takes and how much, and its brush. */
 export const DOCK_ERASE = 'erase';
 
-/** What the dock shows for a tool with no panel of its own yet while something is selected: its heading over `DESELECT`. */
+/** What the dock shows for a tool with no panel of its own yet: its heading, and whatever the bar and the selection put under it. */
 export const DOCK_TOOL = 'tool';
+
+/** The kind the outliner's section of Select's panel is drawn as: rows of placements rather than rows of values. */
+export const DOCK_OUTLINER = 'outliner';
 
 /** What the dock shows with Extrude live: its shapes, and the rows and the one button of the stage its draft is at. */
 export const DOCK_EXTRUDE = 'extrude';
@@ -201,8 +207,64 @@ export const DOCK_DEFAULT_BRUSH = Object.freeze({ id: 'default-brush', label: 'D
 /** The answer that drops the selection, there only while something is selected. */
 export const DOCK_DESELECT = Object.freeze({ id: 'deselect', label: 'DESELECT' });
 
+/**
+ * The dock's bar - the answers that belong to the session rather than to any
+ * one panel, pinned under the heading where every tool has them in the same
+ * place.
+ *
+ * The two histories and the two snaps are all of it, and they are here rather
+ * than among a panel's `actions` because they are not answers to what the
+ * panel is pointed at: `ACCEPT` settles the edit in hand and `DESELECT` drops
+ * the lasso's region, while `UNDO` takes back the last change to the world
+ * whatever is being drawn. A session answer buried among a tool's own answers
+ * is one that moves down the dock every time the tool changes.
+ *
+ * `GRID` and `ANGLE` are switches rather than answers - `pressed` says which -
+ * and their sizes are the builder's own settings, not the bar's: a size is set
+ * once and a switch is turned over while building.
+ */
+export const DOCK_UNDO = Object.freeze({ id: 'undo', label: 'UNDO' });
+export const DOCK_REDO = Object.freeze({ id: 'redo', label: 'REDO' });
+export const DOCK_SNAP_GRID  = Object.freeze({ id: 'snap-grid',  label: 'GRID',  snap: SNAP_GRID });
+export const DOCK_SNAP_ANGLE = Object.freeze({ id: 'snap-angle', label: 'ANGLE', snap: SNAP_ANGLE });
+export const DOCK_BAR = Object.freeze([DOCK_UNDO, DOCK_REDO, DOCK_SNAP_GRID, DOCK_SNAP_ANGLE]);
+
+/**
+ * The bar for a session: each entry `{ id, label, disabled, pressed }`, and
+ * `[]` off a canvas, where there is no world to change and nothing to snap.
+ *
+ * `UNDO` and `REDO` read as pressable exactly when a step can be taken, which
+ * is the one place a pilot can see that there is something to go back to.
+ */
+export function dockBar(state) {
+    if (!buildModeDrawing(state)) return [];
+    const snap = buildSnap(state);
+    return DOCK_BAR.map(answer => ({
+        id: answer.id,
+        label: answer.label,
+        disabled: answer.id === DOCK_UNDO.id ? !canUndoBuild(state)
+            : answer.id === DOCK_REDO.id ? !canRedoBuild(state)
+            : false,
+        pressed: answer.snap ? snap[answer.snap] === true : null
+    }));
+}
+
+/** The answer on the bar that turns one of the two snaps over, or null for anything else. */
+export function barSnap(id) {
+    return DOCK_BAR.find(answer => answer.id === id)?.snap ?? null;
+}
+
 /** The id of the section holding the placement picked with Select. */
 export const PICK_SECTION = 'pick';
+
+/**
+ * The id of the outliner's section of Select's panel, and the three things a
+ * row of it does besides selecting its placement.
+ */
+export const OUTLINER_SECTION = 'outliner';
+export const OUTLINER_HEADING = 'OUTLINER';
+export const OUTLINER_HIDE = 'hidden';
+export const OUTLINER_LOCK = 'locked';
 
 /** The id of the section holding the environment's own element at `index`. */
 export function worldSection(index) {
@@ -553,26 +615,35 @@ export function strokeHolderFor(state, id = state?.tool) {
  * While something is selected every panel carries `DESELECT` among its
  * answers, whatever tool is live - the one way to drop the selection that can
  * be seen without knowing it is there. The lasso's panel has it already, where
- * a pilot looks for it first. A tool with no panel of its own yet - Mountain,
- * before a click has dropped one - shows its heading over `DESELECT` alone,
- * since the selection belongs to the session rather than to any one tool.
+ * a pilot looks for it first.
+ *
+ * **On a canvas there is always a dock**, because the bar is always there: the
+ * two histories and the two snaps belong to the session, so a tool with no
+ * panel of its own yet - Mountain, before a click has dropped one - shows its
+ * heading over the bar rather than nothing at all. Off a canvas there is still
+ * no dock.
  */
 export function dockContent(state, options = {}) {
-    const content = panelContent(state, options);
-    if (!buildModeDrawing(state) || !selectionLive(state)) return content;
-    if (content == null) {
-        const tool = buildTool(buildModeTool(state));
-        return {
-            kind: DOCK_TOOL, heading: tool?.heading ?? tool?.label ?? '', ranges: {}, holder: { config: {} },
-            rows: [], nudges: [], actions: [DOCK_DESELECT], sections: []
-        };
-    }
-    if (content.actions.some(action => action.id === DOCK_DESELECT.id)) return content;
-    return { ...content, actions: [...content.actions, DOCK_DESELECT] };
+    if (!buildModeDrawing(state)) return panelContent(state, options);
+
+    const content = panelContent(state, options) ?? emptyContent(state);
+    const bar = dockBar(state);
+    if (!selectionLive(state)) return { ...content, bar };
+    if (content.actions.some(action => action.id === DOCK_DESELECT.id)) return { ...content, bar };
+    return { ...content, bar, actions: [...content.actions, DOCK_DESELECT] };
+}
+
+/** What the dock shows for a live tool with no panel of its own: its heading, and the bar under it. */
+function emptyContent(state) {
+    const tool = buildTool(buildModeTool(state));
+    return {
+        kind: DOCK_TOOL, heading: tool?.heading ?? tool?.label ?? '', ranges: {}, holder: { config: {} },
+        rows: [], nudges: [], actions: [], sections: []
+    };
 }
 
 /** What the dock shows before the answer every panel gets while something is selected - see `dockContent`. */
-function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [], size = 0, altitude = 'feet' } = {}) {
+function panelContent(state, { camera = null, fov, holder = null, context = {}, open = [], outliner = false, size = 0, altitude = 'feet' } = {}) {
     if (!buildModeDrawing(state)) return null;
 
     const select = buildModeTool(state) === SELECT_TOOL && camera != null;
@@ -621,6 +692,11 @@ function panelContent(state, { camera = null, fov, holder = null, context = {}, 
         actions: [],
         sections: []
     };
+
+    // The outliner first, above whatever is being looked at: it is how the
+    // canvas is navigated, and a list that moved down the panel every time
+    // something was picked would be a list nobody could find twice.
+    content.sections.push(outlinerSection(state, outliner));
 
     if (picked) {
         const draft = buildDraft(state);
@@ -842,6 +918,49 @@ function placementName(placement) {
     return isGroup(placement) ? runwayTemplate(placement.template)?.label ?? 'RUNWAY' : label(placement.type);
 }
 
+/**
+ * The outliner: every committed placement listed in the order it was drawn,
+ * which is the order the ground was composited in, so a reader of the list is
+ * reading what is over what.
+ *
+ * Each entry is a row of four things: a press that selects the placement, its
+ * own name - typed over the type's label, which the field shows until there is
+ * one - and the two boxes that hide it from the canvas and lock it against
+ * Select and Erase.
+ *
+ * `selectable` is false for a hidden or a locked placement, which is the whole
+ * of what those two do to a pick: the row is still the place to show it again
+ * or to unlock it, and it does not pick up something that is not on the canvas
+ * or has been locked against being picked up.
+ *
+ * Folded shut it carries its count and no entries, so a canvas with 300
+ * placements on it costs a heading until the list is opened.
+ */
+function outlinerSection(state, open = false) {
+    const placements = state?.placements ?? [];
+    const picked = pickedIndex(state);
+
+    return {
+        id: OUTLINER_SECTION,
+        kind: DOCK_OUTLINER,
+        heading: `${OUTLINER_HEADING} (${placements.length})`,
+        holder: null,
+        open,
+        folds: true,
+        rows: [],
+        entries: open ? placements.map((placement, index) => ({
+            index,
+            label: placementName(placement),
+            name: placementNamed(placement, ''),
+            hidden: placementHidden(placement),
+            locked: placementLocked(placement),
+            live: index === picked,
+            selectable: placementSelectable(state, index),
+            limit: PLACEMENT_NAME_LIMIT
+        })) : []
+    };
+}
+
 /** One section of the dock: a heading, the holder its rows write, and the rows - none while it is folded. */
 function dockSection(id, kind, heading, ranges, holder, context, open = true) {
     return {
@@ -860,5 +979,9 @@ function dockSection(id, kind, heading, ranges, holder, context, open = true) {
  */
 export function canvasElements(environment, state) {
     const world = state?.world?.length > 0 ? worldPlacements(state) : environmentElements(environment, false);
-    return [...world, ...builtPlacements(state)];
+    // A hidden placement is left out here and nowhere else: this is what the
+    // canvas is drawn from, and `builtWorld` - what a flight and a file are
+    // drawn from - keeps it, so hiding is a building aid rather than a change
+    // to the world.
+    return [...world, ...builtPlacements(state).filter(placement => !placementHidden(placement))];
 }

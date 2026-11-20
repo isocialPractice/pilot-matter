@@ -13,7 +13,7 @@
  *       "savedAt": "2026-11-05T12:00:00.000Z",
  *       "base": "highlands",
  *       "elements": [ { "id": "mountain-0", "type": "mountain", "config": {} } ],
- *       "placements": [ { "type": "mountain", "config": { "at": [0, 0] }, "seed": 7 } ],
+ *       "placements": [ { "type": "mountain", "config": { "at": [0, 0] }, "seed": 7, "name": "North Peak" } ],
  *       "start": { "at": [1200, -800], "heading": 90, "heightFeet": 1000 },
  *       "plane": "bush"
  *     }
@@ -21,6 +21,12 @@
  * `start` and `plane` are the world's own flight, and either may be left out:
  * a world with no start point opens where every world does, and one with no
  * plane is flown in the trainer.
+ *
+ * A placement may carry the outliner's three fields - its own `name`, and
+ * `hidden` or `locked` - and each is left out where it is not set, so a world
+ * nobody has worked through the outliner writes exactly what it always wrote.
+ * They are building aids rather than description, and they are in the file
+ * because a world opened again should be the world as it was being worked on.
  *
  * `schemas/environment.schema.json` is the same format as JSON Schema, for
  * whoever writes one of these by hand or by another program.
@@ -49,6 +55,7 @@ import { isPlaneId } from './planes.js';
 import { readAsset, assetForFile, assetsUsed, refAsset, ASSET_FILE_LIMIT } from './asset-fit.js';
 import { OBJECT_TYPE, OBJECT_RANGES } from './objects.js';
 import { readRecipe } from './prefabs.js';
+import { cleanPlacementName, PLACEMENT_NAME_LIMIT } from './outliner.js';
 
 /** What a file says it is, so a JSON file that is something else is refused by name. */
 export const ENVIRONMENT_FORMAT = 'pilot-matter.environment';
@@ -391,6 +398,21 @@ function readPlacement(placement, where, problems, groups) {
         if (read[key] != null && !isFootprint(read[key])) problems.push(`${where}: ${key} is not a region`);
     }
     if (read.seed != null && !Number.isFinite(read.seed)) problems.push(`${where}: seed is not a number`);
+
+    // The outliner's three. A name is held to its length the way a world's is,
+    // and either box has to be the one value it is ever written as: a `false`
+    // in a file is a box that was turned off, which is written by leaving the
+    // field out, so it is refused rather than read as off.
+    if (read.name != null) {
+        if (typeof read.name !== 'string') problems.push(`${where}: name is not text`);
+        else if (read.name.trim().length > PLACEMENT_NAME_LIMIT) problems.push(`${where}: name is longer than ${PLACEMENT_NAME_LIMIT} characters`);
+        else if (cleanPlacementName(read.name) === '') delete read.name;
+        else read.name = cleanPlacementName(read.name);
+    }
+    for (const box of ['hidden', 'locked']) {
+        if (read[box] == null) continue;
+        if (read[box] !== true) problems.push(`${where}: ${box} is true or is left out`);
+    }
 
     const config = read.config ?? {};
     if (config.at != null && resolvePoint(config.at) == null) problems.push(`${where}: at is not a point`);

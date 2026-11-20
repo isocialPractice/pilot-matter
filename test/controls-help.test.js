@@ -18,7 +18,8 @@ import {
     buildHelpLines
 } from '../js/controls-help.js';
 import { CANVAS_LEAVE_KEYS, PICKER_CLOSE_KEYS } from '../js/build-mode.js';
-import { CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS } from '../js/build-camera.js';
+import { CAMERA_GESTURES, BUILD_MOVE_KEYS, REFRAME_KEYS, FRAME_KEYS } from '../js/build-camera.js';
+import { historyKey, UNDO_COMBOS, REDO_COMBOS } from '../js/build-history.js';
 import { PHOTO_KEY } from '../js/photo.js';
 import { MENU_SELECT_KEYS } from '../js/menu.js';
 import { SETTINGS_OPEN_KEYS } from '../js/settings.js';
@@ -230,11 +231,23 @@ test('every key row of the builder list is a key some builder handler reads', ()
         'and the view is moved by the keys the frame reads, in the order they are read out');
 
     const read = new Set([
-        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS, ...MENU_SELECT_KEYS, ...SETTINGS_OPEN_KEYS,
+        ...CANVAS_LEAVE_KEYS, HELP_KEY, PHOTO_KEY, ...REFRAME_KEYS, ...FRAME_KEYS, ...MENU_SELECT_KEYS, ...SETTINGS_OPEN_KEYS,
         ...Object.values(BUILD_MOVE_KEYS).flat()
     ]);
     for (const row of BUILD_HELP_ROWS.filter(row => row.keys)) {
         for (const code of row.keys.flat()) assert.ok(read.has(code), `${code} on the ${row.id} row is read by nothing`);
+    }
+
+    // The history's rows carry whole combinations rather than codes, so they
+    // are held to the tables `historyKey` reads them off.
+    const combos = Object.fromEntries(BUILD_HELP_ROWS.filter(row => row.combos).map(row => [row.id, row.combos]));
+    assert.deepEqual(combos, { undo: UNDO_COMBOS, redo: REDO_COMBOS },
+        'the list names the combinations the handler reads, and no others');
+    for (const [id, list] of Object.entries(combos)) {
+        for (const combo of list) {
+            assert.equal(historyKey({ code: combo.code, ctrlKey: combo.ctrl, shiftKey: combo.shift }), id,
+                `${combo.code} on the ${id} row is read by nothing`);
+        }
     }
 });
 
@@ -263,6 +276,9 @@ test('the builder list reads as the input and then what it does', () => {
         'Wheel - Zoom',
         'W/A/S/D or ↑/←/↓/→ - Move',
         'Home - Reframe',
+        'F - Frame the Selection',
+        'Ctrl+Z - Undo',
+        'Ctrl+Shift+Z or Ctrl+Y - Redo',
         'Click (Select) - Pick a Built Element',
         'Drag (Lasso) - Draw a Selection, or Within One',
         'Shift+Drag (Lasso) - Add to the Selection',

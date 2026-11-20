@@ -263,6 +263,21 @@ function stepped(range, value) {
     return Number(value.toFixed(rangePlaces(range)));
 }
 
+/**
+ * A value put on the nearest multiple of `step`, or left alone for a step of
+ * nothing - which is how a switch that is off is written.
+ *
+ * It is the value that is snapped and never the drag: a placement is put on
+ * the grid wherever it was before, so one dropped between two lines lands on a
+ * line at the first snapped drag rather than keeping its offset for ever.
+ * `|| 0` so a multiple a hair below zero is written 0 and not -0.
+ */
+export function snapTo(value, step = 0) {
+    const size = Number(step);
+    if (!(size > 0)) return value;
+    return Math.round(Number(value) / size) * size || 0;
+}
+
 function clamp(value, low, high) {
     return Math.min(Math.max(value, low), high);
 }
@@ -312,8 +327,13 @@ export function scaleSpan(pair, factor, range) {
  *   the placement's scale handles are bound to, by the same factor.
  *
  * `size` is the canvas's width, which a point is kept inside, wrapping round.
+ *
+ * `snap` is what the drag lands on - `{ grid, angle }`, in world units and in
+ * degrees, each 0 for off, as `buildSnapSteps` answers it. It reaches the
+ * moves and the turns and nothing else: a size is read against a range's own
+ * bounds and a grid has nothing to say about it.
  */
-export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) {
+export function dragHandle(placement, handleOrId, drag = {}, { size = 0, snap = {} } = {}) {
     const handle  = typeof handleOrId === 'string' ? gumballHandle(handleOrId) : handleOrId;
     const binding = handleBinding(handle, placement);
     if (binding == null) return null;
@@ -332,8 +352,10 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
         }
 
         const centre = gumballCentre(placement);
-        const x = keepOnCanvas(centre.x + dx, size);
-        const z = keepOnCanvas(centre.z + dz, size);
+        // Snapped before the canvas holds it, so a point carried off an edge
+        // comes in on the grid rather than a grid step from it.
+        const x = keepOnCanvas(snapTo(centre.x + dx, snap.grid), size);
+        const z = keepOnCanvas(snapTo(centre.z + dz, snap.grid), size);
         // A placed runway is held wholly on the canvas, where its strip is.
         const [px, pz] = isGroup(placement) ? keepStripOnCanvas([x, z], groupReach(placement), size) : [x, z];
         if (binding.from === 'point') changes.config.at = [Math.round(px) || 0, Math.round(pz) || 0];
@@ -381,12 +403,16 @@ export function dragHandle(placement, handleOrId, drag = {}, { size = 0 } = {}) 
         // A heading turns the way a box's angle does, in whole degrees round
         // the card.
         const heading = (Number(placement.config?.heading) || 0) + (Number(drag.turn) || 0) * 180 / Math.PI;
-        changes.config.heading = ((Math.round(heading) % 360) + 360) % 360;
+        changes.config.heading = ((Math.round(snapTo(heading, snap.angle)) % 360) + 360) % 360;
         return changes;
     }
 
     if (binding.mode === 'turn') {
-        const angle = (Number(placement.footprint.angle) || 0) + (Number(drag.turn) || 0);
+        // A footprint's angle is in radians and the snap is in degrees, so the
+        // snap is the one converted: the angles offered divide a quarter turn,
+        // and a radian step worked out from them would not land on them.
+        const turned = (Number(placement.footprint.angle) || 0) + (Number(drag.turn) || 0);
+        const angle = snap.angle > 0 ? snapTo(turned * 180 / Math.PI, snap.angle) * Math.PI / 180 : turned;
         changes.footprint = { ...placement.footprint, angle };
         return changes;
     }
