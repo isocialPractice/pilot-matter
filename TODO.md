@@ -17,36 +17,98 @@ The work queued for the next run, copied here from the roadmap sections below.
 Each item carries a nested `From:` line recording the section it came from, so
 its context survives being archived.
 
-- [ ] **Undo and redo**: `Ctrl+Z` takes back the last change to the world - a
-  placement added, moved, stepped or erased, a start point set or a plane
-  chosen - and `Ctrl+Shift+Z` or `Ctrl+Y` puts it back, with UNDO and REDO on
-  the dock's bar
-  - A capped history of the session's world, a step pushed when an edit is
-    accepted rather than at every move of a drag, so one gumball drag is one
-    step; cleared when a world is loaded or the canvas opened afresh. A test
-    walks a session through add, move, erase, undo and redo and expects each
-    world back as it was.
+- [ ] **Select more than one**: `Shift+Click` adds a placement to the
+  selection or takes it out, a drag on empty ground draws a marquee that
+  selects what it reaches, and the gumball moves, turns and scales the
+  selection about its middle as one
+  - The dock shows the rows the selection's placements share, a change applied
+    to each. Erase and the outliner act on the whole selection. Shift already
+    places a road free under Insert City; the two never meet, since Select is
+    its own tool.
+  - After: The outliner
   - From: Interactive Build Mode `->` Editor Workflow
-- [ ] **The outliner**: a folding OUTLINER section in the dock listing every
-  placement by name and type in the order drawn, where a row selects its
-  placement, renames it, hides it from the canvas while building, or locks it
-  against Select and Erase
-  - Hidden and locked are building aids: a hidden placement is still flown,
-    and both are saved in the file so a reopened world keeps them.
-  - After: Undo and redo, so a rename or a lock is a step like any other
+- [ ] **Duplicate, copy and paste**: `Alt` held while dragging the gumball
+  leaves a copy behind, as engines' editors do; `Ctrl+C` and `Ctrl+V` copy the
+  selection and paste it under the pointer; `Delete` takes the selection away
+  - A copy is a new placement with an id of its own and its name numbered; a
+    pasted road snaps as a placed one does.
+  - After: Select more than one
   - From: Interactive Build Mode `->` Editor Workflow
-- [ ] **Snapping**: a grid and an angle the gumball's moves and turns snap to,
-  switched on the dock's bar with their sizes in the builder settings - 10 m
-  and 15 degrees to start - the grid drawn faintly round the pointer while it
-  is on
-  - From: Interactive Build Mode `->` Editor Workflow
-- [ ] **Frame the selection**: `F` turns and moves the builder's camera to
-  frame the selection, or the whole world when nothing is selected, as
-  engines' editors do
-  - Check `F` against the key map and the reserved keys first: the builder
-    reads its keys only while it is open, but a key the flight binds must not
-    mean two things.
-  - From: Interactive Build Mode `->` Editor Workflow
+- [ ] **A world's own settings**: a WORLD section of the SAVE / LOAD dock
+  setting the time of day a world is flown at and whether the day turns, its
+  weather, its fog and its sea level, written to the environment file and
+  applied when it is flown
+  - Today these come from the pilot's settings alone. A world naming one
+    outranks the setting for that world, and the Settings screen says so on
+    each row it overrides.
+  - From: Interactive Build Mode `->` Starter Worlds
+
+### UI/UX Override - the editor workflow's four additions
+
+#### Found Issues
+
+- [ ] The outliner's row controls are under a fingertip on a touch phone
+  - **Issue**: on an emulated touch phone the row's select press measures
+    18 x 19 CSS pixels and the `H` and `L` boxes 22 x 18, against the roughly
+    44 px a fingertip needs. `index.html` already answers a coarse pointer -
+    its `@media (pointer: coarse)` block lifts `.dock-spin` to 22 px wide and
+    `.dock-field .dock-value` to a 32 px minimum height - but the outliner's
+    controls, added this turn, were not named in it. A tap driven at the exact
+    centre works, so this is reach rather than function.
+  - **Goal**: Resolve to [outliner-touch-targets.prompt.md](.claude/prompts/outliner-touch-targets.prompt.md)
+  - From: UI/UX Override - the editor workflow's four additions
+- [ ] Two unnamed placements of a kind read identically in the outliner
+  - **Issue**: a row never named shows its type alone, so two mountains are
+    two rows both reading `MOUNTAIN` with nothing on either to tell them
+    apart - not an index, not a count, not where each stands. Pressing a row's
+    `▸` lights it on the canvas, which is the only way to tell which is which,
+    and that is a press per row on a list that exists to save them.
+  - **Goal**: give an unnamed row something of its own - the simplest is to
+    number the duplicates of a type as they are listed, `MOUNTAIN 1`,
+    `MOUNTAIN 2`, drawn as the placeholder so a typed name still replaces it
+    whole and nothing is written into the placement. `placementNamed` in
+    `js/outliner.js` takes the fallback, and `outlinerSection` in
+    `js/build-panel.js` is where the rows are built and knows the whole list.
+  - From: UI/UX Override - the editor workflow's four additions
+- [ ] A dimmed `UNDO` never says why it cannot be pressed
+  - **Issue**: `canUndoBuild` is false both when there is nothing to go back
+    to and when an edit is in hand - `historyReady` requires `!editPending` -
+    and the button looks the same either way: `disabled`, opacity 0.35, with
+    no `title`, no `aria-label` and no status line anywhere on the dock. With
+    a mountain dropped and not yet accepted, `UNDO` is dimmed while the
+    history holds a step, and nothing on screen connects the two.
+  - **Goal**: give the bar's two steps a `title` that names the reason, the
+    way `.dock-outliner-pick` already carries `Select MOUNTAIN` - "Accept or
+    cancel the edit first" while a draft is pending, "Nothing to undo" while
+    the history is empty. `dockBar` in `js/build-panel.js` already asks
+    `canUndoBuild` and `canRedoBuild`, so it is the place that knows which of
+    the two it is; `panel-view.js` draws the button.
+  - From: UI/UX Override - the editor workflow's four additions
+- [ ] The bar's two switches read as two more steps until one is turned on
+  - **Issue**: `UNDO`, `REDO`, `GRID` and `ANGLE` share one class and one
+    resting look. With a step to go back to and both snaps off, all four draw
+    the same - same background, same border, same colour - so nothing says
+    that two of them do something once and two of them stay on. A snap that
+    is on lights green, which tells the pilot afterwards rather than before.
+  - **Goal**: mark the two switches as switches at rest, not only when lit -
+    a different border or a small state mark on `GRID` and `ANGLE`, or a
+    divider between the pair of steps and the pair of switches. They are
+    already separable in the data: `DOCK_SNAP_GRID` and `DOCK_SNAP_ANGLE`
+    carry a `snap` field and the two steps do not, and `dockBar` writes
+    `pressed` for the switches and leaves it off the steps.
+  - From: UI/UX Override - the editor workflow's four additions
+- [ ] A long name cannot be read in the field it is left in
+  - **Issue**: the name field is 203 px on a desktop dock and holds up to
+    `PLACEMENT_NAME_LIMIT` 40 characters. A 35 character name overflows it -
+    `scrollWidth` past `clientWidth` - and the input carries no `title`, so
+    once focus leaves there is no way to read the whole name without clicking
+    into the field and scrolling it. The outliner's point is telling rows
+    apart, which a name half of which is cut does less well.
+  - **Goal**: set the field's `title` to the name it holds as it is drawn, in
+    `drawOutlinerRow` in `js/panel-view.js`, so hovering reads the whole of
+    it; the `aria-label` there is the type's `"<TYPE> name"` and should stay
+    as it is.
+  - From: UI/UX Override - the editor workflow's four additions
 
 ## Game UI/UX
 
@@ -279,49 +341,10 @@ record.
 ### Editor Workflow
 
 The habits every game engine's level editor shares, which the builder still
-lacks.
-
-- [ ] **Undo and redo**: `Ctrl+Z` takes back the last change to the world - a
-  placement added, moved, stepped or erased, a start point set or a plane
-  chosen - and `Ctrl+Shift+Z` or `Ctrl+Y` puts it back, with UNDO and REDO on
-  the dock's bar
-  - A capped history of the session's world, a step pushed when an edit is
-    accepted rather than at every move of a drag, so one gumball drag is one
-    step; cleared when a world is loaded or the canvas opened afresh. A test
-    walks a session through add, move, erase, undo and redo and expects each
-    world back as it was.
-- [ ] **The outliner**: a folding OUTLINER section in the dock listing every
-  placement by name and type in the order drawn, where a row selects its
-  placement, renames it, hides it from the canvas while building, or locks it
-  against Select and Erase
-  - Hidden and locked are building aids: a hidden placement is still flown,
-    and both are saved in the file so a reopened world keeps them.
-  - After: Undo and redo, so a rename or a lock is a step like any other
-- [ ] **Select more than one**: `Shift+Click` adds a placement to the
-  selection or takes it out, a drag on empty ground draws a marquee that
-  selects what it reaches, and the gumball moves, turns and scales the
-  selection about its middle as one
-  - The dock shows the rows the selection's placements share, a change applied
-    to each. Erase and the outliner act on the whole selection. Shift already
-    places a road free under Insert City; the two never meet, since Select is
-    its own tool.
-  - After: The outliner
-- [ ] **Duplicate, copy and paste**: `Alt` held while dragging the gumball
-  leaves a copy behind, as engines' editors do; `Ctrl+C` and `Ctrl+V` copy the
-  selection and paste it under the pointer; `Delete` takes the selection away
-  - A copy is a new placement with an id of its own and its name numbered; a
-    pasted road snaps as a placed one does.
-  - After: Select more than one
-- [ ] **Snapping**: a grid and an angle the gumball's moves and turns snap to,
-  switched on the dock's bar with their sizes in the builder settings - 10 m
-  and 15 degrees to start - the grid drawn faintly round the pointer while it
-  is on
-- [ ] **Frame the selection**: `F` turns and moves the builder's camera to
-  frame the selection, or the whole world when nothing is selected, as
-  engines' editors do
-  - Check `F` against the key map and the reserved keys first: the builder
-    reads its keys only while it is open, but a key the flight binds must not
-    mean two things.
+lacks. Four of its six are built - undo and redo, the outliner, snapping and
+framing the selection - and the last two, multi-select and duplicating, were
+queued into `## Current` on 11.20.2026, so the section stands empty as the
+record of that area of work.
 
 ### Sculpt Environment
 
@@ -439,15 +462,12 @@ tool after them needs all three; the tools are in the order they are most used.
 
 Worlds shipped with the simulator as environment files, built with the
 builder's own tools, so a pilot has something to fly and to take apart on the
-first day - and the quest mode's towns and airports are ready for it.
+first day - and the quest mode's towns and airports are ready for it. The
+first of them, a world's own settings, was queued into `## Current` on
+11.20.2026, ahead of the sculpt tools the three worlds themselves are laid
+with - it is the file and the dock rather than content, so it needs none of
+them.
 
-- [ ] **A world's own settings**: a WORLD section of the SAVE / LOAD dock
-  setting the time of day a world is flown at and whether the day turns, its
-  weather, its fog and its sea level, written to the environment file and
-  applied when it is flown
-  - Today these come from the pilot's settings alone. A world naming one
-    outranks the setting for that world, and the Settings screen says so on
-    each row it overrides.
 - [ ] **Starter worlds on SAVE / LOAD**: a STARTER WORLDS list on the SAVE /
   LOAD dock and the Settings environment rows, reading environment files
   shipped under `worlds/` - each with its name, a line saying what it is and a
@@ -618,70 +638,8 @@ in place, and the pruning item says which ones those were.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 433 earlier items in `TODO-archive.md`, newest last.
+> 437 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Kept builds survive a reload**: the world ACCEPT AND EXIT keeps - its
-  placements, start point, plane and the assets it uses - written to IndexedDB
-  beside the asset library and put back when the page opens, so the world
-  flown after a reload is still the one built
-  - Today it lives only in the page, and closing the tab loses it unless it was
-    saved to a file. Keep one world, the last kept, under a key of its own in
-    the `pilot-matter` database `js/asset-store.js` opens, read before the
-    first tile is drawn; the Settings environment row says the world flown is
-    the kept one, with a way back to the preset.
-  - **Settled**: a `worlds` store beside `assets` in the `pilot-matter`
-    database, at version 2, holding the one last-kept world as the text of its
-    environment file - read back through `readEnvironmentDocument`, so a world
-    a later version would refuse in a file is refused here too. IndexedDB is
-    answered after the page is up rather than before the first tile, as the
-    asset library already is, so the world arrives while the title is holding
-    and the ground is laid again under it. The chosen preset's row reads
-    `BUILT_WORLD_NOTE` while a build is on it, and pressing it again releases
-    the build - the one environment press that used to answer nothing.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **The Matter API stands objects**: `createEnvironment` and
-  `createTiledEnvironment` in `js/api/matter.js` stand a world's objects and
-  roads as the simulator does, and answer `obstacleTop` for them, so a host
-  loading a built world gets its buildings as well as its ground
-  - Today the API draws a world's ground and leaves its objects out, so a
-    host's aircraft flies through a city it cannot see. Reuse
-    `standingObjects` and `objectGroup`; an `objects: false` option keeps
-    today's drawing for a host that stands its own. A worked example in
-    `docs/api.md` loads a built world's file under an external aircraft.
-  - **Settled**: `generate` now puts a description through the same three
-    steps `buildEnvironment` does - groups expanded, erasures resolved,
-    objects left out of the field - which is what the goal needed and more
-    than it asked: before it, a built world's first object, template or erase
-    batch threw `Unknown environment element` rather than being quietly left
-    out. `objects` and `obstacleTop(x, z)` are on the world and on an
-    assembly, and `OBJECT_REACH` moved to `js/objects.js` so the tiles and an
-    assembly read one figure.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Roof Occlusion**: **Select picks a roof**: a click on an object picks it by the object's
-  own bounds under the pointer rather than by the ground point the pointer's
-  ray meets, so a tall building is picked where it is seen
-  - The ray ends on the ground today, so a click on a tower's upper floors
-    picks whatever stands on the ground behind it, or nothing. Test the ray
-    against each object's turned and scaled `recipeBounds`, nearest first,
-    before the ground.
-  - **Settled**: `objectBox`, `rayEntersBox` and `objectRayAt` in
-    `js/build-select.js`, asked by `pickPlacementAt` in `js/main.js` before
-    the ground and by the hover through the same call. The ground under a
-    footprint is read once, by `footprintGround`, so the box is where the
-    building was drawn.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Opening Lever**: **Every plane opens flying**: each plane in `js/planes.js` starts a
-  flight at the start point above its own stall speed and trimmed level,
-  rather than the jet opening slightly stalled
-  - Give each recipe its own start speed and trim, held by a test that steps
-    every plane a few seconds from the start point and expects it neither
-    stalled nor sinking.
-  - **Settled**: a `startSpeed` per recipe, raised to as a floor rather than
-    replacing the pilot's `START AIRSPEED`, with the throttle raised to hold
-    it and the trim worked out from the plane's own figures. `planeStart` is
-    applied in `Aircraft.startState`, where the start is read, so a plane
-    chosen under a start nobody touched is flown on its own figures.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
 - [x] **A pick reaches a summit narrower than the sampling**: `pickGround`
   finds the ground under the pointer on a region too small to raise more than
   one vertex, rather than stepping over it onto the flat ground beyond
@@ -862,3 +820,76 @@ how the simulator got here rather than as a list still to be worked.
     same figure for all five planes; the assertion that read as a general rule
     now says that, and two tests either side of the floor hold the rest.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] **Undo and redo**: `Ctrl+Z` takes back the last change to the world - a
+  placement added, moved, stepped or erased, a start point set or a plane
+  chosen - and `Ctrl+Shift+Z` or `Ctrl+Y` puts it back, with UNDO and REDO on
+  the dock's bar
+  - A capped history of the session's world, a step pushed when an edit is
+    accepted rather than at every move of a drag, so one gumball drag is one
+    step; cleared when a world is loaded or the canvas opened afresh. A test
+    walks a session through add, move, erase, undo and redo and expects each
+    world back as it was.
+  - **Settled**: `js/build-history.js` holds the stack and the key
+    combinations; `markBuildEdit` in `js/build-mode.js` pushes a snapshot of
+    `worldSnapshot` before every settled edit, which is `acceptDraft` for
+    everything made through a draft and the start point and plane writes for
+    what is not. A sequence of writes that is one act - a knob dragged round -
+    shares a `run` and pushes once. `UNDO` and `REDO` are the first two of the
+    dock's new bar, `dockBar`, which is on every panel on a canvas and is why
+    `dockContent` no longer answers null there. Fifty steps, emptied when a
+    canvas opens or a world is loaded over one, and forgotten when an asset is
+    removed - a step back across that would put back placements referring to a
+    model nothing can draw.
+  - From: Interactive Build Mode `->` Editor Workflow
+- [x] **The outliner**: a folding OUTLINER section in the dock listing every
+  placement by name and type in the order drawn, where a row selects its
+  placement, renames it, hides it from the canvas while building, or locks it
+  against Select and Erase
+  - Hidden and locked are building aids: a hidden placement is still flown,
+    and both are saved in the file so a reopened world keeps them.
+  - After: Undo and redo, so a rename or a lock is a step like any other
+  - **Settled**: the three fields are `js/outliner.js`, a pure module with no
+    imports so `js/environment/erase.js` can read a lock without importing the
+    dock. The section is `outlinerSection` in `js/build-panel.js`, above what
+    Select is looking at, and its rows are drawn by `drawOutlinerRow` in
+    `js/panel-view.js`: a press, a name field over the type's label, and `H`
+    and `L`. Hiding is read in `canvasElements` and nowhere else, so a hidden
+    placement is off the canvas and still in what a flight and a file are drawn
+    from; a lock is read in `resolveErasures` and `erasedObjects`, live, so it
+    lifts the cut a batch was making and unlocking puts it back. Neither is
+    pickable - `placementReach` answers nothing for one - and a row that turns
+    either box on lets go of the pick. All three are carried in the file and
+    named in the schema, and each is a step of the history.
+  - From: Interactive Build Mode `->` Editor Workflow
+- [x] **Snapping**: a grid and an angle the gumball's moves and turns snap to,
+  switched on the dock's bar with their sizes in the builder settings - 10 m
+  and 15 degrees to start - the grid drawn faintly round the pointer while it
+  is on
+  - **Settled**: the switches are the session's (`buildSnap`,
+    `toggleBuildSnap`) and the sizes the builder's settings' (`GRID SIZE` and
+    `ANGLE SIZE` under a new `SNAPPING` heading); `buildSnapSteps` is where the
+    two meet, and `dragHandle` takes what it answers. It reaches the moves and
+    the turns and no size: a range is read against its own bounds. A
+    footprint's angle is snapped in degrees and written back in radians, since
+    the angles offered divide a quarter turn. The grid is `snapGridRuns`, read
+    off the point snapped to it so it stands still across a cell, and drawn at
+    `snapGridStep` - the first doubling of the step whose cell covers twelve
+    screen pixels, because Chromium measured the step itself at 36 lit pixels
+    from the opening view.
+  - From: Interactive Build Mode `->` Editor Workflow
+- [x] **Frame the selection**: `F` turns and moves the builder's camera to
+  frame the selection, or the whole world when nothing is selected, as
+  engines' editors do
+  - Check `F` against the key map and the reserved keys first: the builder
+    reads its keys only while it is open, but a key the flight binds must not
+    mean two things.
+  - **Settled**: `KeyF` was checked and is free - not a reserved key, not in
+    `DEFAULT_KEYMAP`, `RESET_KEYS` or `LEVEL_OFF_KEYS`, and none of the keys a
+    canvas already reads - and it is left unreserved for the same reason
+    `W/A/S/D` are, the builder reading its keys only while it is open.
+    `framedBounds` in `js/build-select.js` says what is framed, through a new
+    `placementBounds` that squares off a footprint, a peak's ellipse, a group's
+    strips or an object's box; `frameBuildCamera` moves the target and the
+    distance and leaves the angles, which is the whole difference between it
+    and `Home`. `Ctrl+F` is still the browser's find.
+  - From: Interactive Build Mode `->` Editor Workflow
