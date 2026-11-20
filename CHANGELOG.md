@@ -5,6 +5,126 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.1.67.0] - 2026-11-20
+
+The editor workflow the builder was missing: a world that can be taken back,
+a list of what is on the canvas, a grid and an angle to land on, and a view
+that frames what is selected.
+
+### Added
+
+- **Undo and redo.** `Ctrl+Z` takes back the last change to the world and
+  `Ctrl+Shift+Z` or `Ctrl+Y` puts it back, with `UNDO` and `REDO` on the dock's
+  new bar, each pressable exactly when there is a step to take. What is
+  remembered is the world rather than the act - the placements committed, the
+  environment's own rows, the start point and the plane - so a step back is
+  that world put back, and nothing has to be written in reverse for each tool
+  that arrives. **A step is pushed when an edit is settled, never while it is
+  being made**: the gumball writes the draft on every pointer move and the
+  draft is not the world, so one drag of a handle is one step however many
+  moves it was made of, and an edit cancelled is no step at all - nor is a pick
+  accepted without having been touched, which puts the placement back exactly
+  as it was committed and so changes nothing to go back to. A start point
+  dragged round by its knob is one step for the drag. The history reaches fifty
+  steps back, is empty when a canvas opens and when a world is loaded over one,
+  and is forgotten when an asset is removed from the canvas - a step back
+  across that would put back placements referring to a model nothing can draw.
+  A step is refused with an edit in hand, which is work the pilot has not
+  settled either way, and under a question; a pick nothing has been done to is
+  not an edit, and a step lets go of it.
+- **The dock's bar.** The answers that belong to the session rather than to
+  whatever the panel is pointed at - the two histories and the two snaps -
+  pinned under the heading, in the same place with every tool. A tool with no
+  panel of its own yet shows its heading over the bar rather than nothing at
+  all, which is what makes the session's answers reachable while a stroke tool
+  is live.
+- **The outliner.** A folding `OUTLINER` section above what Select is looking
+  at, listing every placement by the order it was drawn - which is the order
+  the ground was composited in, so a reader of the list is reading what is over
+  what. Each row is a press that picks the placement up, a field its own name
+  is typed into showing the type's label until there is one, and two boxes:
+  `H` hides it from the canvas while the world is being built, `L` locks it
+  against Select and Erase. Both are building aids and both are saved in the
+  file, so a world opened again is the world as it was being worked on.
+- **Snapping.** `GRID` and `ANGLE` on the bar, off when a canvas opens: with
+  `GRID` on every move of the gumball lands the placement on a grid, and with
+  `ANGLE` on every turn lands on a multiple of an angle. It is the value that
+  is snapped rather than the drag, so a placement dropped between two lines
+  lands on a line at the first snapped drag. Neither reaches a size. How far
+  apart and how far round are `GRID SIZE` and `ANGLE SIZE` under a new
+  `SNAPPING` heading in the builder's settings - 10 metres and 15 degrees to
+  start - because a size is set once and a switch is turned over while
+  building. While `GRID` is on the grid is drawn faintly round the pointer,
+  draped over the ground it lies on.
+- **Frame the selection.** `F` turns the view onto the placement picked with
+  `SELECT`, or onto the region the lasso has drawn, or onto everything built,
+  or - with none of those - onto the canvas itself, and stands as far back as
+  it takes to see across it. The angles do not move, which is the whole
+  difference between it and `Home`: the pilot has arranged a view they can work
+  in, and framing a thing in it should not take that away. `Ctrl` with it is
+  still the browser's find.
+
+### Changed
+
+- **A hidden placement is left out of what the canvas is drawn from and of
+  nothing else.** It is still in the world a flight and a file are drawn from,
+  so hiding a mountain takes it off the canvas rather than out of the world.
+- **A locked placement takes no cut from an erase batch.** The cut is weighed
+  when the ground is composited rather than when the stroke was laid, so the
+  lock reads live: it lifts the cut a batch was making, and unlocking puts it
+  back. That is what makes a lock reversible, which a building aid has to be.
+- **Neither a hidden nor a locked placement is picked.** Its reach covers
+  nothing, so a click on the canvas cannot find it and no outline is traced
+  round it; a row of the outliner will not pick it up either, and a row that
+  hides or locks the placement in hand lets go of it. The row is still where it
+  is shown or unlocked again.
+- **A placement may carry `name`, `hidden` and `locked` in an environment
+  file**, each written only where it is set, so a world nobody has worked
+  through the outliner writes exactly what it always wrote. A name longer than
+  40 characters, or either box written `false`, refuses the file by name;
+  `schemas/environment.schema.json` names all three.
+- **The snapping grid is drawn at the step the view can show.** Measured in
+  Chromium: at the opening view over a 16,000 unit canvas one screen pixel is
+  27 units, so a 10 metre grid six cells each way came to 36 lit pixels - a
+  speck nobody can use. It is now drawn at the first doubling of the step whose
+  cell covers twelve screen pixels, which at that distance is 640 units and
+  7,347 lit pixels. Every line drawn is still a line a snapped move lands on,
+  because a doubling of the step is on the grid; what a view from far out loses
+  is the lines between them, which it could not have drawn anyway. Drawing more
+  cells instead would have been wrong twice over - they would still be
+  sub-pixel, and each one costs a reading of the ground every frame.
+
+Held in Node by four new files - `test/build-history.test.js` (29 tests: the
+stack, the cap, the runs, the key combinations, and a session walked through
+add, move, erase, undo and redo expecting each world back as it was),
+`test/outliner.test.js` (27 tests: the three fields, what a hidden or a locked
+placement is out of, the dock's section, and the file and the schema),
+`test/snapping.test.js` (26 tests: the two sizes, the two switches, what a drag
+lands on, and the grid round the pointer) and `test/frame-selection.test.js`
+(20 tests: the key against every other the canvas reads, what a placement
+covers, what `F` frames, and where the camera lands) - with the builder's
+wiring pinned in `test/page.test.js` and the three new control rows carried
+into `CHEATSHEET.md`, `docs/cheatsheet.html` and `docs/controls/index.html` by
+`test/controls-help.test.js`.
+
+A mutation run over the four items put 44 defects back one at a time and the
+tests caught 43. The one they did not was the order the two key tables are
+asked in, and it is not a defect: `matches` reads the shift exactly, so
+`Ctrl+Shift+Z` is in both tables' key and in only one of their shifts, and the
+order carries no behaviour. The comment claiming it did has been corrected
+rather than a test written for something that is not true. The other miss the
+run found was real - a peak squared off by its radius alone, which every
+mountain in the suite had a stretch of 1 - and `test/frame-selection.test.js`
+now frames a girthed one.
+
+Settled in Chromium in 34 checks, the page served by `npm run serve` and
+`js/main.js` routed so its last line binds `window.__sim`: the bar drawn with
+every tool, a mountain built and taken back and brought forward by both the
+answers and all three key combinations, a row renaming, picking, hiding and
+locking its placement, the grid lit over the ground, the two sizes on the
+settings screen, and `F` closing the view on the pick from 15,200 units to
+2,013 with the angles the orbit left.
+
 ## [1.0.0-alpha.1.66.1] - 2026-11-19
 
 Three defects the review of the five gap closures found, and the two accounts

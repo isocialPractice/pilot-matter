@@ -48,6 +48,10 @@ import {
 import {
     DEFAULT_LASSO_TOOL, lassoTool, lassoToolBuilt, isSelection, combineSelection, coversGround, reshapeFootprint
 } from './lasso.js';
+import {
+    createHistory, clearHistory, pushHistory, endHistoryRun, stepBack, stepForward, canUndo, canRedo, historyDepth
+} from './build-history.js';
+import { placementHidden, placementLocked, withPlacementField } from './outliner.js';
 
 /**
  * The one name, on the menu entry and on the picker that entry opens. A pilot
@@ -219,7 +223,17 @@ export function createBuildState() {
         // The committed placement auto accept kept last, while nothing else
         // has been committed since, which the next draft it keeps can be
         // joined to. Null once anything else is committed.
-        kept: null
+        kept: null,
+        // What `Ctrl+Z` goes back to and `Ctrl+Shift+Z` comes forward to: a
+        // capped stack of snapshots of the session's world, as
+        // `js/build-history.js` holds one. Emptied whenever a canvas is
+        // opened - there is nothing before the world a canvas opens with.
+        history: createHistory(),
+        // Whether the gumball's moves and turns snap, each switched on the
+        // dock's bar. How far and how much is the builder's own settings,
+        // handed in where a drag is read - the session holds the switch and
+        // never the size, the way it holds no other preference.
+        snap: { grid: false, angle: false }
     };
 }
 
@@ -528,15 +542,24 @@ export function setBuildStartPoint(state, at) {
     if (!flightEditable(state)) return false;
     const point = placeStartPoint(at, state.start);
     if (point == null) return false;
+    markBuildEdit(state, START_RUN);
     state.start = point;
     return true;
 }
 
-/** Points the start point another way, as its knob is dragged round it. Refused with no start point. */
+/**
+ * Points the start point another way, as its knob is dragged round it. Refused
+ * with no start point.
+ *
+ * Read on every move of the drag, so its step belongs to the start point's own
+ * run: the world before the drag began is the one an undo puts back, and the
+ * moves after the first add no step.
+ */
 export function turnBuildStartPoint(state, heading) {
     if (!flightEditable(state) || state.start == null) return false;
     const turned = turnStartPoint(state.start, heading);
     if (turned.heading === state.start.heading) return false;
+    markBuildEdit(state, START_RUN);
     state.start = turned;
     return true;
 }
@@ -546,6 +569,7 @@ export function writeBuildStartPoint(state, point) {
     if (!flightEditable(state) || state.start == null) return false;
     const written = cleanStartPoint(point);
     if (written == null) return false;
+    markBuildEdit(state, START_RUN);
     state.start = written;
     return true;
 }
@@ -553,6 +577,7 @@ export function writeBuildStartPoint(state, point) {
 /** Takes the start point away, so the world starts where it always did. False with none to take. */
 export function clearBuildStartPoint(state) {
     if (!flightEditable(state) || state.start == null) return false;
+    markBuildEdit(state);
     state.start = null;
     return true;
 }
@@ -560,6 +585,7 @@ export function clearBuildStartPoint(state) {
 /** Chooses the plane the world is flown in. Refused for a plane there is not, and for the one already chosen. */
 export function chooseBuildPlane(state, id) {
     if (!flightEditable(state) || !flyable(state, id) || state.plane === id) return false;
+    markBuildEdit(state);
     state.plane = id;
     return true;
 }
@@ -718,6 +744,10 @@ export function selectPlacement(state, index = null) {
     const target = Number.isInteger(index) && index >= 0 && index < state.placements.length ? index : null;
     const picked = pickedIndex(state);
 
+    // A hidden or a locked placement is not pickable at all. A click on the
+    // canvas never finds one - its reach covers nothing - so this is the
+    // outliner's row being refused, which is the one other way in.
+    if (target != null && !placementSelectable(state, target)) return null;
     if (target != null && target === picked) return null;
     if (target == null && !draftPending(state)) return null;
 
@@ -997,7 +1027,16 @@ export function requestRemoveAsset(state, id) {
     return { confirm: REMOVE_ASSET };
 }
 
-/** The canvas with every placement - and its plane - that used an asset taken away. True where anything went. */
+/**
+ * The canvas with every placement - and its plane - that used an asset taken
+ * away. True where anything went.
+ *
+ * **The history goes with it**, rather than a step being pushed. The asset is
+ * gone from the library and from the computer, so a step back would put back
+ * placements referring to a model nothing can draw - a world the builder could
+ * not have kept. Forgetting is the honest answer: the undo stack cannot cross
+ * a point the world on the other side of it no longer exists at.
+ */
 export function removeAssetFromCanvas(state, id) {
     if (!buildModeDrawing(state)) return false;
     const before = state.placements.length;
@@ -1005,7 +1044,9 @@ export function removeAssetFromCanvas(state, id) {
     state.placements = world.placements;
     if ('plane' in world) state.plane = world.plane;
     if (state.assetChosen === id) state.assetChosen = null;
-    return state.placements.length !== before || 'plane' in world;
+    const went = state.placements.length !== before || 'plane' in world;
+    if (went) clearBuildHistory(state);
+    return went;
 }
 
 // --- Insert City -----------------------------------------------------------------
@@ -1333,6 +1374,7 @@ export function takeEyeDropperColor(state, rgb) {
 export function pickUpPlacement(state, index) {
     if (!buildModeDrawing(state) || confirmOpen(state) || draftPending(state)) return false;
     if (!Number.isInteger(index) || index < 0 || index >= state.placements.length) return false;
+    if (!placementSelectable(state, index)) return false;
 
     state.draft = { placement: own(state.placements[index]), replaces: index, tool: null };
     return true;
@@ -1360,11 +1402,25 @@ export function reviseDraft(state, { config, footprint } = {}) {
  * committed list; one standing on a committed placement takes that
  * placement's place, so a changed mountain is one mountain and not two.
  *
+ * This is where a step goes onto the history, and it is the only place a
+ * placement's own edits ever do: every tool's drawing and every drag of a
+ * handle writes the draft, and the draft becomes the world here. So one drag
+ * is one step, however many pointer moves it was made of.
+ *
+ * **An accept that changes nothing is no step**, the way a cancelled draft is
+ * none: a pick looked at and accepted puts back the placement exactly as it
+ * was committed, and `editPending` - the one reading the whole session makes
+ * of whether there is work in hand - is what tells the two apart. A step for
+ * it would be an `UNDO` lit with nothing to show for being pressed. The run is
+ * ended either way, since an accept is never part of one.
+ *
  * Returns the placement committed, or null when nothing was pending.
  */
 export function acceptDraft(state) {
     if (!draftPending(state)) return null;
 
+    if (editPending(state)) markBuildEdit(state);
+    else endBuildEditRun(state);
     rememberToolValues(state);
     // Anything committed this way ends the run auto accept was keeping, so
     // nothing kept after it is joined to what came before it.
@@ -1427,6 +1483,224 @@ export function worldRows(state) {
  */
 export function worldPlacements(state) {
     return (state?.world ?? []).map(row => ({ type: row.type, config: own(row.config ?? {}) }));
+}
+
+// --- Undo and redo -------------------------------------------------------------
+
+/**
+ * The run every write of the world's own flight belongs to - the start point
+ * placed, turned or typed - so a knob dragged round and then nudged on the
+ * dock's rows is one step rather than one per pointer move. See
+ * `js/build-history.js`.
+ */
+export const START_RUN = 'start';
+
+/**
+ * The world as a step of the history holds it: the committed placements, the
+ * environment's own rows, the start point and the plane, each copied.
+ *
+ * It is `sessionWorld` without the environment - a step never changes which
+ * canvas is being built on - and with `start` and `plane` always present, as
+ * null for none, because a step has to be able to put *back* the absence of a
+ * start point and a field left out would read as "leave it alone".
+ */
+export function worldSnapshot(state) {
+    if (!buildModeDrawing(state)) return null;
+    return {
+        placements: committedPlacements(state),
+        world: worldRows(state),
+        start: state.start ? { ...state.start, at: [...state.start.at] } : null,
+        plane: state.plane ?? null
+    };
+}
+
+/**
+ * Remembers the world as it stands, as the step `Ctrl+Z` goes back to. Called
+ * *before* the change it is a step for, by whatever is about to make it.
+ *
+ * `run` names a sequence of writes that is one step - see `START_RUN`. Called
+ * with none, every call is its own step and the run under way is ended.
+ *
+ * Refused off a canvas, and returns true when a step was pushed.
+ */
+export function markBuildEdit(state, run = null) {
+    if (!buildModeDrawing(state)) return false;
+    return pushHistory(state.history ??= createHistory(), worldSnapshot(state), run);
+}
+
+/** Ends the run under way, so the next write of that kind opens a step of its own. */
+export function endBuildEditRun(state) {
+    endHistoryRun(state?.history);
+    return state;
+}
+
+/** Everything forgotten - what an asset removed from the canvas leaves behind. */
+export function clearBuildHistory(state) {
+    clearHistory(state?.history);
+    return state;
+}
+
+/** How deep the history is either way: `{ past, future }`, which the dock's two answers read. */
+export function buildHistoryDepth(state) {
+    return historyDepth(state?.history);
+}
+
+/**
+ * True while there is a step to go back to, or to come forward to, and the
+ * session is in a state to take one.
+ *
+ * An edit in hand is what refuses it: the draft is not the world, so going
+ * back under one would drop work the pilot has not settled either way. A pick
+ * nothing has been done to is not an edit - that one is let go of, the way a
+ * click on bare ground lets go of it.
+ */
+export function canUndoBuild(state) {
+    return historyReady(state) && canUndo(state.history);
+}
+
+export function canRedoBuild(state) {
+    return historyReady(state) && canRedo(state.history);
+}
+
+function historyReady(state) {
+    return buildModeDrawing(state) && !confirmOpen(state) && !editPending(state);
+}
+
+/**
+ * One step back: the world as it stands goes onto the forward stack and the
+ * step before it is put back. Returns true when it moved.
+ *
+ * The pick is let go of, because the placement it stood on may not be there
+ * any more - and the selection is not, because a lasso's region is the
+ * session's rather than the world's and nothing a step holds describes it.
+ */
+export function undoBuild(state) {
+    if (!canUndoBuild(state)) return false;
+    return applySnapshot(state, stepBack(state.history, worldSnapshot(state)));
+}
+
+/** One step forward, the mirror of `undoBuild`. */
+export function redoBuild(state) {
+    if (!canRedoBuild(state)) return false;
+    return applySnapshot(state, stepForward(state.history, worldSnapshot(state)));
+}
+
+/**
+ * A step put back as the session's world. `dropped` is left where it is - the
+ * seed stream only ever counts on, so a placement undone and drawn again is
+ * drawn from a stream of its own rather than from the one the undone
+ * placement had.
+ */
+function applySnapshot(state, snapshot) {
+    if (snapshot == null) return false;
+
+    state.placements = snapshot.placements.map(own);
+    state.world = snapshot.world.map(own);
+    state.start = snapshot.start ? { ...snapshot.start, at: [...snapshot.start.at] } : null;
+    state.plane = snapshot.plane ?? null;
+    state.draft = null;
+    state.kept = null;
+    return true;
+}
+
+// --- Snapping ------------------------------------------------------------------
+
+/** The two things that can be snapped, as the dock's bar switches them. */
+export const SNAP_GRID  = 'grid';
+export const SNAP_ANGLE = 'angle';
+export const SNAP_KINDS = Object.freeze([SNAP_GRID, SNAP_ANGLE]);
+
+/** Which of the two are on: `{ grid, angle }`, both off off a canvas. */
+export function buildSnap(state) {
+    if (!buildModeDrawing(state)) return { grid: false, angle: false };
+    return { grid: state.snap?.grid === true, angle: state.snap?.angle === true };
+}
+
+/** Turns one of the two over. Refused off a canvas and for anything that is not one of them. */
+export function toggleBuildSnap(state, kind) {
+    if (!buildModeDrawing(state) || !SNAP_KINDS.includes(kind)) return false;
+    state.snap = { ...buildSnap(state), [kind]: !buildSnap(state)[kind] };
+    return true;
+}
+
+/**
+ * What a drag of a handle snaps to, as `js/gumball.js` reads it: `{ grid,
+ * angle }` in world units and in degrees, each 0 for a switch that is off.
+ *
+ * `sizes` is the builder's own settings - `builderSnapSizes` - handed in,
+ * because the session holds the switch and never the size: a preference is the
+ * editor's and no placement carries one.
+ */
+export function buildSnapSteps(state, sizes = {}) {
+    const on = buildSnap(state);
+    const grid = Number(sizes.grid);
+    const angle = Number(sizes.angle);
+    return {
+        grid: on.grid && Number.isFinite(grid) && grid > 0 ? grid : 0,
+        angle: on.angle && Number.isFinite(angle) && angle > 0 ? angle : 0
+    };
+}
+
+// --- The outliner's three fields -----------------------------------------------
+
+/**
+ * Writes one of a placement's outliner fields - its name, whether it is
+ * hidden, whether it is locked - on the committed placement at `index`.
+ *
+ * A step goes onto the history for it, so a rename or a lock is taken back the
+ * way a placement is: the item asked for exactly that, and the three are the
+ * only edits of the world that are not made through a draft.
+ *
+ * **Written on the draft as well when that placement is the one picked**,
+ * because the draft is a copy taken when it was picked and accepting it would
+ * otherwise write the copy back over the field just set. Turning *on* either
+ * box lets go of the pick instead: a placement that has just been hidden from
+ * the canvas, or locked against Select, is not one to leave a gumball standing
+ * on.
+ *
+ * Refused off a canvas, under a question, with an edit in hand, and for an
+ * index the committed list does not hold. Returns true when something changed.
+ */
+export function writePlacementField(state, index, field, value) {
+    if (!buildModeDrawing(state) || confirmOpen(state) || editPending(state)) return false;
+    if (!Number.isInteger(index) || index < 0 || index >= state.placements.length) return false;
+
+    const written = withPlacementField(state.placements[index], field, value);
+    if (JSON.stringify(written) === JSON.stringify(state.placements[index])) return false;
+
+    markBuildEdit(state);
+    state.placements[index] = written;
+    if (pickedIndex(state) !== index) return true;
+
+    if (placementHidden(written) || placementLocked(written)) state.draft = null;
+    else state.draft.placement = own(written);
+    return true;
+}
+
+/** Renames the committed placement at `index`, or takes its name away for an empty one. */
+export function renamePlacement(state, index, name) {
+    return writePlacementField(state, index, 'name', name);
+}
+
+/** Hides the committed placement at `index` from the canvas, or shows it again. */
+export function hidePlacement(state, index, hidden = true) {
+    return writePlacementField(state, index, 'hidden', hidden === true);
+}
+
+/** Locks the committed placement at `index` against Select and Erase, or unlocks it. */
+export function lockPlacement(state, index, locked = true) {
+    return writePlacementField(state, index, 'locked', locked === true);
+}
+
+/**
+ * The committed placements a row of the outliner may still select: one that is
+ * neither hidden nor locked, since a row that picked up something invisible or
+ * locked would be the one way round both.
+ */
+export function placementSelectable(state, index) {
+    const placement = state?.placements?.[index];
+    if (placement == null) return false;
+    return !placementHidden(placement) && !placementLocked(placement);
 }
 
 /** True for something shaped like a placement: a type, and a config if it has one. */
@@ -1520,6 +1794,11 @@ function openCanvas(state, environmentId, kept, world, flight = null) {
     state.camera = null;
     state.settingsOver = null;
     state.kept = null;
+    // A canvas opens with nothing behind it to go back to, which is as true of
+    // one a file was loaded over as of one begun from the picker: the world a
+    // load replaced is not a step of the world it brought.
+    clearHistory(state.history ??= createHistory());
+    state.snap = { grid: false, angle: false };
     state.start = cleanStartPoint(flight?.start);
     state.plane = isPlaneId(flight?.plane) || refAsset(flight?.plane) ? flight.plane : null;
     // The environment's own rows and flight as the canvas opened with them,
