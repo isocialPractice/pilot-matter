@@ -3777,8 +3777,13 @@ test('a held row on the element editor is drawn dimmed', () => {
 test('the dock scrolls its fields between a pinned heading, a pinned bar and pinned answers', () => {
     const dock = indexHtml.match(/<aside id="build-dock"[^>]*>([\s\S]*?)<\/aside>/);
     assert.ok(dock, 'index.html should carry the dock');
-    assert.match(dock[1], /^\s*<h3 data-dock="heading"><\/h3>\s*<div id="build-dock-bar" data-dock="bar"[^>]*><\/div>\s*<div id="build-dock-fields" data-dock="fields"><\/div>\s*<div id="build-dock-actions" data-dock="actions"><\/div>\s*$/,
-        'heading, the bar, then the fields, then the answers - all three outside the fields');
+    // The bar carries a role its label belongs to. A bare `div` maps to
+    // `generic`, which prohibits a name from the author, so the `aria-label`
+    // was dropped and the bar read as four loose buttons between the heading
+    // and the fields. `group` names it without promising the arrow-key
+    // navigation `toolbar` is expected to bring and the bar does not have.
+    assert.match(dock[1], /^\s*<h3 data-dock="heading"><\/h3>\s*<div id="build-dock-bar" data-dock="bar" role="group" aria-label="[^"]+"><\/div>\s*<div id="build-dock-fields" data-dock="fields"><\/div>\s*<div id="build-dock-actions" data-dock="actions"><\/div>\s*$/,
+        'heading, the bar with a role that takes its label, then the fields, then the answers');
 
     assert.ok(styled(indexHtml, '#build-dock-bar', /flex:\s*none/), 'the bar does not scroll with the fields');
     assert.ok(styled(indexHtml, '#build-dock-fields', /overflow-y:\s*auto/), 'the fields scroll');
@@ -3885,6 +3890,116 @@ test('the outliner\'s three answers are wired to the three the session writes', 
     assert.match(box, /const turn = field === 'hidden' \? hidePlacement : lockPlacement;/);
     assert.match(box, /if \(!turn\(this\.builder, index, row\[field\] !== true\)\) return;/, 'turned by what the row says it is now');
     assert.match(box, /this\.redrawCanvas\(\);/);
+});
+
+/**
+ * What the row is drawn as, which no test named until 11.21.2026: the content
+ * both the bar and the outliner are built from is held in Node
+ * (`outlinerSection` in `test/outliner.test.js`, `dockBar` in
+ * `test/build-history.test.js`), and the drawing of it was not. So the `drawn`
+ * key could stop matching between the two methods, a class could be renamed
+ * out from under the stylesheet, and the suite would stay green.
+ */
+test('an outliner row is drawn as four parts, each class the stylesheet draws', () => {
+    const row = methodBody(panelViewSource, 'drawOutlinerRow');
+    assert.match(row, /line\.className = 'dock-outliner-row';/);
+    assert.match(row, /line\.dataset\.outliner = String\(entry\.index\);/, 'the row carries the index the press is read by');
+    assert.match(row, /pick\.className = 'dock-outliner-pick';/);
+    assert.match(row, /pick\.dataset\.outlinerPick = String\(entry\.index\);/);
+    assert.match(row, /name\.className = 'dock-outliner-name';/);
+    assert.match(row, /name\.maxLength = entry\.limit \?\? 40;/, 'held to the length a placement\'s name may be');
+    assert.match(row, /line\.append\(pick, name, this\.outlinerBox\(entry, 'hidden', 'H', 'Hide'\), this\.outlinerBox\(entry, 'locked', 'L', 'Lock'\)\);/,
+        'the press, the field, then the two boxes, which is the order the grid lays out');
+
+    const box = methodBody(panelViewSource, 'outlinerBox');
+    assert.match(box, /box\.className = `dock-outliner-box dock-outliner-\$\{field\}`;/);
+    assert.match(box, /box\.dataset\.outlinerBox = field;/);
+    assert.match(box, /box\.setAttribute\('aria-pressed', String\(entry\[field\] === true\)\);/,
+        'and its state where the stylesheet lights it from');
+
+    // The key the row is found again by, which `update` reads and nothing else
+    // writes. The two have to spell it the same way or every row goes stale.
+    assert.match(row, /this\.drawn\.set\(`outliner:\$\{entry\.index\}`, \{ line, pick, name \}\);/);
+    assert.match(methodBody(panelViewSource, 'update'), /const row = this\.drawn\.get\(`outliner:\$\{entry\.index\}`\);/);
+
+    for (const selector of ['.dock-outliner-row', '.dock-outliner-pick', '.dock-outliner-box', '.dock-outliner-name']) {
+        assert.ok(styleRules(indexHtml).some(rule => rule.selectors.includes(selector)),
+            `index.html should draw ${selector}`);
+    }
+    assert.ok(styled(indexHtml, '.dock-outliner-row', /grid-template-columns:\s*18px 1fr 22px 22px/),
+        'the press, the name taking what is left, and the two boxes');
+});
+
+/**
+ * The row's press and its two boxes are the same `button` inside the same row,
+ * so which handler runs is decided by the order the branches are read in: a
+ * box first, the press after. Reversed, every box press would select the row
+ * instead of hiding or locking it.
+ */
+test('a press inside an outliner row is read as a box before it is read as the row\'s own press', () => {
+    const click = methodBody(panelViewSource, 'onClick');
+    const outlined = click.indexOf("const outlined = button.closest('.dock-outliner-row');");
+    const box = click.indexOf('if (button.dataset.outlinerBox) this.handlers.onOutlinerBox?.(index, button.dataset.outlinerBox);');
+    const pick = click.indexOf('else if (button.dataset.outlinerPick) this.handlers.onOutlinerPick?.(index);');
+    assert.ok(outlined >= 0 && box > outlined && pick > box, 'the row, then the box, then the press');
+
+    // And the row's branch is read after the bar's, so the bar's own answers
+    // are never looked for inside a row.
+    assert.ok(click.indexOf('if (button.dataset.bar) {') < outlined);
+
+    assert.match(methodBody(panelViewSource, 'onChange'), /if \(field\.dataset\.outlinerName != null\) \{\s*this\.handlers\.onOutlinerName\?\.\(Number\(field\.dataset\.outlinerName\), field\.value\);/,
+        'and a name typed is read off the field\'s own index, which may be 0');
+});
+
+/**
+ * The bar's four answers draw alike at rest, and two of them are switches that
+ * stay on while two are steps that do something once. The switch is the one
+ * the content can tell apart - it carries `pressed` and a step does not - so
+ * that is what the class is written from.
+ */
+test('a switch on the bar is marked as one at rest, not only once it is lit', () => {
+    const build = methodBody(panelViewSource, 'build');
+    assert.match(build, /button\.className = answer\.pressed != null \? 'dock-bar-answer dock-bar-switch' : 'dock-bar-answer';/);
+    assert.match(build, /if \(answer\.title\) \{\s*button\.title = answer\.title;/, 'and each answer says what it is for');
+
+    assert.ok(styled(indexHtml, '.dock-bar-switch::before', /border:\s*1px solid currentColor/),
+        'a ring at rest, which is what says it is a switch before it is turned on');
+    assert.ok(styled(indexHtml, '.dock-bar-switch[aria-pressed="true"]::before', /background:\s*currentColor/),
+        'filled once it is on');
+
+    // Why a step is dimmed changes without the panel changing shape, so the
+    // title is written on every draw rather than only where it is built.
+    assert.match(methodBody(panelViewSource, 'update'), /const title = answer\.title \?\? '';\s*if \(button\.title !== title\) \{/);
+});
+
+/**
+ * A name may be 40 characters and the field is 203 pixels on a desktop dock,
+ * so a long one is cut off and there is no way to read it once the focus has
+ * left. The row exists to tell placements apart, which a name half of which is
+ * missing does less well.
+ */
+test('an outliner row\'s field carries what it reads as, so a long name can be read by hovering', () => {
+    assert.match(methodBody(panelViewSource, 'drawOutlinerRow'), /name\.title = entry\.name \|\| entry\.label \|\| '';/);
+
+    const update = methodBody(panelViewSource, 'update');
+    assert.match(update, /const shown = entry\.name \|\| entry\.label \|\| '';\s*if \(row\.name\.title !== shown\) row\.name\.title = shown;/);
+    assert.ok(update.indexOf("const shown = entry.name || entry.label || '';")
+        > update.indexOf('if (document.activeElement !== row.name) {'),
+        'inside the guard, so the field being typed into is left alone as its value is');
+});
+
+/**
+ * The row's three controls were drawn at the size a mouse leaves them - 18 to
+ * 22 CSS pixels, against the roughly 44 a fingertip wants - while the dock
+ * already answered a coarse pointer for its spinners and its values.
+ */
+test('the outliner\'s row controls are lifted for a finger, in the block the dock already has', () => {
+    const coarse = indexHtml.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n        \}/);
+    assert.ok(coarse, 'index.html should carry a coarse-pointer block');
+    assert.match(coarse[1], /\.dock-outliner-row \{\s*grid-template-columns: 32px 1fr 32px 32px;/,
+        'the outer columns widened, which a phone\'s dock has the room for');
+    assert.match(coarse[1], /\.dock-outliner-pick,\s*\.dock-outliner-box,\s*\.dock-outliner-name \{\s*min-height: 32px;/,
+        'and each lifted to the 32px the dock\'s own values already use');
 });
 
 test('the outliner\'s fold is the page\'s, and it comes off with the canvas', () => {

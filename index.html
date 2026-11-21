@@ -1376,6 +1376,26 @@
             border-color: #0f0;
         }
 
+        /* GRID and ANGLE are switches, which the two steps beside them are
+           not, and a switch that is off looks exactly like a step that can be
+           pressed. So each carries a mark that says it stays on once it is
+           pressed: a ring at rest, filled while it is lit. Drawn at rest as
+           well as lit, because telling the pilot afterwards is what the green
+           already does. */
+        .dock-bar-switch::before {
+            content: '';
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            margin-right: 5px;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+        }
+
+        .dock-bar-switch[aria-pressed="true"]::before {
+            background: currentColor;
+        }
+
         #build-dock-fields {
             flex: 1 1 auto;
             min-height: 0;
@@ -1619,6 +1639,22 @@
 
             .dock-spin button {
                 font-size: 11px;
+            }
+
+            /* The outliner's row, whose three controls were drawn at the size
+               a mouse leaves them: 18 to 22 CSS pixels, against the 44 a
+               fingertip wants. Lifted to the 32 px the dock's own values
+               already use rather than to a second figure, and the row's outer
+               columns widened to match, which a phone's dock has the room for
+               - it is 340 to 370 px wide against the 300 of a desktop. */
+            .dock-outliner-row {
+                grid-template-columns: 32px 1fr 32px 32px;
+            }
+
+            .dock-outliner-pick,
+            .dock-outliner-box,
+            .dock-outliner-name {
+                min-height: 32px;
             }
         }
 
@@ -2520,7 +2556,7 @@
 
     <aside id="build-dock" aria-label="Tool controls">
         <h3 data-dock="heading"></h3>
-        <div id="build-dock-bar" data-dock="bar" aria-label="Edit bar"></div>
+        <div id="build-dock-bar" data-dock="bar" role="group" aria-label="Edit bar"></div>
         <div id="build-dock-fields" data-dock="fields"></div>
         <div id="build-dock-actions" data-dock="actions"></div>
     </aside>

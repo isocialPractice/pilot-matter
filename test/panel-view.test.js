@@ -193,3 +193,178 @@ test('a row is found by its range, its part and the section it is in', () => {
     assert.deepEqual(dockRows(null), []);
     assert.equal(fieldFigure({ range: { step: 1 } }, 12.4), 12);
 });
+
+// --- The bar and the outliner, run against a stub ---------------------------------------
+
+/**
+ * A tiny element, enough for the methods below and no more. The real ones are
+ * drawn by the browser; what is held here is which parts a row is made of,
+ * what each is told, and that `update` writes the same row `build` drew -
+ * none of which a pin on the source can prove.
+ */
+function element(tag) {
+    const classes = new Set();
+    return {
+        tag,
+        dataset: {},
+        children: [],
+        attributes: new Map(),
+        style: {},
+        classes,
+        get className() { return [...classes].join(' '); },
+        set className(value) {
+            classes.clear();
+            for (const name of String(value).split(/\s+/).filter(Boolean)) classes.add(name);
+        },
+        classList: { toggle: (name, on) => { if (on) classes.add(name); else classes.delete(name); } },
+        setAttribute(name, value) { this.attributes.set(name, String(value)); },
+        getAttribute(name) { return this.attributes.get(name) ?? null; },
+        removeAttribute(name) { this.attributes.delete(name); },
+        append(...kids) { this.children.push(...kids); },
+        replaceChildren(...kids) { this.children = [...kids]; },
+        querySelectorAll() { return []; },
+        // Enough of a selector for the two this view asks for, each an
+        // attribute test on a child: `[data-outliner-box="hidden"]` and
+        // `.dock-bar-answer[data-bar="undo"]`.
+        querySelector(selector) {
+            const found = selector.match(/\[data-([\w-]+)="([^"]*)"\]/);
+            if (!found) return null;
+            const name = found[1].replace(/-([a-z])/g, (whole, letter) => letter.toUpperCase());
+            return this.children.find(kid => kid.dataset?.[name] === found[2]) ?? null;
+        }
+    };
+}
+
+/** `document` while a body runs, put back afterwards however the body ends. */
+function withDocument(shim, body) {
+    const had = Object.prototype.hasOwnProperty.call(globalThis, 'document');
+    const before = globalThis.document;
+    globalThis.document = shim;
+    try { return body(); }
+    finally {
+        if (had) globalThis.document = before;
+        else delete globalThis.document;
+    }
+}
+
+const ENTRY = Object.freeze({
+    index: 1, label: 'MOUNTAIN 2', name: '', hidden: false, locked: true, live: false, selectable: false, limit: 40
+});
+
+/**
+ * A view with the four places the panel draws into and nothing behind them.
+ * Built on the prototype rather than as a plain object, because `build` calls
+ * the view's own `drawShapes` and `drawRow` - so this runs the real methods
+ * against stub elements rather than standing in for them.
+ */
+function stubView() {
+    return Object.assign(Object.create(PanelView.prototype), {
+        heading: element('h3'), fields: element('div'), answers: element('div'), bar: element('div'),
+        drawn: new Map(), said: new Map()
+    });
+}
+
+test('an outliner row is drawn as the four parts the stylesheet lays out, filed under its index', () => {
+    const view = stubView();
+    withDocument({ createElement: element, activeElement: null }, () =>
+        PanelView.prototype.drawOutlinerRow.call(view, ENTRY));
+
+    assert.equal(view.fields.children.length, 1, 'one row appended');
+    const [line] = view.fields.children;
+    assert.equal(line.className, 'dock-outliner-row');
+    assert.equal(line.dataset.outliner, '1');
+
+    const [pick, name, hidden, locked] = line.children;
+    assert.deepEqual(line.children.map(kid => kid.className), [
+        'dock-outliner-pick',
+        'dock-outliner-name',
+        'dock-outliner-box dock-outliner-hidden',
+        'dock-outliner-box dock-outliner-locked'
+    ], 'the press, the field, then the two boxes, in the order the grid lays out');
+
+    assert.equal(pick.dataset.outlinerPick, '1');
+    assert.equal(pick.title, 'Select MOUNTAIN 2');
+    assert.equal(pick.getAttribute('aria-label'), 'Select MOUNTAIN 2', 'named by what the row reads as');
+
+    assert.equal(name.dataset.outlinerName, '1');
+    assert.equal(name.maxLength, 40);
+    assert.equal(name.getAttribute('aria-label'), 'MOUNTAIN 2 name');
+    assert.equal(name.title, 'MOUNTAIN 2', 'what the field reads as, for a name too long to fit in it');
+
+    assert.equal(hidden.dataset.outlinerBox, 'hidden');
+    assert.equal(hidden.getAttribute('aria-pressed'), 'false');
+    assert.equal(locked.dataset.outlinerBox, 'locked');
+    assert.equal(locked.getAttribute('aria-pressed'), 'true', 'which is what the stylesheet lights it by');
+    assert.equal(locked.title, 'Lock MOUNTAIN 2');
+
+    // The key `update` finds the row by again. Spelt differently in the two
+    // methods, every row would go stale the moment anything changed.
+    assert.deepEqual([...view.drawn.keys()], ['outliner:1']);
+    assert.deepEqual(view.drawn.get('outliner:1'), { line, pick, name });
+});
+
+test('the bar is drawn with a switch marked as one, and each answer saying what it is for', () => {
+    const view = stubView();
+    const bar = [
+        { id: 'undo', label: 'UNDO', title: 'Nothing to undo', disabled: true, pressed: null },
+        { id: 'snap-grid', label: 'GRID', title: 'Snap what is moved to the grid', disabled: false, pressed: false }
+    ];
+    withDocument({ createElement: element, activeElement: null }, () =>
+        PanelView.prototype.build.call(view, { heading: 'SELECT', rows: [], bar }));
+
+    const [step, snap] = view.bar.children;
+    assert.equal(step.className, 'dock-bar-answer', 'a step is not marked as a switch');
+    assert.equal(snap.className, 'dock-bar-answer dock-bar-switch', 'and a switch is, whether or not it is on');
+    assert.equal(step.title, 'Nothing to undo');
+    assert.equal(step.getAttribute('aria-label'), 'UNDO: Nothing to undo', 'so a reader hears the reason as well');
+    assert.equal(snap.getAttribute('aria-pressed'), 'false');
+    assert.equal(step.getAttribute('aria-pressed'), null, 'a step has no state to read');
+});
+
+test('a draw writes the bar and the rows it drew, leaving the field being typed into alone', () => {
+    const view = stubView();
+    const content = (step, entry) => ({
+        heading: 'SELECT',
+        rows: [],
+        bar: [{ id: 'undo', label: 'UNDO', ...step }],
+        sections: [{ id: 'outliner', heading: 'OUTLINER (2)', rows: [], entries: [entry] }]
+    });
+
+    const opened = content({ title: 'Nothing to undo', disabled: true, pressed: null }, ENTRY);
+    withDocument({ createElement: element, activeElement: null }, () => PanelView.prototype.build.call(view, opened));
+
+    const row = view.drawn.get('outliner:1');
+    const answer = view.bar.children[0];
+
+    // The step goes live and its reason changes, with nothing about the panel
+    // changing shape - which is the case the titles are written on every draw
+    // for.
+    const live = content(
+        { title: 'Undo the last change to the world', disabled: false, pressed: null },
+        { ...ENTRY, name: 'The long north ridge above the valley', live: true, selectable: true, hidden: true }
+    );
+    withDocument({ createElement: element, activeElement: null }, () => PanelView.prototype.update.call(view, live));
+
+    assert.equal(answer.disabled, false);
+    assert.equal(answer.title, 'Undo the last change to the world');
+    assert.equal(answer.getAttribute('aria-label'), 'UNDO: Undo the last change to the world');
+
+    assert.equal(row.name.value, 'The long north ridge above the valley');
+    assert.equal(row.name.placeholder, 'MOUNTAIN 2');
+    assert.equal(row.name.title, 'The long north ridge above the valley', 'the whole name, for a field 203 pixels wide');
+    assert.equal(row.pick.getAttribute('aria-pressed'), 'true');
+    assert.equal(row.pick.disabled, false);
+    assert.ok(row.line.classes.has('hidden-placement'), 'a hidden placement reads as one');
+    assert.equal(row.line.querySelector('[data-outliner-box="locked"]').getAttribute('aria-pressed'), 'true');
+
+    // The field being typed into is left exactly as the pilot has it, title
+    // and all, which is the rule every other field in the dock is written by.
+    const typing = content(
+        { title: 'Nothing to undo', disabled: true, pressed: null },
+        { ...ENTRY, name: 'Something else entirely' }
+    );
+    withDocument({ createElement: element, activeElement: row.name }, () => PanelView.prototype.update.call(view, typing));
+    assert.equal(row.name.value, 'The long north ridge above the valley');
+    assert.equal(row.name.title, 'The long north ridge above the valley');
+    assert.equal(answer.title, 'Nothing to undo', 'while the bar is written as it always is');
+});

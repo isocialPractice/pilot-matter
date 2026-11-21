@@ -26,7 +26,7 @@ import {
     brushIsDefault, eyeDropperArmed, buildExtrudeTool, extrudeValues, extrudeStage, extrudeReady, extrudeSurface,
     saveName, fileStatus, buildStartPoint, buildPlane, buildCityPrefab, buildCitySection,
     assetLibrary, assetStep, chosenLibraryAsset,
-    canUndoBuild, canRedoBuild, buildSnap, placementSelectable, committedPlacements,
+    canUndoBuild, canRedoBuild, buildSnap, placementSelectable, confirmOpen, editPending,
     SNAP_GRID, SNAP_ANGLE
 } from './build-mode.js';
 import { placementHidden, placementLocked, placementNamed, PLACEMENT_NAME_LIMIT } from './outliner.js';
@@ -230,23 +230,63 @@ export const DOCK_SNAP_ANGLE = Object.freeze({ id: 'snap-angle', label: 'ANGLE',
 export const DOCK_BAR = Object.freeze([DOCK_UNDO, DOCK_REDO, DOCK_SNAP_GRID, DOCK_SNAP_ANGLE]);
 
 /**
- * The bar for a session: each entry `{ id, label, disabled, pressed }`, and
- * `[]` off a canvas, where there is no world to change and nothing to snap.
+ * What each answer on the bar says of itself when it is hovered: a switch what
+ * it snaps, and a step either what it takes back or, dimmed, why it cannot be
+ * pressed.
+ *
+ * A step is dimmed for two quite different reasons - there is nothing to go
+ * back to, or there is and an edit is in hand, since `historyReady` refuses
+ * one while a draft is unsettled - and the button looks the same either way.
+ * So the reason is written where the pilot is already looking, the way a
+ * row's own press carries `Select MOUNTAIN 1`.
+ */
+export const BAR_SNAP_TITLES = Object.freeze({
+    [DOCK_SNAP_GRID.id]:  'Snap what is moved to the grid',
+    [DOCK_SNAP_ANGLE.id]: 'Snap what is turned to the angle'
+});
+export const BAR_STEP_TITLES = Object.freeze({
+    [DOCK_UNDO.id]: 'Undo the last change to the world',
+    [DOCK_REDO.id]: 'Redo the last change undone'
+});
+export const BAR_NOTHING_TITLES = Object.freeze({
+    [DOCK_UNDO.id]: 'Nothing to undo',
+    [DOCK_REDO.id]: 'Nothing to redo'
+});
+export const BAR_EDIT_TITLE    = 'Accept or cancel the edit first';
+export const BAR_CONFIRM_TITLE = 'Answer the question on the canvas first';
+
+/** Why a step is dimmed, or what it does where it is not. */
+function barStepTitle(state, id, disabled) {
+    if (!disabled) return BAR_STEP_TITLES[id];
+    if (confirmOpen(state)) return BAR_CONFIRM_TITLE;
+    if (editPending(state)) return BAR_EDIT_TITLE;
+    return BAR_NOTHING_TITLES[id];
+}
+
+/**
+ * The bar for a session: each entry `{ id, label, title, disabled, pressed }`,
+ * and `[]` off a canvas, where there is no world to change and nothing to
+ * snap.
  *
  * `UNDO` and `REDO` read as pressable exactly when a step can be taken, which
- * is the one place a pilot can see that there is something to go back to.
+ * is the one place a pilot can see that there is something to go back to, and
+ * `title` is the one place they can see why not when it is not.
  */
 export function dockBar(state) {
     if (!buildModeDrawing(state)) return [];
     const snap = buildSnap(state);
-    return DOCK_BAR.map(answer => ({
-        id: answer.id,
-        label: answer.label,
-        disabled: answer.id === DOCK_UNDO.id ? !canUndoBuild(state)
+    return DOCK_BAR.map(answer => {
+        const disabled = answer.id === DOCK_UNDO.id ? !canUndoBuild(state)
             : answer.id === DOCK_REDO.id ? !canRedoBuild(state)
-            : false,
-        pressed: answer.snap ? snap[answer.snap] === true : null
-    }));
+            : false;
+        return {
+            id: answer.id,
+            label: answer.label,
+            title: answer.snap ? BAR_SNAP_TITLES[answer.id] : barStepTitle(state, answer.id, disabled),
+            disabled,
+            pressed: answer.snap ? snap[answer.snap] === true : null
+        };
+    });
 }
 
 /** The answer on the bar that turns one of the two snaps over, or null for anything else. */
@@ -919,6 +959,36 @@ function placementName(placement) {
 }
 
 /**
+ * What each placement is read as in the outliner before it is named: its
+ * type's own label, numbered from 1 wherever more than one of that type is
+ * listed, so two mountains are MOUNTAIN 1 and MOUNTAIN 2 rather than two rows
+ * reading the same word with nothing on either to tell them apart. A type
+ * listed once is left unnumbered, since a number says nothing where there is
+ * nothing to tell apart.
+ *
+ * The number is a placeholder and nothing else. Nothing is written into the
+ * placement, so a name typed over it replaces the whole of it, and a placement
+ * taken out of the middle renumbers the rows after it rather than leaving a
+ * gap where it was.
+ */
+function outlinerLabels(placements) {
+    const total = new Map();
+    for (const placement of placements) {
+        const label = placementName(placement);
+        total.set(label, (total.get(label) ?? 0) + 1);
+    }
+
+    const seen = new Map();
+    return placements.map(placement => {
+        const label = placementName(placement);
+        if (total.get(label) === 1) return label;
+        const at = (seen.get(label) ?? 0) + 1;
+        seen.set(label, at);
+        return `${label} ${at}`;
+    });
+}
+
+/**
  * The outliner: every committed placement listed in the order it was drawn,
  * which is the order the ground was composited in, so a reader of the list is
  * reading what is over what.
@@ -939,6 +1009,7 @@ function placementName(placement) {
 function outlinerSection(state, open = false) {
     const placements = state?.placements ?? [];
     const picked = pickedIndex(state);
+    const labels = open ? outlinerLabels(placements) : [];
 
     return {
         id: OUTLINER_SECTION,
@@ -950,7 +1021,7 @@ function outlinerSection(state, open = false) {
         rows: [],
         entries: open ? placements.map((placement, index) => ({
             index,
-            label: placementName(placement),
+            label: labels[index],
             name: placementNamed(placement, ''),
             hidden: placementHidden(placement),
             locked: placementLocked(placement),

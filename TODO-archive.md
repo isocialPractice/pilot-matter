@@ -6542,3 +6542,227 @@ still be found by name.
     applied in `Aircraft.startState`, where the start is read, so a plane
     chosen under a start nobody touched is flown on its own figures.
   - From: Interactive Build Mode `->` Closing the Builder's Gaps
+
+## Archived 11-21-26
+
+- [x] **A pick reaches a summit narrower than the sampling**: `pickGround`
+  finds the ground under the pointer on a region too small to raise more than
+  one vertex, rather than stepping over it onto the flat ground beyond
+  - The march steps half a cell, 40 units. A 200 unit extrusion is raised at
+    one vertex of the 80 unit grid, so its sides fall about 5 units per unit
+    while a ray at 55 degrees comes down 1.4: a ray aimed a pixel off the peak
+    meets the flank 0.8 units from it, and the first step jumps from 3.5 units
+    in front of the peak to 19 units past it. Driven in Chromium on 11-08-26,
+    one 200 unit block alone on a blank canvas: the pick answers the peak when
+    aimed at its exact point and answers the ground 450 units beyond for every
+    pixel either side, so `EDIT EXTRUSION` cannot be pointed at its top.
+    `.tmp/ui-ux/t28/top-and-rim.log`, phase C, is the measurement, and the 320
+    unit block beside it in the same log is reached at every try.
+  - The ceiling boundary is settled and is not this: a ray aimed at the peak
+    is answered at the entry, which is what `PICK_SURFACE` is for. What is
+    left is the step. Refining between the entry and the first step, or
+    stepping by a share of the ray's own descent rather than of a cell, are
+    the two shapes - and the cost is paid on every pointer move, since the
+    hover outline asks the same question, so measure before choosing.
+  - **Settled**: neither shape the item named works, measured - stepping by a
+    share of the ray's descent reaches the same one aim of 185, and refining
+    the first stretch out of the ceiling fixes only a summit at the highest
+    ground. Told the grid, `pickGround` walks the ray cell by cell and solves
+    each cell's own quadratic, which has the summit's vertex in it as a
+    corner: all 185 aims across the face, and a third of the ground reads. The
+    stepped walk is kept for a caller that names no grid.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] **The hover reads every object's ground on every pointer move**, so a
+  canvas with a few hundred objects on it has got heavier to hover over
+  - **Issue**: `pickPlacementAt` runs on every pointer move with Select live,
+    and `objectRayAt` builds every object's box before testing any of them
+    against the ray. One box is `objectBox` `->` `footprintGround`, which
+    samples the ground 25 times, so 300 objects is 7,500 terrain reads a move
+    with the ray's direction playing no part in any of them. Measured in
+    Chromium on a blank canvas with objects 300 m apart, the view 50 degrees
+    over the ground: 20.0 fps while the pointer is swept, against 60.2 fps for
+    the same scene with the mountain tool live so no pick runs, and 19.8 again
+    on a second sweep with Select. One move's pick is 52.2 ms against the
+    24.4 ms the reading it replaced cost on the same rays, both paths built
+    out of the same modules. It is linear in the object count - 25 objects
+    4.6 ms, 100 objects 17.9 ms at 53.8 fps, 300 objects 52.2 ms at 20.0 fps.
+    The ground half is exactly as the item claimed and is not the cost: solved
+    on the grid it reads the ground 6 times against the march's 27. Every one
+    of the 27.7 ms added is the box pass.
+    `.tmp/ui-ux/t34/c5-hover.log` is the measurement.
+  - **Goal**: Resolve to [hover-reads-every-box.prompt.md](.claude/prompts/hover-reads-every-box.prompt.md)
+  - **Settled**: four readings taken again on every move, now taken once. A box
+    is built only for an object the ray's horizontal path could still reach -
+    `rayNearsFootprint` in `js/build-select.js`, refusing a footprint beside
+    the path by more than its own half-diagonal, behind where the ray begins,
+    or past how far the ray may travel - which took the terrain reads for the
+    boxes from 7,500 a move to 0 on the same rays. `recipeBounds` is held per
+    recipe in a `WeakMap` and frozen, which was 12.0 ms a move of walking
+    20,460 parts whose answer had not changed. `pickablePlacements` hands over
+    the session's own placements rather than a `structuredClone` of them, which
+    was 17.1 ms a move and the single most expensive thing a hover did - and
+    also what made the held reading miss, a fresh clone being a fresh key; what
+    means to change a placement still asks `committedPlacements`, which copies.
+    And `erasedObjects` weighs the erase batches once for the list rather than
+    slicing its tail per object. The ground half was exactly as the item said
+    and was never the cost. Swept again, the 300-building canvas holds 60.1 fps
+    against the 60.2 of the same scene with no pick running, and one move's
+    pick is 0.13 ms against 52.2. `.tmp/ui-ux/t35/c8-hidden.log` and
+    `.tmp/ui-ux/t35/c7-attribute.log` are the measurements.
+  - From: UI/UX Override - the hover over a built canvas
+- [x] **A Node test that counts what a pick reads**, so the cost of the box
+  pass is held by the project's own suite rather than by a browser sweep
+  - **Issue**: nothing in `npm test` notices how many times a pick reads the
+    ground. The 11 new tests in `test/build-picking.test.js` hold the solved
+    reading's own reads, and the walk's cell limit is held by counting them -
+    but `objectRayAt` has no such test, which is why a pass that reads 7,500
+    heights a pointer move shipped with a full suite behind it.
+  - **Goal**: in `test/build-select.test.js`, hand `objectRayAt` a counting
+    `groundAt` and a list of objects of which the ray can reach one, and
+    expect the reads to be a function of what the ray could reach rather than
+    of how long the list is. It needs no browser, and it is the assertion the
+    code above fails and its fix passes.
+  - **Settled**: *a pick reads the ground for what the ray could reach, not for
+    the length of the list* in `test/build-select.test.js` hands `objectRayAt` a
+    counting `groundAt` and expects `STAND_SAMPLES` squared reads for the one
+    object on the ray's path - and the same 25 with 300 more stood beside it -
+    then expects 0 for a box past the limit, so the limit is held to paying for
+    itself. Beside it, *the path refuses only boxes the slab test would refuse
+    anyway* sweeps a grid of footprints against a fan of rays at six pitches
+    and six yaws and expects every box `rayEntersBox` enters inside the limit
+    to be one the cull let through, which is the soundness the counting test
+    cannot see. A mutation run proved both: every box built whatever the ray
+    could reach is caught by the first, and the footprint reaching its
+    half-width rather than its half-diagonal by both.
+  - From: UI/UX Override - the hover over a built canvas
+- [x] **`pickPlacementAt`'s docstring puts the ground 450 units past a 200
+  unit tower**, where every other reading of the same geometry says 140
+  - **Issue**: the docstring on `pickPlacementAt` in `js/main.js` ends *the
+    ground point under a click on a roof is the ground beyond the building,
+    450 units past it for a 200 unit tower*. At the builder's own 55 degrees
+    over the ground a ray leaving a 200 unit roof reaches the ground after
+    200 / tan(55) = 140 units, which is the figure `CHANGELOG.md` and
+    `docs/terrain.html` both give for the same tower and the same view, and
+    the figure `test/build-select.test.js` works out for itself as `beyond`.
+    450 is the figure the summit item measured for a different scene and a
+    different view. Nothing names an angle beside it, so a reader has no way
+    to tell it is not the 140 everything else says - and the next model to
+    read it is as likely to carry it on as to check it.
+  - **Goal**: 140 units, in the one place that says otherwise. Leave the
+    reading in `js/build-select.js` - *the roof of a 200 unit tower is 200
+    units from the ground its own click lands on* - alone: that is the height
+    of the tower rather than a distance along the ground, and it is true.
+  - **Settled**: 140, with the angle named beside it so the next reader can
+    check the arithmetic rather than take the figure on trust. The docstring
+    was rewritten anyway for the new order of its three questions - the ground
+    read first as the bound, the boxes answered, then the ground point's own
+    reach - so the figure went in with that. `js/build-select.js`'s reading is
+    untouched, and `aimCanvasRay`'s docstring, which said the pick asks the
+    objects and then the ground, now says the other way round.
+  - From: UI/UX Override - the hover over a built canvas
+- [x] Roof Occlusion 1: an object behind the ground is picked through it
+  - **Issue**: `pickPlacementAt` asks the object boxes and then the ground,
+    and never compares the two distances, so a box the terrain hides is taken
+    as readily as one in plain view. Measured in Node against the real
+    modules, with the builder's camera at 12 degrees over the ground - 2
+    degrees off `MIN_PITCH`, so a view a pilot can hold: a 400 unit extrusion
+    at `x = -600` and a 200 unit tower on the flat ground at `x = 100`. Of 39
+    aims across the cliff's face, 11 answered the tower. On the first the
+    ground is met 6,134 units along the ray, on the cliff's near face, and the
+    tower's box is entered 7,156 units along - 1,022 units further on and out
+    of sight. The hover reads through the same call, so the outline goes to
+    the hidden building first and the pick looks like a fault in the outline.
+    Asking the boxes first is right and is not the defect; the missing
+    comparison is.
+  - **Goal**: Resolve to [object-picked-through-the-ground.prompt.md](.claude/prompts/object-picked-through-the-ground.prompt.md)
+  - **Settled**: `objectRayAt` takes a `within` in the direction's own lengths
+    and refuses a box entered beyond it, and `pickPlacementAt` reads the ground
+    first and hands over `rayDistance(origin, direction, point)` - `Infinity`
+    where the ray meets no ground, which refuses nothing. Worked after the
+    hover item as that prompt asked, so the limit went into a pass that had
+    already been given a reason to look at the ray: `rayNearsFootprint` reads
+    it too, and a box past where the ray stops is now refused without its
+    ground being read, so the comparison costs less than nothing. Held in Node
+    by the limit's three cases and by two sweeps over a cliff and a tower built
+    on a real field through the real compositor, and in `test/page.test.js` by
+    pins on the order of the three calls in `pickPlacementAt`, which a mutation
+    run proved by putting the old order back. Settled in Chromium: of 31 aims
+    across the block's face, the 7 the unbounded pass answers the tower for all
+    pick the block now, and 21 of 21 aims from the side where nothing hides it
+    still take the tower.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] Opening Lever 1: the throttle is raised past what the plane's floor
+  needed, over a setting the pilot entered
+  - **Issue**: `planeStart` reads the throttle it raises to off the speed the
+    start ends up carrying rather than off the plane's own floor, so a pilot
+    who asks for a speed above the floor has `START THROTTLE` raised as well -
+    in a case where no plane was near its stall and nothing needed holding.
+    `START AIRSPEED` 200 knots with `START THROTTLE` 20 per cent opens the
+    trainer's lever at 50 per cent, the jet's at 33 and the biplane's at 67,
+    each asking for 100 rather than the 40, 60 and 30 the pilot set.
+    `docs/controls/settings.html` - a file this turn edited - still says *a
+    start whose throttle asks for a different speed than it was given is flown
+    exactly as written*, and `START THROTTLE`'s note in `js/config.js`, in the
+    object whose `START AIRSPEED` note this turn rewrote, still reads *the
+    lever setting the flight opens with*. The suite cannot see it: every
+    assertion is built from `DEFAULT_CONFIG.start`, where the asked speed and
+    the floor are the same figure for all five planes.
+  - **Goal**: Resolve to [opening-lever-overrides-the-pilot.prompt.md](.claude/prompts/opening-lever-overrides-the-pilot.prompt.md)
+  - **Settled**: the prompt's first option, bounding the raise by the floor -
+    `holds` in `planeStart` is read off `Math.max(floor, 0) / maxSpeed` rather
+    than off `speed`, which is the greater of the floor and what the pilot
+    asked for. So a plane whose floor wants more than the lever was set to
+    still gets it, and a lever already above that is left where the pilot put
+    it. The documentation was the half that was right, so it stands: the
+    paragraph closing the start fields in `docs/controls/settings.html` and
+    `START THROTTLE`'s note in `js/config.js` are both true again untouched,
+    and what changed instead were the three accounts that had promised more -
+    `planeStart`'s own second bullet, the previous `CHANGELOG.md` entry's *to
+    exactly what holds that speed*, and the sentences in `docs/terrain.html`
+    and `docs/controls/settings.html` that said the lever asks for the opening
+    speed. The suite could not see the defect because `askedStart` is built
+    from `DEFAULT_CONFIG.start`, where the asked speed and the floor are the
+    same figure for all five planes; the assertion that read as a general rule
+    now says that, and two tests either side of the floor hold the rest.
+  - From: Interactive Build Mode `->` Closing the Builder's Gaps
+- [x] **Undo and redo**: `Ctrl+Z` takes back the last change to the world - a
+  placement added, moved, stepped or erased, a start point set or a plane
+  chosen - and `Ctrl+Shift+Z` or `Ctrl+Y` puts it back, with UNDO and REDO on
+  the dock's bar
+  - A capped history of the session's world, a step pushed when an edit is
+    accepted rather than at every move of a drag, so one gumball drag is one
+    step; cleared when a world is loaded or the canvas opened afresh. A test
+    walks a session through add, move, erase, undo and redo and expects each
+    world back as it was.
+  - **Settled**: `js/build-history.js` holds the stack and the key
+    combinations; `markBuildEdit` in `js/build-mode.js` pushes a snapshot of
+    `worldSnapshot` before every settled edit, which is `acceptDraft` for
+    everything made through a draft and the start point and plane writes for
+    what is not. A sequence of writes that is one act - a knob dragged round -
+    shares a `run` and pushes once. `UNDO` and `REDO` are the first two of the
+    dock's new bar, `dockBar`, which is on every panel on a canvas and is why
+    `dockContent` no longer answers null there. Fifty steps, emptied when a
+    canvas opens or a world is loaded over one, and forgotten when an asset is
+    removed - a step back across that would put back placements referring to a
+    model nothing can draw.
+  - From: Interactive Build Mode `->` Editor Workflow
+- [x] **The outliner**: a folding OUTLINER section in the dock listing every
+  placement by name and type in the order drawn, where a row selects its
+  placement, renames it, hides it from the canvas while building, or locks it
+  against Select and Erase
+  - Hidden and locked are building aids: a hidden placement is still flown,
+    and both are saved in the file so a reopened world keeps them.
+  - After: Undo and redo, so a rename or a lock is a step like any other
+  - **Settled**: the three fields are `js/outliner.js`, a pure module with no
+    imports so `js/environment/erase.js` can read a lock without importing the
+    dock. The section is `outlinerSection` in `js/build-panel.js`, above what
+    Select is looking at, and its rows are drawn by `drawOutlinerRow` in
+    `js/panel-view.js`: a press, a name field over the type's label, and `H`
+    and `L`. Hiding is read in `canvasElements` and nowhere else, so a hidden
+    placement is off the canvas and still in what a flight and a file are drawn
+    from; a lock is read in `resolveErasures` and `erasedObjects`, live, so it
+    lifts the cut a batch was making and unlocking puts it back. Neither is
+    pickable - `placementReach` answers nothing for one - and a row that turns
+    either box on lets go of the pick. All three are carried in the file and
+    named in the schema, and each is a step of the history.
+  - From: Interactive Build Mode `->` Editor Workflow

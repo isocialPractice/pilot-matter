@@ -290,10 +290,35 @@ test('opened it lists every placement in the order it was drawn', () => {
     const open = outliner(state);
 
     assert.deepEqual(open.entries.map(entry => entry.index), [0, 1, 2]);
-    assert.deepEqual(open.entries.map(entry => entry.label), ['MOUNTAIN', 'MOUNTAIN', 'MOUNTAIN'],
-        'each read by its type, which is what a field shows until it is named');
+    assert.deepEqual(open.entries.map(entry => entry.label), ['MOUNTAIN 1', 'MOUNTAIN 2', 'MOUNTAIN 3'],
+        'each read by its type, numbered because three of them are listed');
     assert.deepEqual(open.entries.map(entry => entry.name), ['', 'North Peak', '']);
     assert.ok(open.entries.every(entry => entry.limit === PLACEMENT_NAME_LIMIT));
+});
+
+/**
+ * A row never named shows its type alone, so without this two mountains are
+ * two rows reading MOUNTAIN with nothing on either to tell them apart, and the
+ * only way to find out which is which is pressing each row in turn.
+ */
+test('a type listed more than once is numbered as it is listed, and one listed alone is not', () => {
+    const one = built(1);
+    assert.deepEqual(outliner(one).entries.map(entry => entry.label), ['MOUNTAIN'],
+        'a number says nothing where there is nothing to tell apart');
+
+    const mixed = built(2);
+    mixed.placements.push(placeObject(PREFAB, [0, 0]));
+    assert.deepEqual(outliner(mixed).entries.map(entry => entry.label),
+        ['MOUNTAIN 1', 'MOUNTAIN 2', prefabById(PREFAB).label],
+        'each type counted on its own, the one standing alone left as it was');
+
+    // The number is a placeholder and nothing else: naming a row leaves the
+    // rest numbered as they were, and nothing is written into the placement.
+    renamePlacement(mixed, 0, 'North Peak');
+    assert.deepEqual(outliner(mixed).entries.map(entry => entry.label),
+        ['MOUNTAIN 1', 'MOUNTAIN 2', prefabById(PREFAB).label]);
+    assert.deepEqual(outliner(mixed).entries.map(entry => entry.name), ['North Peak', '', '']);
+    assert.equal(committedPlacements(mixed)[1].name, undefined, 'the second mountain was never written to');
 });
 
 test('a row says whether it is the one picked, whether either box is on, and whether it can be picked', () => {

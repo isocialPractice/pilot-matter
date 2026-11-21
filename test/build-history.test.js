@@ -14,7 +14,10 @@ import {
     buildStartPoint, buildPlane, setAssetLibrary, removeAssetFromCanvas, worldRows,
     BUILD_FROM_TITLE, CONFIRM_YES, START_RUN
 } from '../js/build-mode.js';
-import { dockBar, dockContent, DOCK_UNDO, DOCK_REDO, DOCK_SNAP_GRID, DOCK_SNAP_ANGLE } from '../js/build-panel.js';
+import {
+    dockBar, dockContent, DOCK_UNDO, DOCK_REDO, DOCK_SNAP_GRID, DOCK_SNAP_ANGLE,
+    BAR_SNAP_TITLES, BAR_STEP_TITLES, BAR_NOTHING_TITLES, BAR_EDIT_TITLE, BAR_CONFIRM_TITLE
+} from '../js/build-panel.js';
 import { SELECT_TOOL } from '../js/build-tools.js';
 
 const SIZE = 16000;
@@ -450,6 +453,42 @@ test('the bar is on every panel, whatever the tool is pointed at', () => {
         assert.deepEqual(shown.bar.map(answer => answer.id),
             [DOCK_UNDO.id, DOCK_REDO.id, DOCK_SNAP_GRID.id, DOCK_SNAP_ANGLE.id], tool);
     }
+});
+
+/**
+ * A dimmed step says why it is dimmed, because the two reasons look identical
+ * and one of them - an edit in hand, with a step sitting in the history -
+ * reads as a bar that has simply stopped working.
+ */
+test('a step says what it does, or dimmed, which of the reasons it is dimmed for', () => {
+    const state = onCanvas();
+    const title = id => dockBar(state).find(answer => answer.id === id)?.title;
+
+    assert.equal(title(DOCK_UNDO.id), BAR_NOTHING_TITLES[DOCK_UNDO.id], 'nothing to go back to');
+    assert.equal(title(DOCK_REDO.id), BAR_NOTHING_TITLES[DOCK_REDO.id]);
+
+    dropMountain(state, [0, 0]);
+    assert.equal(title(DOCK_UNDO.id), BAR_STEP_TITLES[DOCK_UNDO.id], 'a step that can be taken says what it takes back');
+    assert.equal(title(DOCK_REDO.id), BAR_NOTHING_TITLES[DOCK_REDO.id], 'and nothing has been undone yet');
+
+    // The reason the button could not say before: the history holds a step and
+    // the draft in hand is what is refusing it.
+    chooseBuildTool(state, 'mountain');
+    dropDraft(state, { x: 2000, z: 2000 }, { size: SIZE });
+    assert.equal(canUndoBuild(state), false);
+    assert.equal(title(DOCK_UNDO.id), BAR_EDIT_TITLE);
+    assert.equal(title(DOCK_REDO.id), BAR_EDIT_TITLE);
+
+    acceptDraft(state);
+    requestLeave(state);
+    assert.equal(title(DOCK_UNDO.id), BAR_CONFIRM_TITLE, 'a question on the canvas is the third reason');
+});
+
+test('a switch says what it snaps, whichever way it is turned', () => {
+    const state = onCanvas();
+    const bar = Object.fromEntries(dockBar(state).map(answer => [answer.id, answer.title]));
+    assert.equal(bar[DOCK_SNAP_GRID.id], BAR_SNAP_TITLES[DOCK_SNAP_GRID.id]);
+    assert.equal(bar[DOCK_SNAP_ANGLE.id], BAR_SNAP_TITLES[DOCK_SNAP_ANGLE.id]);
 });
 
 test('the two snaps carry whether they are on and the two histories carry nothing of the kind', () => {

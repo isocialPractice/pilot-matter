@@ -268,9 +268,17 @@ export class PanelView {
             for (const answer of content.bar ?? []) {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'dock-bar-answer';
+                // A switch carries a class of its own as well as `pressed`, so
+                // the stylesheet can mark it as one at rest rather than only
+                // once it is lit: a step does something once and a switch
+                // stays on, and the four of them otherwise draw alike.
+                button.className = answer.pressed != null ? 'dock-bar-answer dock-bar-switch' : 'dock-bar-answer';
                 button.dataset.bar = answer.id;
                 button.textContent = answer.label;
+                if (answer.title) {
+                    button.title = answer.title;
+                    button.setAttribute('aria-label', `${answer.label}: ${answer.title}`);
+                }
                 if (answer.pressed != null) button.setAttribute('aria-pressed', String(answer.pressed));
                 this.bar.append(button);
             }
@@ -333,6 +341,11 @@ export class PanelView {
      * `aria-label` and `title`, because the row is 276 pixels wide and the
      * name is what a pilot is reading along it. Their state is on
      * `aria-pressed`, which is also what the stylesheet lights them by.
+     *
+     * The field carries what it reads as on `title` for the same reason: a
+     * name may be up to `PLACEMENT_NAME_LIMIT` characters and the field is
+     * 203 pixels on a desktop dock, so a long one is cut off, and the
+     * outliner's whole point is telling rows apart.
      */
     drawOutlinerRow(entry) {
         const line = document.createElement('div');
@@ -354,6 +367,7 @@ export class PanelView {
         name.maxLength = entry.limit ?? 40;
         name.spellcheck = false;
         name.autocomplete = 'off';
+        name.title = entry.name || entry.label || '';
         name.setAttribute('aria-label', `${entry.label} name`);
 
         line.append(pick, name, this.outlinerBox(entry, 'hidden', 'H', 'Hide'), this.outlinerBox(entry, 'locked', 'L', 'Lock'));
@@ -628,6 +642,16 @@ export class PanelView {
             const button = this.bar?.querySelector(`.dock-bar-answer[data-bar="${answer.id}"]`);
             if (!button) continue;
             if (button.textContent !== answer.label) button.textContent = answer.label;
+            // Why a step is dimmed changes while the panel stands - an edit
+            // taken in hand turns "Nothing to undo" into "Accept or cancel the
+            // edit first" with nothing else about the bar moving - so the
+            // title is written here rather than only where it is built.
+            const title = answer.title ?? '';
+            if (button.title !== title) {
+                button.title = title;
+                if (title) button.setAttribute('aria-label', `${answer.label}: ${title}`);
+                else button.removeAttribute('aria-label');
+            }
             button.disabled = answer.disabled === true;
             if (answer.pressed != null) button.setAttribute('aria-pressed', String(answer.pressed));
         }
@@ -642,6 +666,10 @@ export class PanelView {
                 if (document.activeElement !== row.name) {
                     if (row.name.value !== (entry.name ?? '')) row.name.value = entry.name ?? '';
                     if (row.name.placeholder !== entry.label) row.name.placeholder = entry.label;
+                    // What the field reads as, so a name too long for it can
+                    // be read by hovering once the focus has left.
+                    const shown = entry.name || entry.label || '';
+                    if (row.name.title !== shown) row.name.title = shown;
                 }
                 row.pick.setAttribute('aria-pressed', String(entry.live === true));
                 row.pick.disabled = entry.selectable === false;
