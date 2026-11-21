@@ -63,6 +63,49 @@ its context survives being archived.
     settled deliberately when the dock's own spinners replaced the browser's.
   - **Goal**: Resolve to [dock-bar-touch-targets.prompt.md](.claude/prompts/dock-bar-touch-targets.prompt.md)
   - From: UI/UX Override - the dock's bar and the outliner's rows
+- [ ] The outliner row's coarse-pointer rule reaches wider screens than the
+  reason written beside it covers
+  - **Issue**: the comment on the new rule in `index.html` says the widened
+    columns are what "a phone's dock has the room for - it is 340 to 370 px
+    wide against the 300 of a desktop", but `@media (pointer: coarse)` is
+    bounded by the pointer and not by the width, while the dock is widened to
+    the screen only inside `@media (max-width: 640px)`. So a coarse pointer on
+    a screen wider than that - a tablet in landscape, a touchscreen laptop -
+    keeps the 300 px side dock and gets the 32 px columns anyway. Arithmetic
+    off the stylesheet, with the global `box-sizing: border-box`: a 300 px dock
+    is 274 px inside its border and its 12 px padding, so at `18px 1fr 22px
+    22px` with 3 px gaps the name field is 274 - 62 - 9 = 203 px, which is the
+    figure the row's own docstring in `js/panel-view.js` gives, and at `32px
+    1fr 32px 32px` it is 274 - 96 - 9 = 169 px. The field loses 34 px on the
+    one device class where the `title` this turn added to it cannot be
+    hovered. Nothing overflows - `.dock-outliner-name` carries `min-width: 0` -
+    and no figure here was measured in a browser.
+  - **Goal**: settle which the rule is for and make the stylesheet and its
+    comment say the same thing: either bound the rule the way the dock's own
+    width is bounded, `@media (pointer: coarse) and (max-width: 640px)`, or
+    keep it as it stands and write the comment to the pointer rather than to a
+    phone's width. Measure the row on a coarse pointer wider than 640 px
+    before choosing, since 169 px is arithmetic rather than a reading. The
+    `CHANGELOG.md` entry for 1.0.0-alpha.1.67.1 carried the same claim and was
+    corrected in place by this review, so only the comment is left.
+  - From: UI/UX Override - the dock's bar and the outliner's rows
+- [ ] `dockBar`'s docstring counts two reasons for a dimmed step where the
+  code gives three
+  - **Issue**: the docstring over `BAR_SNAP_TITLES` in `js/build-panel.js`
+    reads "A step is dimmed for two quite different reasons - there is nothing
+    to go back to, or there is and an edit is in hand". `barStepTitle`, eighteen
+    lines below it, has three branches, and `historyReady` in
+    `js/build-mode.js` refuses a step on `confirmOpen` as well as on
+    `editPending` - which is why `BAR_CONFIRM_TITLE` is declared four lines
+    under that very sentence. `CHANGELOG.md`, `docs/terrain.html` and the test
+    in `test/build-history.test.js` all say three. The docstring is the one
+    place that says two, and it is the place a reader of `barStepTitle` reads
+    first, so the next model to work this module is as likely to read the
+    confirm branch as surplus as to check it.
+  - **Goal**: three, with the question on the canvas named beside the other
+    two, in the one sentence that says otherwise. Nothing else about the
+    docstring is wrong and no code changes.
+  - From: UI/UX Override - the dock's bar and the outliner's rows
 
 ## Game UI/UX
 
