@@ -43,115 +43,26 @@ its context survives being archived.
     each row it overrides.
   - From: Interactive Build Mode `->` Starter Worlds
 
-### UI/UX Override - the editor workflow's four additions
+### UI/UX Override - the dock's bar and the outliner's rows
 
 #### Found Issues
 
-- [ ] The outliner's row controls are under a fingertip on a touch phone
-  - **Issue**: on an emulated touch phone the row's select press measures
-    18 x 19 CSS pixels and the `H` and `L` boxes 22 x 18, against the roughly
-    44 px a fingertip needs. `index.html` already answers a coarse pointer -
-    its `@media (pointer: coarse)` block lifts `.dock-spin` to 22 px wide and
-    `.dock-field .dock-value` to a 32 px minimum height - but the outliner's
-    controls, added this turn, were not named in it. A tap driven at the exact
-    centre works, so this is reach rather than function.
-  - **Goal**: Resolve to [outliner-touch-targets.prompt.md](.claude/prompts/outliner-touch-targets.prompt.md)
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] Two unnamed placements of a kind read identically in the outliner
-  - **Issue**: a row never named shows its type alone, so two mountains are
-    two rows both reading `MOUNTAIN` with nothing on either to tell them
-    apart - not an index, not a count, not where each stands. Pressing a row's
-    `▸` lights it on the canvas, which is the only way to tell which is which,
-    and that is a press per row on a list that exists to save them.
-  - **Goal**: give an unnamed row something of its own - the simplest is to
-    number the duplicates of a type as they are listed, `MOUNTAIN 1`,
-    `MOUNTAIN 2`, drawn as the placeholder so a typed name still replaces it
-    whole and nothing is written into the placement. `placementNamed` in
-    `js/outliner.js` takes the fallback, and `outlinerSection` in
-    `js/build-panel.js` is where the rows are built and knows the whole list.
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] A dimmed `UNDO` never says why it cannot be pressed
-  - **Issue**: `canUndoBuild` is false both when there is nothing to go back
-    to and when an edit is in hand - `historyReady` requires `!editPending` -
-    and the button looks the same either way: `disabled`, opacity 0.35, with
-    no `title`, no `aria-label` and no status line anywhere on the dock. With
-    a mountain dropped and not yet accepted, `UNDO` is dimmed while the
-    history holds a step, and nothing on screen connects the two.
-  - **Goal**: give the bar's two steps a `title` that names the reason, the
-    way `.dock-outliner-pick` already carries `Select MOUNTAIN` - "Accept or
-    cancel the edit first" while a draft is pending, "Nothing to undo" while
-    the history is empty. `dockBar` in `js/build-panel.js` already asks
-    `canUndoBuild` and `canRedoBuild`, so it is the place that knows which of
-    the two it is; `panel-view.js` draws the button.
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] The bar's two switches read as two more steps until one is turned on
-  - **Issue**: `UNDO`, `REDO`, `GRID` and `ANGLE` share one class and one
-    resting look. With a step to go back to and both snaps off, all four draw
-    the same - same background, same border, same colour - so nothing says
-    that two of them do something once and two of them stay on. A snap that
-    is on lights green, which tells the pilot afterwards rather than before.
-  - **Goal**: mark the two switches as switches at rest, not only when lit -
-    a different border or a small state mark on `GRID` and `ANGLE`, or a
-    divider between the pair of steps and the pair of switches. They are
-    already separable in the data: `DOCK_SNAP_GRID` and `DOCK_SNAP_ANGLE`
-    carry a `snap` field and the two steps do not, and `dockBar` writes
-    `pressed` for the switches and leaves it off the steps.
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] A long name cannot be read in the field it is left in
-  - **Issue**: the name field is 203 px on a desktop dock and holds up to
-    `PLACEMENT_NAME_LIMIT` 40 characters. A 35 character name overflows it -
-    `scrollWidth` past `clientWidth` - and the input carries no `title`, so
-    once focus leaves there is no way to read the whole name without clicking
-    into the field and scrolling it. The outliner's point is telling rows
-    apart, which a name half of which is cut does less well.
-  - **Goal**: set the field's `title` to the name it holds as it is drawn, in
-    `drawOutlinerRow` in `js/panel-view.js`, so hovering reads the whole of
-    it; the `aria-label` there is the type's `"<TYPE> name"` and should stay
-    as it is.
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] The bar's label is written on an element no reader announces it for
-  - **Issue**: `index.html` draws the bar as
-    `<div id="build-dock-bar" data-dock="bar" aria-label="Edit bar">`. A bare
-    `div` maps to the `generic` role, which prohibits a name from the author,
-    so a screen reader drops the label and reads the bar as four loose
-    buttons between the heading and the fields. The file's own practice is the
-    other way - `<aside id="build-dock" aria-label="Tool controls">` labels an
-    element whose role takes a name - so this is the one label in the dock
-    that does nothing.
-  - **Goal**: give the bar a role its label belongs to. `role="toolbar"` is
-    the closer fit - it is a row of controls acting on the session - and
-    brings arrow-key navigation as an expectation; `role="group"` names it
-    without that promise. Either way the `aria-label` then reads, and the pin
-    in `test/page.test.js` that matches the bar's tag should name the role.
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] Nothing holds the outliner's rows or the dock's bar as they are drawn
-  - **Issue**: `js/panel-view.js` gained the bar's buttons, `drawOutlinerRow`,
-    `outlinerBox`, the bar and outliner branches of `update`, two branches of
-    `onClick` and one of `onChange`, and no test names
-    `dock-outliner-row`, `dock-outliner-pick`, `dock-outliner-box`,
-    `dock-outliner-name` or `dock-bar-answer` - nor do the styles those
-    classes are drawn by in `index.html`. The content both are drawn from is
-    held (`outlinerSection` in `test/outliner.test.js`, `dockBar` in
-    `test/build-history.test.js`); the drawing is not. So the `drawn` key
-    `outliner:${index}` could stop matching between the two methods, the
-    `onClick` branch could move below `dataset.section`, or a class could be
-    renamed out from under the stylesheet, and the suite would stay green.
-  - **Goal**: hold it the two ways this repository already holds drawing code.
-    Source pins in `test/page.test.js` for the row's four parts, the press
-    order in `onClick` and the `styled(indexHtml, ...)` rules behind the
-    classes; and a stub-driven run of the methods themselves in
-    `test/panel-view.test.js`, the way
-    `PanelView.prototype.showStatus.call(stub, ...)` already runs one against
-    a stub with no DOM behind it - `update` needs a `document.activeElement`
-    shim and nothing else.
-  - From: UI/UX Override - the editor workflow's four additions
-- [ ] `js/build-panel.js` imports `committedPlacements` and never reads it
-  - **Issue**: the import added at line 29 is unused - `outlinerSection`
-    reads `state?.placements ?? []` directly - so the module declares a
-    dependency it does not have.
-  - **Goal**: drop the name from the import, or read the placements through it
-    in `outlinerSection` if the copy was the intent.
-  - From: UI/UX Override - the editor workflow's four additions
+- [ ] The dock's bar answers are under a fingertip on a touch phone
+  - **Issue**: the coarse-pointer block in `index.html` now lifts the
+    outliner's row controls to 32 px, taking that figure from
+    `.dock-field .dock-value`, which the same block already lifts. The bar
+    pinned under the panel heading - `UNDO`, `REDO`, `GRID`, `ANGLE`, the
+    session's own four answers - was never named in that block, and measures
+    74 x 22, 88 x 22 and 96 x 22 CSS pixels on an emulated touch phone
+    (Chromium, `devices['iPhone 13']`, 390 x 664, a coarse pointer, Select
+    live on a blank canvas). That is ten pixels under the floor the same
+    stylesheet now sets for the rows below it in the same dock, and half the
+    roughly 44 a fingertip wants. `button.dock-section`, the fold heading, is
+    30 px tall for the same reason, though it spans the dock's whole width.
+    `.dock-spin button` is 22 x 15 and is left alone: its 22 px column was
+    settled deliberately when the dock's own spinners replaced the browser's.
+  - **Goal**: Resolve to [dock-bar-touch-targets.prompt.md](.claude/prompts/dock-bar-touch-targets.prompt.md)
+  - From: UI/UX Override - the dock's bar and the outliner's rows
 
 ## Game UI/UX
 
@@ -386,8 +297,51 @@ record.
 The habits every game engine's level editor shares, which the builder still
 lacks. Four of its six are built - undo and redo, the outliner, snapping and
 framing the selection - and the last two, multi-select and duplicating, were
-queued into `## Current` on 11.20.2026, so the section stands empty as the
-record of that area of work.
+queued into `## Current` on 11.20.2026. What is listed below came from this
+repository's feedback inbox on 11.21.2026: the ways a tool is reached without
+pointing at it.
+
+- [ ] `ctrl-holds-select`: Holding `Ctrl` on a canvas reaches Select without leaving the live tool
+  - **Issue**: Select is only reached by pressing its tile in the palette, so
+    picking a placement in the middle of a stroke or a run of road costs two
+    presses to leave the tool and two to come back. `SELECT_TOOL` is named in
+    `js/build-tools.js` and the live tool is `state.tool` in
+    `js/build-mode.js`, written by a palette press in `js/main.js` and by
+    nothing else: no held modifier on a canvas reads as a tool of its own.
+  - **Goal**: `Ctrl` held on a canvas makes Select live for as long as it is
+    down, and puts the tool that was live back when it is released, so a pick
+    costs one press. The hold is a field beside `state.tool` rather than a
+    write over it, so the tool it interrupted is not lost, and `canvasCursor`
+    in `js/main.js` and the dock both follow whichever is live. The builder's
+    undo and redo are `Ctrl+Z` and `Ctrl+Y` in `js/build-history.js`, and
+    `Ctrl+C` and `Ctrl+V` are queued for Duplicate, copy and paste, so the hold
+    stands only while no other key goes down with it. A switch for it and the
+    key it is held on go in `js/builder-settings.js` under a heading of their
+    own, and it gains a row in `js/controls-help.js`, mirrored in
+    `CHEATSHEET.md`, `docs/cheatsheet.html` and `docs/controls/index.html`.
+  - **Done when**: A test holds the key, reads Select live, releases it and
+    reads the first tool back; a second holds the key with `Z` and reads an
+    undo rather than a tool change; and the control list test holds the new row
+    across the four files.
+- [ ] `tool-hot-keys`: A key of its own for each tool on the palette
+  - **Issue**: Every tool is chosen by pointing at its tile. `BUILD_TOOLS` in
+    `js/build-tools.js` lists them in palette order and `js/build-palette.js`
+    draws the marks, but nothing on a canvas answers a key with a tool:
+    `BUILD_HELP_ROWS` in `js/controls-help.js` carries keys for moving,
+    reframing, framing, undo, the builder settings, the help list and the
+    photo, and not one for choosing a tool.
+  - **Goal**: Each built tool carries a key, read on a canvas where no edit is
+    in hand, and its tile shows that key beside the name it already carries on
+    `title` and `aria-label`. The key is declared with the tool in
+    `js/build-tools.js`, so a tool added later brings its own, and the set is
+    held clear of what a canvas already answers to through
+    `js/key-bindings.js` and `js/reserved-keys.js`. A switch and the key for
+    each tool go in `js/builder-settings.js`, and each tool gains a row in
+    `js/controls-help.js`, mirrored in `CHEATSHEET.md`, `docs/cheatsheet.html`
+    and `docs/controls/index.html`.
+  - **Done when**: A test presses each built tool's key and reads that tool
+    live, a second reads no key colliding with the canvas keys already bound,
+    and the control list test holds the new rows across the four files.
 
 ### Sculpt Environment
 
@@ -646,6 +600,61 @@ than linked as a goal because a completed item takes its goal file with it
 when it is archived - and `.claude/` is untracked, so that copy is the only
 one.
 
+- [ ] `alt-click-turns-piece`: `Alt` held at a click turns the piece in hand instead of putting it down
+  - **Issue**: A piece armed in Insert City is placed facing the way the view
+    looks, to the nearest ten degrees: `insertObject` in `js/build-mode.js`
+    takes its heading from `arrivalHeading(viewBearing(...))` in `js/main.js`,
+    and a second click moves the piece in hand keeping the heading it had. So
+    the only way to turn a piece before it is accepted is to orbit the camera
+    round to the angle wanted, and the only way after is to accept it and
+    reach for the gumball.
+  - **Goal**: With Insert City live and a piece in hand, a click with `Alt`
+    held turns that piece by one step where it stands rather than moving it, so
+    a run of road or a row of houses is laid at the angle wanted without moving
+    the view. The step follows the angle snap the dock's `ANGLE` switch holds,
+    and the preview in `js/main.js` turns with it. `Alt` is free for this tool:
+    it is the lasso's cut, the extrude region's cut and Erase's restore, none
+    of which is live beside Insert City. A switch and the held key go in
+    `js/builder-settings.js`, and the gesture gains a row in
+    `js/controls-help.js` beside the two Insert City already has, mirrored in
+    `CHEATSHEET.md`, `docs/cheatsheet.html` and `docs/controls/index.html`.
+  - **Done when**: A test places a piece, clicks with `Alt` held, and reads the
+    heading stepped with the piece still in hand at the point it was put down.
+- [ ] `roads-own-section`: The road pieces fold under a section of their own on Insert City
+  - **Issue**: The six road pieces carry `category: 'infrastructure'` in
+    `js/prefabs.js`, so `INFRASTRUCTURE` on the Insert City dock opens on a
+    grid holding a power station, a water tower, a substation, a fire station
+    and a hospital with STRAIGHT, CURVE, T-JUNCTION, CROSSROADS, ROUNDABOUT and
+    DEAD END among them. Roads are laid differently from everything else in
+    that grid, snapping end to end unless `Shift` places one free, and laying a
+    run of them means finding them again among the buildings every time.
+  - **Goal**: A `roads` category of its own in `PREFAB_CATEGORIES` in
+    `js/prefabs.js`, carrying the six pieces, so `DOCK_CITY` in
+    `js/build-panel.js` folds a `ROADS` section beside `INFRASTRUCTURE` with
+    nothing else to change: the dock builds its sections from the categories
+    and `prefabsIn` already answers per category.
+  - **Done when**: `test/city.test.js` reads the six road prefabs under the
+    roads category and none of them under infrastructure, and
+    `test/roads.test.js` still snaps them to each other.
+- [ ] `interstate-road-pieces`: An interstate family of road pieces that join each other
+  - **Issue**: Every road in `js/prefabs.js` is a single carriageway at
+    `ROAD_WIDTH` 12, built from `asphalt`, `dashes` and `arc`: STRAIGHT, CURVE,
+    T-JUNCTION, CROSSROADS, ROUNDABOUT and DEAD END. There is nothing to lay a
+    trunk road with, so a city has streets inside it and no road running out of
+    it.
+  - **Goal**: A family of interstate pieces beside the six, each a `road` kind
+    recipe whose `connectors` join the others of its family through `snapRoad`
+    in `js/roads.js`: a divided straight and a divided curve, an entrance ramp
+    and an exit ramp, an overpass standing clear of the piece crossing under
+    it, and an interchange where two of them meet. They are drawn from the same
+    `ribbon` parts the six are, at a width of their own with a median between
+    the carriageways, and one piece tapers from that width to `ROAD_WIDTH` so
+    the family meets the streets. Each is offered under the roads section of
+    the catalogue.
+  - **Done when**: `test/roads.test.js` snaps each piece of the family to every
+    piece it should meet, and `test/city.test.js` reads the new recipes through
+    `readRecipe` with bounds matching the footprints they declare.
+
 ## Documentation & Polish
 
 Keep the docs accurate and improve first-run experience. Completing items
@@ -676,234 +685,85 @@ has always left this file, so the record of what was built survives in
 `TODO-archive.md`. An item that turns out not to be built stays unchecked and
 in place, and the pruning item says which ones those were.
 
+## User Feedback
+
+Feedback from this repository's `.user-feedback` inbox that no other section
+of the roadmap holds, each item rewritten as work a run can do. Completing
+items in this section applies a patch version update.
+
+- [ ] `extrude-water-on-top`: Water drawn over an extrusion is buried under it rather than lying on its top
+  - **Issue**: `ELEMENT_ORDER` in `js/environment/elements.js` lays `water`
+    before `extrude`, so a water stroke drawn on an extruded top is composed
+    into the ground the extrusion has not yet been raised from. `bankMeasure`
+    in `js/environment/footprinted.js` settles the stroke's line from that
+    lower ground, `drawWater` cuts the ground down to it, and the extrusion
+    then levels and repaints every vertex over the top of it. Measured in Node
+    on 11.21.2026: a 300 unit extrusion with a water stroke across its top
+    comes out at height 328.7 in the extrusion's own grey, with the water line
+    left at -1.5, so the water a renderer finds is 330 units under the surface
+    it was drawn on.
+  - **Goal**: A water stroke drawn over an extrusion rests on the extruded
+    surface. The order is what decides it, and the two kinds of water are told
+    apart rather than the whole order moved: a drawn body, the one
+    `footprintSettles` names `waterLine`, is composed after the extrusions, so
+    its bank and its cut read the raised ground, while a preset's sea keeps the
+    place it has, since a sea laid after an extrusion would flood a building
+    standing on a shore.
+  - **Repro**: Open a canvas, extrude a shape, choose the cover tool's water
+    and draw a stroke across the extruded top, then accept the edit.
+  - **Evidence**: `.user-feedback/img/extrude-water-on-top.png` (local only;
+    the stroke shown on the plateau while it is drawn, and the plateau dry with
+    water on the lower ground beside it after the mouse is released)
+- [ ] `extrude-paint-on-top`: A Free Paint stroke over an extrusion leaves no colour once it is released
+  - **Issue**: Free Paint shows over an extruded top while the stroke is being
+    drawn, through `strokeRibbon` in `js/build-overlay.js`, and the top is its
+    own colour again once the mouse is released. The element pipeline is not
+    the cause: measured in Node on 11.21.2026, a paint stroke over a 300 unit
+    extrusion composes as painted, because `ELEMENT_ORDER` in
+    `js/environment/elements.js` lays `paint` after `extrude`. So the stroke is
+    either not being committed over an extruded surface or is committed
+    somewhere the redraw does not read it, which puts it in `layStroke` in
+    `js/build-mode.js` and the stroke gesture and redraw in `js/main.js`.
+  - **Goal**: A Free Paint stroke drawn on an extruded surface keeps its colour
+    once it is accepted, as a stroke on ordinary ground does, and the ground
+    under it is redrawn in that colour while the draft is still in hand.
+  - **Repro**: Open a canvas, extrude a shape, choose Free Paint and drag a
+    stroke across the extruded top, then release.
+  - **Evidence**: `.user-feedback/img/extrude-paint-on-top.png` (local only;
+    the stroke shown in colour while it is drawn, and the extruded top back to
+    its own grey after the mouse is released)
+- [ ] `build-water-spot-removal`: Drawn water carries a repeating pale blotch instead of reading as water
+  - **Issue**: The glint on water is laid per vertex. `waveSpecular` in
+    `js/water.js` is a function of where a point is and what time it is, and
+    `animateWater` reads it at the field's own vertices, which stand 80 units
+    apart on a 16,000 unit canvas. `WAVE.wavelength` is 380, so one crest spans
+    under five vertices, and the crossing train at `WAVE.angle` with
+    `crossScale` 1.7 beats against that lattice. `WATER_SHEEN` is very nearly
+    white and `SHEEN_STRENGTH` is 0.5, so a lit vertex becomes a pale blob a
+    cell wide once it is interpolated across its triangles, and the blobs
+    repeat in a fixed pattern rather than moving as light on water does.
+  - **Goal**: Water reads as water: the glint broken up so nothing repeats at
+    the sampling's own spacing, through a noise term in the phase or an offset
+    per place so neighbouring vertices are not lit together; the sheen narrowed
+    or weakened so a lit vertex is a glint rather than a patch; and the whole of
+    it scaled by how open the water is, which `waterSurface` in
+    `js/environment/elements.js` already measures and `animateWater` already
+    reads for the swell. `WAVE`, `WATER_SHEEN`, `SHEEN_STRENGTH`,
+    `waveSpecular` and `waterColor` in `js/water.js` are where it is decided,
+    and the module is pure, so the pattern is measurable in Node.
+  - **Done when**: A test reads the specular across a tile's vertices and finds
+    no repeat at the sampling's spacing, and a canvas screen shot of a drawn
+    pond reads as an even surface with glints on it.
+  - **Evidence**: `.user-feedback/img/build-water-spot-removal.png` (local only;
+    a drawn pond mottled with pale patches, the callouts marking them)
+
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 437 earlier items in `TODO-archive.md`, newest last.
+> 445 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **A pick reaches a summit narrower than the sampling**: `pickGround`
-  finds the ground under the pointer on a region too small to raise more than
-  one vertex, rather than stepping over it onto the flat ground beyond
-  - The march steps half a cell, 40 units. A 200 unit extrusion is raised at
-    one vertex of the 80 unit grid, so its sides fall about 5 units per unit
-    while a ray at 55 degrees comes down 1.4: a ray aimed a pixel off the peak
-    meets the flank 0.8 units from it, and the first step jumps from 3.5 units
-    in front of the peak to 19 units past it. Driven in Chromium on 11-08-26,
-    one 200 unit block alone on a blank canvas: the pick answers the peak when
-    aimed at its exact point and answers the ground 450 units beyond for every
-    pixel either side, so `EDIT EXTRUSION` cannot be pointed at its top.
-    `.tmp/ui-ux/t28/top-and-rim.log`, phase C, is the measurement, and the 320
-    unit block beside it in the same log is reached at every try.
-  - The ceiling boundary is settled and is not this: a ray aimed at the peak
-    is answered at the entry, which is what `PICK_SURFACE` is for. What is
-    left is the step. Refining between the entry and the first step, or
-    stepping by a share of the ray's own descent rather than of a cell, are
-    the two shapes - and the cost is paid on every pointer move, since the
-    hover outline asks the same question, so measure before choosing.
-  - **Settled**: neither shape the item named works, measured - stepping by a
-    share of the ray's descent reaches the same one aim of 185, and refining
-    the first stretch out of the ceiling fixes only a summit at the highest
-    ground. Told the grid, `pickGround` walks the ray cell by cell and solves
-    each cell's own quadratic, which has the summit's vertex in it as a
-    corner: all 185 aims across the face, and a third of the ground reads. The
-    stepped walk is kept for a caller that names no grid.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **The hover reads every object's ground on every pointer move**, so a
-  canvas with a few hundred objects on it has got heavier to hover over
-  - **Issue**: `pickPlacementAt` runs on every pointer move with Select live,
-    and `objectRayAt` builds every object's box before testing any of them
-    against the ray. One box is `objectBox` `->` `footprintGround`, which
-    samples the ground 25 times, so 300 objects is 7,500 terrain reads a move
-    with the ray's direction playing no part in any of them. Measured in
-    Chromium on a blank canvas with objects 300 m apart, the view 50 degrees
-    over the ground: 20.0 fps while the pointer is swept, against 60.2 fps for
-    the same scene with the mountain tool live so no pick runs, and 19.8 again
-    on a second sweep with Select. One move's pick is 52.2 ms against the
-    24.4 ms the reading it replaced cost on the same rays, both paths built
-    out of the same modules. It is linear in the object count - 25 objects
-    4.6 ms, 100 objects 17.9 ms at 53.8 fps, 300 objects 52.2 ms at 20.0 fps.
-    The ground half is exactly as the item claimed and is not the cost: solved
-    on the grid it reads the ground 6 times against the march's 27. Every one
-    of the 27.7 ms added is the box pass.
-    `.tmp/ui-ux/t34/c5-hover.log` is the measurement.
-  - **Goal**: Resolve to [hover-reads-every-box.prompt.md](.claude/prompts/hover-reads-every-box.prompt.md)
-  - **Settled**: four readings taken again on every move, now taken once. A box
-    is built only for an object the ray's horizontal path could still reach -
-    `rayNearsFootprint` in `js/build-select.js`, refusing a footprint beside
-    the path by more than its own half-diagonal, behind where the ray begins,
-    or past how far the ray may travel - which took the terrain reads for the
-    boxes from 7,500 a move to 0 on the same rays. `recipeBounds` is held per
-    recipe in a `WeakMap` and frozen, which was 12.0 ms a move of walking
-    20,460 parts whose answer had not changed. `pickablePlacements` hands over
-    the session's own placements rather than a `structuredClone` of them, which
-    was 17.1 ms a move and the single most expensive thing a hover did - and
-    also what made the held reading miss, a fresh clone being a fresh key; what
-    means to change a placement still asks `committedPlacements`, which copies.
-    And `erasedObjects` weighs the erase batches once for the list rather than
-    slicing its tail per object. The ground half was exactly as the item said
-    and was never the cost. Swept again, the 300-building canvas holds 60.1 fps
-    against the 60.2 of the same scene with no pick running, and one move's
-    pick is 0.13 ms against 52.2. `.tmp/ui-ux/t35/c8-hidden.log` and
-    `.tmp/ui-ux/t35/c7-attribute.log` are the measurements.
-  - From: UI/UX Override - the hover over a built canvas
-- [x] **A Node test that counts what a pick reads**, so the cost of the box
-  pass is held by the project's own suite rather than by a browser sweep
-  - **Issue**: nothing in `npm test` notices how many times a pick reads the
-    ground. The 11 new tests in `test/build-picking.test.js` hold the solved
-    reading's own reads, and the walk's cell limit is held by counting them -
-    but `objectRayAt` has no such test, which is why a pass that reads 7,500
-    heights a pointer move shipped with a full suite behind it.
-  - **Goal**: in `test/build-select.test.js`, hand `objectRayAt` a counting
-    `groundAt` and a list of objects of which the ray can reach one, and
-    expect the reads to be a function of what the ray could reach rather than
-    of how long the list is. It needs no browser, and it is the assertion the
-    code above fails and its fix passes.
-  - **Settled**: *a pick reads the ground for what the ray could reach, not for
-    the length of the list* in `test/build-select.test.js` hands `objectRayAt` a
-    counting `groundAt` and expects `STAND_SAMPLES` squared reads for the one
-    object on the ray's path - and the same 25 with 300 more stood beside it -
-    then expects 0 for a box past the limit, so the limit is held to paying for
-    itself. Beside it, *the path refuses only boxes the slab test would refuse
-    anyway* sweeps a grid of footprints against a fan of rays at six pitches
-    and six yaws and expects every box `rayEntersBox` enters inside the limit
-    to be one the cull let through, which is the soundness the counting test
-    cannot see. A mutation run proved both: every box built whatever the ray
-    could reach is caught by the first, and the footprint reaching its
-    half-width rather than its half-diagonal by both.
-  - From: UI/UX Override - the hover over a built canvas
-- [x] **`pickPlacementAt`'s docstring puts the ground 450 units past a 200
-  unit tower**, where every other reading of the same geometry says 140
-  - **Issue**: the docstring on `pickPlacementAt` in `js/main.js` ends *the
-    ground point under a click on a roof is the ground beyond the building,
-    450 units past it for a 200 unit tower*. At the builder's own 55 degrees
-    over the ground a ray leaving a 200 unit roof reaches the ground after
-    200 / tan(55) = 140 units, which is the figure `CHANGELOG.md` and
-    `docs/terrain.html` both give for the same tower and the same view, and
-    the figure `test/build-select.test.js` works out for itself as `beyond`.
-    450 is the figure the summit item measured for a different scene and a
-    different view. Nothing names an angle beside it, so a reader has no way
-    to tell it is not the 140 everything else says - and the next model to
-    read it is as likely to carry it on as to check it.
-  - **Goal**: 140 units, in the one place that says otherwise. Leave the
-    reading in `js/build-select.js` - *the roof of a 200 unit tower is 200
-    units from the ground its own click lands on* - alone: that is the height
-    of the tower rather than a distance along the ground, and it is true.
-  - **Settled**: 140, with the angle named beside it so the next reader can
-    check the arithmetic rather than take the figure on trust. The docstring
-    was rewritten anyway for the new order of its three questions - the ground
-    read first as the bound, the boxes answered, then the ground point's own
-    reach - so the figure went in with that. `js/build-select.js`'s reading is
-    untouched, and `aimCanvasRay`'s docstring, which said the pick asks the
-    objects and then the ground, now says the other way round.
-  - From: UI/UX Override - the hover over a built canvas
-- [x] Roof Occlusion 1: an object behind the ground is picked through it
-  - **Issue**: `pickPlacementAt` asks the object boxes and then the ground,
-    and never compares the two distances, so a box the terrain hides is taken
-    as readily as one in plain view. Measured in Node against the real
-    modules, with the builder's camera at 12 degrees over the ground - 2
-    degrees off `MIN_PITCH`, so a view a pilot can hold: a 400 unit extrusion
-    at `x = -600` and a 200 unit tower on the flat ground at `x = 100`. Of 39
-    aims across the cliff's face, 11 answered the tower. On the first the
-    ground is met 6,134 units along the ray, on the cliff's near face, and the
-    tower's box is entered 7,156 units along - 1,022 units further on and out
-    of sight. The hover reads through the same call, so the outline goes to
-    the hidden building first and the pick looks like a fault in the outline.
-    Asking the boxes first is right and is not the defect; the missing
-    comparison is.
-  - **Goal**: Resolve to [object-picked-through-the-ground.prompt.md](.claude/prompts/object-picked-through-the-ground.prompt.md)
-  - **Settled**: `objectRayAt` takes a `within` in the direction's own lengths
-    and refuses a box entered beyond it, and `pickPlacementAt` reads the ground
-    first and hands over `rayDistance(origin, direction, point)` - `Infinity`
-    where the ray meets no ground, which refuses nothing. Worked after the
-    hover item as that prompt asked, so the limit went into a pass that had
-    already been given a reason to look at the ray: `rayNearsFootprint` reads
-    it too, and a box past where the ray stops is now refused without its
-    ground being read, so the comparison costs less than nothing. Held in Node
-    by the limit's three cases and by two sweeps over a cliff and a tower built
-    on a real field through the real compositor, and in `test/page.test.js` by
-    pins on the order of the three calls in `pickPlacementAt`, which a mutation
-    run proved by putting the old order back. Settled in Chromium: of 31 aims
-    across the block's face, the 7 the unbounded pass answers the tower for all
-    pick the block now, and 21 of 21 aims from the side where nothing hides it
-    still take the tower.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] Opening Lever 1: the throttle is raised past what the plane's floor
-  needed, over a setting the pilot entered
-  - **Issue**: `planeStart` reads the throttle it raises to off the speed the
-    start ends up carrying rather than off the plane's own floor, so a pilot
-    who asks for a speed above the floor has `START THROTTLE` raised as well -
-    in a case where no plane was near its stall and nothing needed holding.
-    `START AIRSPEED` 200 knots with `START THROTTLE` 20 per cent opens the
-    trainer's lever at 50 per cent, the jet's at 33 and the biplane's at 67,
-    each asking for 100 rather than the 40, 60 and 30 the pilot set.
-    `docs/controls/settings.html` - a file this turn edited - still says *a
-    start whose throttle asks for a different speed than it was given is flown
-    exactly as written*, and `START THROTTLE`'s note in `js/config.js`, in the
-    object whose `START AIRSPEED` note this turn rewrote, still reads *the
-    lever setting the flight opens with*. The suite cannot see it: every
-    assertion is built from `DEFAULT_CONFIG.start`, where the asked speed and
-    the floor are the same figure for all five planes.
-  - **Goal**: Resolve to [opening-lever-overrides-the-pilot.prompt.md](.claude/prompts/opening-lever-overrides-the-pilot.prompt.md)
-  - **Settled**: the prompt's first option, bounding the raise by the floor -
-    `holds` in `planeStart` is read off `Math.max(floor, 0) / maxSpeed` rather
-    than off `speed`, which is the greater of the floor and what the pilot
-    asked for. So a plane whose floor wants more than the lever was set to
-    still gets it, and a lever already above that is left where the pilot put
-    it. The documentation was the half that was right, so it stands: the
-    paragraph closing the start fields in `docs/controls/settings.html` and
-    `START THROTTLE`'s note in `js/config.js` are both true again untouched,
-    and what changed instead were the three accounts that had promised more -
-    `planeStart`'s own second bullet, the previous `CHANGELOG.md` entry's *to
-    exactly what holds that speed*, and the sentences in `docs/terrain.html`
-    and `docs/controls/settings.html` that said the lever asks for the opening
-    speed. The suite could not see the defect because `askedStart` is built
-    from `DEFAULT_CONFIG.start`, where the asked speed and the floor are the
-    same figure for all five planes; the assertion that read as a general rule
-    now says that, and two tests either side of the floor hold the rest.
-  - From: Interactive Build Mode `->` Closing the Builder's Gaps
-- [x] **Undo and redo**: `Ctrl+Z` takes back the last change to the world - a
-  placement added, moved, stepped or erased, a start point set or a plane
-  chosen - and `Ctrl+Shift+Z` or `Ctrl+Y` puts it back, with UNDO and REDO on
-  the dock's bar
-  - A capped history of the session's world, a step pushed when an edit is
-    accepted rather than at every move of a drag, so one gumball drag is one
-    step; cleared when a world is loaded or the canvas opened afresh. A test
-    walks a session through add, move, erase, undo and redo and expects each
-    world back as it was.
-  - **Settled**: `js/build-history.js` holds the stack and the key
-    combinations; `markBuildEdit` in `js/build-mode.js` pushes a snapshot of
-    `worldSnapshot` before every settled edit, which is `acceptDraft` for
-    everything made through a draft and the start point and plane writes for
-    what is not. A sequence of writes that is one act - a knob dragged round -
-    shares a `run` and pushes once. `UNDO` and `REDO` are the first two of the
-    dock's new bar, `dockBar`, which is on every panel on a canvas and is why
-    `dockContent` no longer answers null there. Fifty steps, emptied when a
-    canvas opens or a world is loaded over one, and forgotten when an asset is
-    removed - a step back across that would put back placements referring to a
-    model nothing can draw.
-  - From: Interactive Build Mode `->` Editor Workflow
-- [x] **The outliner**: a folding OUTLINER section in the dock listing every
-  placement by name and type in the order drawn, where a row selects its
-  placement, renames it, hides it from the canvas while building, or locks it
-  against Select and Erase
-  - Hidden and locked are building aids: a hidden placement is still flown,
-    and both are saved in the file so a reopened world keeps them.
-  - After: Undo and redo, so a rename or a lock is a step like any other
-  - **Settled**: the three fields are `js/outliner.js`, a pure module with no
-    imports so `js/environment/erase.js` can read a lock without importing the
-    dock. The section is `outlinerSection` in `js/build-panel.js`, above what
-    Select is looking at, and its rows are drawn by `drawOutlinerRow` in
-    `js/panel-view.js`: a press, a name field over the type's label, and `H`
-    and `L`. Hiding is read in `canvasElements` and nowhere else, so a hidden
-    placement is off the canvas and still in what a flight and a file are drawn
-    from; a lock is read in `resolveErasures` and `erasedObjects`, live, so it
-    lifts the cut a batch was making and unlocking puts it back. Neither is
-    pickable - `placementReach` answers nothing for one - and a row that turns
-    either box on lets go of the pick. All three are carried in the file and
-    named in the schema, and each is a step of the history.
-  - From: Interactive Build Mode `->` Editor Workflow
 - [x] **Snapping**: a grid and an angle the gumball's moves and turns snap to,
   switched on the dock's bar with their sizes in the builder settings - 10 m
   and 15 degrees to start - the grid drawn faintly round the pointer while it
@@ -936,3 +796,151 @@ how the simulator got here rather than as a list still to be worked.
     distance and leaves the angles, which is the whole difference between it
     and `Home`. `Ctrl+F` is still the browser's find.
   - From: Interactive Build Mode `->` Editor Workflow
+- [x] The outliner's row controls are under a fingertip on a touch phone
+  - **Issue**: on an emulated touch phone the row's select press measures
+    18 x 19 CSS pixels and the `H` and `L` boxes 22 x 18, against the roughly
+    44 px a fingertip needs. `index.html` already answers a coarse pointer -
+    its `@media (pointer: coarse)` block lifts `.dock-spin` to 22 px wide and
+    `.dock-field .dock-value` to a 32 px minimum height - but the outliner's
+    controls, added this turn, were not named in it. A tap driven at the exact
+    centre works, so this is reach rather than function.
+  - **Goal**: Resolve to [outliner-touch-targets.prompt.md](.claude/prompts/outliner-touch-targets.prompt.md)
+  - **Settled**: the coarse-pointer block now lifts the three controls to the
+    32 px the dock's own values already use and widens the row's outer columns
+    to match, which a phone's dock has the room for. Measured again in
+    Chromium on an emulated touch phone: the press, `H` and `L` each 32 x 32,
+    the name field 239 x 32, and the dock not overflowing at that width.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] Two unnamed placements of a kind read identically in the outliner
+  - **Issue**: a row never named shows its type alone, so two mountains are
+    two rows both reading `MOUNTAIN` with nothing on either to tell them
+    apart - not an index, not a count, not where each stands. Pressing a row's
+    `▸` lights it on the canvas, which is the only way to tell which is which,
+    and that is a press per row on a list that exists to save them.
+  - **Goal**: give an unnamed row something of its own - the simplest is to
+    number the duplicates of a type as they are listed, `MOUNTAIN 1`,
+    `MOUNTAIN 2`, drawn as the placeholder so a typed name still replaces it
+    whole and nothing is written into the placement. `placementNamed` in
+    `js/outliner.js` takes the fallback, and `outlinerSection` in
+    `js/build-panel.js` is where the rows are built and knows the whole list.
+  - **Settled**: `outlinerLabels` in `js/build-panel.js` numbers a type from 1
+    wherever more than one of it is listed and leaves a type listed alone as
+    it was, and the row's press and its two boxes are named by the same label,
+    so a row reads `Select MOUNTAIN 2` as well. Nothing is written into the
+    placement.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] A dimmed `UNDO` never says why it cannot be pressed
+  - **Issue**: `canUndoBuild` is false both when there is nothing to go back
+    to and when an edit is in hand - `historyReady` requires `!editPending` -
+    and the button looks the same either way: `disabled`, opacity 0.35, with
+    no `title`, no `aria-label` and no status line anywhere on the dock. With
+    a mountain dropped and not yet accepted, `UNDO` is dimmed while the
+    history holds a step, and nothing on screen connects the two.
+  - **Goal**: give the bar's two steps a `title` that names the reason, the
+    way `.dock-outliner-pick` already carries `Select MOUNTAIN` - "Accept or
+    cancel the edit first" while a draft is pending, "Nothing to undo" while
+    the history is empty. `dockBar` in `js/build-panel.js` already asks
+    `canUndoBuild` and `canRedoBuild`, so it is the place that knows which of
+    the two it is; `panel-view.js` draws the button.
+  - **Settled**: `dockBar` carries a `title` on every answer. A step says what
+    it takes back where it can be pressed, and dimmed names the reason - the
+    third being a question open on the canvas, which `historyReady` refuses a
+    step for as well. It is written on every draw rather than only where the
+    bar is built, since an edit taken in hand changes the reason with nothing
+    about the panel changing shape, and it goes on `aria-label` too so a
+    reader hears it.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] The bar's two switches read as two more steps until one is turned on
+  - **Issue**: `UNDO`, `REDO`, `GRID` and `ANGLE` share one class and one
+    resting look. With a step to go back to and both snaps off, all four draw
+    the same - same background, same border, same colour - so nothing says
+    that two of them do something once and two of them stay on. A snap that
+    is on lights green, which tells the pilot afterwards rather than before.
+  - **Goal**: mark the two switches as switches at rest, not only when lit -
+    a different border or a small state mark on `GRID` and `ANGLE`, or a
+    divider between the pair of steps and the pair of switches. They are
+    already separable in the data: `DOCK_SNAP_GRID` and `DOCK_SNAP_ANGLE`
+    carry a `snap` field and the two steps do not, and `dockBar` writes
+    `pressed` for the switches and leaves it off the steps.
+  - **Settled**: a switch carries `dock-bar-switch` as well, written off the
+    `pressed` a step does not have, and the stylesheet draws it a ring in its
+    own colour - at rest as a ring, filled once the switch is on. Seen in
+    Chromium: the ring on `GRID` and `ANGLE` and on neither step, with both
+    snaps off.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] A long name cannot be read in the field it is left in
+  - **Issue**: the name field is 203 px on a desktop dock and holds up to
+    `PLACEMENT_NAME_LIMIT` 40 characters. A 35 character name overflows it -
+    `scrollWidth` past `clientWidth` - and the input carries no `title`, so
+    once focus leaves there is no way to read the whole name without clicking
+    into the field and scrolling it. The outliner's point is telling rows
+    apart, which a name half of which is cut does less well.
+  - **Goal**: set the field's `title` to the name it holds as it is drawn, in
+    `drawOutlinerRow` in `js/panel-view.js`, so hovering reads the whole of
+    it; the `aria-label` there is the type's `"<TYPE> name"` and should stay
+    as it is.
+  - **Settled**: the field's `title` is what it reads as - the name, or the
+    numbered placeholder for a row never named - written as the row is drawn
+    and kept in step by `update`, inside the guard that leaves the field being
+    typed into alone. The `aria-label` is untouched. Measured in Chromium: a
+    36 character name overflows the 203 px field and the whole of it is on the
+    title.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] The bar's label is written on an element no reader announces it for
+  - **Issue**: `index.html` draws the bar as
+    `<div id="build-dock-bar" data-dock="bar" aria-label="Edit bar">`. A bare
+    `div` maps to the `generic` role, which prohibits a name from the author,
+    so a screen reader drops the label and reads the bar as four loose
+    buttons between the heading and the fields. The file's own practice is the
+    other way - `<aside id="build-dock" aria-label="Tool controls">` labels an
+    element whose role takes a name - so this is the one label in the dock
+    that does nothing.
+  - **Goal**: give the bar a role its label belongs to. `role="toolbar"` is
+    the closer fit - it is a row of controls acting on the session - and
+    brings arrow-key navigation as an expectation; `role="group"` names it
+    without that promise. Either way the `aria-label` then reads, and the pin
+    in `test/page.test.js` that matches the bar's tag should name the role.
+  - **Settled**: `role="group"`, and the pin now names it. `toolbar` was the
+    other option and was not taken: it is expected to be one tab stop with the
+    arrow keys moving inside it, which the bar does not do, so it would have
+    promised a keyboard behaviour that is not there. `group` makes the label
+    read, which is the whole of the defect.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] Nothing holds the outliner's rows or the dock's bar as they are drawn
+  - **Issue**: `js/panel-view.js` gained the bar's buttons, `drawOutlinerRow`,
+    `outlinerBox`, the bar and outliner branches of `update`, two branches of
+    `onClick` and one of `onChange`, and no test names
+    `dock-outliner-row`, `dock-outliner-pick`, `dock-outliner-box`,
+    `dock-outliner-name` or `dock-bar-answer` - nor do the styles those
+    classes are drawn by in `index.html`. The content both are drawn from is
+    held (`outlinerSection` in `test/outliner.test.js`, `dockBar` in
+    `test/build-history.test.js`); the drawing is not. So the `drawn` key
+    `outliner:${index}` could stop matching between the two methods, the
+    `onClick` branch could move below `dataset.section`, or a class could be
+    renamed out from under the stylesheet, and the suite would stay green.
+  - **Goal**: hold it the two ways this repository already holds drawing code.
+    Source pins in `test/page.test.js` for the row's four parts, the press
+    order in `onClick` and the `styled(indexHtml, ...)` rules behind the
+    classes; and a stub-driven run of the methods themselves in
+    `test/panel-view.test.js`, the way
+    `PanelView.prototype.showStatus.call(stub, ...)` already runs one against
+    a stub with no DOM behind it - `update` needs a `document.activeElement`
+    shim and nothing else.
+  - **Settled**: both ways. `test/page.test.js` pins the row's four parts, the
+    `drawn` key spelt the same way in `drawOutlinerRow` and `update`, the
+    press order in `onClick`, and the stylesheet rules behind the four
+    classes; `test/panel-view.test.js` runs `drawOutlinerRow`, `build` and
+    `update` against a stub element and a `document` shim, which is what holds
+    what each part is told and that a redraw writes the row it drew. A
+    mutation run of ten mutants over the day's changes caught every one.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] `js/build-panel.js` imports `committedPlacements` and never reads it
+  - **Issue**: the import added at line 29 is unused - `outlinerSection`
+    reads `state?.placements ?? []` directly - so the module declares a
+    dependency it does not have.
+  - **Goal**: drop the name from the import, or read the placements through it
+    in `outlinerSection` if the copy was the intent.
+  - **Settled**: dropped. `outlinerSection` reading the session's placements
+    directly was the intent, and the same import now brings `confirmOpen` and
+    `editPending`, which the bar's titles need.
+  - From: UI/UX Override - the editor workflow's four additions
