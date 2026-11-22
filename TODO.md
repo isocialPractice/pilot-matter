@@ -43,69 +43,63 @@ its context survives being archived.
     each row it overrides.
   - From: Interactive Build Mode `->` Starter Worlds
 
-### UI/UX Override - the dock's bar and the outliner's rows
+### Code Review Override - the dock's remaining touch targets
 
 #### Found Issues
 
-- [ ] The dock's bar answers are under a fingertip on a touch phone
-  - **Issue**: the coarse-pointer block in `index.html` now lifts the
-    outliner's row controls to 32 px, taking that figure from
-    `.dock-field .dock-value`, which the same block already lifts. The bar
-    pinned under the panel heading - `UNDO`, `REDO`, `GRID`, `ANGLE`, the
-    session's own four answers - was never named in that block, and measures
-    74 x 22, 88 x 22 and 96 x 22 CSS pixels on an emulated touch phone
-    (Chromium, `devices['iPhone 13']`, 390 x 664, a coarse pointer, Select
-    live on a blank canvas). That is ten pixels under the floor the same
-    stylesheet now sets for the rows below it in the same dock, and half the
-    roughly 44 a fingertip wants. `button.dock-section`, the fold heading, is
-    30 px tall for the same reason, though it spans the dock's whole width.
-    `.dock-spin button` is 22 x 15 and is left alone: its 22 px column was
-    settled deliberately when the dock's own spinners replaced the browser's.
-  - **Goal**: Resolve to [dock-bar-touch-targets.prompt.md](.claude/prompts/dock-bar-touch-targets.prompt.md)
-  - From: UI/UX Override - the dock's bar and the outliner's rows
-- [ ] The outliner row's coarse-pointer rule reaches wider screens than the
-  reason written beside it covers
-  - **Issue**: the comment on the new rule in `index.html` says the widened
-    columns are what "a phone's dock has the room for - it is 340 to 370 px
-    wide against the 300 of a desktop", but `@media (pointer: coarse)` is
-    bounded by the pointer and not by the width, while the dock is widened to
-    the screen only inside `@media (max-width: 640px)`. So a coarse pointer on
-    a screen wider than that - a tablet in landscape, a touchscreen laptop -
-    keeps the 300 px side dock and gets the 32 px columns anyway. Arithmetic
-    off the stylesheet, with the global `box-sizing: border-box`: a 300 px dock
-    is 274 px inside its border and its 12 px padding, so at `18px 1fr 22px
-    22px` with 3 px gaps the name field is 274 - 62 - 9 = 203 px, which is the
-    figure the row's own docstring in `js/panel-view.js` gives, and at `32px
-    1fr 32px 32px` it is 274 - 96 - 9 = 169 px. The field loses 34 px on the
-    one device class where the `title` this turn added to it cannot be
-    hovered. Nothing overflows - `.dock-outliner-name` carries `min-width: 0` -
-    and no figure here was measured in a browser.
-  - **Goal**: settle which the rule is for and make the stylesheet and its
-    comment say the same thing: either bound the rule the way the dock's own
-    width is bounded, `@media (pointer: coarse) and (max-width: 640px)`, or
-    keep it as it stands and write the comment to the pointer rather than to a
-    phone's width. Measure the row on a coarse pointer wider than 640 px
-    before choosing, since 169 px is arithmetic rather than a reading. The
-    `CHANGELOG.md` entry for 1.0.0-alpha.1.67.1 carried the same claim and was
-    corrected in place by this review, so only the comment is left.
-  - From: UI/UX Override - the dock's bar and the outliner's rows
-- [ ] `dockBar`'s docstring counts two reasons for a dimmed step where the
-  code gives three
-  - **Issue**: the docstring over `BAR_SNAP_TITLES` in `js/build-panel.js`
-    reads "A step is dimmed for two quite different reasons - there is nothing
-    to go back to, or there is and an edit is in hand". `barStepTitle`, eighteen
-    lines below it, has three branches, and `historyReady` in
-    `js/build-mode.js` refuses a step on `confirmOpen` as well as on
-    `editPending` - which is why `BAR_CONFIRM_TITLE` is declared four lines
-    under that very sentence. `CHANGELOG.md`, `docs/terrain.html` and the test
-    in `test/build-history.test.js` all say three. The docstring is the one
-    place that says two, and it is the place a reader of `barStepTitle` reads
-    first, so the next model to work this module is as likely to read the
-    confirm branch as surplus as to check it.
-  - **Goal**: three, with the question on the canvas named beside the other
-    two, in the one sentence that says otherwise. Nothing else about the
-    docstring is wrong and no code changes.
-  - From: UI/UX Override - the dock's bar and the outliner's rows
+- [ ] Five more of the dock's answers are under a fingertip, and the comment
+  beside the new floor says there are none left
+  - **Issue**: this turn lifted `.dock-bar-answer` and `button.dock-section`
+    to 32 px in the `@media (pointer: coarse)` block of `index.html`, and the
+    comment over that rule, `index.html:1669`, gives the two of them as "the
+    other two answers in the dock a finger lands on". Five more are answers a
+    finger lands on, none of them is named in that block, and none of them
+    reaches 32. `.dock-step` (`index.html:1527`) is `min-height: 24px` and
+    24 px wide, since `.dock-row` (`index.html:1477`) lays a row out as
+    `1fr 24px 84px 24px`, and it is the mark that steps every switch, every
+    choice and the `PAN` and `MOVE` nudges, so a pilot reaches it on more
+    edits than the bar. `.dock-pick` (`index.html:1717`), the reading a press
+    steps round, is 24. `.dock-text-row .dock-text` (`index.html:1688`), the
+    name SAVE / LOAD writes a world under, is 24. `.dock-swatch`
+    (`index.html:1876`) is 30. `.dock-dropper` (`index.html:1912`) is a fixed
+    `height: 30px` rather than a floor, so a `min-height` added to the coarse
+    block would not move it at all. Nothing is broken - a tap driven at the
+    centre works, which is the reach-rather-than-function framing the
+    outliner's own item used - but that sentence is what the next reader
+    looking for what is left will read, and it says nothing is.
+  - **Goal**: measure the five on a coarse pointer first, the way this turn
+    measured the bar, then either lift them to the same 32 px or leave a
+    figure where it is and say in the comment which figure and why - the way
+    `.dock-spin button` is already left there with its reason. `.dock-step`
+    and `.dock-pick` want the column widened as well as the floor raised, as
+    `.dock-outliner-row` was, and `.dock-dropper` wants its `height` turned
+    into a `min-height` before a floor can reach it. Either way the comment
+    at `index.html:1669` must name what the block covers and what it
+    deliberately leaves, rather than reading as though the dock were done.
+  - From: Code Review Override - the dock's remaining touch targets
+- [ ] Three figures in the dock's prose the code no longer supports
+  - **Issue**: two of them bless the 30 px this turn measured as two under
+    the floor. The comment over `.dock-section`, `index.html:1492`, says a
+    folding heading is "a button, marked open or shut, tall enough for a
+    fingertip", and `test/page.test.js:4522` asserts `min-height: 30px;` with
+    `'tall enough for a fingertip'` as its message - while
+    `test/page.test.js:4007` and `index.html:1669`, both written this turn,
+    say 30 is under the floor the same stylesheet gives the rows in the same
+    dock. A model reading either of the first two first concludes the fold
+    heading was already a fingertip target and the coarse rule is surplus,
+    which is the trap the `dockBar` docstring item was queued for. The third
+    is older: `js/panel-view.js:341` says "the row is 276 pixels wide", and
+    the row is 274 - a 300 px dock less its 1 px border each side less the
+    24 px of `#build-dock-fields`' padding - which is the figure the same
+    docstring's own 203 is derived from, 274 - 62 - 9. This turn read the
+    276 as the desktop row and wrote in its settle note that the row
+    "measures 344 px at 390 and 274 at 320", so the two figures in one
+    docstring still disagree by 2 px.
+  - **Goal**: `index.html:1492` and `test/page.test.js:4522` say what 30 px
+    is - the figure a mouse is given, with the fingertip's 32 in the coarse
+    block - rather than calling it a fingertip's. `js/panel-view.js:341` says
+    274. No code changes in any of the three.
+  - From: Code Review Override - the dock's remaining touch targets
 
 ## Game UI/UX
 
@@ -799,61 +793,95 @@ items in this section applies a patch version update.
     pond reads as an even surface with glints on it.
   - **Evidence**: `.user-feedback/img/build-water-spot-removal.png` (local only;
     a drawn pond mottled with pale patches, the callouts marking them)
+- [ ] `repo-content-skills`: Five repository skills that explain Pilot Matter and turn the explanation into narrated video
+  - **Issue**: `.claude/skills/` holds twelve skills and one of them is about
+    this project: `interactive-build-mode`, written for a run changing the
+    builder's modules rather than for explaining the builder to somebody
+    watching. Nothing in the repository gathers what it knows about the
+    simulator itself, which is spread across `docs/api.md`,
+    `docs/api-reference.html`, `docs/project-structure.html` and the `js/`
+    modules, and nothing knows how to turn an answer into a script, a
+    narration or a finished video. Every piece of outreach starts from the
+    source again.
+  - **Goal**: Five skills under `.claude/skills/`, each its own folder with a
+    `SKILL.md`, in the shape `interactive-build-mode` already uses.
+    `interactive-build-mode-expert` explains the builder to a viewer rather
+    than to a run, from the module map and the tool list that skill already
+    carries, and writes instructional scripts from it. `pilot-matter-expert`
+    covers the simulator as a whole, the API in `docs/api.md`, the module
+    layout, the pages under `docs/` and taking the project as a dependency,
+    and writes educational scripts. `voice-actor` turns a script into
+    narration in a lightly British voice that reads excited, informed or wry
+    as the script asks, and names the narration route it drives as an input
+    the owner supplies rather than assuming one is installed.
+    `pilot-matter-content-creator` drives After Effects, Illustrator and
+    Photoshop through the Adobe scripting skills already on this machine to
+    cut a script and its narration into a video. `social-media-manager` plans
+    what goes out and prepares each post for the owner to publish, holding no
+    credential and publishing nothing itself, since no tool on this machine
+    posts to a social account and the accounts themselves stay in the local
+    inbox rather than in this file.
+  - **Done when**: Each of the five folders holds a `SKILL.md` whose front
+    matter names it and says when to use it, and
+    `interactive-build-mode-expert` and `pilot-matter-expert` each produce a
+    script for one feature of the repository from the repository alone.
+- [ ] **User only**: `instructional-video-posts`: Narrated Interactive Build Mode videos go out on a settled cadence
+  - **Issue**: Interactive Build Mode is the largest thing in the repository
+    and the only account of it for somebody who has not read the code is
+    `docs/terrain.html` and `CHEATSHEET.md`, both written to be read rather
+    than watched. No routine takes a builder feature, writes a script for it,
+    narrates it, cuts it and puts it in front of anybody, so each new tool
+    lands with nothing explaining it.
+  - **Goal**: A standing routine that produces one instructional video a cycle
+    about a builder feature and leaves it ready to publish: the script from
+    `interactive-build-mode-expert`, the narration from `voice-actor`, the cut
+    from `pilot-matter-content-creator`, and the plan and the post copy from
+    `social-media-manager`. The finished files land outside the repository, in
+    the folder the owner names, nothing is published by a run, and the accounts
+    to publish to stay in the local inbox rather than in this file.
+  - **Decide first**: Two questions the repository cannot answer. The cadence:
+    weekly builds an audience fastest and is a video a week to make; monthly
+    sits alongside the roadmap without crowding it and reads as quiet; one per
+    release ties each video to work already finished and leaves gaps as long as
+    the release gaps. The reach: a short for every platform is the least edit
+    and suits the builder's short gestures; one long video with shorts cut from
+    it carries a whole workflow and doubles the edit; a single platform is the
+    smallest commitment and the smallest result.
+  - **After**: `repo-content-skills`
+- [ ] **User only**: `educational-content-posts`: Educational posts about the simulator itself go out on a settled cadence
+  - **Issue**: The repository explains itself only to a reader who opens it:
+    `README.md`, `QUICKSTART.md` and the pages under `docs/` cover the API, the
+    flight model and the project layout, and none of it reaches anybody who has
+    not already found the repository. Nothing turns a module, an API call or a
+    piece of the flight model into a post or a video, so the parts of the
+    project that would interest somebody building on it are invisible from
+    outside.
+  - **Goal**: A standing routine that produces one educational piece a cycle
+    about the simulator itself, a module, an API call, the flight model or
+    taking the project as a dependency, and leaves it ready to publish: the
+    script from `pilot-matter-expert`, the narration from `voice-actor`, the cut
+    or the still from `pilot-matter-content-creator`, and the plan and the post
+    copy from `social-media-manager`. The finished files land outside the
+    repository, in the folder the owner names, nothing is published by a run,
+    and the accounts to publish to stay in the local inbox rather than in this
+    file.
+  - **Decide first**: Two questions the repository cannot answer. The cadence,
+    on the same three readings as the instructional videos, and whether the two
+    share one calendar or keep their own: one calendar is a single decision and
+    halves what goes out per subject; two calendars double the output and the
+    work. The form: video for everything matches the instructional side and
+    costs the most per piece; a still or a code card for the educational side is
+    far cheaper and reaches a different reader; alternating keeps both and
+    settles neither cadence cleanly.
+  - **After**: `repo-content-skills`
 
 ## Complete
 
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 445 earlier items in `TODO-archive.md`, newest last.
+> 448 earlier items in `TODO-archive.md`, newest last.
 
-- [x] **Snapping**: a grid and an angle the gumball's moves and turns snap to,
-  switched on the dock's bar with their sizes in the builder settings - 10 m
-  and 15 degrees to start - the grid drawn faintly round the pointer while it
-  is on
-  - **Settled**: the switches are the session's (`buildSnap`,
-    `toggleBuildSnap`) and the sizes the builder's settings' (`GRID SIZE` and
-    `ANGLE SIZE` under a new `SNAPPING` heading); `buildSnapSteps` is where the
-    two meet, and `dragHandle` takes what it answers. It reaches the moves and
-    the turns and no size: a range is read against its own bounds. A
-    footprint's angle is snapped in degrees and written back in radians, since
-    the angles offered divide a quarter turn. The grid is `snapGridRuns`, read
-    off the point snapped to it so it stands still across a cell, and drawn at
-    `snapGridStep` - the first doubling of the step whose cell covers twelve
-    screen pixels, because Chromium measured the step itself at 36 lit pixels
-    from the opening view.
-  - From: Interactive Build Mode `->` Editor Workflow
-- [x] **Frame the selection**: `F` turns and moves the builder's camera to
-  frame the selection, or the whole world when nothing is selected, as
-  engines' editors do
-  - Check `F` against the key map and the reserved keys first: the builder
-    reads its keys only while it is open, but a key the flight binds must not
-    mean two things.
-  - **Settled**: `KeyF` was checked and is free - not a reserved key, not in
-    `DEFAULT_KEYMAP`, `RESET_KEYS` or `LEVEL_OFF_KEYS`, and none of the keys a
-    canvas already reads - and it is left unreserved for the same reason
-    `W/A/S/D` are, the builder reading its keys only while it is open.
-    `framedBounds` in `js/build-select.js` says what is framed, through a new
-    `placementBounds` that squares off a footprint, a peak's ellipse, a group's
-    strips or an object's box; `frameBuildCamera` moves the target and the
-    distance and leaves the angles, which is the whole difference between it
-    and `Home`. `Ctrl+F` is still the browser's find.
-  - From: Interactive Build Mode `->` Editor Workflow
-- [x] The outliner's row controls are under a fingertip on a touch phone
-  - **Issue**: on an emulated touch phone the row's select press measures
-    18 x 19 CSS pixels and the `H` and `L` boxes 22 x 18, against the roughly
-    44 px a fingertip needs. `index.html` already answers a coarse pointer -
-    its `@media (pointer: coarse)` block lifts `.dock-spin` to 22 px wide and
-    `.dock-field .dock-value` to a 32 px minimum height - but the outliner's
-    controls, added this turn, were not named in it. A tap driven at the exact
-    centre works, so this is reach rather than function.
-  - **Goal**: Resolve to [outliner-touch-targets.prompt.md](.claude/prompts/outliner-touch-targets.prompt.md)
-  - **Settled**: the coarse-pointer block now lifts the three controls to the
-    32 px the dock's own values already use and widens the row's outer columns
-    to match, which a phone's dock has the room for. Measured again in
-    Chromium on an emulated touch phone: the press, `H` and `L` each 32 x 32,
-    the name field 239 x 32, and the dock not overflowing at that width.
-  - From: UI/UX Override - the editor workflow's four additions
 - [x] Two unnamed placements of a kind read identically in the outliner
   - **Issue**: a row never named shows its type alone, so two mountains are
     two rows both reading `MOUNTAIN` with nothing on either to tell them
@@ -987,3 +1015,92 @@ how the simulator got here rather than as a list still to be worked.
     directly was the intent, and the same import now brings `confirmOpen` and
     `editPending`, which the bar's titles need.
   - From: UI/UX Override - the editor workflow's four additions
+- [x] The dock's bar answers are under a fingertip on a touch phone
+  - **Issue**: the coarse-pointer block in `index.html` now lifts the
+    outliner's row controls to 32 px, taking that figure from
+    `.dock-field .dock-value`, which the same block already lifts. The bar
+    pinned under the panel heading - `UNDO`, `REDO`, `GRID`, `ANGLE`, the
+    session's own four answers - was never named in that block, and measures
+    74 x 22, 88 x 22 and 96 x 22 CSS pixels on an emulated touch phone
+    (Chromium, `devices['iPhone 13']`, 390 x 664, a coarse pointer, Select
+    live on a blank canvas). That is ten pixels under the floor the same
+    stylesheet now sets for the rows below it in the same dock, and half the
+    roughly 44 a fingertip wants. `button.dock-section`, the fold heading, is
+    30 px tall for the same reason, though it spans the dock's whole width.
+    `.dock-spin button` is 22 x 15 and is left alone: its 22 px column was
+    settled deliberately when the dock's own spinners replaced the browser's.
+  - **Goal**: Resolve to [dock-bar-touch-targets.prompt.md](.claude/prompts/dock-bar-touch-targets.prompt.md)
+  - **Settled**: `.dock-bar-answer` and `button.dock-section` take
+    `min-height: 32px` in the `@media (pointer: coarse)` block, the same figure
+    the dock's own values and the outliner's rows already use. Measured in
+    Chromium on 11-22-26 at 900, 390, 360 and 320 px wide: the four answers
+    were 22 px tall at every one of them and the fold headings 30, and all six
+    controls read 32 afterwards with the four still on one line at 320, their
+    switch rings drawn clear of the words, and neither the dock nor its fields
+    overflowing. The prompt's claim that the four sit "in a 276 px row" is the
+    desktop dock's row and was not relied on: the row measures 344 px at 390
+    and 274 at 320. `.dock-spin button` was left at its deliberate 22 px
+    column, which a test now pins.
+  - From: UI/UX Override - the dock's bar and the outliner's rows
+- [x] The outliner row's coarse-pointer rule reaches wider screens than the
+  reason written beside it covers
+  - **Issue**: the comment on the new rule in `index.html` says the widened
+    columns are what "a phone's dock has the room for - it is 340 to 370 px
+    wide against the 300 of a desktop", but `@media (pointer: coarse)` is
+    bounded by the pointer and not by the width, while the dock is widened to
+    the screen only inside `@media (max-width: 640px)`. So a coarse pointer on
+    a screen wider than that - a tablet in landscape, a touchscreen laptop -
+    keeps the 300 px side dock and gets the 32 px columns anyway. Arithmetic
+    off the stylesheet, with the global `box-sizing: border-box`: a 300 px dock
+    is 274 px inside its border and its 12 px padding, so at `18px 1fr 22px
+    22px` with 3 px gaps the name field is 274 - 62 - 9 = 203 px, which is the
+    figure the row's own docstring in `js/panel-view.js` gives, and at `32px
+    1fr 32px 32px` it is 274 - 96 - 9 = 169 px. The field loses 34 px on the
+    one device class where the `title` this turn added to it cannot be
+    hovered. Nothing overflows - `.dock-outliner-name` carries `min-width: 0` -
+    and no figure here was measured in a browser.
+  - **Goal**: settle which the rule is for and make the stylesheet and its
+    comment say the same thing: either bound the rule the way the dock's own
+    width is bounded, `@media (pointer: coarse) and (max-width: 640px)`, or
+    keep it as it stands and write the comment to the pointer rather than to a
+    phone's width. Measure the row on a coarse pointer wider than 640 px
+    before choosing, since 169 px is arithmetic rather than a reading. The
+    `CHANGELOG.md` entry for 1.0.0-alpha.1.67.1 carried the same claim and was
+    corrected in place by this review, so only the comment is left.
+  - **Settled**: measured first, as the goal asked. On a coarse pointer at
+    900 x 700 the dock is the desktop's 300 px and the row's name field 169,
+    which is the arithmetic confirmed as a reading, against 203 on a desktop
+    and 239 on a 390 px phone; nothing is cut at 169 and nothing overflows.
+    The rule is kept as it stands, on the pointer, and the comment is written
+    to the pointer: a finger is the same size on a tablet, so bounding the rule
+    by `max-width: 640px` would put a 22 px target under one on every
+    touchscreen wider than a phone, which is the defect the rule exists to fix,
+    to buy back 34 px of a field that is not cut and takes a caret on a tap.
+    The row's docstring in `js/panel-view.js` now carries the coarse figures
+    beside the 203 it already gave, and says `title` cannot be hovered there.
+  - From: UI/UX Override - the dock's bar and the outliner's rows
+- [x] `dockBar`'s docstring counts two reasons for a dimmed step where the
+  code gives three
+  - **Issue**: the docstring over `BAR_SNAP_TITLES` in `js/build-panel.js`
+    reads "A step is dimmed for two quite different reasons - there is nothing
+    to go back to, or there is and an edit is in hand". `barStepTitle`, eighteen
+    lines below it, has three branches, and `historyReady` in
+    `js/build-mode.js` refuses a step on `confirmOpen` as well as on
+    `editPending` - which is why `BAR_CONFIRM_TITLE` is declared four lines
+    under that very sentence. `CHANGELOG.md`, `docs/terrain.html` and the test
+    in `test/build-history.test.js` all say three. The docstring is the one
+    place that says two, and it is the place a reader of `barStepTitle` reads
+    first, so the next model to work this module is as likely to read the
+    confirm branch as surplus as to check it.
+  - **Goal**: three, with the question on the canvas named beside the other
+    two, in the one sentence that says otherwise. Nothing else about the
+    docstring is wrong and no code changes.
+  - **Settled**: the sentence names three and names the question on the canvas
+    beside the other two; nothing else in the docstring and no code changed.
+    The count is now pinned rather than kept by hand: a test in
+    `test/build-history.test.js` reads `js/build-panel.js` as text and holds
+    the sentence against the answers `barStepTitle` can give, so a fourth
+    reason cannot be added without the sentence being read again. A mutation
+    run caught the two-reason wording, the dropped third reason, and the
+    confirm branch removed from the function.
+  - From: UI/UX Override - the dock's bar and the outliner's rows
