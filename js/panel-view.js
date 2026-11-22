@@ -345,7 +345,10 @@ export class PanelView {
      * The field carries what it reads as on `title` for the same reason: a
      * name may be up to `PLACEMENT_NAME_LIMIT` characters and the field is
      * 203 pixels on a desktop dock, so a long one is cut off, and the
-     * outliner's whole point is telling rows apart.
+     * outliner's whole point is telling rows apart. A coarse pointer trades
+     * 34 of those pixels for the row's 32 px targets, leaving 169 on a side
+     * dock and 239 where a phone widens it, and there `title` cannot be
+     * hovered - the name is read by tapping the field, which scrolls.
      */
     drawOutlinerRow(entry) {
         const line = document.createElement('div');

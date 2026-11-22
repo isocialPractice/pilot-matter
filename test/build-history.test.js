@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
     createHistory, clearHistory, pushHistory, endHistoryRun, stepBack, stepForward,
     canUndo, canRedo, historyDepth, historyKey,
@@ -482,6 +484,41 @@ test('a step says what it does, or dimmed, which of the reasons it is dimmed for
     acceptDraft(state);
     requestLeave(state);
     assert.equal(title(DOCK_UNDO.id), BAR_CONFIRM_TITLE, 'a question on the canvas is the third reason');
+});
+
+/**
+ * The docstring over the titles is what a reader of `barStepTitle` reads
+ * first, and it counted two of those reasons where the function answers three
+ * - with `BAR_CONFIRM_TITLE` declared four lines under the sentence that left
+ * it out. The count is pinned to the answers the function can give, so the
+ * next one added cannot be added without the sentence being read again.
+ */
+test('the bar\'s docstring counts the same reasons the function answers with', () => {
+    const source = readFileSync(fileURLToPath(new URL('../js/build-panel.js', import.meta.url)), 'utf8');
+
+    // The comment immediately above the declaration and no earlier one, which
+    // is what holding `*/` out of the capture is for.
+    const docstring = source.match(/\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*export const BAR_SNAP_TITLES/);
+    assert.ok(docstring, 'BAR_SNAP_TITLES should carry a docstring');
+
+    // Read as prose rather than as lines: every reason here wraps, so a phrase
+    // matched against the raw comment is matched against a line break.
+    const prose = docstring[1].replace(/^\s*\*/gm, '').replace(/\s+/g, ' ').trim();
+    assert.match(prose, /dimmed for three quite different reasons/,
+        'three, which is how many answers barStepTitle has for a dimmed step');
+    assert.doesNotMatch(prose, /dimmed for two/, 'and not the two it counted before');
+    assert.match(prose, /nothing to go back to/);
+    assert.match(prose, /an edit is in hand/);
+    assert.match(prose, /a question is standing on the canvas/,
+        'the third reason named beside the other two');
+
+    const step = source.match(/function barStepTitle\(state, id, disabled\) \{([\s\S]*?)\n\}/);
+    assert.ok(step, 'barStepTitle should be findable');
+    assert.equal((step[1].match(/\breturn\b/g) ?? []).length, 4,
+        'one answer for a step that can be pressed, and three for one that cannot');
+    for (const answer of ['BAR_CONFIRM_TITLE', 'BAR_EDIT_TITLE', 'BAR_NOTHING_TITLES']) {
+        assert.match(step[1], new RegExp(`return ${answer}`), `${answer} is one of the three`);
+    }
 });
 
 test('a switch says what it snaps, whichever way it is turned', () => {

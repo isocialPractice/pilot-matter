@@ -1645,8 +1645,17 @@
                a mouse leaves them: 18 to 22 CSS pixels, against the 44 a
                fingertip wants. Lifted to the 32 px the dock's own values
                already use rather than to a second figure, and the row's outer
-               columns widened to match, which a phone's dock has the room for
-               - it is 340 to 370 px wide against the 300 of a desktop. */
+               columns widened to match.
+
+               Bounded by the pointer and not by the width, because the finger
+               is what it is for and a finger is the same size on a tablet. A
+               coarse pointer over 640 px keeps the 300 px side dock, so the
+               name field is 169 px there, against the 203 of a desktop and the
+               239 of a 390 px phone - measured 11-22-26 at 900, 390, 360 and
+               320 px wide. It is not cut at 169 and a tap puts the caret in
+               it, so those 34 px are the cheaper half of the trade: bounding
+               the rule by the width instead would leave a 22 px target under a
+               finger on every touchscreen wider than a phone. */
             .dock-outliner-row {
                 grid-template-columns: 32px 1fr 32px 32px;
             }
@@ -1654,6 +1663,22 @@
             .dock-outliner-pick,
             .dock-outliner-box,
             .dock-outliner-name {
+                min-height: 32px;
+            }
+
+            /* The bar and the fold headings, the other two answers in the dock
+               a finger lands on, and the bar is the one a pilot reaches on
+               every edit. Measured 11-22-26 at the same four widths: the bar's
+               answers are 22 CSS pixels tall at all of them and a heading is
+               30, under the floor the rows above them now have in the same
+               dock. The same 32 px again rather than a third figure.
+               `.dock-bar-answer` already carries its own padding and
+               `flex: 1 1 auto`, and `#build-dock-bar` wraps, so a floor is the
+               whole of the change. `.dock-spin button` keeps the 22 px column
+               that was settled when the dock's own spinners replaced the
+               browser's. */
+            .dock-bar-answer,
+            button.dock-section {
                 min-height: 32px;
             }
         }

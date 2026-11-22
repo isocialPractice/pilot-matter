@@ -6766,3 +6766,53 @@ still be found by name.
     either box on lets go of the pick. All three are carried in the file and
     named in the schema, and each is a step of the history.
   - From: Interactive Build Mode `->` Editor Workflow
+
+## Archived 11-22-26
+
+- [x] **Snapping**: a grid and an angle the gumball's moves and turns snap to,
+  switched on the dock's bar with their sizes in the builder settings - 10 m
+  and 15 degrees to start - the grid drawn faintly round the pointer while it
+  is on
+  - **Settled**: the switches are the session's (`buildSnap`,
+    `toggleBuildSnap`) and the sizes the builder's settings' (`GRID SIZE` and
+    `ANGLE SIZE` under a new `SNAPPING` heading); `buildSnapSteps` is where the
+    two meet, and `dragHandle` takes what it answers. It reaches the moves and
+    the turns and no size: a range is read against its own bounds. A
+    footprint's angle is snapped in degrees and written back in radians, since
+    the angles offered divide a quarter turn. The grid is `snapGridRuns`, read
+    off the point snapped to it so it stands still across a cell, and drawn at
+    `snapGridStep` - the first doubling of the step whose cell covers twelve
+    screen pixels, because Chromium measured the step itself at 36 lit pixels
+    from the opening view.
+  - From: Interactive Build Mode `->` Editor Workflow
+- [x] **Frame the selection**: `F` turns and moves the builder's camera to
+  frame the selection, or the whole world when nothing is selected, as
+  engines' editors do
+  - Check `F` against the key map and the reserved keys first: the builder
+    reads its keys only while it is open, but a key the flight binds must not
+    mean two things.
+  - **Settled**: `KeyF` was checked and is free - not a reserved key, not in
+    `DEFAULT_KEYMAP`, `RESET_KEYS` or `LEVEL_OFF_KEYS`, and none of the keys a
+    canvas already reads - and it is left unreserved for the same reason
+    `W/A/S/D` are, the builder reading its keys only while it is open.
+    `framedBounds` in `js/build-select.js` says what is framed, through a new
+    `placementBounds` that squares off a footprint, a peak's ellipse, a group's
+    strips or an object's box; `frameBuildCamera` moves the target and the
+    distance and leaves the angles, which is the whole difference between it
+    and `Home`. `Ctrl+F` is still the browser's find.
+  - From: Interactive Build Mode `->` Editor Workflow
+- [x] The outliner's row controls are under a fingertip on a touch phone
+  - **Issue**: on an emulated touch phone the row's select press measures
+    18 x 19 CSS pixels and the `H` and `L` boxes 22 x 18, against the roughly
+    44 px a fingertip needs. `index.html` already answers a coarse pointer -
+    its `@media (pointer: coarse)` block lifts `.dock-spin` to 22 px wide and
+    `.dock-field .dock-value` to a 32 px minimum height - but the outliner's
+    controls, added this turn, were not named in it. A tap driven at the exact
+    centre works, so this is reach rather than function.
+  - **Goal**: Resolve to [outliner-touch-targets.prompt.md](.claude/prompts/outliner-touch-targets.prompt.md)
+  - **Settled**: the coarse-pointer block now lifts the three controls to the
+    32 px the dock's own values already use and widens the row's outer columns
+    to match, which a phone's dock has the room for. Measured again in
+    Chromium on an emulated touch phone: the press, `H` and `L` each 32 x 32,
+    the name field 239 x 32, and the dock not overflowing at that width.
+  - From: UI/UX Override - the editor workflow's four additions

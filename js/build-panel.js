@@ -234,11 +234,12 @@ export const DOCK_BAR = Object.freeze([DOCK_UNDO, DOCK_REDO, DOCK_SNAP_GRID, DOC
  * it snaps, and a step either what it takes back or, dimmed, why it cannot be
  * pressed.
  *
- * A step is dimmed for two quite different reasons - there is nothing to go
- * back to, or there is and an edit is in hand, since `historyReady` refuses
- * one while a draft is unsettled - and the button looks the same either way.
- * So the reason is written where the pilot is already looking, the way a
- * row's own press carries `Select MOUNTAIN 1`.
+ * A step is dimmed for three quite different reasons - there is nothing to go
+ * back to, there is and an edit is in hand, or there is and a question is
+ * standing on the canvas, since `historyReady` refuses one while a draft is
+ * unsettled and refuses one while a confirm is open - and the button looks the
+ * same whichever it is. So the reason is written where the pilot is already
+ * looking, the way a row's own press carries `Select MOUNTAIN 1`.
  */
 export const BAR_SNAP_TITLES = Object.freeze({
     [DOCK_SNAP_GRID.id]:  'Snap what is moved to the grid',

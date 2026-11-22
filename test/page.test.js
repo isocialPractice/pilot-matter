@@ -3997,9 +3997,25 @@ test('the outliner\'s row controls are lifted for a finger, in the block the doc
     const coarse = indexHtml.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n        \}/);
     assert.ok(coarse, 'index.html should carry a coarse-pointer block');
     assert.match(coarse[1], /\.dock-outliner-row \{\s*grid-template-columns: 32px 1fr 32px 32px;/,
-        'the outer columns widened, which a phone\'s dock has the room for');
+        'the outer columns widened, on the pointer rather than on the screen\'s width');
     assert.match(coarse[1], /\.dock-outliner-pick,\s*\.dock-outliner-box,\s*\.dock-outliner-name \{\s*min-height: 32px;/,
         'and each lifted to the 32px the dock\'s own values already use');
+});
+
+/**
+ * The bar is the session's own answers - UNDO, REDO and the two snaps - pinned
+ * under the panel heading and reached on every edit, and `button.dock-section`
+ * is the fold heading. Neither was named in the block above, so on a coarse
+ * pointer they stood at 22 and 30 CSS pixels: ten and two under the floor the
+ * same stylesheet gives the rows below them in the same dock.
+ */
+test('the bar and the fold heading are lifted to the dock\'s own 32px for a finger', () => {
+    const coarse = indexHtml.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n        \}/);
+    assert.ok(coarse, 'index.html should carry a coarse-pointer block');
+    assert.match(coarse[1], /\.dock-bar-answer,\s*button\.dock-section \{\s*min-height: 32px;/,
+        'the bar and the fold heading take the same figure as the rows and the values');
+    assert.doesNotMatch(coarse[1], /\.dock-spin button \{[^}]*min-height/,
+        'and the spinner keeps the 22px column settled when it replaced the browser\'s');
 });
 
 test('the outliner\'s fold is the page\'s, and it comes off with the canvas', () => {
