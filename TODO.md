@@ -97,6 +97,55 @@ its context survives being archived.
     that item if the fix taken covers it, and leave it open if option 3 is
     taken alone.
   - From: UI/UX Override - the dock's label column
+- [ ] `figure()` in `test/page.test.js` escapes nothing, and reads a selector's
+  top-level rule rather than the one asked for
+  - **Issue**: the helper the new derivation test reads the stylesheet with has
+    three faults, none of which its own three calls happen to reach, and the
+    next run is told to build on it. Its escape, on line 3999, is
+    ``rule.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')``: the character class
+    closes at the `]` that follows `[\\`, so the pattern reads as "one of those
+    characters, then two backslashes, then `]`" and matches nothing a selector
+    contains - `.dock-outliner-row` goes through unescaped and its `.` matches
+    any character - and the replacement would insert two backslashes rather
+    than one if it ever fired. Its property match, `${property}: ([^;]+);`, is
+    unanchored, so `figure('#build-dock', 'width')` would read a `min-width`
+    declared above `width`, and `padding.match(/\s(\d+)px/)` takes a
+    shorthand's second value, which is the vertical one in `12px 8px`. Worst
+    for what comes next, its block pattern requires the eight space indent of a
+    top-level rule, so `figure('.dock-row', 'grid-template-columns')` returns
+    the base `1fr 24px 84px 24px` and can never return the
+    `1fr 32px 84px 32px` the coarse block declares at twelve spaces - which is
+    the one figure
+    [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
+    asks the label column test to be derived from, "in the same style and the
+    same file".
+  - **Goal**: close the class as `` /[.*+?^${}()|[\]\\]/g `` with a `'\\$&'`
+    replacement; anchor the property to the start of a declaration; take a
+    shorthand's first value rather than its second; and let the caller name
+    which rule of a selector it wants - an indent or an enclosing `@media`
+    argument, or a second helper that reads inside a named block - before the
+    two label column tests are written against it. Settle this first if the
+    column's fix is measured by a derived test, since that test needs the
+    coarse `.dock-row` the helper cannot reach today.
+  - From: UI/UX Override - the dock's label column
+- [ ] The test that holds the coarse block's position checks seven of the
+  twelve rules it lifts
+  - **Issue**: `the coarse block sits after every dock rule it lifts` in
+    `test/page.test.js` is the only thing holding the block below its base
+    rules, which is what makes its floors win on source order at all. Its list
+    names `.dock-row`, `button.dock-section`, `.dock-pick`,
+    `.dock-text-row .dock-text`, `.dock-swatch`, `.dock-dropper` and
+    `.dock-slider`, and leaves out `.dock-hex`, `.dock-step`,
+    `.dock-outliner-row`, `.dock-bar-answer` and `.dock-field .dock-value`.
+    `.dock-hex` is the nearest of them, declared about 30 lines above the
+    block, so a rule added between the two is the realistic way a floor goes
+    silently dead while the suite stays green - the exact failure the test was
+    written for.
+  - **Goal**: derive the list from the block rather than repeating it by hand -
+    read the selectors the coarse block declares, and assert each one's own
+    declaration sits above it - so a floor added later is covered without the
+    list being remembered. The test's name is then true as written.
+  - From: UI/UX Override - the dock's label column
 
 ## Game UI/UX
 
