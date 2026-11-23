@@ -81,9 +81,10 @@ its context survives being archived.
 - [ ] `WORLD: TOWN`'s two building height labels wrapped in the dock's label
   column before the marks were widened, and still do
   - **Issue**: `BUILDING HEIGHT MIN` and `BUILDING HEIGHT MAX`, 19 characters
-    and 144.4 px each, are on two lines in the 114 px column and were on two in
-    the 130 px column as well, so the widening did not cause them - it only
-    takes the column from 14 px short of them to 30. Read on `WORLD: TOWN` in
+    each, are on two lines in the 114 px column and were on two in the 130 px
+    column as well, so the widening did not cause them - at the 7.602 px a
+    character measured off `FIELD OF VIEW` they want 144.4 px, which neither
+    column has. Read on `WORLD: TOWN` in
     Select's panel with the canvas opened on `LAKESIDE`, at 900 x 700 and at
     320. They break after `BUILDING`, read correctly as two lines, and are not
     cut. Nothing else in the 78 labels that panel writes wraps at either
