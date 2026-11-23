@@ -6816,3 +6816,45 @@ still be found by name.
     Chromium on an emulated touch phone: the press, `H` and `L` each 32 x 32,
     the name field 239 x 32, and the dock not overflowing at that width.
   - From: UI/UX Override - the editor workflow's four additions
+
+## Archived 11-23-26
+
+- [x] Two unnamed placements of a kind read identically in the outliner
+  - **Issue**: a row never named shows its type alone, so two mountains are
+    two rows both reading `MOUNTAIN` with nothing on either to tell them
+    apart - not an index, not a count, not where each stands. Pressing a row's
+    `▸` lights it on the canvas, which is the only way to tell which is which,
+    and that is a press per row on a list that exists to save them.
+  - **Goal**: give an unnamed row something of its own - the simplest is to
+    number the duplicates of a type as they are listed, `MOUNTAIN 1`,
+    `MOUNTAIN 2`, drawn as the placeholder so a typed name still replaces it
+    whole and nothing is written into the placement. `placementNamed` in
+    `js/outliner.js` takes the fallback, and `outlinerSection` in
+    `js/build-panel.js` is where the rows are built and knows the whole list.
+  - **Settled**: `outlinerLabels` in `js/build-panel.js` numbers a type from 1
+    wherever more than one of it is listed and leaves a type listed alone as
+    it was, and the row's press and its two boxes are named by the same label,
+    so a row reads `Select MOUNTAIN 2` as well. Nothing is written into the
+    placement.
+  - From: UI/UX Override - the editor workflow's four additions
+- [x] A dimmed `UNDO` never says why it cannot be pressed
+  - **Issue**: `canUndoBuild` is false both when there is nothing to go back
+    to and when an edit is in hand - `historyReady` requires `!editPending` -
+    and the button looks the same either way: `disabled`, opacity 0.35, with
+    no `title`, no `aria-label` and no status line anywhere on the dock. With
+    a mountain dropped and not yet accepted, `UNDO` is dimmed while the
+    history holds a step, and nothing on screen connects the two.
+  - **Goal**: give the bar's two steps a `title` that names the reason, the
+    way `.dock-outliner-pick` already carries `Select MOUNTAIN` - "Accept or
+    cancel the edit first" while a draft is pending, "Nothing to undo" while
+    the history is empty. `dockBar` in `js/build-panel.js` already asks
+    `canUndoBuild` and `canRedoBuild`, so it is the place that knows which of
+    the two it is; `panel-view.js` draws the button.
+  - **Settled**: `dockBar` carries a `title` on every answer. A step says what
+    it takes back where it can be pressed, and dimmed names the reason - the
+    third being a question open on the canvas, which `historyReady` refuses a
+    step for as well. It is written on every draw rather than only where the
+    bar is built, since an edit taken in hand changes the reason with nothing
+    about the panel changing shape, and it goes on `aria-label` too so a
+    reader hears it.
+  - From: UI/UX Override - the editor workflow's four additions

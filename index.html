@@ -1489,8 +1489,9 @@
 
         /* A section of the dock under the first part: the placement picked
            with Select, or one of the world's own elements. A section that folds
-           has a heading that is a button, marked open or shut, tall enough for
-           a fingertip. */
+           has a heading that is a button, marked open or shut, 30 px tall - the
+           figure a mouse is given, which the coarse block at the foot of the
+           dock's rules lifts to the fingertip's 32. */
         .dock-section {
             display: block;
             width: 100%;
@@ -1624,63 +1625,6 @@
         .dock-spin button:disabled {
             cursor: default;
             opacity: 0.4;
-        }
-
-        @media (pointer: coarse) {
-            .dock-spin {
-                width: 22px;
-                opacity: 1;
-            }
-
-            .dock-field .dock-value {
-                min-height: 32px;
-                padding-right: 24px;
-            }
-
-            .dock-spin button {
-                font-size: 11px;
-            }
-
-            /* The outliner's row, whose three controls were drawn at the size
-               a mouse leaves them: 18 to 22 CSS pixels, against the 44 a
-               fingertip wants. Lifted to the 32 px the dock's own values
-               already use rather than to a second figure, and the row's outer
-               columns widened to match.
-
-               Bounded by the pointer and not by the width, because the finger
-               is what it is for and a finger is the same size on a tablet. A
-               coarse pointer over 640 px keeps the 300 px side dock, so the
-               name field is 169 px there, against the 203 of a desktop and the
-               239 of a 390 px phone - measured 11-22-26 at 900, 390, 360 and
-               320 px wide. It is not cut at 169 and a tap puts the caret in
-               it, so those 34 px are the cheaper half of the trade: bounding
-               the rule by the width instead would leave a 22 px target under a
-               finger on every touchscreen wider than a phone. */
-            .dock-outliner-row {
-                grid-template-columns: 32px 1fr 32px 32px;
-            }
-
-            .dock-outliner-pick,
-            .dock-outliner-box,
-            .dock-outliner-name {
-                min-height: 32px;
-            }
-
-            /* The bar and the fold headings, the other two answers in the dock
-               a finger lands on, and the bar is the one a pilot reaches on
-               every edit. Measured 11-22-26 at the same four widths: the bar's
-               answers are 22 CSS pixels tall at all of them and a heading is
-               30, under the floor the rows above them now have in the same
-               dock. The same 32 px again rather than a third figure.
-               `.dock-bar-answer` already carries its own padding and
-               `flex: 1 1 auto`, and `#build-dock-bar` wraps, so a floor is the
-               whole of the change. `.dock-spin button` keeps the 22 px column
-               that was settled when the dock's own spinners replaced the
-               browser's. */
-            .dock-bar-answer,
-            button.dock-section {
-                min-height: 32px;
-            }
         }
 
         /* SAVE / LOAD's name: a line of text across the readings' columns, read
@@ -1908,9 +1852,12 @@
         }
 
         /* The eye dropper, drawn as the art draws it: a navy pipette. Pressed,
-           it is ringed, and the next click on the ground takes a colour. */
+           it is ringed, and the next click on the ground takes a colour. A
+           floor rather than a fixed height, so the coarse block can lift it: it
+           holds an image and no text, so it draws at the figure below either
+           way. */
         .dock-dropper {
-            height: 30px;
+            min-height: 30px;
             background: no-repeat center / 18px 26px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 26'%3E%3Cpath d='M12 1a4 4 0 0 1 4 4l-2 3-9 13-3 3-1-1 1-4 9-13z' fill='%23061d43'/%3E%3Cpath d='M5 14l6 2' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E");
             border: 1px solid transparent;
             border-radius: 4px;
@@ -1938,6 +1885,151 @@
             background: #fff;
             border: 2px solid #3c6482;
             border-left: 10px solid var(--dock-color, #000);
+        }
+
+        /* Every answer in the dock a finger lands on, held to one floor of
+           32 CSS pixels. What the block covers is listed rule by rule below and
+           what it deliberately leaves is named at its foot, so the next reader
+           looking for what is left can see both without measuring.
+
+           It sits here, after every dock rule it overrides, and that position
+           is load-bearing rather than tidy: a floor and the rule it lifts carry
+           the same specificity, so `.dock-pick { min-height: 32px }` written
+           above `.dock-pick`'s own declaration loses to it on source order and
+           does nothing, while reading exactly like a rule that works. Four of
+           the floors below are in that position - the pick, SAVE / LOAD's name,
+           the swatch and the dropper are all declared further up the file than
+           the block used to be. A rule added here later wants this place too.
+
+           Bounded by the pointer and not by the width, because the finger is
+           what it is for and a finger is the same size on a tablet. A coarse
+           pointer over 640 px keeps the 300 px side dock, so every figure in
+           the comments below is the reading at the narrower of the two docks -
+           measured 11-22-26 and 11-23-26 at 900, 390, 360 and 320 px wide. */
+        @media (pointer: coarse) {
+            .dock-spin {
+                width: 22px;
+                opacity: 1;
+            }
+
+            .dock-field .dock-value {
+                min-height: 32px;
+                padding-right: 24px;
+            }
+
+            .dock-spin button {
+                font-size: 11px;
+            }
+
+            /* The outliner's row, whose three controls were drawn at the size
+               a mouse leaves them: 18 to 22 CSS pixels, against the 44 a
+               fingertip wants. Lifted to the 32 px the dock's own values
+               already use rather than to a second figure, and the row's outer
+               columns widened to match.
+
+               A coarse pointer over 640 px keeps the 300 px side dock, so the
+               name field is 169 px there, against the 203 of a desktop and the
+               239 of a 390 px phone. It is not cut at 169 and a tap puts the
+               caret in it, so those 34 px are the cheaper half of the trade:
+               bounding the rule by the width instead would leave a 22 px target
+               under a finger on every touchscreen wider than a phone. */
+            .dock-outliner-row {
+                grid-template-columns: 32px 1fr 32px 32px;
+            }
+
+            .dock-outliner-pick,
+            .dock-outliner-box,
+            .dock-outliner-name {
+                min-height: 32px;
+            }
+
+            /* The bar and the fold headings: the two answers pinned above and
+               between the panels, and the bar is the one a pilot reaches on
+               every edit. The bar's answers are 22 CSS pixels tall at all four
+               widths and a heading is 30, under the floor the rows above them
+               now have in the same dock. The same 32 px again rather than a
+               third figure. `.dock-bar-answer` already carries its own padding
+               and `flex: 1 1 auto`, and `#build-dock-bar` wraps, so a floor is
+               the whole of the change. */
+            .dock-bar-answer,
+            button.dock-section {
+                min-height: 32px;
+            }
+
+            /* The marks that step a row, and the reading between them that a
+               press steps round. `.dock-step` is the busiest answer in the
+               dock - it steps every switch, every choice and the PAN and MOVE
+               nudges, so a pilot reaches it on more edits than the bar - and it
+               was 24 x 24 at all four widths, the one target under the floor on
+               both measures. `.dock-row` gives it its width, so the two mark
+               columns are widened the way the outliner's were; the reading
+               stands in the 84 px column and wants the floor alone. The label
+               column pays the 16 px: 114 px at 320 and at the side dock,
+               against the 130 it had. Nothing is cut or wrapped at 114 - the
+               longest labels the dock writes are 13 characters of 11 px
+               Courier, FIELD OF VIEW and CORNER RADIUS, read across all twelve
+               panels with every section open. */
+            .dock-row {
+                grid-template-columns: 1fr 32px 84px 32px;
+            }
+
+            .dock-step,
+            .dock-pick {
+                min-height: 32px;
+            }
+
+            /* The two fields a caret has to land in: the name SAVE / LOAD
+               writes a world under, 140 x 24 at every width and 156 once the
+               columns above widen, and Free Paint's hex, 20 tall and as wide as
+               the colour panel leaves it. Both are text rather than a figure,
+               so neither is reached by the `.dock-field .dock-value` floor at
+               the head of this block. */
+            .dock-text-row .dock-text,
+            .dock-hex {
+                min-height: 32px;
+            }
+
+            /* Free Paint's colour, the one panel drawn on the artwork's pale
+               card rather than the dock's own black. The eight swatches were 30
+               tall - two under, like a fold heading - and the eye dropper a
+               fixed 30, which is why its base rule now carries a `min-height`
+               instead of a `height`: a floor cannot lift a fixed height, so the
+               rule below would have read as a 32 px target and drawn a 30 px
+               one. Both are wide enough already, the swatch at 59 px in the
+               side dock and the dropper in its own 40 px column. */
+            .dock-swatch,
+            .dock-dropper {
+                min-height: 32px;
+            }
+
+            /* A value set by eye. The element is the track, not the thumb, so
+               the floor is what gives a finger somewhere to start the drag
+               either side of a thumb the browser draws; 16 px left it a target
+               the width of the row and barely half a fingertip tall. */
+            .dock-slider {
+                min-height: 32px;
+            }
+
+            /* What this block deliberately leaves under 32 px, with the figure
+               and the reason, so neither reads as an oversight:
+
+               `.dock-spin button` keeps the 22 px column settled when the
+               dock's own spinners replaced the browser's: 22 x 15, the two of
+               them stacked inside the field's own 32. The field is on the
+               floor, and the spinner is the second way to reach a figure the
+               field itself already types.
+
+               `.dock-picker-band` keeps its 12 px. The four bands are one
+               colour at four lightnesses stacked into a single 48 px strip, so
+               a finger landing on the neighbour gets that colour a quarter
+               lighter rather than a wrong answer - and a 32 px band would make
+               the strip 128 px tall, which is the colour panel twice over. The
+               eight swatches above it and the hex field below it both offer a
+               colour at a full target.
+
+               Nothing else in the dock is under it: every `.dock-action` is
+               36 px and every `.dock-shape` card 44 or more. Measured by
+               walking all twelve panels with every section open. */
         }
 
         /* The builder's two confirms, ACCEPT EDITS and SAVE AND EXIT MODE: a

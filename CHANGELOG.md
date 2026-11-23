@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > 36 earlier entries in `CHANGELOG-2026.md`, newest first.
 
+## [1.0.0-alpha.1.67.3] - 2026-11-23
+
+The two the last review left beside the three it settled: five more of the
+dock's answers under a fingertip, with the comment beside the new floor saying
+there were none left, and three figures in the dock's prose the code no longer
+supports.
+
+### Fixed
+
+- **The rest of the dock under a fingertip, and the comment saying what is
+  left.** Lifting the bar and the fold headings left five answers below the
+  floor and a comment reading as though the dock were done. Measured on a
+  coarse pointer at 900 x 700 and on an emulated touch phone at 390, 360 and
+  320 px wide, walking all twelve panels with every section open: `.dock-step`
+  stood 24 x 24 at every width - the mark that steps every switch, every choice
+  and the `PAN` and `MOVE` nudges, so a pilot reaches it on more edits than the
+  bar - `.dock-pick` 84 x 24, SAVE / LOAD's name 140 x 24, a swatch 30 tall and
+  the eye dropper a fixed 30. Two more the finding did not name were under it
+  as well: Free Paint's hex field at 20 and the slider a value is set by eye
+  with at 16. All seven now take the same 32 px rather than an eighth figure,
+  and `.dock-row`'s two mark columns are widened to 32 as the outliner's were,
+  so a mark is square rather than tall and thin. The label column pays the
+  16 px - 114 px at 320 and on the side dock, against 130 - and nothing there
+  is cut, but four labels now wrap that did not. The reading that cleared the
+  column was taken on a blank canvas with the panels at rest, which writes 19
+  labels where a preset with a draft in hand writes 78, so the longest it met
+  were the 13 characters of `FIELD OF VIEW` and `CORNER RADIUS`. The dock
+  writes 15: `GIRTH RANGE MIN`, `GIRTH RANGE MAX`, `TREE HEIGHT MIN` and
+  `TREE HEIGHT MAX` each want 114.03 px and take a second line in the 114 px
+  column where they took one in the 130, and `BUILDING HEIGHT MIN` and
+  `BUILDING HEIGHT MAX` at 19 characters wrapped in both. Two 12 px lines fit
+  inside the 32 px floor the same block gives the row, so the cost is a label
+  read as two lines rather than one; the column is queued as its own item with
+  the four ways to settle it. What stays below the floor is now named beside
+  the rules with its figure and its reason, so neither reads as an oversight:
+  the spinners inside a figure's field keep the 22 px column settled when they
+  replaced the browser's, the field itself being on the floor, and
+  the picker's four bands keep their 12 px, being one colour at four
+  lightnesses stacked into a single 48 px strip - a finger on the neighbour
+  gets that colour a quarter lighter rather than a wrong answer, and a 32 px
+  band would make the strip 128 px tall.
+- **A floor that could not reach the eye dropper.** `.dock-dropper` carried
+  `height: 30px` rather than a `min-height`, so a `min-height` in the coarse
+  block would have read as a 32 px target and drawn a 30 px one. Its base rule
+  is a floor now. It holds an image and no text, so it still draws at 30 under
+  a mouse.
+- **Four of the dock's coarse floors could not have worked where the block
+  sat.** The `@media (pointer: coarse)` block was written in the middle of the
+  dock's rules, which is where the first of them happened to need it. A floor
+  and the rule it lifts carry the same specificity, so a floor declared above
+  its base rule loses on source order and does nothing while reading exactly
+  like a rule that works - and `.dock-pick`, `.dock-text-row .dock-text`,
+  `.dock-swatch` and `.dock-dropper` are all declared further down the file
+  than the block was. The block now sits after every dock rule it lifts, which
+  is also where a rule added to it later wants to be. Its order relative to
+  `@media (max-width: 640px)` is unchanged, so nothing about the narrow dock
+  moves.
+
+### Internal
+
+- **Three figures in the dock's prose the code no longer supports.** Two of
+  them blessed the 30 px the last turn had just measured as two under the
+  floor: the comment over `.dock-section` called a folding heading "tall enough
+  for a fingertip" and `test/page.test.js` asserted its `min-height: 30px;`
+  with the same words as the message, while the coarse block in the same
+  stylesheet lifted that heading to 32 for being short. A model reading either
+  first concluded the coarse rule was surplus. Both now say what 30 px is - the
+  figure a mouse is given, with the fingertip's 32 in the coarse block. The
+  third was older: `js/panel-view.js` gave the outliner's row as "276 pixels
+  wide" while deriving the name field's 203 from 274, which is what the
+  stylesheet gives - a 300 px dock less a pixel of border each side and the
+  24 px of `#build-dock-fields`' padding. It says 274, and a test derives both
+  figures from those rules rather than reading them once. No code changed in
+  any of the three.
+
+Held in Node by `test/page.test.js`, 2,621 tests in all, and by a mutation run
+of eleven mutants over the day's changes: each of the five new floors removed
+in turn, the dropper back to a height a floor cannot lift, a second coarse
+block opened above the rules it would lift, the band the block leaves lifted
+without a word changing, the block no longer saying what it leaves, the
+docstring giving the row as 276 again, and the fold heading's 30 px called a
+fingertip's again. Each was caught by the test named for it.
+
+Settled in Chromium in seven readings: four that opened Select, Free Paint and
+SAVE / LOAD on a coarse pointer at 900 x 700 and on a phone at 390, 360 and
+320, measuring every one of the targets and, for a cut or a wrap, the row
+labels a blank canvas writes with the panels at rest - not every label the
+dock writes, which is how the four that wrap were missed - and three that
+walked all twelve panels with every section open at 900, 390 and 320 to settle
+what is left below the floor - the picker's bands at 12 and the field's
+spinners at 22 x 15, and nothing else.
+
 ## [1.0.0-alpha.1.67.2] - 2026-11-22
 
 The three the last verification left beside the eight it settled: the dock's

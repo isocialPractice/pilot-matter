@@ -338,9 +338,10 @@ export class PanelView {
      * and the two boxes that hide it and lock it.
      *
      * The boxes are a letter each with the whole of what they do on
-     * `aria-label` and `title`, because the row is 276 pixels wide and the
-     * name is what a pilot is reading along it. Their state is on
-     * `aria-pressed`, which is also what the stylesheet lights them by.
+     * `aria-label` and `title`, because the row is 274 pixels wide - a 300 px
+     * dock less a pixel of border each side and the 24 of `#build-dock-fields`'
+     * padding - and the name is what a pilot is reading along it. Their state
+     * is on `aria-pressed`, which is also what the stylesheet lights them by.
      *
      * The field carries what it reads as on `title` for the same reason: a
      * name may be up to `PLACEMENT_NAME_LIMIT` characters and the field is

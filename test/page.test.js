@@ -3989,6 +3989,43 @@ test('an outliner row\'s field carries what it reads as, so a long name can be r
 });
 
 /**
+ * The docstring above reasons from two figures, and it carried a third that
+ * disagreed with them: it gave the row as 276 pixels while deriving the name
+ * field's 203 from 274. Both come out of the stylesheet, so the derivation is
+ * what holds them together rather than a reading taken once.
+ */
+test('the outliner docstring\'s row and field figures are the ones the stylesheet gives', () => {
+    const figure = (rule, property) => {
+        const block = indexHtml.match(new RegExp(`\\n        ${rule.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} \\{[^}]*\\}`))?.[0] ?? '';
+        const found = block.match(new RegExp(`${property}: ([^;]+);`))?.[1];
+        assert.ok(found, `${rule} should declare ${property}`);
+        return found.trim();
+    };
+
+    // The dock's own box: 300 px wide, a pixel of border each side, and
+    // `#build-dock-fields` padding 12 px in from each.
+    assert.strictEqual(figure('#build-dock', 'width'), '300px');
+    const border = Number(figure('#build-dock', 'border').match(/^(\d+)px/)[1]);
+    const padding = Number(figure('#build-dock-fields', 'padding').match(/\s(\d+)px/)[1]);
+    const row = 300 - 2 * border - 2 * padding;
+    assert.strictEqual(row, 274, 'the row a side dock gives a panel');
+
+    // The name takes what the row's three fixed columns and its gaps leave.
+    const columns = figure('.dock-outliner-row', 'grid-template-columns').split(/\s+/);
+    const gap = Number(figure('.dock-outliner-row', 'gap').match(/^(\d+)px/)[1]);
+    const fixed = columns.filter(part => part !== '1fr').reduce((sum, part) => sum + Number(part.replace('px', '')), 0);
+    const name = row - fixed - gap * (columns.length - 1);
+    assert.strictEqual(name, 203, 'the name field on a desktop dock');
+
+    // The method's own definition, not the call `build` makes to it.
+    const doc = panelViewSource.slice(0, panelViewSource.indexOf('\n    drawOutlinerRow(entry) {'));
+    const docstring = doc.slice(doc.lastIndexOf('/**'));
+    assert.match(docstring, new RegExp(`the row is ${row} pixels wide`), 'the docstring names the row it derives from');
+    assert.match(docstring, new RegExp(`${name} pixels on a desktop dock`), 'and the field it derives');
+    assert.doesNotMatch(docstring, /276/, 'and not the figure that disagreed with both');
+});
+
+/**
  * The row's three controls were drawn at the size a mouse leaves them - 18 to
  * 22 CSS pixels, against the roughly 44 a fingertip wants - while the dock
  * already answered a coarse pointer for its spinners and its values.
@@ -4016,6 +4053,82 @@ test('the bar and the fold heading are lifted to the dock\'s own 32px for a fing
         'the bar and the fold heading take the same figure as the rows and the values');
     assert.doesNotMatch(coarse[1], /\.dock-spin button \{[^}]*min-height/,
         'and the spinner keeps the 22px column settled when it replaced the browser\'s');
+});
+
+/**
+ * Five more answers were under a fingertip after the bar was lifted, and the
+ * comment over that rule said there were none left. Measured 11-23-26 on a
+ * coarse pointer at 900, 390, 360 and 320 px wide, walking all twelve panels
+ * with every section open: `.dock-step` 24 x 24, `.dock-pick` 84 x 24,
+ * `.dock-text-row .dock-text` 140 x 24, `.dock-swatch` 30 tall and
+ * `.dock-dropper` a fixed 30 - and `.dock-hex` at 20 and `.dock-slider` at 16,
+ * which that item's five did not name either.
+ */
+test('every answer the dock offers a finger is on the 32px floor, in one block', () => {
+    const coarse = indexHtml.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n        \}/);
+    assert.ok(coarse, 'index.html should carry a coarse-pointer block');
+
+    assert.match(coarse[1], /\.dock-row \{\s*grid-template-columns: 1fr 32px 84px 32px;/,
+        'the two mark columns widened, as the outliner row\'s were');
+    assert.match(coarse[1], /\.dock-step,\s*\.dock-pick \{\s*min-height: 32px;/,
+        'the mark that steps a row, and the reading a press steps round');
+    assert.match(coarse[1], /\.dock-text-row \.dock-text,\s*\.dock-hex \{\s*min-height: 32px;/,
+        'the two fields a caret lands in, which the figure field\'s own floor does not reach');
+    assert.match(coarse[1], /\.dock-swatch,\s*\.dock-dropper \{\s*min-height: 32px;/,
+        'Free Paint\'s colour, on the artwork\'s own card');
+    assert.match(coarse[1], /\.dock-slider \{\s*min-height: 32px;/,
+        'the track a drag starts on, either side of the thumb');
+});
+
+/**
+ * A floor and the rule it lifts carry the same specificity, so a floor written
+ * above its base rule loses on source order and does nothing while reading
+ * exactly like a rule that works. Four of the floors are in that position -
+ * `.dock-pick`, `.dock-text-row .dock-text`, `.dock-swatch` and `.dock-dropper`
+ * are all declared further up the file than the block once sat - so the block's
+ * place after every dock rule is what makes it work at all.
+ */
+test('the coarse block sits after every dock rule it lifts', () => {
+    const block = indexHtml.indexOf('@media (pointer: coarse) {');
+    assert.ok(block > 0, 'index.html should carry a coarse-pointer block');
+
+    for (const rule of ['.dock-row {', 'button.dock-section {', '.dock-pick {',
+        '.dock-text-row .dock-text {', '.dock-swatch {', '.dock-dropper {', '.dock-slider {']) {
+        const at = indexHtml.indexOf(`\n        ${rule}`);
+        assert.ok(at > 0, `${rule} should be declared in index.html`);
+        assert.ok(at < block, `${rule} is declared above the coarse block, so its floor reaches it`);
+    }
+});
+
+/**
+ * A `height` cannot be lifted by a `min-height`, so the dropper would have read
+ * as a 32 px target in the block above and drawn a 30 px one. It holds an image
+ * and no text, so the floor draws it at the same 30 under a mouse.
+ */
+test('the eye dropper is given a floor rather than a fixed height', () => {
+    const rule = indexHtml.match(/\n        \.dock-dropper \{[^}]*\}/)?.[0] ?? '';
+    assert.match(rule, /min-height: 30px;/, 'a floor the coarse block can lift');
+    assert.doesNotMatch(rule, /\n\s+height: /, 'and no fixed height beside it');
+});
+
+/**
+ * The comment the five-target item was queued against said the dock was done
+ * when it was not, so the block now names what it leaves as well as what it
+ * covers. These two are the whole of what is left under 32 px, measured by
+ * walking every panel: the picker's bands and the field's own spinners.
+ */
+test('the coarse block names the two answers it leaves under the floor', () => {
+    const coarse = indexHtml.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n        \}/);
+    assert.ok(coarse, 'index.html should carry a coarse-pointer block');
+    assert.match(coarse[1], /deliberately leaves under 32 px/,
+        'the block says what it leaves, not only what it covers');
+    assert.match(coarse[1], /`\.dock-spin button` keeps the 22 px column/);
+    assert.match(coarse[1], /`\.dock-picker-band` keeps its 12 px/);
+
+    assert.match(indexHtml, /\n        \.dock-picker-band \{[^}]*height: 12px;/,
+        'and the band is still the 12 px the comment gives it');
+    assert.doesNotMatch(coarse[1], /\.dock-picker-band \{[^}]*min-height/,
+        'left where it is rather than lifted');
 });
 
 test('the outliner\'s fold is the page\'s, and it comes off with the canvas', () => {
@@ -4519,7 +4632,17 @@ test('the dock draws a heading for each section, and a folding one is a button t
     assert.match(mainSource, /onFold: +\(id\) => this\.onDockFold\(id\)/);
 
     const rule = indexHtml.match(/button\.dock-section \{[^}]*\}/)?.[0] ?? '';
-    assert.match(rule, /min-height: 30px;/, 'tall enough for a fingertip');
+    assert.match(rule, /min-height: 30px;/, 'the figure a mouse is given; the coarse block lifts it to 32');
+
+    // The comment over `.dock-section` blessed that 30 as "tall enough for a
+    // fingertip" while the coarse block below it lifted the same heading to 32
+    // for being two under the floor. A reader who met the comment first
+    // concluded the coarse rule was surplus.
+    const comment = indexHtml.slice(0, indexHtml.indexOf('\n        .dock-section {'));
+    const section = comment.slice(comment.lastIndexOf('/*'));
+    assert.match(section, /30 px tall/, 'the comment gives the figure');
+    assert.doesNotMatch(section, /tall enough for a fingertip/,
+        'and does not call a mouse\'s figure a fingertip\'s, which is the coarse block\'s 32');
 });
 
 /**
