@@ -3,3 +3,5 @@
 .tmp/
 test-results/
 user-scripts/
+CHANGELOG-*.md 
+TODO-archive.md 
