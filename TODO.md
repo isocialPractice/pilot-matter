@@ -43,63 +43,59 @@ its context survives being archived.
     each row it overrides.
   - From: Interactive Build Mode `->` Starter Worlds
 
-### Code Review Override - the dock's remaining touch targets
+### UI/UX Override - the dock's label column
+
+#### Resolve Issues
+
+- [ ] **Dock Label Column 1**: four of the dock's row labels wrap onto a second
+  line in the 114 px column the widened mark columns leave them
+  - **Issue**: the marks widened from 24 px to 32 take their 16 px out of
+    `.dock-row`'s `1fr`, and the comment over the rule says that is affordable
+    because "the longest labels the dock writes are 13 characters of 11 px
+    Courier, `FIELD OF VIEW` and `CORNER RADIUS`, read across all twelve
+    panels with every section open". The dock writes longer ones. Read in
+    Chromium on a coarse pointer at 900 x 700 and on an emulated touch phone at
+    320, both of which give the label 114 px, the same page measured twice -
+    once as the stylesheet stands and once with one appended rule putting the
+    mark columns back to 24 px, so the only thing between the readings is what
+    this turn changed: `GIRTH RANGE MIN`, `GIRTH RANGE MAX`, `TREE HEIGHT MIN`
+    and `TREE HEIGHT MAX`, 15 characters and 114.03 px each, are on **one**
+    line in the 130 px column the 24 px marks left and on **two** in the 114 px
+    column the 32 px marks leave. Each breaks after its second word:
+    `GIRTH RANGE` over `MIN`. Nothing is cut - `scrollWidth` never passes
+    `clientWidth` - and the row stays 32 px tall, two 12 px lines fitting
+    inside the floor the same block gives `.dock-step`, so the cost is a label
+    read as two lines rather than one. At 390 px the column is 184 and nothing
+    wraps, so the defect is the 114 px column alone: 320 px wide, and the side
+    dock a coarse pointer over 640 px keeps. The turn's own walk missed them
+    for two reasons, both worth knowing before the fix is measured: it walked a
+    **blank canvas**, whose `WORLD:` sections are grass alone against the eight
+    a preset such as `LAKESIDE` carries, and it walked the panels **at rest**,
+    where a drop tool draws no rows until something is in hand - `MOUNTAIN`
+    drew none, and drops fifteen with a draft.
+  - **Goal**: Resolve to [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
+  - From: Code Review Override - the dock's remaining touch targets
 
 #### Found Issues
 
-- [ ] Five more of the dock's answers are under a fingertip, and the comment
-  beside the new floor says there are none left
-  - **Issue**: this turn lifted `.dock-bar-answer` and `button.dock-section`
-    to 32 px in the `@media (pointer: coarse)` block of `index.html`, and the
-    comment over that rule, `index.html:1669`, gives the two of them as "the
-    other two answers in the dock a finger lands on". Five more are answers a
-    finger lands on, none of them is named in that block, and none of them
-    reaches 32. `.dock-step` (`index.html:1527`) is `min-height: 24px` and
-    24 px wide, since `.dock-row` (`index.html:1477`) lays a row out as
-    `1fr 24px 84px 24px`, and it is the mark that steps every switch, every
-    choice and the `PAN` and `MOVE` nudges, so a pilot reaches it on more
-    edits than the bar. `.dock-pick` (`index.html:1717`), the reading a press
-    steps round, is 24. `.dock-text-row .dock-text` (`index.html:1688`), the
-    name SAVE / LOAD writes a world under, is 24. `.dock-swatch`
-    (`index.html:1876`) is 30. `.dock-dropper` (`index.html:1912`) is a fixed
-    `height: 30px` rather than a floor, so a `min-height` added to the coarse
-    block would not move it at all. Nothing is broken - a tap driven at the
-    centre works, which is the reach-rather-than-function framing the
-    outliner's own item used - but that sentence is what the next reader
-    looking for what is left will read, and it says nothing is.
-  - **Goal**: measure the five on a coarse pointer first, the way this turn
-    measured the bar, then either lift them to the same 32 px or leave a
-    figure where it is and say in the comment which figure and why - the way
-    `.dock-spin button` is already left there with its reason. `.dock-step`
-    and `.dock-pick` want the column widened as well as the floor raised, as
-    `.dock-outliner-row` was, and `.dock-dropper` wants its `height` turned
-    into a `min-height` before a floor can reach it. Either way the comment
-    at `index.html:1669` must name what the block covers and what it
-    deliberately leaves, rather than reading as though the dock were done.
-  - From: Code Review Override - the dock's remaining touch targets
-- [ ] Three figures in the dock's prose the code no longer supports
-  - **Issue**: two of them bless the 30 px this turn measured as two under
-    the floor. The comment over `.dock-section`, `index.html:1492`, says a
-    folding heading is "a button, marked open or shut, tall enough for a
-    fingertip", and `test/page.test.js:4522` asserts `min-height: 30px;` with
-    `'tall enough for a fingertip'` as its message - while
-    `test/page.test.js:4007` and `index.html:1669`, both written this turn,
-    say 30 is under the floor the same stylesheet gives the rows in the same
-    dock. A model reading either of the first two first concludes the fold
-    heading was already a fingertip target and the coarse rule is surplus,
-    which is the trap the `dockBar` docstring item was queued for. The third
-    is older: `js/panel-view.js:341` says "the row is 276 pixels wide", and
-    the row is 274 - a 300 px dock less its 1 px border each side less the
-    24 px of `#build-dock-fields`' padding - which is the figure the same
-    docstring's own 203 is derived from, 274 - 62 - 9. This turn read the
-    276 as the desktop row and wrote in its settle note that the row
-    "measures 344 px at 390 and 274 at 320", so the two figures in one
-    docstring still disagree by 2 px.
-  - **Goal**: `index.html:1492` and `test/page.test.js:4522` say what 30 px
-    is - the figure a mouse is given, with the fingertip's 32 in the coarse
-    block - rather than calling it a fingertip's. `js/panel-view.js:341` says
-    274. No code changes in any of the three.
-  - From: Code Review Override - the dock's remaining touch targets
+- [ ] `WORLD: TOWN`'s two building height labels wrapped in the dock's label
+  column before the marks were widened, and still do
+  - **Issue**: `BUILDING HEIGHT MIN` and `BUILDING HEIGHT MAX`, 19 characters
+    and 144.4 px each, are on two lines in the 114 px column and were on two in
+    the 130 px column as well, so the widening did not cause them - it only
+    takes the column from 14 px short of them to 30. Read on `WORLD: TOWN` in
+    Select's panel with the canvas opened on `LAKESIDE`, at 900 x 700 and at
+    320. They break after `BUILDING`, read correctly as two lines, and are not
+    cut. Nothing else in the 78 labels that panel writes wraps at either
+    column.
+  - **Goal**: the same fix as Dock Label Column 1, which is why it is recorded
+    beside it rather than queued on its own: options 1 and 2 in
+    [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
+    settle both, and option 3 settles only the 15 character labels, so this is
+    the reading that tells the whole fixes from the partial one. Close it with
+    that item if the fix taken covers it, and leave it open if option 3 is
+    taken alone.
+  - From: UI/UX Override - the dock's label column
 
 ## Game UI/UX
 
@@ -880,47 +876,8 @@ items in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 448 earlier items in `TODO-archive.md`, newest last.
+> 450 earlier items in `TODO-archive.md`, newest last.
 
-- [x] Two unnamed placements of a kind read identically in the outliner
-  - **Issue**: a row never named shows its type alone, so two mountains are
-    two rows both reading `MOUNTAIN` with nothing on either to tell them
-    apart - not an index, not a count, not where each stands. Pressing a row's
-    `▸` lights it on the canvas, which is the only way to tell which is which,
-    and that is a press per row on a list that exists to save them.
-  - **Goal**: give an unnamed row something of its own - the simplest is to
-    number the duplicates of a type as they are listed, `MOUNTAIN 1`,
-    `MOUNTAIN 2`, drawn as the placeholder so a typed name still replaces it
-    whole and nothing is written into the placement. `placementNamed` in
-    `js/outliner.js` takes the fallback, and `outlinerSection` in
-    `js/build-panel.js` is where the rows are built and knows the whole list.
-  - **Settled**: `outlinerLabels` in `js/build-panel.js` numbers a type from 1
-    wherever more than one of it is listed and leaves a type listed alone as
-    it was, and the row's press and its two boxes are named by the same label,
-    so a row reads `Select MOUNTAIN 2` as well. Nothing is written into the
-    placement.
-  - From: UI/UX Override - the editor workflow's four additions
-- [x] A dimmed `UNDO` never says why it cannot be pressed
-  - **Issue**: `canUndoBuild` is false both when there is nothing to go back
-    to and when an edit is in hand - `historyReady` requires `!editPending` -
-    and the button looks the same either way: `disabled`, opacity 0.35, with
-    no `title`, no `aria-label` and no status line anywhere on the dock. With
-    a mountain dropped and not yet accepted, `UNDO` is dimmed while the
-    history holds a step, and nothing on screen connects the two.
-  - **Goal**: give the bar's two steps a `title` that names the reason, the
-    way `.dock-outliner-pick` already carries `Select MOUNTAIN` - "Accept or
-    cancel the edit first" while a draft is pending, "Nothing to undo" while
-    the history is empty. `dockBar` in `js/build-panel.js` already asks
-    `canUndoBuild` and `canRedoBuild`, so it is the place that knows which of
-    the two it is; `panel-view.js` draws the button.
-  - **Settled**: `dockBar` carries a `title` on every answer. A step says what
-    it takes back where it can be pressed, and dimmed names the reason - the
-    third being a question open on the canvas, which `historyReady` refuses a
-    step for as well. It is written on every draw rather than only where the
-    bar is built, since an edit taken in hand changes the reason with nothing
-    about the panel changing shape, and it goes on `aria-label` too so a
-    reader hears it.
-  - From: UI/UX Override - the editor workflow's four additions
 - [x] The bar's two switches read as two more steps until one is turned on
   - **Issue**: `UNDO`, `REDO`, `GRID` and `ANGLE` share one class and one
     resting look. With a step to go back to and both snaps off, all four draw
@@ -1104,3 +1061,86 @@ how the simulator got here rather than as a list still to be worked.
     run caught the two-reason wording, the dropped third reason, and the
     confirm branch removed from the function.
   - From: UI/UX Override - the dock's bar and the outliner's rows
+- [x] **Dock Label Column**: Five more of the dock's answers are under a fingertip, and the comment
+  beside the new floor says there are none left
+  - **Issue**: this turn lifted `.dock-bar-answer` and `button.dock-section`
+    to 32 px in the `@media (pointer: coarse)` block of `index.html`, and the
+    comment over that rule, `index.html:1669`, gives the two of them as "the
+    other two answers in the dock a finger lands on". Five more are answers a
+    finger lands on, none of them is named in that block, and none of them
+    reaches 32. `.dock-step` (`index.html:1527`) is `min-height: 24px` and
+    24 px wide, since `.dock-row` (`index.html:1477`) lays a row out as
+    `1fr 24px 84px 24px`, and it is the mark that steps every switch, every
+    choice and the `PAN` and `MOVE` nudges, so a pilot reaches it on more
+    edits than the bar. `.dock-pick` (`index.html:1717`), the reading a press
+    steps round, is 24. `.dock-text-row .dock-text` (`index.html:1688`), the
+    name SAVE / LOAD writes a world under, is 24. `.dock-swatch`
+    (`index.html:1876`) is 30. `.dock-dropper` (`index.html:1912`) is a fixed
+    `height: 30px` rather than a floor, so a `min-height` added to the coarse
+    block would not move it at all. Nothing is broken - a tap driven at the
+    centre works, which is the reach-rather-than-function framing the
+    outliner's own item used - but that sentence is what the next reader
+    looking for what is left will read, and it says nothing is.
+  - **Goal**: measure the five on a coarse pointer first, the way this turn
+    measured the bar, then either lift them to the same 32 px or leave a
+    figure where it is and say in the comment which figure and why - the way
+    `.dock-spin button` is already left there with its reason. `.dock-step`
+    and `.dock-pick` want the column widened as well as the floor raised, as
+    `.dock-outliner-row` was, and `.dock-dropper` wants its `height` turned
+    into a `min-height` before a floor can reach it. Either way the comment
+    at `index.html:1669` must name what the block covers and what it
+    deliberately leaves, rather than reading as though the dock were done.
+  - **Settled**: measured first, on a coarse pointer at 900 x 700 and on an
+    emulated touch phone at 390, 360 and 320 px wide, walking all twelve
+    panels with every section open. The five read as the finding said -
+    `.dock-step` 24 x 24 at every width, `.dock-pick` 84 x 24, SAVE / LOAD's
+    name 140 x 24, a swatch 30 tall, the dropper a fixed 30 - and the walk
+    turned up two more the finding had not named: `.dock-hex` at 20 and
+    `.dock-slider` at 16. All seven are lifted to the same 32 px, with
+    `.dock-row`'s two mark columns widened to 32 as the outliner's were; the
+    label column pays 16 px, to 114 at 320 and on the side dock, and nothing
+    is cut or wrapped there, the longest labels being 13 characters.
+    `.dock-dropper`'s base rule is a `min-height` now, since a floor cannot
+    lift a fixed height. Two things are left below the floor with the figure
+    and the reason written beside the rules - the field's spinners at 22 x 15
+    and the picker's bands at 12 - and the comment says so under a heading
+    naming what the block deliberately leaves, with the walk's finding that
+    nothing else in the dock is under 32. Found while fixing it: the coarse
+    block sat in the middle of the dock's rules, so four of these floors
+    would have lost to their own base rules on source order and done nothing;
+    the block is moved to after every rule it lifts, its order against
+    `@media (max-width: 640px)` unchanged.
+  - From: Code Review Override - the dock's remaining touch targets
+- [x] Three figures in the dock's prose the code no longer supports
+  - **Issue**: two of them bless the 30 px this turn measured as two under
+    the floor. The comment over `.dock-section`, `index.html:1492`, says a
+    folding heading is "a button, marked open or shut, tall enough for a
+    fingertip", and `test/page.test.js:4522` asserts `min-height: 30px;` with
+    `'tall enough for a fingertip'` as its message - while
+    `test/page.test.js:4007` and `index.html:1669`, both written this turn,
+    say 30 is under the floor the same stylesheet gives the rows in the same
+    dock. A model reading either of the first two first concludes the fold
+    heading was already a fingertip target and the coarse rule is surplus,
+    which is the trap the `dockBar` docstring item was queued for. The third
+    is older: `js/panel-view.js:341` says "the row is 276 pixels wide", and
+    the row is 274 - a 300 px dock less its 1 px border each side less the
+    24 px of `#build-dock-fields`' padding - which is the figure the same
+    docstring's own 203 is derived from, 274 - 62 - 9. This turn read the
+    276 as the desktop row and wrote in its settle note that the row
+    "measures 344 px at 390 and 274 at 320", so the two figures in one
+    docstring still disagree by 2 px.
+  - **Goal**: `index.html:1492` and `test/page.test.js:4522` say what 30 px
+    is - the figure a mouse is given, with the fingertip's 32 in the coarse
+    block - rather than calling it a fingertip's. `js/panel-view.js:341` says
+    274. No code changes in any of the three.
+  - **Settled**: all three are prose, and no code changed for them. The
+    comment over `.dock-section` and the message on the `min-height: 30px;`
+    assertion both say what 30 px is - the figure a mouse is given, lifted to
+    the fingertip's 32 by the coarse block - and the fold-heading test now
+    asserts the comment gives the figure and does not call it a fingertip's,
+    so the wording cannot drift back unnoticed. The row docstring says 274,
+    with the derivation beside it, and a new test works the row and the name
+    field out of `#build-dock`'s width and border, `#build-dock-fields`'
+    padding and the outliner row's own columns and gap, asserting the
+    docstring names both and no longer carries 276.
+  - From: Code Review Override - the dock's remaining touch targets
