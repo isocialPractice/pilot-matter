@@ -94,6 +94,54 @@ its context survives being archived.
     stylesheet, needs no browser, and would have failed on the turn that
     dropped the rule.
   - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [ ] The coarse `.dock-row` comment counts six wrapped labels where the dock
+  writes eight, and names the wrong four as fitting the old column
+  - **Issue**: two figures in the comment over `.dock-row` inside
+    `@media (pointer: coarse)` in `index.html`, both of them the panel-walk
+    arithmetic this turn was sent to replace. First, "Six labels read as two
+    lines in the 114 px column - the two above, `GIRTH RANGE MIN` and `MAX`
+    and `TREE HEIGHT MIN` and `MAX`" leaves out `DUNE HEIGHT MIN` and `MAX`,
+    which the desert element writes and which are 15 characters like the
+    girth and tree pairs, so 114.03 px against the 114 px column. The turn's
+    own `dockLabels()` walk finds eight labels over 114 px, not six - run it
+    and filter on `text.length * 7.602 > 114`. The six is the LAKESIDE
+    reading, and the comment's own paragraph credits the derived walk, so the
+    one figure in it still taken off a canvas is the one a later reader would
+    trust most. Second, "the first four of those read as one line in the 130
+    it had" names `BUILDING HEIGHT MIN` and `MAX` among the four, and the
+    sentence before it gives them as 19 characters and 144 px - over the 130.
+    The four that fit 130 are the 15 character ones, which is the last four of
+    the list as written, and the clause after it ("the widening caused four of
+    the six") depends on that reading.
+  - **Goal**: rewrite both from the walk rather than the canvas. The count
+    wants the eight labels over 114 px with the desert pair named, or wants
+    saying that six is what LAKESIDE shows and eight is what the dock can
+    write; the second wants "the last four" with the 15 character pairs named,
+    so it cannot be read as including the 19 character pair the sentence above
+    it has just excluded. Six of the eight are then the widening's and two are
+    older than it. The 274 px, the 130 px of clearance and the 19 character
+    longest were all re-derived in review and hold, so it is these two figures
+    alone.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [ ] The 45 px row the trade is quoted in is derived from nothing
+  - **Issue**: the same comment prices the fix at "13 px a row, 45 against 32,
+    which is 3.2 rows of the panel at 320 x 664 against 4.5", and the
+    `CHANGELOG` entry repeats it. That figure is `line-height: 13px` on
+    `.dock-row > .dock-label` plus the 32 px control row plus `row-gap: 0` on
+    `.dock-row`, and no test reads any of the three - neither `row-gap` nor
+    `line-height` appears in `test/page.test.js` at all. Drop `row-gap: 0` and
+    every coarse row gains the base rule's 4 px gap - 49 px a row, 2.9 rows at
+    320 x 664 - and the suite stays at 2,624 passing while the comment and the
+    release note both state 45. This is the shape of fault the turn was sent
+    to fix, on the figure the turn's own trade is argued from.
+  - **Goal**: one assertion in `the dock's label column is what the stylesheet
+    leaves it, under a mouse and under a finger` deriving the coarse row's
+    height the way the column is derived beside it: the label's `line-height`,
+    the `min-height` the controls are floored at and `row-gap` off the coarse
+    `.dock-row`, summed to the 45 px the comment states, with the 32 px a
+    mouse row comes to as the figure it is traded against. Arithmetic off the
+    stylesheet, no browser, and it fails on any of the three being dropped.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
 
 ## Game UI/UX
 
