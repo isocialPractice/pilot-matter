@@ -43,109 +43,57 @@ its context survives being archived.
     each row it overrides.
   - From: Interactive Build Mode `->` Starter Worlds
 
-### UI/UX Override - the dock's label column
-
-#### Resolve Issues
-
-- [ ] **Dock Label Column 1**: four of the dock's row labels wrap onto a second
-  line in the 114 px column the widened mark columns leave them
-  - **Issue**: the marks widened from 24 px to 32 take their 16 px out of
-    `.dock-row`'s `1fr`, and the comment over the rule says that is affordable
-    because "the longest labels the dock writes are 13 characters of 11 px
-    Courier, `FIELD OF VIEW` and `CORNER RADIUS`, read across all twelve
-    panels with every section open". The dock writes longer ones. Read in
-    Chromium on a coarse pointer at 900 x 700 and on an emulated touch phone at
-    320, both of which give the label 114 px, the same page measured twice -
-    once as the stylesheet stands and once with one appended rule putting the
-    mark columns back to 24 px, so the only thing between the readings is what
-    this turn changed: `GIRTH RANGE MIN`, `GIRTH RANGE MAX`, `TREE HEIGHT MIN`
-    and `TREE HEIGHT MAX`, 15 characters and 114.03 px each, are on **one**
-    line in the 130 px column the 24 px marks left and on **two** in the 114 px
-    column the 32 px marks leave. Each breaks after its second word:
-    `GIRTH RANGE` over `MIN`. Nothing is cut - `scrollWidth` never passes
-    `clientWidth` - and the row stays 32 px tall, two 12 px lines fitting
-    inside the floor the same block gives `.dock-step`, so the cost is a label
-    read as two lines rather than one. At 390 px the column is 184 and nothing
-    wraps, so the defect is the 114 px column alone: 320 px wide, and the side
-    dock a coarse pointer over 640 px keeps. The turn's own walk missed them
-    for two reasons, both worth knowing before the fix is measured: it walked a
-    **blank canvas**, whose `WORLD:` sections are grass alone against the eight
-    a preset such as `LAKESIDE` carries, and it walked the panels **at rest**,
-    where a drop tool draws no rows until something is in hand - `MOUNTAIN`
-    drew none, and drops fifteen with a draft.
-  - **Goal**: Resolve to [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
-  - From: Code Review Override - the dock's remaining touch targets
+### UI/UX Override - SAVE / LOAD's name field under a finger
 
 #### Found Issues
 
-- [ ] `WORLD: TOWN`'s two building height labels wrapped in the dock's label
-  column before the marks were widened, and still do
-  - **Issue**: `BUILDING HEIGHT MIN` and `BUILDING HEIGHT MAX`, 19 characters
-    each, are on two lines in the 114 px column and were on two in the 130 px
-    column as well, so the widening did not cause them - at the 7.602 px a
-    character measured off `FIELD OF VIEW` they want 144.4 px, which neither
-    column has. Read on `WORLD: TOWN` in
-    Select's panel with the canvas opened on `LAKESIDE`, at 900 x 700 and at
-    320. They break after `BUILDING`, read correctly as two lines, and are not
-    cut. Nothing else in the 78 labels that panel writes wraps at either
-    column.
-  - **Goal**: the same fix as Dock Label Column 1, which is why it is recorded
-    beside it rather than queued on its own: options 1 and 2 in
-    [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
-    settle both, and option 3 settles only the 15 character labels, so this is
-    the reading that tells the whole fixes from the partial one. Close it with
-    that item if the fix taken covers it, and leave it open if option 3 is
-    taken alone.
-  - From: UI/UX Override - the dock's label column
-- [ ] `figure()` in `test/page.test.js` escapes nothing, and reads a selector's
-  top-level rule rather than the one asked for
-  - **Issue**: the helper the new derivation test reads the stylesheet with has
-    three faults, none of which its own three calls happen to reach, and the
-    next run is told to build on it. Its escape, on line 3999, is
-    ``rule.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')``: the character class
-    closes at the `]` that follows `[\\`, so the pattern reads as "one of those
-    characters, then two backslashes, then `]`" and matches nothing a selector
-    contains - `.dock-outliner-row` goes through unescaped and its `.` matches
-    any character - and the replacement would insert two backslashes rather
-    than one if it ever fired. Its property match, `${property}: ([^;]+);`, is
-    unanchored, so `figure('#build-dock', 'width')` would read a `min-width`
-    declared above `width`, and `padding.match(/\s(\d+)px/)` takes a
-    shorthand's second value, which is the vertical one in `12px 8px`. Worst
-    for what comes next, its block pattern requires the eight space indent of a
-    top-level rule, so `figure('.dock-row', 'grid-template-columns')` returns
-    the base `1fr 24px 84px 24px` and can never return the
-    `1fr 32px 84px 32px` the coarse block declares at twelve spaces - which is
-    the one figure
-    [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
-    asks the label column test to be derived from, "in the same style and the
-    same file".
-  - **Goal**: close the class as `` /[.*+?^${}()|[\]\\]/g `` with a `'\\$&'`
-    replacement; anchor the property to the start of a declaration; take a
-    shorthand's first value rather than its second; and let the caller name
-    which rule of a selector it wants - an indent or an enclosing `@media`
-    argument, or a second helper that reads inside a named block - before the
-    two label column tests are written against it. Settle this first if the
-    column's fix is measured by a derived test, since that test needs the
-    coarse `.dock-row` the helper cannot reach today.
-  - From: UI/UX Override - the dock's label column
-- [ ] The test that holds the coarse block's position checks seven of the
-  twelve rules it lifts
-  - **Issue**: `the coarse block sits after every dock rule it lifts` in
-    `test/page.test.js` is the only thing holding the block below its base
-    rules, which is what makes its floors win on source order at all. Its list
-    names `.dock-row`, `button.dock-section`, `.dock-pick`,
-    `.dock-text-row .dock-text`, `.dock-swatch`, `.dock-dropper` and
-    `.dock-slider`, and leaves out `.dock-hex`, `.dock-step`,
-    `.dock-outliner-row`, `.dock-bar-answer` and `.dock-field .dock-value`.
-    `.dock-hex` is the nearest of them, declared about 30 lines above the
-    block, so a rule added between the two is the realistic way a floor goes
-    silently dead while the suite stays green - the exact failure the test was
-    written for.
-  - **Goal**: derive the list from the block rather than repeating it by hand -
-    read the selectors the coarse block declares, and assert each one's own
-    declaration sits above it - so a floor added later is covered without the
-    list being remembered. The test's name is then true as written.
-  - From: UI/UX Override - the dock's label column
+- [ ] The comment over SAVE / LOAD's name field in the coarse block gives two
+  figures the browser contradicts, in the rule this turn added
+  - **Issue**: the comment above `.dock-text-row .dock-text, .dock-hex` inside
+    `@media (pointer: coarse)` says the name is "140 x 24 at every width and
+    156 once the columns above widen", and that its own `2 / -1` "would leave
+    it the 84 px reading column and the 32 px mark beside it" - 120 px with
+    the gap between them. Both figures are of the stylesheet as it stood
+    before this turn. Read in Chromium on `LAKESIDE` with SAVE / LOAD open,
+    at 320 x 664, at 390 x 844 and at the 900 x 700 side dock: the field is
+    274 x 32 at 320 and in the side dock and 344 x 32 at 390, not 156 x 24.
+    And with that one declaration put back to the base rule's `2 / -1` and
+    nothing else changed, it is **238 px** starting 36 px in from the row's
+    left edge - still under its label and not cut - because `-1` is the last
+    line of the four column explicit grid, so `2 / -1` spans the trailing
+    `1fr` as well: 84 + 32 + 114 and two 4 px gaps. The rule is worth 36 px of
+    field and 36 px of left edge, not the 154 px the comment implies. This is
+    the same shape of fault the turn was sent to fix - a figure in a comment
+    that nothing measured - written into the fix itself.
+  - **Goal**: rewrite both figures from a reading. The first paragraph wants
+    the field's width now rather than before the rule, or wants saying that
+    140 and 156 are what it was; the second wants the measured 238 px and the
+    36 px the rule is worth, with the trailing `1fr` named as the third
+    column `2 / -1` reaches. The 22 x 15 spinners and the 12 px picker bands
+    lower down the same block were re-measured this run and both still hold,
+    so it is these two figures alone.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [ ] The name field's own column is the one declaration of this change that
+  no test reads
+  - **Issue**: `test/page.test.js` derives the coarse `.dock-row`'s
+    `grid-template-columns` and `grid-template-areas`, and asserts
+    `.dock-row > .dock-label` is `grid-area: label` and
+    `.dock-row > .dock-field` is `grid-area: reading`. Nothing asserts
+    `.dock-text-row > .dock-text { grid-column: 1 / -1 }`. Proved by removing
+    that rule from `index.html` and running the suite: 2,624 tests, 2,624
+    pass, while the field narrows from 274 px to 238 and moves 36 px right -
+    the reading above. The page was restored byte for byte afterwards. The
+    rule's own `min-height` floor is held, and the block's source-order test
+    reads `.dock-text-row .dock-text`, the descendant selector of the floor,
+    rather than this one, so neither covers it.
+  - **Goal**: one assertion beside the two the same test already makes, in
+    `the dock's label column is what the stylesheet leaves it, under a mouse
+    and under a finger`: `figure('.dock-text-row > .dock-text', 'grid-column',
+    { inside: '(pointer: coarse)' })` is `1 / -1`, with the base rule's
+    `2 / -1` named as what it displaces and why. It is arithmetic off the
+    stylesheet, needs no browser, and would have failed on the turn that
+    dropped the rule.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
 
 ## Game UI/UX
 
@@ -373,7 +321,36 @@ needs all of it.
 ### Closing the Builder's Gaps
 
 What the Post Interactive Build plan finished without, each named in its
-record.
+record, and anything left behind in the builder by a turn that closed - a
+defect measured after the work that caused it was archived belongs here rather
+than in a queue of new features.
+
+- [ ] **Dock Label Column 2**: the two 19 character labels still read as two
+  lines under a mouse, where the fix for a finger does not reach
+  - **Issue**: the label column was given the whole row under
+    `@media (pointer: coarse)`, which settles every label a finger meets. A
+    mouse is not in that block, so `.dock-row` keeps `1fr 24px 84px 24px` and
+    the label keeps the 130 px the row's three fixed columns and its three
+    gaps leave it. `BUILDING HEIGHT MIN` and `BUILDING HEIGHT MAX` want 144.4
+    px at 7.602 a character, so both read as two lines there. Measured in
+    Chromium at 1280 x 800 on `LAKESIDE` with every `WORLD:` section open:
+    the 76 other labels Select writes are one line, nothing is cut, and the
+    row grows from 18 px to 24 to hold the second line rather than clipping
+    it. This is the older half of the defect the coarse fix was queued for,
+    and the only half left.
+  - **Goal**: decide whether a mouse should pay for it, and record the
+    decision either way rather than leaving the column undescribed. The row
+    is 18 px under a mouse against 32 under a finger, so giving the label its
+    own line there costs proportionally more and buys less: a 24 px row that
+    reads correctly is not the same defect as a label that cannot be read.
+    The three other ways are the same ones the coarse column had - restore
+    the label's 16 px by narrowing something else, drop the label's
+    letter-spacing to 0 and take 19 characters to 125.4 px, or keep the wrap
+    and say so in the comment over the rule. The assertion in
+    `every label the dock can write fits the column a finger is given` records
+    the shortfall today and fails when it is settled, which is the prompt to
+    close this item; whatever is chosen, that line is what has to be rewritten
+    to the new state.
 
 ### Editor Workflow
 
@@ -926,92 +903,8 @@ items in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 450 earlier items in `TODO-archive.md`, newest last.
+> 454 earlier items in `TODO-archive.md`, newest last.
 
-- [x] The bar's two switches read as two more steps until one is turned on
-  - **Issue**: `UNDO`, `REDO`, `GRID` and `ANGLE` share one class and one
-    resting look. With a step to go back to and both snaps off, all four draw
-    the same - same background, same border, same colour - so nothing says
-    that two of them do something once and two of them stay on. A snap that
-    is on lights green, which tells the pilot afterwards rather than before.
-  - **Goal**: mark the two switches as switches at rest, not only when lit -
-    a different border or a small state mark on `GRID` and `ANGLE`, or a
-    divider between the pair of steps and the pair of switches. They are
-    already separable in the data: `DOCK_SNAP_GRID` and `DOCK_SNAP_ANGLE`
-    carry a `snap` field and the two steps do not, and `dockBar` writes
-    `pressed` for the switches and leaves it off the steps.
-  - **Settled**: a switch carries `dock-bar-switch` as well, written off the
-    `pressed` a step does not have, and the stylesheet draws it a ring in its
-    own colour - at rest as a ring, filled once the switch is on. Seen in
-    Chromium: the ring on `GRID` and `ANGLE` and on neither step, with both
-    snaps off.
-  - From: UI/UX Override - the editor workflow's four additions
-- [x] A long name cannot be read in the field it is left in
-  - **Issue**: the name field is 203 px on a desktop dock and holds up to
-    `PLACEMENT_NAME_LIMIT` 40 characters. A 35 character name overflows it -
-    `scrollWidth` past `clientWidth` - and the input carries no `title`, so
-    once focus leaves there is no way to read the whole name without clicking
-    into the field and scrolling it. The outliner's point is telling rows
-    apart, which a name half of which is cut does less well.
-  - **Goal**: set the field's `title` to the name it holds as it is drawn, in
-    `drawOutlinerRow` in `js/panel-view.js`, so hovering reads the whole of
-    it; the `aria-label` there is the type's `"<TYPE> name"` and should stay
-    as it is.
-  - **Settled**: the field's `title` is what it reads as - the name, or the
-    numbered placeholder for a row never named - written as the row is drawn
-    and kept in step by `update`, inside the guard that leaves the field being
-    typed into alone. The `aria-label` is untouched. Measured in Chromium: a
-    36 character name overflows the 203 px field and the whole of it is on the
-    title.
-  - From: UI/UX Override - the editor workflow's four additions
-- [x] The bar's label is written on an element no reader announces it for
-  - **Issue**: `index.html` draws the bar as
-    `<div id="build-dock-bar" data-dock="bar" aria-label="Edit bar">`. A bare
-    `div` maps to the `generic` role, which prohibits a name from the author,
-    so a screen reader drops the label and reads the bar as four loose
-    buttons between the heading and the fields. The file's own practice is the
-    other way - `<aside id="build-dock" aria-label="Tool controls">` labels an
-    element whose role takes a name - so this is the one label in the dock
-    that does nothing.
-  - **Goal**: give the bar a role its label belongs to. `role="toolbar"` is
-    the closer fit - it is a row of controls acting on the session - and
-    brings arrow-key navigation as an expectation; `role="group"` names it
-    without that promise. Either way the `aria-label` then reads, and the pin
-    in `test/page.test.js` that matches the bar's tag should name the role.
-  - **Settled**: `role="group"`, and the pin now names it. `toolbar` was the
-    other option and was not taken: it is expected to be one tab stop with the
-    arrow keys moving inside it, which the bar does not do, so it would have
-    promised a keyboard behaviour that is not there. `group` makes the label
-    read, which is the whole of the defect.
-  - From: UI/UX Override - the editor workflow's four additions
-- [x] Nothing holds the outliner's rows or the dock's bar as they are drawn
-  - **Issue**: `js/panel-view.js` gained the bar's buttons, `drawOutlinerRow`,
-    `outlinerBox`, the bar and outliner branches of `update`, two branches of
-    `onClick` and one of `onChange`, and no test names
-    `dock-outliner-row`, `dock-outliner-pick`, `dock-outliner-box`,
-    `dock-outliner-name` or `dock-bar-answer` - nor do the styles those
-    classes are drawn by in `index.html`. The content both are drawn from is
-    held (`outlinerSection` in `test/outliner.test.js`, `dockBar` in
-    `test/build-history.test.js`); the drawing is not. So the `drawn` key
-    `outliner:${index}` could stop matching between the two methods, the
-    `onClick` branch could move below `dataset.section`, or a class could be
-    renamed out from under the stylesheet, and the suite would stay green.
-  - **Goal**: hold it the two ways this repository already holds drawing code.
-    Source pins in `test/page.test.js` for the row's four parts, the press
-    order in `onClick` and the `styled(indexHtml, ...)` rules behind the
-    classes; and a stub-driven run of the methods themselves in
-    `test/panel-view.test.js`, the way
-    `PanelView.prototype.showStatus.call(stub, ...)` already runs one against
-    a stub with no DOM behind it - `update` needs a `document.activeElement`
-    shim and nothing else.
-  - **Settled**: both ways. `test/page.test.js` pins the row's four parts, the
-    `drawn` key spelt the same way in `drawOutlinerRow` and `update`, the
-    press order in `onClick`, and the stylesheet rules behind the four
-    classes; `test/panel-view.test.js` runs `drawOutlinerRow`, `build` and
-    `update` against a stub element and a `document` shim, which is what holds
-    what each part is told and that a redraw writes the row it drew. A
-    mutation run of ten mutants over the day's changes caught every one.
-  - From: UI/UX Override - the editor workflow's four additions
 - [x] `js/build-panel.js` imports `committedPlacements` and never reads it
   - **Issue**: the import added at line 29 is unused - `outlinerSection`
     reads `state?.placements ?? []` directly - so the module declares a
@@ -1194,3 +1087,156 @@ how the simulator got here rather than as a list still to be worked.
     padding and the outliner row's own columns and gap, asserting the
     docstring names both and no longer carries 276.
   - From: Code Review Override - the dock's remaining touch targets
+- [x] **Dock Label Column 1**: four of the dock's row labels wrap onto a second
+  line in the 114 px column the widened mark columns leave them
+  - **Issue**: the marks widened from 24 px to 32 take their 16 px out of
+    `.dock-row`'s `1fr`, and the comment over the rule says that is affordable
+    because "the longest labels the dock writes are 13 characters of 11 px
+    Courier, `FIELD OF VIEW` and `CORNER RADIUS`, read across all twelve
+    panels with every section open". The dock writes longer ones. Read in
+    Chromium on a coarse pointer at 900 x 700 and on an emulated touch phone at
+    320, both of which give the label 114 px, the same page measured twice -
+    once as the stylesheet stands and once with one appended rule putting the
+    mark columns back to 24 px, so the only thing between the readings is what
+    this turn changed: `GIRTH RANGE MIN`, `GIRTH RANGE MAX`, `TREE HEIGHT MIN`
+    and `TREE HEIGHT MAX`, 15 characters and 114.03 px each, are on **one**
+    line in the 130 px column the 24 px marks left and on **two** in the 114 px
+    column the 32 px marks leave. Each breaks after its second word:
+    `GIRTH RANGE` over `MIN`. Nothing is cut - `scrollWidth` never passes
+    `clientWidth` - and the row stays 32 px tall, two 12 px lines fitting
+    inside the floor the same block gives `.dock-step`, so the cost is a label
+    read as two lines rather than one. At 390 px the column is 184 and nothing
+    wraps, so the defect is the 114 px column alone: 320 px wide, and the side
+    dock a coarse pointer over 640 px keeps. The turn's own walk missed them
+    for two reasons, both worth knowing before the fix is measured: it walked a
+    **blank canvas**, whose `WORLD:` sections are grass alone against the eight
+    a preset such as `LAKESIDE` carries, and it walked the panels **at rest**,
+    where a drop tool draws no rows until something is in hand - `MOUNTAIN`
+    drew none, and drops fifteen with a draft.
+  - **Goal**: Resolve to [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
+  - **Settled**: option 1, the prompt's own recommendation, and the only one
+    of the four that reaches every label. Under `@media (pointer: coarse)`
+    `.dock-row` becomes two rows - `'label label label label'` over
+    `'down reading up .'` on `32px 84px 32px 1fr` - which is the shape
+    `.dock-row.dock-row-slider` already uses. The label takes the row's whole
+    274 px at 320 and in the side dock, and 344 at 390; the trailing `1fr` is
+    what gives it the row rather than the 156 px the three control tracks come
+    to. `.dock-row > .dock-field` moves to the `reading` area and
+    `.dock-text-row > .dock-text` to the whole row, so a figure's field and
+    SAVE / LOAD's name are not left in a 32 px mark column. Measured in
+    Chromium on `LAKESIDE` with every `WORLD:` section open: all 78 labels
+    Select writes are one line at 320 x 664, at 390 x 844 and at the 900 x 700
+    side dock, against six that wrapped before - the four this turn caused and
+    the two older ones; nothing is cut, no two children of a row overlap, the
+    marks are still 32 x 32 and the readings are still one column. It costs
+    13 px a row, 45 against 32, which is 3.2 rows of the panel at 320 x 664
+    against 4.5 and 13 of the side dock against 18.3. Options 2 and 3 were
+    measured the same way and settle the six as well, but only together and
+    with 4.6 px to spare on the longest label, against 129.6 for option 1.
+  - From: Code Review Override - the dock's remaining touch targets
+- [x] `WORLD: TOWN`'s two building height labels wrapped in the dock's label
+  column before the marks were widened, and still do
+  - **Issue**: `BUILDING HEIGHT MIN` and `BUILDING HEIGHT MAX`, 19 characters
+    each, are on two lines in the 114 px column and were on two in the 130 px
+    column as well, so the widening did not cause them - at the 7.602 px a
+    character measured off `FIELD OF VIEW` they want 144.4 px, which neither
+    column has. Read on `WORLD: TOWN` in
+    Select's panel with the canvas opened on `LAKESIDE`, at 900 x 700 and at
+    320. They break after `BUILDING`, read correctly as two lines, and are not
+    cut. Nothing else in the 78 labels that panel writes wraps at either
+    column.
+  - **Goal**: the same fix as Dock Label Column 1, which is why it is recorded
+    beside it rather than queued on its own: options 1 and 2 in
+    [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
+    settle both, and option 3 settles only the 15 character labels, so this is
+    the reading that tells the whole fixes from the partial one. Close it with
+    that item if the fix taken covers it, and leave it open if option 3 is
+    taken alone.
+  - **Settled**: option 1 was taken, and it covers both readings this item was
+    written from - `BUILDING HEIGHT MIN` and `MAX` are one line at 900 x 700
+    and at 320, in the 274 px the label now has. The item's premise that
+    option 2 would settle them does not hold and was not relied on: the 130 px
+    column option 2 restores is 14.4 px short of their 144.4, which the same
+    Chromium reading confirms. What the fix does not reach is a mouse, whose
+    label column is that same 130 px and where the pair still reads as two
+    lines; that half is queued on its own under `Closing the Builder's Gaps`,
+    and the derived test in `test/page.test.js` records it so it cannot be
+    settled silently.
+  - From: UI/UX Override - the dock's label column
+- [x] `figure()` in `test/page.test.js` escapes nothing, and reads a selector's
+  top-level rule rather than the one asked for
+  - **Issue**: the helper the new derivation test reads the stylesheet with has
+    three faults, none of which its own three calls happen to reach, and the
+    next run is told to build on it. Its escape, on line 3999, is
+    ``rule.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')``: the character class
+    closes at the `]` that follows `[\\`, so the pattern reads as "one of those
+    characters, then two backslashes, then `]`" and matches nothing a selector
+    contains - `.dock-outliner-row` goes through unescaped and its `.` matches
+    any character - and the replacement would insert two backslashes rather
+    than one if it ever fired. Its property match, `${property}: ([^;]+);`, is
+    unanchored, so `figure('#build-dock', 'width')` would read a `min-width`
+    declared above `width`, and `padding.match(/\s(\d+)px/)` takes a
+    shorthand's second value, which is the vertical one in `12px 8px`. Worst
+    for what comes next, its block pattern requires the eight space indent of a
+    top-level rule, so `figure('.dock-row', 'grid-template-columns')` returns
+    the base `1fr 24px 84px 24px` and can never return the
+    `1fr 32px 84px 32px` the coarse block declares at twelve spaces - which is
+    the one figure
+    [dock-label-column-wrap.prompt.md](.claude/prompts/dock-label-column-wrap.prompt.md)
+    asks the label column test to be derived from, "in the same style and the
+    same file".
+  - **Goal**: close the class as `` /[.*+?^${}()|[\]\\]/g `` with a `'\\$&'`
+    replacement; anchor the property to the start of a declaration; take a
+    shorthand's first value rather than its second; and let the caller name
+    which rule of a selector it wants - an indent or an enclosing `@media`
+    argument, or a second helper that reads inside a named block - before the
+    two label column tests are written against it. Settle this first if the
+    column's fix is measured by a derived test, since that test needs the
+    coarse `.dock-row` the helper cannot reach today.
+  - **Settled**: settled first, and by deletion rather than by repair. The file
+    already carried a stylesheet parser - `styleRules`, `declarations` and
+    `media`, used thirty-eight times - so `figure` is now four lines on top of
+    it rather than a second reader built out of patterns: it takes an `inside`
+    naming an `@media` condition, which is how a caller says which of a
+    selector's rules it wants, and it throws rather than answering null. None
+    of the three faults can recur, because none of the three mechanisms is
+    there: `declarations` parses property names whole, so there is nothing to
+    anchor; it finds a rule by its selector list, so there is nothing to
+    escape; and `media` cuts the block out by counting braces, so indent is
+    never read. `firstLength` and `boxSide` replace the two length readings -
+    the first takes the front of a value and refuses one that does not open
+    with a length, the second expands a box shorthand and is asked for a side
+    by name. The faults were unreachable through `index.html`, which is how
+    they survived three callers, so the reader is held by a test of its own
+    against a stylesheet written to carry them, and four mutants prove it.
+  - From: UI/UX Override - the dock's label column
+- [x] The test that holds the coarse block's position checks seven of the
+  twelve rules it lifts
+  - **Issue**: `the coarse block sits after every dock rule it lifts` in
+    `test/page.test.js` is the only thing holding the block below its base
+    rules, which is what makes its floors win on source order at all. Its list
+    names `.dock-row`, `button.dock-section`, `.dock-pick`,
+    `.dock-text-row .dock-text`, `.dock-swatch`, `.dock-dropper` and
+    `.dock-slider`, and leaves out `.dock-hex`, `.dock-step`,
+    `.dock-outliner-row`, `.dock-bar-answer` and `.dock-field .dock-value`.
+    `.dock-hex` is the nearest of them, declared about 30 lines above the
+    block, so a rule added between the two is the realistic way a floor goes
+    silently dead while the suite stays green - the exact failure the test was
+    written for.
+  - **Goal**: derive the list from the block rather than repeating it by hand -
+    read the selectors the coarse block declares, and assert each one's own
+    declaration sits above it - so a floor added later is covered without the
+    list being remembered. The test's name is then true as written.
+  - **Settled**: the list is read off the block with `media` and `styleRules`,
+    which gives the nineteen selectors the block declares rather than the
+    seven that were written down - `.dock-hex` and `.dock-step` among them,
+    and the two rules this turn added. What is asserted of each is that no
+    declaration of its own sits **below** the block, which is the failure
+    itself rather than a roster of what is above it: a selector the page never
+    declares has nothing to lose on source order, so the derived list carries
+    `.dock-row > .dock-label` without needing a base rule invented for it. A
+    floor count and ten named selectors keep an extraction that returns
+    nothing from passing vacuously, and a mutant that moves `.dock-hex`'s base
+    rule below the block - the exact case the hand-kept list could not see -
+    now fails the test.
+  - From: UI/UX Override - the dock's label column
