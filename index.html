@@ -1963,14 +1963,61 @@
                was 24 x 24 at all four widths, the one target under the floor on
                both measures. `.dock-row` gives it its width, so the two mark
                columns are widened the way the outliner's were; the reading
-               stands in the 84 px column and wants the floor alone. The label
-               column pays the 16 px: 114 px at 320 and at the side dock,
-               against the 130 it had. Nothing is cut or wrapped at 114 - the
-               longest labels the dock writes are 13 characters of 11 px
-               Courier, FIELD OF VIEW and CORNER RADIUS, read across all twelve
-               panels with every section open. */
+               stands in the 84 px column and wants the floor alone.
+
+               The label takes the row above them rather than the column beside
+               them, which is the shape `.dock-row.dock-row-slider` already
+               uses for a row whose value is set by eye. Widening the marks
+               inside the old four columns left the label 114 px at 320 and at
+               the side dock, against the 130 it had, and the comment here said
+               nothing wrapped at 114 because the longest label the dock writes
+               was taken to be 13 characters. It is not: a label is a range's
+               name with a bound's suffix on it, so a range of two words comes
+               to three, and `BUILDING HEIGHT MIN` is 19 characters and 144 px.
+               Six labels read as two lines in the 114 px column - the two
+               above, `GIRTH RANGE MIN` and `MAX` and `TREE HEIGHT MIN` and
+               `MAX` - and the first four of those read as one line in the 130
+               it had, so the widening caused four of the six and uncovered
+               two that were older than it.
+
+               Across the whole row the label has 274 px in the side dock and
+               at 320, which is every label the dock can write with 130 px to
+               spare: measured by walking the ranges rather than the panels,
+               the longest is the 19 characters above, and a test in
+               test/page.test.js derives both figures so a range added later
+               is measured rather than assumed. The row costs 13 px of height
+               for it - 45 px against 32 - which is 3.2 rows of the panel at
+               320 x 664 against 4.5, and 13 of the side dock against 18.3.
+               That is the trade, and it is a panel that was always scrolled:
+               Select on a preset with every section open holds 4,141 px of
+               rows where it held 3,127, against the 143 px a phone shows of
+               it at 320 x 664. A third more to scroll, and no label read
+               twice.
+
+               The fourth column is what the label spans into. The three the
+               controls stand in are fixed, so without it the row's grid would
+               be 156 px wide and the label would have that rather than the
+               row - 11 px clear of the longest label instead of 130. */
             .dock-row {
-                grid-template-columns: 1fr 32px 84px 32px;
+                grid-template-columns: 32px 84px 32px 1fr;
+                grid-template-areas:
+                    'label   label   label label'
+                    'down    reading up    .';
+                row-gap: 0;
+            }
+
+            .dock-row > .dock-label {
+                grid-area: label;
+                line-height: 13px;
+            }
+
+            /* A row holding a figure has no marks, so its field stands in the
+               reading's own column rather than the third of the four it names
+               under a mouse - which is the `up` mark's column here. The
+               readings of a panel are one column whichever kind each row is,
+               and that is what keeps them one. */
+            .dock-row > .dock-field {
+                grid-area: reading;
             }
 
             .dock-step,
@@ -1983,10 +2030,19 @@
                columns above widen, and Free Paint's hex, 20 tall and as wide as
                the colour panel leaves it. Both are text rather than a figure,
                so neither is reached by the `.dock-field .dock-value` floor at
-               the head of this block. */
+               the head of this block.
+
+               The name takes the row under its label for the same reason the
+               label takes the row above it: its own columns are `2 / -1` of
+               the four the base rule has, which here would leave it the 84 px
+               reading column and the 32 px mark beside it. */
             .dock-text-row .dock-text,
             .dock-hex {
                 min-height: 32px;
+            }
+
+            .dock-text-row > .dock-text {
+                grid-column: 1 / -1;
             }
 
             /* Free Paint's colour, the one panel drawn on the artwork's pale
