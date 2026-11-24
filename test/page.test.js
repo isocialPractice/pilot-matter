@@ -40,7 +40,10 @@ import { completeLeg, createPatternState, patternScore, FINAL_LEG } from '../js/
 import { missedBy } from '../js/corridor.js';
 import { shotFault, shotFor } from '../js/survey.js';
 import { bearingToDirection } from '../js/units.js';
-import { runwayDirection } from '../js/environment/elements.js';
+import { runwayDirection, ELEMENTS } from '../js/environment/elements.js';
+import { BUILD_TOOLS } from '../js/build-tools.js';
+import { rangeRows } from '../js/properties-panel.js';
+import { CAMERA_NUDGES, cameraFieldRanges } from '../js/build-camera.js';
 import { formatStageClock, formatRunPointer } from '../js/hud.js';
 import { stageReport } from '../js/best-times.js';
 
@@ -3012,6 +3015,110 @@ function pixels(css, selector, property) {
 }
 
 /**
+ * One declaration of a selector's rule, as it is written, for a test that
+ * derives a figure from the stylesheet rather than repeating a reading of it.
+ * `inside` names an `@media` condition, so the rule asked for is the one that
+ * condition declares rather than the base rule of the same selector: there
+ * are two `.dock-row` rules, and `1fr 24px 84px 24px` and the columns a
+ * coarse pointer declares are different answers to the same question.
+ *
+ * It reads through `declarations`, which parses the page rather than matching
+ * a pattern in it. The pattern this replaced had three faults its own three
+ * calls never reached: its escape closed its character class early, so every
+ * selector went through unescaped and a `.` matched any character; its
+ * property match was unanchored, so a `min-width` declared above a `width`
+ * answered for it; and it required the eight space indent of a top-level
+ * rule, so it could not reach a rule inside a media block at all - which is
+ * the one rule the label column has to be derived from.
+ *
+ * With no `inside` the rule asked for has to be a rule of the page itself.
+ * `declarations` takes the first rule written for a selector wherever it sits,
+ * so a selector only an at-rule declares would otherwise answer out of that
+ * at-rule as though it were the rule every screen gets: `.dock-row >
+ * .dock-label` is written once, inside the coarse block, and would hand
+ * `grid-area: label` to a caller asking what a mouse is given. That question
+ * is refused rather than answered quietly, which is the same reason the
+ * reader throws instead of returning null - and it is what stops a
+ * derivation of the coarse block passing with the `inside` left off.
+ */
+function figure(selector, property, { inside = null, css = indexHtml } = {}) {
+    let source = css;
+    if (inside != null) {
+        source = media(css, inside);
+        assert.ok(source, `index.html should carry an @media ${inside} block`);
+    } else {
+        const written = styleRules(source).find(rule => rule.selectors.includes(selector));
+        assert.ok(!written?.nested,
+            `${selector} is declared inside an at-rule, so the condition has to be named`);
+    }
+
+    const value = declarations(source, selector).get(property);
+    assert.ok(value, `${selector} should declare ${property}`
+        + `${inside == null ? '' : ` inside ${inside}`}`);
+    return value;
+}
+
+// The first length a value names, which is a single value whole, the top of a
+// box shorthand, and the width of a `border`. Never the second: `padding: 12px
+// 8px` is twelve across and eight down, so a reader taking the second value
+// answers about the other axis from the one it was asked about.
+//
+// Read off the front of the value rather than by looking for `px` in it,
+// because a zero length is written without a unit: `0 12px 8px` names three
+// lengths and only two of them say `px`, so a reader hunting the unit answers
+// 12 to a question about the top.
+function firstLength(value) {
+    const first = String(value).trim().split(/\s+/)[0] ?? '';
+    const found = first.match(/^(-?\d+(?:\.\d+)?)(px)?$/);
+    assert.ok(found && (found[2] || Number(found[1]) === 0),
+        `${value} should open with a length in pixels`);
+    return Number(found[1]);
+}
+
+// `index.html` with its comments blanked out and every index kept, for a
+// reader that needs where in the file a rule is written as well as what it
+// says. The stylesheet's comments quote the rules they explain - the coarse
+// block's own comment writes `.dock-pick { min-height: 32px }` inside a
+// sentence about source order - so a search over the page as written can
+// answer out of prose rather than out of a declaration.
+const cssPage = indexHtml.replace(/\/\*[\s\S]*?\*\//g, comment =>
+    comment.replace(/[^\n]/g, ' '));
+
+// A selector or a property made literal for a regex. The class has to close
+// after the characters it lists: written with the `]` escaped it is one of
+// those characters, and written with the `]` bare it closes early and the
+// pattern reads as "one of these, then two backslashes, then `]`" - which
+// matches nothing a selector contains, so every selector goes through
+// unescaped and its dots match any character.
+const literal = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Where a selector is written as a rule of the stylesheet itself, every place
+// it is. Matched at the page's own eight space indent and only where the next
+// character ends the selector - the brace, a comma or the line - so
+// `.dock-pick` is not found inside `.dock-pick:disabled` and `.dock-row` is
+// not found inside `.dock-row.dock-row-slider`.
+function ruleStarts(selector, css = cssPage) {
+    const written = new RegExp(`\\n {8}${literal(selector)}(?=[ ,\\n{])`, 'g');
+    return [...css.matchAll(written)].map(found => found.index);
+}
+
+// A named side of a box shorthand, expanded the way CSS expands one, so a
+// caller that means the padding across a row says which side it means rather
+// than counting values. `0 12px 8px` is 0 above, 12 either side and 8 below.
+const BOX_SIDES = ['top', 'right', 'bottom', 'left'];
+function boxSide(value, which) {
+    const parts = String(value).trim().split(/\s+/);
+    const box = parts.length === 1 ? [parts[0], parts[0], parts[0], parts[0]]
+        : parts.length === 2 ? [parts[0], parts[1], parts[0], parts[1]]
+        : parts.length === 3 ? [parts[0], parts[1], parts[2], parts[1]]
+        : parts.slice(0, 4);
+
+    const at = BOX_SIDES.indexOf(which);
+    assert.ok(at >= 0, `${which} is not a side of a box`);
+    return firstLength(box[at]);
+}
+
+/**
  * The body of an `@media` block, as its own stylesheet, so the rules written
  * for one screen can be read apart from the rules written for every screen.
  * Both are `#hud.floated`, and reading them together would answer a question
@@ -3989,30 +4096,129 @@ test('an outliner row\'s field carries what it reads as, so a long name can be r
 });
 
 /**
+ * `figure` is what every derived figure below is read with, and a reader that
+ * answers the wrong question quietly is worse than no reader: the test built
+ * on it still passes, and the figure it holds is one nothing measured. Its own
+ * three callers reach none of the three ways it used to be wrong, so the
+ * reader is held here rather than by them.
+ *
+ * It used to match a pattern against the page. The pattern escaped its
+ * selector with a character class that closed early, so no selector was
+ * escaped at all and a `.` matched any character; it matched a property
+ * anywhere in the block, so a `min-width` above a `width` answered for it;
+ * and it required the eight space indent of a top-level rule, so a rule
+ * inside a media block was out of its reach.
+ */
+test('the stylesheet reader answers about the rule and the declaration it was asked for', () => {
+    // A selector is matched as itself. `.dock-row` and `.dock-row-slider` are
+    // one character apart, and an unescaped `.` matches that character - so a
+    // reader that does not escape answers about whichever rule comes first.
+    assert.strictEqual(figure('.dock-row', 'grid-template-columns'), '1fr 24px 84px 24px');
+    assert.strictEqual(figure('.dock-row.dock-row-slider', 'grid-template-rows'), 'auto auto');
+
+    // A property is the whole of a declaration's name rather than part of one.
+    // No rule in the page declares a `min-width` above a `width`, so the fault
+    // is unreachable through `index.html` and is held against a stylesheet
+    // written here to carry it - which is the only way to hold a reader
+    // against a shape the file it reads happens not to have.
+    const both = '.sample { min-width: 0; width: 300px; max-width: 400px }';
+    assert.strictEqual(figure('.sample', 'width', { css: both }), '300px',
+        'the width, not the min-width declared above it');
+    assert.strictEqual(figure('.sample', 'min-width', { css: both }), '0');
+    assert.strictEqual(figure('.sample', 'max-width', { css: both }), '400px');
+
+    assert.strictEqual(figure('#build-dock', 'width'), '300px');
+    assert.strictEqual(figure('#build-dock', 'max-height'), 'calc(100vh - 40px)');
+
+    // The rule a condition declares, which is a second rule for the same
+    // selector rather than a different selector. Both `.dock-row` columns are
+    // real answers and the base one is never the answer to a question about a
+    // finger.
+    const coarseColumns = figure('.dock-row', 'grid-template-columns', { inside: '(pointer: coarse)' });
+    assert.notStrictEqual(coarseColumns, figure('.dock-row', 'grid-template-columns'),
+        'the coarse block declares its own columns, which is the point of asking for them');
+    assert.match(coarseColumns, /32px/, 'and they are the widened mark columns');
+
+    // A selector the block alone declares is not a rule of the page. The rule
+    // read for a selector is the first one written for it wherever it sits, so
+    // these three would answer out of the block with the condition left off -
+    // and a derivation of what a finger is given would pass while holding
+    // nothing about a finger. Asked without it, there is no answer to give.
+    assert.strictEqual(figure('.dock-row > .dock-label', 'grid-area',
+        { inside: '(pointer: coarse)' }), 'label');
+    assert.throws(() => figure('.dock-row > .dock-label', 'grid-area'),
+        /declared inside an at-rule/);
+    assert.throws(() => figure('.dock-row > .dock-field', 'grid-area'),
+        /declared inside an at-rule/);
+    assert.throws(() => figure('.dock-text-row > .dock-text', 'grid-column'),
+        /declared inside an at-rule/);
+
+    // A rule written at the head of a comma list is that list's rule, which is
+    // where four of the dock's own answers are declared.
+    assert.strictEqual(figure('.dock-step', 'min-height'), '24px');
+    assert.strictEqual(figure('.dock-action', 'min-height'), '24px');
+
+    // A length is read off the front of a value, and a side of a box is named
+    // rather than counted to.
+    assert.strictEqual(firstLength('1px solid rgba(0, 255, 0, 0.4)'), 1);
+    assert.strictEqual(firstLength('0 12px 8px'), 0, 'the first value, not the second');
+    assert.strictEqual(boxSide('0 12px 8px', 'left'), 12);
+    assert.strictEqual(boxSide('0 12px 8px', 'right'), 12);
+    assert.strictEqual(boxSide('0 12px 8px', 'top'), 0);
+    assert.strictEqual(boxSide('0 12px 8px', 'bottom'), 8);
+    assert.strictEqual(boxSide('12px 8px', 'top'), 12, 'two values are down and across');
+    assert.strictEqual(boxSide('12px 8px', 'right'), 8);
+    assert.strictEqual(boxSide('6px', 'bottom'), 6);
+
+    // A length is read off the front or not at all. Hunting a value for the
+    // first thing that looks like one answers about whatever it finds, which
+    // is how a reader asked for a width comes back with a border's colour
+    // channel or the pixels inside a `calc`.
+    assert.throws(() => firstLength('solid 2px'), /should open with a length/);
+    assert.throws(() => firstLength('calc(100vh - 40px)'), /should open with a length/);
+    assert.throws(() => firstLength('auto'), /should open with a length/);
+
+    // A selector is found as itself. `[aria-pressed="true"]` is a character
+    // class to a regex, so an unescaped selector matches none of the text it
+    // was written from - and a reader of where a rule sits answers that it
+    // sits nowhere, which every ordering built on it then passes vacuously.
+    assert.strictEqual(ruleStarts('.dock-outliner-box[aria-pressed="true"]').length, 1,
+        'the selector the page declares, matched as the characters it is');
+    assert.strictEqual(ruleStarts('.dock-outliner-pick[aria-pressed="true"]').length, 1);
+    assert.strictEqual(ruleStarts('.dock-row').length, 1,
+        'and once, not once for every rule whose selector starts the same way');
+    assert.strictEqual(ruleStarts('.dock-outliner-box[aria-pressed="false"]').length, 0,
+        'a selector the page does not declare is nowhere, rather than anywhere');
+
+    // And a question with no answer is an error rather than a silent null,
+    // which is what lets a derivation be trusted at all.
+    assert.throws(() => figure('#build-dock', 'letter-spacings'), /should declare/);
+    assert.throws(() => figure('.dock-label', 'letter-spacing'), /should declare/);
+    assert.throws(() => figure('.dock-row', 'gap', { inside: '(pointer: fine)' }), /should carry/);
+});
+
+/**
  * The docstring above reasons from two figures, and it carried a third that
  * disagreed with them: it gave the row as 276 pixels while deriving the name
  * field's 203 from 274. Both come out of the stylesheet, so the derivation is
  * what holds them together rather than a reading taken once.
  */
 test('the outliner docstring\'s row and field figures are the ones the stylesheet gives', () => {
-    const figure = (rule, property) => {
-        const block = indexHtml.match(new RegExp(`\\n        ${rule.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} \\{[^}]*\\}`))?.[0] ?? '';
-        const found = block.match(new RegExp(`${property}: ([^;]+);`))?.[1];
-        assert.ok(found, `${rule} should declare ${property}`);
-        return found.trim();
-    };
-
     // The dock's own box: 300 px wide, a pixel of border each side, and
-    // `#build-dock-fields` padding 12 px in from each.
+    // `#build-dock-fields` padding 12 px in from each - the padding across
+    // the row, which is the shorthand's second value and its fourth rather
+    // than the first one a reader of lengths would take.
     assert.strictEqual(figure('#build-dock', 'width'), '300px');
-    const border = Number(figure('#build-dock', 'border').match(/^(\d+)px/)[1]);
-    const padding = Number(figure('#build-dock-fields', 'padding').match(/\s(\d+)px/)[1]);
+    const border = firstLength(figure('#build-dock', 'border'));
+    const padding = boxSide(figure('#build-dock-fields', 'padding'), 'left');
+    assert.strictEqual(padding, boxSide(figure('#build-dock-fields', 'padding'), 'right'),
+        'the same either side, which is what makes it twice over below');
     const row = 300 - 2 * border - 2 * padding;
     assert.strictEqual(row, 274, 'the row a side dock gives a panel');
 
     // The name takes what the row's three fixed columns and its gaps leave.
     const columns = figure('.dock-outliner-row', 'grid-template-columns').split(/\s+/);
-    const gap = Number(figure('.dock-outliner-row', 'gap').match(/^(\d+)px/)[1]);
+    const gap = firstLength(figure('.dock-outliner-row', 'gap'));
     const fixed = columns.filter(part => part !== '1fr').reduce((sum, part) => sum + Number(part.replace('px', '')), 0);
     const name = row - fixed - gap * (columns.length - 1);
     assert.strictEqual(name, 203, 'the name field on a desktop dock');
@@ -4068,8 +4274,12 @@ test('every answer the dock offers a finger is on the 32px floor, in one block',
     const coarse = indexHtml.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n        \}/);
     assert.ok(coarse, 'index.html should carry a coarse-pointer block');
 
-    assert.match(coarse[1], /\.dock-row \{\s*grid-template-columns: 1fr 32px 84px 32px;/,
-        'the two mark columns widened, as the outliner row\'s were');
+    // The marks stand in 32 px columns of their own. They were widened out of
+    // the label's `1fr`, which cost it 16 px it did not have; the label now
+    // takes the row above them, so the columns are the three the controls
+    // stand in and the one the label spans into.
+    assert.strictEqual(figure('.dock-row', 'grid-template-columns', { inside: '(pointer: coarse)' }),
+        '32px 84px 32px 1fr', 'the two mark columns widened, as the outliner row\'s were');
     assert.match(coarse[1], /\.dock-step,\s*\.dock-pick \{\s*min-height: 32px;/,
         'the mark that steps a row, and the reading a press steps round');
     assert.match(coarse[1], /\.dock-text-row \.dock-text,\s*\.dock-hex \{\s*min-height: 32px;/,
@@ -4080,6 +4290,196 @@ test('every answer the dock offers a finger is on the 32px floor, in one block',
         'the track a drag starts on, either side of the thumb');
 });
 
+// 11 px Courier New is monospaced at 0.6 em a character, and `#build-dock`'s
+// own letter-spacing lands on the last character too. Read in Chromium off
+// `FIELD OF VIEW`, 13 characters, which measured 98.8 px - 7.6 a character,
+// against the 7.602 the same reading gives to two decimal places.
+const COURIER_ADVANCE = 0.6;
+const LABEL_PER_CHARACTER = 7.602;
+
+/**
+ * Every label the dock writes into a row's label column, taken from the ranges
+ * rather than from a walk of the panels - which is how a label only reached
+ * with a draft in hand, or only on a canvas opened from a preset, is missed.
+ *
+ * `rangeRows` is what decides a range's suffixes, so it is what the labels come
+ * out of: a span has MIN and MAX, a gradient has LIGHT and DARK, a toggle has
+ * neither, and adding all four to every name invents labels the dock never
+ * writes. A colour row draws swatches, a picker and a hex field, and its own
+ * name is never written into a label column, so it is left out.
+ */
+function dockLabels() {
+    const found = new Map();
+    const add = (text, from) => {
+        if (!found.has(text)) found.set(text, new Set());
+        found.get(text).add(from);
+    };
+
+    const take = (ranges, from) => {
+        for (const [name, range] of Object.entries(ranges ?? {})) {
+            if (range == null) continue;
+            for (const row of rangeRows(name, range)) {
+                if (row.color) continue;
+                add(row.label, from);
+            }
+        }
+    };
+
+    for (const element of ELEMENTS) take(element.ranges, `element ${element.id}`);
+    for (const tool of BUILD_TOOLS) take(tool.ranges, `tool ${tool.id}`);
+    for (const nudge of CAMERA_NUDGES) add(nudge.label, 'camera nudge');
+
+    // The view's own fields, which are declared with the same helpers as an
+    // element's and drawn by the same panel. The bounds want a canvas to be
+    // worked out from; the labels fall out of the names, so any canvas does.
+    take(cameraFieldRanges({ reach: 8000, furthest: 20000, nearest: 100 }), 'the view');
+
+    return [...found.entries()].map(([text, from]) => ({ text, from: [...from].join(', ') }));
+}
+
+/** The row the dock leaves a panel: 300 px less a border each side and the panel's padding. */
+function dockRowWidth() {
+    const border = firstLength(figure('#build-dock', 'border'));
+    const padding = boxSide(figure('#build-dock-fields', 'padding'), 'left');
+    return firstLength(figure('#build-dock', 'width')) - 2 * border - 2 * padding;
+}
+
+/** What each track of a row comes to, the flexible ones sharing what the fixed leave. */
+function trackWidths(tracks, row, gap) {
+    const fixed = tracks.filter(track => track !== '1fr')
+        .reduce((sum, track) => sum + firstLength(track), 0);
+    const flexible = tracks.filter(track => track === '1fr').length;
+    const spare = row - fixed - gap * (tracks.length - 1);
+    return tracks.map(track => (track === '1fr' ? spare / flexible : firstLength(track)));
+}
+
+/** A row's `grid-template-areas` as a grid of names, or null where it declares none. */
+function rowAreas(inside) {
+    const written = declarations(
+        inside == null ? indexHtml : media(indexHtml, inside), '.dock-row'
+    ).get('grid-template-areas');
+    if (!written) return null;
+    return written.split('\'').map(line => line.trim()).filter(Boolean)
+        .map(line => line.split(/\s+/));
+}
+
+/**
+ * The column a `.dock-label` is given, derived rather than read off a browser
+ * once. The label is a row's first child, so with no areas declared it takes
+ * the row's first track; with areas it takes every track the `label` area
+ * spans, and the gaps between them come with it.
+ */
+function labelColumn({ inside = null } = {}) {
+    const row = dockRowWidth();
+    const gap = firstLength(figure('.dock-row', 'gap'));
+    const tracks = figure('.dock-row', 'grid-template-columns', inside == null ? {} : { inside }).split(/\s+/);
+    const widths = trackWidths(tracks, row, gap);
+
+    const areas = rowAreas(inside);
+    if (areas == null) return widths[0];
+
+    const spanned = [...new Set(areas.flatMap(line =>
+        line.flatMap((cell, at) => (cell === 'label' ? [at] : []))))];
+    assert.ok(spanned.length > 0, 'the areas should name a label area for the label to be put in');
+    return spanned.reduce((sum, at) => sum + widths[at], 0) + gap * (spanned.length - 1);
+}
+
+/**
+ * The comment over the coarse `.dock-row` claimed the label column was wide
+ * enough while six labels wrapped in it, and the suite stayed green because
+ * nothing derived either figure. These two derive both.
+ *
+ * The first is the column: what the dock's width, its border, the panel's
+ * padding and the row's own tracks and areas leave the label, under a mouse
+ * and under a finger. The second is the longest label the dock can write,
+ * walked out of the ranges and measured against that same derived column.
+ * Neither needs a browser, so a range added later is measured in Node rather
+ * than found in a reading taken by hand months afterwards.
+ */
+test('the dock\'s label column is what the stylesheet leaves it, under a mouse and under a finger', () => {
+    // The row a side dock gives a panel, which is the same 274 px a phone's
+    // full-width dock leaves at 320.
+    assert.strictEqual(dockRowWidth(), 274, 'the row a side dock gives a panel');
+
+    // Under a mouse the label is the row's `1fr`: what the three fixed columns
+    // and the three gaps leave it.
+    assert.strictEqual(rowAreas(null), null, 'the base rule places by order rather than by name');
+    assert.strictEqual(labelColumn(), 130, 'the label column under a mouse');
+
+    // Under a finger the label takes the row above the controls rather than
+    // the column beside them, so its column is the whole row however the
+    // tracks under it are sized.
+    const tracks = figure('.dock-row', 'grid-template-columns', { inside: '(pointer: coarse)' }).split(/\s+/);
+    const areas = rowAreas('(pointer: coarse)');
+    assert.ok(areas, 'the coarse rule should name its areas');
+    assert.strictEqual(areas.length, 2, 'two rows: the label, and the controls under it');
+    for (const line of areas) {
+        assert.strictEqual(line.length, tracks.length,
+            `every row of the areas names ${tracks.length} columns, as the tracks do`);
+    }
+    assert.deepStrictEqual(areas[0], Array(tracks.length).fill('label'),
+        'the label spans every column, which is what gives it the row');
+    assert.deepStrictEqual(areas[1], ['down', 'reading', 'up', '.'],
+        'and the controls keep the order they are drawn in');
+    assert.strictEqual(labelColumn({ inside: '(pointer: coarse)' }), 274,
+        'so the label column under a finger is the whole row');
+
+    assert.strictEqual(figure('.dock-row > .dock-label', 'grid-area', { inside: '(pointer: coarse)' }), 'label',
+        'the label is put in that area; without this the areas place nothing');
+    assert.strictEqual(figure('.dock-row > .dock-field', 'grid-area', { inside: '(pointer: coarse)' }), 'reading',
+        'and a figure\'s field stands in the readings\' own column');
+
+    // The reading is the 84 px it has always been, so the column of readings
+    // is one column whichever kind each row is.
+    assert.strictEqual(firstLength(tracks[areas[1].indexOf('reading')]), 84,
+        'the reading column is unchanged by any of this');
+});
+
+test('every label the dock can write fits the column a finger is given', () => {
+    const labels = dockLabels();
+    const written = labels.map(entry => entry.text);
+    assert.ok(labels.length > 60, `${labels.length} labels is too few to be the whole of them`);
+
+    // A colour row draws swatches, a picker and a hex field; its range's name
+    // is never written into a label column, so counting it would hold the
+    // column against text the dock does not draw. A gradient is a different
+    // thing and its two shade rows are ordinary rows with ordinary labels.
+    for (const name of ['TOP COLOR', 'WALL COLOR', 'COLOR']) {
+        assert.ok(!written.includes(name), `${name} is a colour row and writes no label`);
+    }
+    assert.ok(written.includes('COLOR LIGHT') && written.includes('COLOR DARK'),
+        'a gradient\'s two shade rows do write labels, and are counted');
+
+    const size = firstLength(figure('#build-dock', 'font-size'));
+    const spacing = firstLength(figure('#build-dock', 'letter-spacing'));
+    const derived = size * COURIER_ADVANCE + spacing;
+    assert.ok(Math.abs(derived - LABEL_PER_CHARACTER) < 0.01,
+        `the stylesheet gives ${derived} px a character against the ${LABEL_PER_CHARACTER} read in Chromium`);
+
+    const column = labelColumn({ inside: '(pointer: coarse)' });
+    const longest = labels.reduce((a, b) => (b.text.length > a.text.length ? b : a));
+    const width = longest.text.length * LABEL_PER_CHARACTER;
+
+    assert.ok(width <= column,
+        `${longest.text} is ${longest.text.length} characters and ${Math.round(width * 100) / 100} px `
+      + `(${longest.from}), against a ${column} px column`);
+
+    // This is the assertion a new range of two words has to get past, so it is
+    // worth seeing it has room rather than only that it passes.
+    assert.ok(column - width > 100,
+        `the longest label clears the column by ${Math.round((column - width) * 100) / 100} px, `
+      + 'which is what makes a range added later safe without a reading');
+
+    // What is not covered, recorded rather than left to be rediscovered: under
+    // a mouse the label is the row's 130 px column, and the 19 character pair
+    // is 144.4 px, so it reads as two lines there. That is the older half of
+    // the defect and is queued on its own; this line fails if it is fixed,
+    // which is the prompt to close that item.
+    assert.ok(width > labelColumn(),
+        `${longest.text} fits the ${labelColumn()} px column a mouse leaves, so the mouse half is `
+      + 'settled and this test should now hold the label against that column too');
+});
+
 /**
  * A floor and the rule it lifts carry the same specificity, so a floor written
  * above its base rule loses on source order and does nothing while reading
@@ -4087,16 +4487,45 @@ test('every answer the dock offers a finger is on the 32px floor, in one block',
  * `.dock-pick`, `.dock-text-row .dock-text`, `.dock-swatch` and `.dock-dropper`
  * are all declared further up the file than the block once sat - so the block's
  * place after every dock rule is what makes it work at all.
+ *
+ * The list is read off the block rather than written down beside it. Written
+ * down, it named seven of the twelve selectors the block was lifting and left
+ * out `.dock-hex`, which is declared about thirty lines above it: a rule added
+ * in that gap is the realistic way a floor goes silently dead, and it is the
+ * exact failure this test was written for. A derived list covers a floor added
+ * later without anybody remembering to add it here.
  */
 test('the coarse block sits after every dock rule it lifts', () => {
-    const block = indexHtml.indexOf('@media (pointer: coarse) {');
+    const block = cssPage.indexOf('@media (pointer: coarse) {');
     assert.ok(block > 0, 'index.html should carry a coarse-pointer block');
 
-    for (const rule of ['.dock-row {', 'button.dock-section {', '.dock-pick {',
-        '.dock-text-row .dock-text {', '.dock-swatch {', '.dock-dropper {', '.dock-slider {']) {
-        const at = indexHtml.indexOf(`\n        ${rule}`);
-        assert.ok(at > 0, `${rule} should be declared in index.html`);
-        assert.ok(at < block, `${rule} is declared above the coarse block, so its floor reaches it`);
+    const body = media(indexHtml, '(pointer: coarse)');
+    assert.ok(body, 'and it should read as a block of its own');
+    const lifted = [...new Set(styleRules(body).flatMap(rule => rule.selectors))];
+    assert.ok(lifted.length >= 15,
+        `the block declares ${lifted.length} selectors, which is too few to be the whole of it`);
+
+    for (const selector of lifted) {
+        // Every place the stylesheet declares the selector itself. A selector
+        // the page never declares cannot lose on source order, so it has
+        // nothing to order - which is the case for anything the block reaches
+        // that inherits the dock's own type rather than carrying a rule.
+        for (const at of ruleStarts(selector)) {
+            assert.ok(at < block,
+                `${selector} is declared at ${at}, below the coarse block at ${block}, `
+              + 'so the block\'s own rule for it loses on source order');
+        }
+    }
+
+    // And the ones the docstring reasons from are in the derived list, so a
+    // block rewritten into a shape the reader cannot parse fails here rather
+    // than passing with an empty list.
+    for (const selector of ['.dock-row', '.dock-pick', '.dock-hex', '.dock-step',
+        '.dock-text-row .dock-text', '.dock-swatch', '.dock-dropper', '.dock-slider',
+        'button.dock-section', '.dock-outliner-row']) {
+        assert.ok(lifted.includes(selector), `${selector} should be read out of the block`);
+        assert.ok(ruleStarts(selector).length > 0,
+            `${selector} should carry a base rule the block's own lifts`);
     }
 });
 

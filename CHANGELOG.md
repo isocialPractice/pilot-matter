@@ -7,6 +7,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > 36 earlier entries in `CHANGELOG-2026.md`, newest first.
 
+## [1.0.0-alpha.1.67.4] - 2026-11-24
+
+The column the last turn left: six of the dock's labels reading as two lines
+under a finger, and the two test helpers that were meant to hold the figure
+and could not.
+
+### Fixed
+
+- **The dock's label column, which the widened marks left 16 px short.**
+  `1.0.0-alpha.1.67.3` widened `.dock-row`'s two mark columns from 24 px to 32
+  inside `@media (pointer: coarse)`, out of the label's `1fr`, and the comment
+  over the rule cleared the cost on a reading of 19 labels taken on a blank
+  canvas with the panels at rest. A canvas opened on a preset with every
+  `WORLD:` section open writes 78, and a label is a range's name with a
+  bound's suffix on it - so a range of two words comes to a label of three.
+  Six of them read as two lines in the 114 px column: `GIRTH RANGE MIN` and
+  `MAX` and `TREE HEIGHT MIN` and `MAX` at 15 characters, which the widening
+  caused, and `BUILDING HEIGHT MIN` and `MAX` at 19, which wrapped in the 130
+  px column as well and are older than it. The label now takes the row above
+  the controls rather than the column beside them, which is the shape
+  `.dock-row.dock-row-slider` already uses for a row whose value is set by
+  eye: two rows of `32px 84px 32px 1fr`, the label spanning all four and the
+  marks and the reading beneath it. That gives it the row's whole 274 px at
+  320 and in the side dock, and 344 at 390 - every label the dock can write
+  with 130 px to spare, against the 4.6 px restoring the old columns would
+  have left. A figure's field moves to the reading's own column and SAVE /
+  LOAD's name to the whole row, so neither is left standing in a 32 px mark
+  column. It costs 13 px a row, 45 against 32, which is 3.2 rows of the panel
+  at 320 x 664 against 4.5 and 13 of the side dock against 18.3; the comment
+  over the rule now carries that trade and the figures behind it rather than
+  the claim that 13 characters is the longest the dock writes. Under a mouse
+  the label keeps its 130 px column and the 19 character pair still reads as
+  two lines, which is queued on its own and recorded in the test, so the
+  column cannot be called settled on both pointers by accident.
+
+### Internal
+
+- **The helper the column's figure was to be derived from read neither the
+  selector nor the declaration it was asked for.** `figure` in
+  `test/page.test.js` matched a pattern against the page: its escape closed
+  its character class early, so no selector was escaped and a `.` matched any
+  character; its property match was unanchored, so a `min-width` above a
+  `width` would answer for it; it took a box shorthand's second value, which
+  is the other axis from the one asked about; and it required the eight space
+  indent of a top-level rule, so the coarse `.dock-row` the column has to be
+  derived from was out of its reach entirely. None of its three callers
+  reached any of the four. The file already carried a stylesheet parser used
+  thirty-eight times, so `figure` is now four lines on top of it, taking an
+  `inside` that names an `@media` condition and throwing rather than answering
+  null; `firstLength` reads the front of a value and refuses one that does not
+  open with a length, and `boxSide` expands a box shorthand and is asked for a
+  side by name. The faults are unreachable through `index.html`, which is how
+  they survived, so the reader is held by a test of its own against a
+  stylesheet written to carry them.
+- **The test holding the coarse block's position checked seven of the rules it
+  lifts.** A floor and the rule it lifts carry the same specificity, so the
+  block's place after every dock rule is the whole of why its floors work, and
+  the only thing holding it there named seven selectors by hand. The block
+  declares nineteen. `.dock-hex` was the nearest of the twelve it left out,
+  about thirty lines above the block, so a rule added in that gap was the
+  realistic way a floor goes silently dead while the suite stays green. The
+  list is read off the block now, and what is asserted of each selector is
+  that no declaration of its own sits below it - which is the failure itself,
+  covers a floor added later without anybody remembering this test, and asks
+  for no base rule to be invented for a selector the page never declares.
+- **Two figures of the label column, derived.** One works the column out of
+  the dock's width, its border, the panel's padding and the row's own tracks
+  and areas, under a mouse and under a finger. The other walks the ranges -
+  `ELEMENTS`, each tool's, the view's own - through the rows each kind comes
+  to, which is what decides a range's suffixes, and measures the longest label
+  against that column. Walking the rows rather than adding every suffix to
+  every name matters: a gradient has no bounds and a span has no shades, and
+  guessing both for both invents labels the dock never writes - a list built
+  that way gave 201 labels and a longest of 21 characters, where the walk
+  gives 69 and a longest of 19. Both are arithmetic off the stylesheet and
+  the modules, so a range added later is measured in Node rather than found in
+  a browser months afterwards.
+- **The reader answered out of the coarse block when it was asked for the
+  page's own rule.** `figure` reads the first rule written for a selector
+  wherever it sits, so a selector only an at-rule declares - `.dock-row >
+  .dock-label`, `.dock-row > .dock-field` and `.dock-text-row > .dock-text`,
+  all three written once inside the coarse block - answered with the block's
+  value to a caller that named no condition, as though it were the rule every
+  pointer gets. A derivation of what a finger is given would have passed with
+  the `inside` left off while holding nothing about a finger. The question is
+  refused now, which is the same way the reader already treats a declaration
+  that is not there.
+
+Held in Node by `test/page.test.js`, 2,624 tests in all, and by a mutation run
+of twelve mutants over the day's changes: the label put back in the column
+beside the marks, the areas named with the label never put in one, a figure's
+field left in the up mark's column, the label given only the tracks the
+controls stand in, the dock narrowed so the longest label no longer clears its
+column, a range of five words added, the hex's base rule moved below the
+coarse block, the escape class closed early again, the declaration read
+unanchored, the `inside` option ignored, a length hunted for `px` instead of
+read off the front, and a colour row's own name counted as a label the dock
+writes. Each was caught by every test named for it. The reader's at-rule
+guard, added in review, was held the same way on its own: taken out, a
+coarse-only rule answers as the page's own and the three assertions that ask
+for one without its condition stop refusing.
+
+Settled in Chromium in seven readings: three that measured the same page three
+ways at 320 x 664, 390 x 844 and the 900 x 700 side dock - as the stylesheet
+stood, with the label given its own line, and with the mark columns restored
+and the label's letter-spacing dropped - so the only thing between the
+readings was the rule under test; and four of the stylesheet as it now stands,
+opening Select, a drop tool and Free Paint on `LAKESIDE` with every `WORLD:`
+section open at those three sizes and at a mouse's 1280 x 800, reading all 78
+labels Select writes for the line boxes each comes to, every row of every
+panel for a child overlapping another, the marks for their 32 px and the
+readings for their one column.
+
 ## [1.0.0-alpha.1.67.3] - 2026-11-23
 
 The two the last review left beside the three it settled: five more of the
