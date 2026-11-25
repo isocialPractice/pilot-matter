@@ -1974,11 +1974,17 @@
                was taken to be 13 characters. It is not: a label is a range's
                name with a bound's suffix on it, so a range of two words comes
                to three, and `BUILDING HEIGHT MIN` is 19 characters and 144 px.
-               Six labels read as two lines in the 114 px column - the two
-               above, `GIRTH RANGE MIN` and `MAX` and `TREE HEIGHT MIN` and
-               `MAX` - and the first four of those read as one line in the 130
-               it had, so the widening caused four of the six and uncovered
-               two that were older than it.
+               Eight labels read as two lines in the 114 px column - the two
+               above, and `GIRTH RANGE MIN` and `MAX`, `DUNE HEIGHT MIN` and
+               `MAX` and `TREE HEIGHT MIN` and `MAX`, 15 characters and
+               114.03 px each - and the last six of those, the three 15
+               character pairs, read as one line in the 130 it had, so the
+               widening caused six of the eight and uncovered two that were
+               older than it. Six of the eight is what a canvas with no
+               desert on it shows, which is where this count came from while
+               the figures below it came from the walk: the dune pair is the
+               desert element's, so a reading taken off one canvas misses it.
+               Eight is what the dock can write, and the walk is what says so.
 
                Across the whole row the label has 274 px in the side dock and
                at 320, which is every label the dock can write with 130 px to
@@ -1986,9 +1992,11 @@
                the longest is the 19 characters above, and a test in
                test/page.test.js derives both figures so a range added later
                is measured rather than assumed. The row costs 13 px of height
-               for it - 45 px against 32 - which is 3.2 rows of the panel at
-               320 x 664 against 4.5, and 13 of the side dock against 18.3.
-               That is the trade, and it is a panel that was always scrolled:
+               for it: 45 px against 32, which is the label's own line and the
+               gap under it, summed off these three rules by that same test.
+               At 320 x 664 that is 3.2 rows of the panel against 4.5, and 13
+               of the side dock against 18.3. That is the trade, and it is a
+               panel that was always scrolled:
                Select on a preset with every section open holds 4,141 px of
                rows where it held 3,127, against the 143 px a phone shows of
                it at 320 x 664. A third more to scroll, and no label read
@@ -2026,16 +2034,23 @@
             }
 
             /* The two fields a caret has to land in: the name SAVE / LOAD
-               writes a world under, 140 x 24 at every width and 156 once the
-               columns above widen, and Free Paint's hex, 20 tall and as wide as
-               the colour panel leaves it. Both are text rather than a figure,
-               so neither is reached by the `.dock-field .dock-value` floor at
-               the head of this block.
+               writes a world under, 140 x 24 under a mouse and 274 x 32 under
+               a finger at 320 and in the side dock, 344 x 32 at 390, and Free
+               Paint's hex, 20 tall and as wide as the colour panel leaves it.
+               Both are text rather than a figure, so neither is reached by the
+               `.dock-field .dock-value` floor at the head of this block.
 
                The name takes the row under its label for the same reason the
-               label takes the row above it: its own columns are `2 / -1` of
-               the four the base rule has, which here would leave it the 84 px
-               reading column and the 32 px mark beside it. */
+               label takes the row above it, and the rule below is worth less
+               than it reads as. Its own columns are `2 / -1` of the four the
+               base rule has, and `-1` is the last line of that explicit grid
+               rather than the line before it, so `2 / -1` reaches three of
+               the four columns and not two: the 84 px reading column, the
+               32 px mark beside it and the 114 px the trailing `1fr` comes
+               to, with the two gaps between them. That is 238 px starting
+               36 px in from the row's left edge - still under its label and
+               not cut. So `1 / -1` buys 36 px of field and the 36 px of left
+               edge, which is the caret starting where the label does. */
             .dock-text-row .dock-text,
             .dock-hex {
                 min-height: 32px;

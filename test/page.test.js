@@ -4433,6 +4433,41 @@ test('the dock\'s label column is what the stylesheet leaves it, under a mouse a
     // is one column whichever kind each row is.
     assert.strictEqual(firstLength(tracks[areas[1].indexOf('reading')]), 84,
         'the reading column is unchanged by any of this');
+
+    // SAVE / LOAD's name field takes the row for the same reason the label
+    // does, and it was the one declaration of this change nothing here read.
+    // Under a mouse it is `2 / -1` of `1fr 24px 84px 24px`, which is the
+    // readings' columns; under a finger `1 / -1` displaces that, because `-1`
+    // is the last line of the explicit grid rather than the line before it, so
+    // `2 / -1` would still span the trailing `1fr` and leave the field under
+    // its label but a column's width short of it.
+    const gap = firstLength(figure('.dock-row', 'gap'));
+    const widths = trackWidths(tracks, dockRowWidth(), gap);
+    assert.strictEqual(figure('.dock-text-row .dock-text', 'grid-column'), '2 / -1',
+        'the base rule puts the name in the readings\' columns');
+    assert.strictEqual(figure('.dock-text-row > .dock-text', 'grid-column', { inside: '(pointer: coarse)' }),
+        '1 / -1', 'and under a finger it takes the whole row, as its label does');
+    assert.strictEqual(
+        widths.slice(1).reduce((sum, width) => sum + width, 0) + gap * (widths.length - 2), 238,
+        'so the rule is worth the first column and its gap, not the 154 px a two column reading of `2 / -1` suggests'
+    );
+    assert.strictEqual(widths[0] + gap, 274 - 238,
+        'which is 36 px of field, and the same 36 px of left edge the caret starts in from');
+
+    // The height the row costs for the label's own line, derived the way the
+    // column above it is. The comment over the rule prices the trade at 45 px
+    // against 32, and until this read it, no test read the label's line, the
+    // floor the controls stand on, or the gap between them: dropping `row-gap`
+    // alone leaves every coarse row 4 px taller than the figure the trade is
+    // argued from, with nothing to say so.
+    const labelLine = firstLength(figure('.dock-row > .dock-label', 'line-height', { inside: '(pointer: coarse)' }));
+    const rowGap = firstLength(figure('.dock-row', 'row-gap', { inside: '(pointer: coarse)' }));
+    const controls = firstLength(figure('.dock-step', 'min-height', { inside: '(pointer: coarse)' }));
+    assert.strictEqual(controls, 32,
+        'the controls stand on the block\'s own 32 px floor, which is what a row came to with its label beside them');
+    assert.strictEqual(labelLine + rowGap + controls, 45,
+        `the coarse row is ${labelLine} px of label, ${rowGap} px of gap and ${controls} px of controls, `
+      + 'which is the 45 px the comment trades against that 32');
 });
 
 test('every label the dock can write fits the column a finger is given', () => {
