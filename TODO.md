@@ -43,105 +43,55 @@ its context survives being archived.
     each row it overrides.
   - From: Interactive Build Mode `->` Starter Worlds
 
-### UI/UX Override - SAVE / LOAD's name field under a finger
+### Code Review Override - the label column tests' own account of themselves
 
-#### Found Issues
-
-- [ ] The comment over SAVE / LOAD's name field in the coarse block gives two
-  figures the browser contradicts, in the rule this turn added
-  - **Issue**: the comment above `.dock-text-row .dock-text, .dock-hex` inside
-    `@media (pointer: coarse)` says the name is "140 x 24 at every width and
-    156 once the columns above widen", and that its own `2 / -1` "would leave
-    it the 84 px reading column and the 32 px mark beside it" - 120 px with
-    the gap between them. Both figures are of the stylesheet as it stood
-    before this turn. Read in Chromium on `LAKESIDE` with SAVE / LOAD open,
-    at 320 x 664, at 390 x 844 and at the 900 x 700 side dock: the field is
-    274 x 32 at 320 and in the side dock and 344 x 32 at 390, not 156 x 24.
-    And with that one declaration put back to the base rule's `2 / -1` and
-    nothing else changed, it is **238 px** starting 36 px in from the row's
-    left edge - still under its label and not cut - because `-1` is the last
-    line of the four column explicit grid, so `2 / -1` spans the trailing
-    `1fr` as well: 84 + 32 + 114 and two 4 px gaps. The rule is worth 36 px of
-    field and 36 px of left edge, not the 154 px the comment implies. This is
-    the same shape of fault the turn was sent to fix - a figure in a comment
-    that nothing measured - written into the fix itself.
-  - **Goal**: rewrite both figures from a reading. The first paragraph wants
-    the field's width now rather than before the rule, or wants saying that
-    140 and 156 are what it was; the second wants the measured 238 px and the
-    36 px the rule is worth, with the trailing `1fr` named as the third
-    column `2 / -1` reaches. The 22 x 15 spinners and the 12 px picker bands
-    lower down the same block were re-measured this run and both still hold,
-    so it is these two figures alone.
-  - From: UI/UX Override - SAVE / LOAD's name field under a finger
-- [ ] The name field's own column is the one declaration of this change that
-  no test reads
-  - **Issue**: `test/page.test.js` derives the coarse `.dock-row`'s
-    `grid-template-columns` and `grid-template-areas`, and asserts
-    `.dock-row > .dock-label` is `grid-area: label` and
-    `.dock-row > .dock-field` is `grid-area: reading`. Nothing asserts
-    `.dock-text-row > .dock-text { grid-column: 1 / -1 }`. Proved by removing
-    that rule from `index.html` and running the suite: 2,624 tests, 2,624
-    pass, while the field narrows from 274 px to 238 and moves 36 px right -
-    the reading above. The page was restored byte for byte afterwards. The
-    rule's own `min-height` floor is held, and the block's source-order test
-    reads `.dock-text-row .dock-text`, the descendant selector of the floor,
-    rather than this one, so neither covers it.
-  - **Goal**: one assertion beside the two the same test already makes, in
-    `the dock's label column is what the stylesheet leaves it, under a mouse
-    and under a finger`: `figure('.dock-text-row > .dock-text', 'grid-column',
-    { inside: '(pointer: coarse)' })` is `1 / -1`, with the base rule's
-    `2 / -1` named as what it displaces and why. It is arithmetic off the
-    stylesheet, needs no browser, and would have failed on the turn that
-    dropped the rule.
-  - From: UI/UX Override - SAVE / LOAD's name field under a finger
-- [ ] The coarse `.dock-row` comment counts six wrapped labels where the dock
-  writes eight, and names the wrong four as fitting the old column
-  - **Issue**: two figures in the comment over `.dock-row` inside
-    `@media (pointer: coarse)` in `index.html`, both of them the panel-walk
-    arithmetic this turn was sent to replace. First, "Six labels read as two
-    lines in the 114 px column - the two above, `GIRTH RANGE MIN` and `MAX`
-    and `TREE HEIGHT MIN` and `MAX`" leaves out `DUNE HEIGHT MIN` and `MAX`,
-    which the desert element writes and which are 15 characters like the
-    girth and tree pairs, so 114.03 px against the 114 px column. The turn's
-    own `dockLabels()` walk finds eight labels over 114 px, not six - run it
-    and filter on `text.length * 7.602 > 114`. The six is the LAKESIDE
-    reading, and the comment's own paragraph credits the derived walk, so the
-    one figure in it still taken off a canvas is the one a later reader would
-    trust most. Second, "the first four of those read as one line in the 130
-    it had" names `BUILDING HEIGHT MIN` and `MAX` among the four, and the
-    sentence before it gives them as 19 characters and 144 px - over the 130.
-    The four that fit 130 are the 15 character ones, which is the last four of
-    the list as written, and the clause after it ("the widening caused four of
-    the six") depends on that reading.
-  - **Goal**: rewrite both from the walk rather than the canvas. The count
-    wants the eight labels over 114 px with the desert pair named, or wants
-    saying that six is what LAKESIDE shows and eight is what the dock can
-    write; the second wants "the last four" with the 15 character pairs named,
-    so it cannot be read as including the 19 character pair the sentence above
-    it has just excluded. Six of the eight are then the widening's and two are
-    older than it. The 274 px, the 130 px of clearance and the 19 character
-    longest were all re-derived in review and hold, so it is these two figures
-    alone.
-  - From: UI/UX Override - SAVE / LOAD's name field under a finger
-- [ ] The 45 px row the trade is quoted in is derived from nothing
-  - **Issue**: the same comment prices the fix at "13 px a row, 45 against 32,
-    which is 3.2 rows of the panel at 320 x 664 against 4.5", and the
-    `CHANGELOG` entry repeats it. That figure is `line-height: 13px` on
-    `.dock-row > .dock-label` plus the 32 px control row plus `row-gap: 0` on
-    `.dock-row`, and no test reads any of the three - neither `row-gap` nor
-    `line-height` appears in `test/page.test.js` at all. Drop `row-gap: 0` and
-    every coarse row gains the base rule's 4 px gap - 49 px a row, 2.9 rows at
-    320 x 664 - and the suite stays at 2,624 passing while the comment and the
-    release note both state 45. This is the shape of fault the turn was sent
-    to fix, on the figure the turn's own trade is argued from.
-  - **Goal**: one assertion in `the dock's label column is what the stylesheet
-    leaves it, under a mouse and under a finger` deriving the coarse row's
-    height the way the column is derived beside it: the label's `line-height`,
-    the `min-height` the controls are floored at and `row-gap` off the coarse
-    `.dock-row`, summed to the 45 px the comment states, with the 32 px a
-    mouse row comes to as the figure it is traded against. Arithmetic off the
-    stylesheet, no browser, and it fails on any of the three being dropped.
-  - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [ ] The docstring over the two label column tests still counts six wrapped
+  labels where this turn settled eight
+  - **Issue**: `test/page.test.js:4389`, in the docstring that heads both `the
+    dock's label column is what the stylesheet leaves it, under a mouse and
+    under a finger` and `every label the dock can write fits the column a
+    finger is given`, reads "The comment over the coarse `.dock-row` claimed
+    the label column was wide enough while six labels wrapped in it". Six is
+    the figure this turn replaced in that very comment. The walk finds eight
+    labels over the 114 px column - `BUILDING HEIGHT MIN` and `MAX` at 19
+    characters and 144.44 px, and `GIRTH RANGE MIN`, `DUNE HEIGHT MIN` and
+    `TREE HEIGHT MIN` with their `MAX` at 15 and 114.03 px - which is
+    reproduced by running `dockLabels()` and filtering on
+    `text.length * 7.602 > 114`. The docstring sits four lines above the test
+    the turn added six assertions to, so it is what a reader of those
+    assertions reads first, and it is now the only place in the file saying
+    six.
+  - **Goal**: eight, matching the comment over the coarse `.dock-row` in
+    `index.html` that this turn rewrote - or six named as the reading of a
+    canvas with no desert on it, the way that comment now names it. Nothing
+    else in the docstring is wrong and no code changes.
+  - From: Code Review Override - the label column tests' own account of
+    themselves
+- [ ] Two comments the turn added say nothing read the controls' floor, which
+  a test has matched since 1.0.0-alpha.1.67.3
+  - **Issue**: `test/page.test.js:4459` reads "until this read it, no test
+    read the label's line, the floor the controls stand on, or the gap
+    between them", and `test/page.test.js:4438` says the field's column "was
+    the one declaration of this change nothing here read". Both are wrong
+    about the suite. `every answer the dock offers a finger is on the 32px
+    floor, in one block`, added at `1.0.0-alpha.1.67.3`, matches the coarse
+    block's `.dock-step, .dock-pick` rule with its `min-height: 32px` written
+    out, so the floor is held: move it to `30px` and that test fails
+    alongside the new one, where dropping `row-gap: 0` or moving the label's
+    `line-height` off 13 fails the new one alone. Three declarations of
+    `1.0.0-alpha.1.67.4` went unread by this test rather than one - the
+    field's column, the label's line and the row gap - which the sentence at
+    4459 says itself, so the block contradicts itself twenty lines apart. The
+    release note carried the same claim and was corrected in place by this
+    review, so only the two comments are left.
+  - **Goal**: name the two that nothing read, `row-gap: 0` and the label's
+    `line-height`, and say of the floor that a test already matched it and
+    that what this one adds is the sum of the three. The sentence at 4438
+    wants the field's column named as the one declaration whose *value*
+    nothing read, or as one of the three, since the row's two were unread
+    here as well.
+  - From: Code Review Override - the label column tests' own account of
+    themselves
 
 ## Game UI/UX
 
@@ -337,6 +287,44 @@ this section applies a minor version update.
 How the aircraft is flown rather than what it is flown over: what the keys
 mean, how far the attitude may go, and which of that a pilot is allowed to
 change. Completing items in this section applies a minor version update.
+
+- [ ] `smooth-level-off`: The level off eases the climb out over at least two
+  seconds instead of stopping it on the next frame
+  - **Issue**: Pressing the level off key stops the climb in one frame. `onKey`
+    in `js/aircraft.js` calls `levelOff()`, which sets `holdingAltitude` true on
+    the press, and `heldAltitude` in `js/flight-model.js` then returns the
+    altitude the frame opened at, so the vertical speed indicator reads
+    `0 ft/min` from the very next frame however steep the climb was. Only the
+    attitude is eased, and only over `LEVEL_OFF_SECONDS = 0.6` in
+    `js/flight-model.js` through `pitchLevellingOff`. Releasing the key does
+    nothing at all: `onKey` reads the level off key on `down` alone, so the hold
+    stays in force until `wantsVerticalChange` calls `endLevelOff`. The climb
+    ending on one frame is what reads as abrupt.
+  - **Goal**: The vertical speed eases to zero over at least two seconds while
+    the key is held, rather than the altitude being pinned on the press, and the
+    ease is timed from the climb the press found so a steeper climb takes longer
+    than the two second floor rather than the same time as a shallow one. The
+    altitude the aircraft settles at is the one it reaches at the end of the
+    ease, and the vertical speed reaches zero once, without overshooting into a
+    descent. Releasing the key part way through leaves the aircraft holding the
+    altitude and the attitude it had at the release rather than carrying on to
+    level or handing the vertical back entirely. The work is a level off
+    interval of two seconds or more in `js/flight-model.js` replacing the 0.6
+    there, a vertical that is eased across that interval instead of
+    `heldAltitude` returning the opening altitude from the press, and a release
+    path in `onKey` in `js/aircraft.js` that ends the ease where it stands while
+    keeping what it reached. The comments that argue the present order, the one
+    over `levelOff` in `js/aircraft.js`, the one over `heldAltitude` and
+    `LEVEL_OFF_SECONDS` in `js/flight-model.js`, and `js/input-map.js:34`, are
+    rewritten with it.
+  - **Repro**: Fly a steady climb, read the vertical speed, then press the level
+    off key once and watch the indicator. It reaches zero on the next frame
+    while the nose is still coming down.
+  - **Done when**: Tests read the ease rather than the endpoints: the vertical
+    speed one second into a level off from a given climb is between that climb
+    and zero, it is zero only at or after two seconds, it never crosses into a
+    descent, and a release part way through leaves the altitude and the pitch at
+    the values the release found.
 
 ## Interactive Build Mode
 
@@ -951,107 +939,8 @@ items in this section applies a patch version update.
 Everything already done, in the order it was finished, kept as the record of
 how the simulator got here rather than as a list still to be worked.
 
-> 454 earlier items in `TODO-archive.md`, newest last.
+> 458 earlier items in `TODO-archive.md`, newest last.
 
-- [x] `js/build-panel.js` imports `committedPlacements` and never reads it
-  - **Issue**: the import added at line 29 is unused - `outlinerSection`
-    reads `state?.placements ?? []` directly - so the module declares a
-    dependency it does not have.
-  - **Goal**: drop the name from the import, or read the placements through it
-    in `outlinerSection` if the copy was the intent.
-  - **Settled**: dropped. `outlinerSection` reading the session's placements
-    directly was the intent, and the same import now brings `confirmOpen` and
-    `editPending`, which the bar's titles need.
-  - From: UI/UX Override - the editor workflow's four additions
-- [x] The dock's bar answers are under a fingertip on a touch phone
-  - **Issue**: the coarse-pointer block in `index.html` now lifts the
-    outliner's row controls to 32 px, taking that figure from
-    `.dock-field .dock-value`, which the same block already lifts. The bar
-    pinned under the panel heading - `UNDO`, `REDO`, `GRID`, `ANGLE`, the
-    session's own four answers - was never named in that block, and measures
-    74 x 22, 88 x 22 and 96 x 22 CSS pixels on an emulated touch phone
-    (Chromium, `devices['iPhone 13']`, 390 x 664, a coarse pointer, Select
-    live on a blank canvas). That is ten pixels under the floor the same
-    stylesheet now sets for the rows below it in the same dock, and half the
-    roughly 44 a fingertip wants. `button.dock-section`, the fold heading, is
-    30 px tall for the same reason, though it spans the dock's whole width.
-    `.dock-spin button` is 22 x 15 and is left alone: its 22 px column was
-    settled deliberately when the dock's own spinners replaced the browser's.
-  - **Goal**: Resolve to [dock-bar-touch-targets.prompt.md](.claude/prompts/dock-bar-touch-targets.prompt.md)
-  - **Settled**: `.dock-bar-answer` and `button.dock-section` take
-    `min-height: 32px` in the `@media (pointer: coarse)` block, the same figure
-    the dock's own values and the outliner's rows already use. Measured in
-    Chromium on 11-22-26 at 900, 390, 360 and 320 px wide: the four answers
-    were 22 px tall at every one of them and the fold headings 30, and all six
-    controls read 32 afterwards with the four still on one line at 320, their
-    switch rings drawn clear of the words, and neither the dock nor its fields
-    overflowing. The prompt's claim that the four sit "in a 276 px row" is the
-    desktop dock's row and was not relied on: the row measures 344 px at 390
-    and 274 at 320. `.dock-spin button` was left at its deliberate 22 px
-    column, which a test now pins.
-  - From: UI/UX Override - the dock's bar and the outliner's rows
-- [x] The outliner row's coarse-pointer rule reaches wider screens than the
-  reason written beside it covers
-  - **Issue**: the comment on the new rule in `index.html` says the widened
-    columns are what "a phone's dock has the room for - it is 340 to 370 px
-    wide against the 300 of a desktop", but `@media (pointer: coarse)` is
-    bounded by the pointer and not by the width, while the dock is widened to
-    the screen only inside `@media (max-width: 640px)`. So a coarse pointer on
-    a screen wider than that - a tablet in landscape, a touchscreen laptop -
-    keeps the 300 px side dock and gets the 32 px columns anyway. Arithmetic
-    off the stylesheet, with the global `box-sizing: border-box`: a 300 px dock
-    is 274 px inside its border and its 12 px padding, so at `18px 1fr 22px
-    22px` with 3 px gaps the name field is 274 - 62 - 9 = 203 px, which is the
-    figure the row's own docstring in `js/panel-view.js` gives, and at `32px
-    1fr 32px 32px` it is 274 - 96 - 9 = 169 px. The field loses 34 px on the
-    one device class where the `title` this turn added to it cannot be
-    hovered. Nothing overflows - `.dock-outliner-name` carries `min-width: 0` -
-    and no figure here was measured in a browser.
-  - **Goal**: settle which the rule is for and make the stylesheet and its
-    comment say the same thing: either bound the rule the way the dock's own
-    width is bounded, `@media (pointer: coarse) and (max-width: 640px)`, or
-    keep it as it stands and write the comment to the pointer rather than to a
-    phone's width. Measure the row on a coarse pointer wider than 640 px
-    before choosing, since 169 px is arithmetic rather than a reading. The
-    `CHANGELOG.md` entry for 1.0.0-alpha.1.67.1 carried the same claim and was
-    corrected in place by this review, so only the comment is left.
-  - **Settled**: measured first, as the goal asked. On a coarse pointer at
-    900 x 700 the dock is the desktop's 300 px and the row's name field 169,
-    which is the arithmetic confirmed as a reading, against 203 on a desktop
-    and 239 on a 390 px phone; nothing is cut at 169 and nothing overflows.
-    The rule is kept as it stands, on the pointer, and the comment is written
-    to the pointer: a finger is the same size on a tablet, so bounding the rule
-    by `max-width: 640px` would put a 22 px target under one on every
-    touchscreen wider than a phone, which is the defect the rule exists to fix,
-    to buy back 34 px of a field that is not cut and takes a caret on a tap.
-    The row's docstring in `js/panel-view.js` now carries the coarse figures
-    beside the 203 it already gave, and says `title` cannot be hovered there.
-  - From: UI/UX Override - the dock's bar and the outliner's rows
-- [x] `dockBar`'s docstring counts two reasons for a dimmed step where the
-  code gives three
-  - **Issue**: the docstring over `BAR_SNAP_TITLES` in `js/build-panel.js`
-    reads "A step is dimmed for two quite different reasons - there is nothing
-    to go back to, or there is and an edit is in hand". `barStepTitle`, eighteen
-    lines below it, has three branches, and `historyReady` in
-    `js/build-mode.js` refuses a step on `confirmOpen` as well as on
-    `editPending` - which is why `BAR_CONFIRM_TITLE` is declared four lines
-    under that very sentence. `CHANGELOG.md`, `docs/terrain.html` and the test
-    in `test/build-history.test.js` all say three. The docstring is the one
-    place that says two, and it is the place a reader of `barStepTitle` reads
-    first, so the next model to work this module is as likely to read the
-    confirm branch as surplus as to check it.
-  - **Goal**: three, with the question on the canvas named beside the other
-    two, in the one sentence that says otherwise. Nothing else about the
-    docstring is wrong and no code changes.
-  - **Settled**: the sentence names three and names the question on the canvas
-    beside the other two; nothing else in the docstring and no code changed.
-    The count is now pinned rather than kept by hand: a test in
-    `test/build-history.test.js` reads `js/build-panel.js` as text and holds
-    the sentence against the answers `barStepTitle` can give, so a fourth
-    reason cannot be added without the sentence being read again. A mutation
-    run caught the two-reason wording, the dropped third reason, and the
-    confirm branch removed from the function.
-  - From: UI/UX Override - the dock's bar and the outliner's rows
 - [x] **Dock Label Column**: Five more of the dock's answers are under a fingertip, and the comment
   beside the new floor says there are none left
   - **Issue**: this turn lifted `.dock-bar-answer` and `button.dock-section`
@@ -1288,3 +1177,139 @@ how the simulator got here rather than as a list still to be worked.
     rule below the block - the exact case the hand-kept list could not see -
     now fails the test.
   - From: UI/UX Override - the dock's label column
+- [x] The comment over SAVE / LOAD's name field in the coarse block gives two
+  figures the browser contradicts, in the rule this turn added
+  - **Issue**: the comment above `.dock-text-row .dock-text, .dock-hex` inside
+    `@media (pointer: coarse)` says the name is "140 x 24 at every width and
+    156 once the columns above widen", and that its own `2 / -1` "would leave
+    it the 84 px reading column and the 32 px mark beside it" - 120 px with
+    the gap between them. Both figures are of the stylesheet as it stood
+    before this turn. Read in Chromium on `LAKESIDE` with SAVE / LOAD open,
+    at 320 x 664, at 390 x 844 and at the 900 x 700 side dock: the field is
+    274 x 32 at 320 and in the side dock and 344 x 32 at 390, not 156 x 24.
+    And with that one declaration put back to the base rule's `2 / -1` and
+    nothing else changed, it is **238 px** starting 36 px in from the row's
+    left edge - still under its label and not cut - because `-1` is the last
+    line of the four column explicit grid, so `2 / -1` spans the trailing
+    `1fr` as well: 84 + 32 + 114 and two 4 px gaps. The rule is worth 36 px of
+    field and 36 px of left edge, not the 154 px the comment implies. This is
+    the same shape of fault the turn was sent to fix - a figure in a comment
+    that nothing measured - written into the fix itself.
+  - **Goal**: rewrite both figures from a reading. The first paragraph wants
+    the field's width now rather than before the rule, or wants saying that
+    140 and 156 are what it was; the second wants the measured 238 px and the
+    36 px the rule is worth, with the trailing `1fr` named as the third
+    column `2 / -1` reaches. The 22 x 15 spinners and the 12 px picker bands
+    lower down the same block were re-measured this run and both still hold,
+    so it is these two figures alone.
+  - **Settled**: both rewritten. The first paragraph gives 140 x 24 as what a
+    mouse leaves and 274 x 32 at 320 and in the side dock, 344 x 32 at 390, as
+    what a finger is given. The second names `-1` as the last line of the four
+    column explicit grid, so `2 / -1` reaches three columns rather than two -
+    84 + 32 + 114 with the two gaps, which is 238 px starting 36 px in from the
+    row's left edge - and prices the rule at the 36 px of field and 36 px of
+    left edge it is worth rather than the 154 px a two column reading implies.
+    The arithmetic is now derived by the test the next item added, so neither
+    figure rests on a reading again.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [x] The name field's own column is the one declaration of this change that
+  no test reads
+  - **Issue**: `test/page.test.js` derives the coarse `.dock-row`'s
+    `grid-template-columns` and `grid-template-areas`, and asserts
+    `.dock-row > .dock-label` is `grid-area: label` and
+    `.dock-row > .dock-field` is `grid-area: reading`. Nothing asserts
+    `.dock-text-row > .dock-text { grid-column: 1 / -1 }`. Proved by removing
+    that rule from `index.html` and running the suite: 2,624 tests, 2,624
+    pass, while the field narrows from 274 px to 238 and moves 36 px right -
+    the reading above. The page was restored byte for byte afterwards. The
+    rule's own `min-height` floor is held, and the block's source-order test
+    reads `.dock-text-row .dock-text`, the descendant selector of the floor,
+    rather than this one, so neither covers it.
+  - **Goal**: one assertion beside the two the same test already makes, in
+    `the dock's label column is what the stylesheet leaves it, under a mouse
+    and under a finger`: `figure('.dock-text-row > .dock-text', 'grid-column',
+    { inside: '(pointer: coarse)' })` is `1 / -1`, with the base rule's
+    `2 / -1` named as what it displaces and why. It is arithmetic off the
+    stylesheet, needs no browser, and would have failed on the turn that
+    dropped the rule.
+  - **Settled**: three assertions beside the two the test already made: the
+    base rule's `2 / -1`, the coarse rule's `1 / -1`, and the 238 px that
+    `2 / -1` would leave, summed off the coarse tracks, which is the 36 px of
+    field the rule buys. Proved by mutation - the coarse `1 / -1` put back to
+    `2 / -1` fails this test and nothing else, where before this turn it failed
+    nothing at all. The item's own proof is off by one test: removing the rule
+    outright also fails `the stylesheet reader answers about the rule and the
+    declaration it was asked for`, whose fixture asks for that selector with no
+    condition and expects the at-rule refusal, so a selector declared nowhere
+    throws the wrong message. What nothing read was the value, which is what
+    the value mutant shows and what the new assertion holds.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [x] The coarse `.dock-row` comment counts six wrapped labels where the dock
+  writes eight, and names the wrong four as fitting the old column
+  - **Issue**: two figures in the comment over `.dock-row` inside
+    `@media (pointer: coarse)` in `index.html`, both of them the panel-walk
+    arithmetic this turn was sent to replace. First, "Six labels read as two
+    lines in the 114 px column - the two above, `GIRTH RANGE MIN` and `MAX`
+    and `TREE HEIGHT MIN` and `MAX`" leaves out `DUNE HEIGHT MIN` and `MAX`,
+    which the desert element writes and which are 15 characters like the
+    girth and tree pairs, so 114.03 px against the 114 px column. The turn's
+    own `dockLabels()` walk finds eight labels over 114 px, not six - run it
+    and filter on `text.length * 7.602 > 114`. The six is the LAKESIDE
+    reading, and the comment's own paragraph credits the derived walk, so the
+    one figure in it still taken off a canvas is the one a later reader would
+    trust most. Second, "the first four of those read as one line in the 130
+    it had" names `BUILDING HEIGHT MIN` and `MAX` among the four, and the
+    sentence before it gives them as 19 characters and 144 px - over the 130.
+    The four that fit 130 are the 15 character ones, which is the last four of
+    the list as written, and the clause after it ("the widening caused four of
+    the six") depends on that reading.
+  - **Goal**: rewrite both from the walk rather than the canvas. The count
+    wants the eight labels over 114 px with the desert pair named, or wants
+    saying that six is what LAKESIDE shows and eight is what the dock can
+    write; the second wants "the last four" with the 15 character pairs named,
+    so it cannot be read as including the 19 character pair the sentence above
+    it has just excluded. Six of the eight are then the widening's and two are
+    older than it. The 274 px, the 130 px of clearance and the 19 character
+    longest were all re-derived in review and hold, so it is these two figures
+    alone.
+  - **Settled**: both rewritten from the walk, which finds eight labels over
+    114 px: `BUILDING HEIGHT MIN` and `MAX` at 19 characters and 144.44 px, and
+    `GIRTH RANGE MIN`, `DUNE HEIGHT MIN` and `TREE HEIGHT MIN` with their `MAX`
+    at 15 and 114.03 px. Six of the eight fit the 130 px column a mouse leaves,
+    so the widening caused six and uncovered two older than it. "The first
+    four" is now "the last six, the three 15 character pairs", which cannot be
+    read as including the 19 character pair the sentence above it excludes. The
+    six is named as a reading of a canvas with no desert on it rather than by
+    naming that canvas: `the picker leaves its two lists empty for the registry
+    to fill` fails on any preset's label appearing anywhere in `index.html`,
+    comments included, which is how the first draft of this fix was caught.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger
+- [x] The 45 px row the trade is quoted in is derived from nothing
+  - **Issue**: the same comment prices the fix at "13 px a row, 45 against 32,
+    which is 3.2 rows of the panel at 320 x 664 against 4.5", and the
+    `CHANGELOG` entry repeats it. That figure is `line-height: 13px` on
+    `.dock-row > .dock-label` plus the 32 px control row plus `row-gap: 0` on
+    `.dock-row`, and no test reads any of the three - neither `row-gap` nor
+    `line-height` appears in `test/page.test.js` at all. Drop `row-gap: 0` and
+    every coarse row gains the base rule's 4 px gap - 49 px a row, 2.9 rows at
+    320 x 664 - and the suite stays at 2,624 passing while the comment and the
+    release note both state 45. This is the shape of fault the turn was sent
+    to fix, on the figure the turn's own trade is argued from.
+  - **Goal**: one assertion in `the dock's label column is what the stylesheet
+    leaves it, under a mouse and under a finger` deriving the coarse row's
+    height the way the column is derived beside it: the label's `line-height`,
+    the `min-height` the controls are floored at and `row-gap` off the coarse
+    `.dock-row`, summed to the 45 px the comment states, with the 32 px a
+    mouse row comes to as the figure it is traded against. Arithmetic off the
+    stylesheet, no browser, and it fails on any of the three being dropped.
+  - **Settled**: three assertions in the same test - the coarse `.dock-step`
+    floor at 32, and the label's 13 px line plus the coarse `row-gap` of 0 plus
+    that floor summed to the 45 px the comment trades against it. Proved by
+    mutation: dropping `row-gap: 0`, moving the label's `line-height` off 13,
+    and moving the floor off 32 each fail this test. The 32 is named as what a
+    row came to with its label beside its controls, which is the coarse row
+    before this change rather than a mouse row - a mouse row stands on the base
+    `.dock-step` floor of 24, so the Goal's phrase for it is the one figure in
+    this group that was not re-read. The comment now says the test sums the
+    three rules, as the paragraph above it already said of the column.
+  - From: UI/UX Override - SAVE / LOAD's name field under a finger

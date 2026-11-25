@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > 36 earlier entries in `CHANGELOG-2026.md`, newest first.
 
+## [1.0.0-alpha.1.67.5] - 2026-11-25
+
+Four figures the last turn left behind it: two written into the comments of
+the fix itself, and two the suite had no way of holding.
+
+### Fixed
+
+- **The comment over SAVE / LOAD's name field gave the field's size from
+  before its own rule.** `1.0.0-alpha.1.67.4` put the name on the whole row
+  under a coarse pointer, and the comment above that rule still read 140 x 24
+  "at every width", which is what the base rule leaves a mouse, and 156 "once
+  the columns above widen", which is the three fixed columns and their gaps
+  rather than anything the field is ever given. It now reads 140 x 24 under a
+  mouse and 274 x 32 at 320 and in the side dock, 344 x 32 at 390. The second
+  paragraph priced the rule as rescuing the field from "the 84 px reading
+  column and the 32 px mark beside it", 120 px of the row: `-1` is the last
+  line of the four column explicit grid rather than the line before it, so
+  `2 / -1` reaches three columns and the field would be 238 px starting 36 px
+  in - still under its label and not cut. The rule is worth 36 px of field and
+  the 36 px of left edge the caret starts in from, not the 154 px a two column
+  reading implies, and the comment says that instead.
+- **The same block's `.dock-row` comment counted six wrapped labels where the
+  dock writes eight, and named the wrong four as fitting the old column.** It
+  listed `BUILDING HEIGHT MIN` and `MAX` at 19 characters and the 15 character
+  pairs `GIRTH RANGE MIN` and `MAX` and `TREE HEIGHT MIN` and `MAX` as the
+  labels reading as two lines in the 114 px column. That is what a canvas with
+  no desert on it shows: the desert element writes `DUNE HEIGHT MIN` and
+  `MAX`, 15 characters and 114.03 px like the other two pairs, so the walk the
+  comment's own paragraph credits finds eight. It then named "the first four
+  of those" as reading as one line in the 130 px column the label had, which
+  takes in the 19 character pair the sentence before it had just measured at
+  144 px. It is the last six, the three 15 character pairs, so the widening
+  caused six of the eight and uncovered two that were older than it. The six
+  is kept as the reading of a canvas without a desert, described rather than
+  named: a preset's label appearing anywhere in `index.html`, a comment
+  included, fails the test that keeps the picker's lists empty for the
+  registry to fill.
+
+### Internal
+
+- **Two of the declarations that turn carried no assertion at all, so a
+  mutation of either passed the suite.** `.dock-text-row > .dock-text
+  { grid-column: 1 / -1 }` is what puts the name field under its label rather
+  than beside it, and nothing read the value: putting `2 / -1` back in its
+  place left 2,624 tests passing while the field narrowed by 36 px and moved
+  36 px right. The coarse row's 45 px, which the trade in the comment and the
+  release note are both argued from, is `line-height: 13px` on the label plus
+  the controls' 32 px floor plus `row-gap: 0`, and two of the three were read
+  nowhere in `test/page.test.js`: neither `row-gap` nor `line-height` appeared
+  in it at all, while the floor is matched by `every answer the dock offers a
+  finger is on the 32px floor, in one block` and was already the one of the
+  three a mutation failed. Dropping the `row-gap` alone made every coarse row
+  49 px while both texts went on saying 45. Four assertions now derive the
+  field's column, from the base rule's `2 / -1` through the 238 px that
+  reaches to the 36 px the coarse rule buys, and two more sum the row's own
+  height off those same three rules. Both are arithmetic off the
+  stylesheet, so a figure quoted in a comment is now a figure the suite holds.
+
+Held in Node by `test/page.test.js`, 2,624 tests in all - the assertions sit
+inside the test that already derives the label column, so the count is
+unchanged - and by a mutation run of six mutants over the day's changes: the
+field's coarse column removed outright and its value put back to `2 / -1`, the
+base rule's own `2 / -1` moved to `1 / -1`, `row-gap: 0` dropped, the label's
+`line-height` moved off 13, and the controls' floor moved off 32. Each was
+caught by the test named for it, and `index.html` was restored from a byte
+copy and the restore checked. Nothing was read in a browser this turn and
+nothing needed to be: every figure above falls out of the stylesheet and the
+range tables, which is the whole point of deriving them.
+
 ## [1.0.0-alpha.1.67.4] - 2026-11-24
 
 The column the last turn left: six of the dock's labels reading as two lines
